@@ -1,0 +1,112 @@
+import requests
+import json
+import hashlib
+
+class LMStudioWrapper:
+    def __init__(self, base_url="http://localhost:1234/v1", timeout=120):
+        self.base_url = base_url
+        self.cache = {}
+        self.timeout = timeout
+        
+    def _get_cache_key(self, prompt):
+        return hashlib.md5(prompt.encode()).hexdigest()
+
+    def generate(self, prompt, temperature=0.7, max_tokens=1024, use_cache=True):
+        cache_key = self._get_cache_key(prompt)
+        if use_cache and cache_key in self.cache:
+            print(f"✓ Cache hit")
+            return self.cache[cache_key]
+
+        # Tving dansk i prompten
+        dansk_prompt = f"""Du er en dansk AI-assistent. Du svarer KUN på dansk.
+Du bruger ikke svensk, norsk eller engelsk.
+Dette er en dansk bruger. Undlad at gentage dig selv i svar, og drop høfligheden.
+
+{prompt}
+
+Svar på dansk:"""
+
+        compressed_prompt = " ".join(dansk_prompt.split())
+        print(f"📤 Sending to LLM (timeout: {self.timeout}s)")
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/completions",
+                json={
+                    "prompt": compressed_prompt,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stop": ["\nSvensk:", "\nEnglish:", "\nNorwegian:"]  # Stop hvis LLM skifter sprog
+                },
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json()["choices"][0]["text"].strip()
+                self.cache[cache_key] = result
+                print(f"✓ LLM response received")
+                return result
+            else:
+                return f"ERROR:HTTP {response.status_code}"
+                
+        except requests.exceptions.Timeout:
+            print(f"✗ Timeout after {self.timeout}s")
+            return f"ERROR:Timeout after {self.timeout}s"
+        except Exception as e:
+            print(f"✗ Error: {e}")
+            return f"ERROR:{str(e)}"
+
+    def generate_stream(self, prompt, temperature=0.7, max_tokens=1024):
+        """Stream LLM output token by token - på dansk"""
+        # Tving dansk i streamingen
+        dansk_prompt = f"""Du er en dansk AI-assistent. Du svarer KUN på dansk.
+Du bruger ikke svensk, norsk eller engelsk.
+Dette er en dansk bruger.
+
+{prompt}
+
+Svar på dansk:"""
+
+        compressed_prompt = " ".join(dansk_prompt.split())
+        print(f"📡 Streaming request to LLM (dansk tvunget)")
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/completions",
+                json={
+                    "prompt": compressed_prompt,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": True,
+                    "stop": ["\nSvensk:", "\nEnglish:", "\nNorwegian:"]
+                },
+                timeout=self.timeout,
+                stream=True
+            )
+            
+            if response.status_code != 200:
+                yield f"[ERROR: HTTP {response.status_code}]"
+                return
+            
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        line_str = line.decode('utf-8')
+                        if line_str.startswith('data: '):
+                            data = line_str[6:]
+                            if data != '[DONE]':
+                                chunk = json.loads(data)
+                                if 'choices' in chunk and chunk['choices']:
+                                    text = chunk['choices'][0].get('text', '')
+                                    if text:
+                                        yield text
+                    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                        print(f"Parse error: {e}")
+                        continue
+                        
+        except requests.exceptions.Timeout:
+            yield f"\n[ERROR: Timeout after {self.timeout}s]"
+        except requests.exceptions.ConnectionError:
+            yield f"\n[ERROR: Cannot connect to LM Studio at {self.base_url}]"
+        except Exception as e:
+            yield f"\n[ERROR: {str(e)}]"

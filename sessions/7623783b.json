@@ -1,0 +1,71 @@
+{
+  "id": "7623783b",
+  "name": "Sig \"hej\"",
+  "tree": {
+    "name": "Sig \"hej\"",
+    "status": "pending",
+    "children": [
+      {
+        "name": "Analyser problemet",
+        "status": "pending",
+        "children": []
+      },
+      {
+        "name": "Udvikl løsningsstrategi",
+        "status": "pending",
+        "children": []
+      },
+      {
+        "name": "Implementer løsningen",
+        "status": "pending",
+        "children": []
+      },
+      {
+        "name": "Test og valider",
+        "status": "pending",
+        "children": []
+      }
+    ]
+  },
+  "execution_log": [],
+  "agent_log": [
+    {
+      "timestamp": 1778410898.4145513,
+      "level": "INFO",
+      "message": "Starter nedbrydning",
+      "detail": "Sig \"hej\""
+    },
+    {
+      "timestamp": 1778410898.4145513,
+      "level": "LLM",
+      "message": "Sender forespørgsel til LLM",
+      "detail": ""
+    },
+    {
+      "timestamp": 1778411020.4854934,
+      "level": "LLM",
+      "message": "Modtog svar fra LLM",
+      "detail": "24 tegn"
+    },
+    {
+      "timestamp": 1778411020.4854934,
+      "level": "ERROR",
+      "message": "LLM fejl, bruger fallback",
+      "detail": "ERROR:Timeout after 120s"
+    },
+    {
+      "timestamp": 1778411020.4854934,
+      "level": "INFO",
+      "message": "Oprettede fallback træ",
+      "detail": "4 hovedopgaver"
+    },
+    {
+      "timestamp": 1778411020.4854934,
+      "level": "INFO",
+      "message": "Nedbrydning færdig",
+      "detail": "5 opgaver oprettet"
+    }
+  ],
+  "original_prompt": "Sig \"hej\"",
+  "last_modified": "2026-05-10T13:03:40.485493"
+}

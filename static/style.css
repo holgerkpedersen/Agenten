@@ -1,0 +1,47 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #1e1e2f;
+    color: #cdd6f4;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    background: #313244;
+    padding: 20px;
+    border-radius: 16px;
+}
+
+textarea, button {
+    margin: 10px 5px;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+}
+
+button {
+    background: #89b4fa;
+    color: #1e1e2e;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #b4befe;
+}
+
+pre {
+    background: #1e1e2e;
+    padding: 15px;
+    border-radius: 12px;
+    overflow-x: auto;
+}
+
+#treeContainer svg {
+    background: #1e1e2e;
+    border-radius: 12px;
+    width: 100%;
+    height: 500px;
+}
