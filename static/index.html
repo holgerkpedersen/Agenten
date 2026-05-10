@@ -2,10 +2,11 @@
 <html lang="da">
 <head>
     <meta charset="UTF-8">
-    <title>Agenten – Drag & Drop Layout</title>
+    <title>Agenten – Frit layout med overlappende vinduer</title>
     <style>
         * {
             box-sizing: border-box;
+            user-select: none;
         }
         
         body {
@@ -25,7 +26,6 @@
             gap: 15px;
         }
         
-        /* Header - fixed height */
         .header {
             background: #1e293b;
             padding: 15px 20px;
@@ -42,7 +42,6 @@
             color: transparent;
         }
         
-        /* Session bar */
         .session-bar {
             display: flex;
             gap: 10px;
@@ -85,28 +84,33 @@
             resize: vertical;
         }
         
-        /* Grid layout - CSS Grid baseret */
-        .grid-layout {
+        .canvas-container {
             flex: 1;
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            grid-template-rows: 1fr 1fr;
-            gap: 15px;
+            position: relative;
+            background: #0f172a;
+            border-radius: 16px;
+            overflow: auto;
             min-height: 0;
-            transition: all 0.1s ease;
         }
         
-        /* Panel styling */
         .panel {
+            position: absolute;
             background: #1e293b;
             border-radius: 16px;
             border: 1px solid #334155;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            position: relative;
-            min-width: 100px;
-            min-height: 100px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            min-width: 200px;
+            min-height: 150px;
+        }
+        
+        .panel.dragging {
+            opacity: 0.8;
+            cursor: grabbing;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            z-index: 1000;
         }
         
         .panel-header {
@@ -117,7 +121,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            user-select: none;
+            flex-shrink: 0;
         }
         
         .panel-header:active {
@@ -128,6 +132,17 @@
             margin: 0;
             font-size: 14px;
             color: #e2e8f0;
+        }
+        
+        .drag-icon {
+            cursor: grab;
+            margin-right: 8px;
+            opacity: 0.6;
+            font-size: 16px;
+        }
+        
+        .drag-icon:active {
+            cursor: grabbing;
         }
         
         .panel-controls {
@@ -156,7 +171,6 @@
             min-height: 0;
         }
         
-        /* Resize handle */
         .resize-handle {
             position: absolute;
             bottom: 0;
@@ -173,16 +187,7 @@
             background: linear-gradient(135deg, transparent 50%, #a78bfa 50%);
         }
         
-        /* Drag placeholder */
-        .drag-placeholder {
-            background: #3b82f6;
-            opacity: 0.3;
-            border-radius: 16px;
-            transition: all 0.1s;
-        }
-        
-        /* Tree styling */
-        .tree-container, .llm-box, .log-box {
+        .tree-container, .llm-box, .log-box, .history-box {
             background: #0f172a;
             border-radius: 8px;
             padding: 10px;
@@ -252,7 +257,33 @@
         .log-ERROR { border-left-color: #ef4444; color: #fca5a5; }
         .log-LLM { border-left-color: #a78bfa; color: #c4b5fd; }
         
-        /* Scrollbars */
+        .history-item {
+            background: #1e293b;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-left: 3px solid #60a5fa;
+        }
+        
+        .history-prompt {
+            font-weight: bold;
+            color: #60a5fa;
+            margin-bottom: 5px;
+        }
+        
+        .history-result {
+            font-size: 11px;
+            color: #93c5fd;
+            margin-top: 5px;
+        }
+        
+        .reuse-btn {
+            margin-top: 5px;
+            font-size: 10px;
+            padding: 2px 8px;
+            background: #475569;
+        }
+        
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -271,28 +302,13 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #64748b;
         }
-        
-        /* Layout editor mode */
-        .layout-editor .panel {
-            border: 2px solid #60a5fa;
-        }
-        
-        .drag-icon {
-            cursor: grab;
-            margin-right: 8px;
-            opacity: 0.6;
-        }
-        
-        .drag-icon:active {
-            cursor: grabbing;
-        }
     </style>
 </head>
 <body>
 <div class="app-container">
     <div class="header">
-        <h1>🤖 Agenten – Drag & Drop Layout</h1>
-        <p>🎯 Træk i <span style="background:#475569; padding:2px 6px; border-radius:4px;">⋮⋮</span> ikonet for at flytte • Træk i hjørnet for at resize</p>
+        <h1>🤖 Agenten – Frit layout med overlappende vinduer</h1>
+        <p>🎯 Træk i ⋮⋮ ikonet • Træk i hjørnet for resize • Vinduer kan overlappe</p>
         
         <div class="session-bar">
             <select id="sessionSelect" class="session-select">
@@ -312,48 +328,42 @@
         </div>
     </div>
     
-    <div class="grid-layout" id="gridLayout"></div>
+    <div class="canvas-container" id="canvasContainer"></div>
 </div>
 
 <script>
-// Panel definitioner
-const panels = [
-    { id: 'tree', title: '📁 Opgavetræ', defaultWidth: 1, defaultHeight: 1 },
-    { id: 'llm', title: '📡 LLM Output', defaultWidth: 1, defaultHeight: 1 },
-    { id: 'log', title: '📋 Agent Log', defaultWidth: 1, defaultHeight: 1 }
+// Panel definitioner med alle 4 paneler
+const panelDefinitions = [
+    { id: 'tree', title: '📁 Opgavetræ', defaultLeft: 20, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
+    { id: 'llm', title: '📡 LLM Output', defaultLeft: 440, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
+    { id: 'log', title: '📋 Agent Log', defaultLeft: 860, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
+    { id: 'history', title: '📜 Prompt Historik', defaultLeft: 20, defaultTop: 340, defaultWidth: 1240, defaultHeight: 200 }
 ];
 
 let currentSessionId = null;
 let currentTree = null;
 let eventSource = null;
+let panels = {};
 
+// Drag state
 let dragState = {
     active: false,
     panelId: null,
-    startX: 0,
-    startY: 0,
-    startLeft: 0,
-    startTop: 0,
     startMouseX: 0,
     startMouseY: 0,
-    panel: null
+    startLeft: 0,
+    startTop: 0
 };
 
+// Resize state
 let resizeState = {
     active: false,
     panelId: null,
-    startX: 0,
-    startY: 0,
+    startMouseX: 0,
+    startMouseY: 0,
     startWidth: 0,
-    startHeight: 0,
-    startColSpan: 0,
-    startRowSpan: 0
+    startHeight: 0
 };
-
-// Grid configuration
-let gridCols = 3;
-let gridRows = 2;
-let gridCells = [];
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -402,76 +412,107 @@ function updateTreeDisplay() {
     const treeContainer = document.getElementById('treeContent');
     if (treeContainer && currentTree) {
         treeContainer.innerHTML = renderTree(currentTree);
-    } else if (treeContainer) {
-        treeContainer.innerHTML = '<div style="color: #64748b;">Klik "Nedbryd til træ"</div>';
     }
 }
 
-function updateLogDisplay(logs) {
-    const logBox = document.getElementById('logContent');
-    if (!logBox) return;
-    if (logs && logs.length > 0) {
-        logBox.innerHTML = '';
-        for (const log of logs) {
-            const time = new Date(log.timestamp * 1000).toLocaleTimeString();
-            logBox.innerHTML += `<div class="log-entry log-${log.level}">
-                <strong>[${time}] ${log.level}</strong>: ${escapeHtml(log.message)}<br>
-                <span style="font-size: 10px;">${escapeHtml(log.detail || '')}</span>
-            </div>`;
+async function updatePromptHistory(sessionId) {
+    const historyContainer = document.getElementById('historyContent');
+    if (!historyContainer) return;
+    
+    try {
+        const response = await fetch(`/api/sessions/prompts/${sessionId}`);
+        const data = await response.json();
+        
+        if (data.success && data.prompts && data.prompts.length > 0) {
+            historyContainer.innerHTML = '';
+            for (const item of data.prompts.slice().reverse()) { // Nyeste først
+                const time = new Date(item.timestamp).toLocaleTimeString();
+                const promptShort = item.prompt.length > 60 ? item.prompt.slice(0, 60) + '...' : item.prompt;
+                const resultShort = item.result ? (item.result.length > 100 ? item.result.slice(0, 100) + '...' : item.result) : 'Ingen resultat endnu';
+                
+                historyContainer.innerHTML += `
+                    <div class="history-item">
+                        <div class="history-prompt">
+                            📝 ${escapeHtml(promptShort)}
+                            <span style="font-size: 10px; color: #64748b; float: right;">${time}</span>
+                        </div>
+                        <div class="history-result">
+                            💡 Resultat: ${escapeHtml(resultShort)}
+                        </div>
+                        <button class="reuse-btn" onclick="reusePrompt('${escapeHtml(item.prompt).replace(/'/g, "\\'")}')">🔄 Genbrug denne prompt</button>
+                    </div>
+                `;
+            }
+        } else {
+            historyContainer.innerHTML = '<div style="color: #64748b;">Ingen prompts endnu. Skriv en opgave og klik "Nedbryd til træ"</div>';
         }
+    } catch (e) {
+        console.error('Failed to load history:', e);
+        historyContainer.innerHTML = '<div style="color: #ef4444;">Fejl ved indlæsning af historik</div>';
     }
 }
 
-// Initialize grid layout
-function initGridLayout() {
-    const container = document.getElementById('gridLayout');
+function reusePrompt(prompt) {
+    document.getElementById('promptInput').value = prompt;
+    addLogEntry('INFO', 'Genbruger tidligere prompt', prompt.slice(0, 50));
+    decompose();
+}
+
+function bringToFront(panelId) {
+    const container = document.getElementById('canvasContainer');
+    const panels_list = container.querySelectorAll('.panel');
+    let maxZ = 0;
+    panels_list.forEach(p => {
+        const z = parseInt(p.style.zIndex) || 0;
+        if (z > maxZ) maxZ = z;
+    });
+    const panel = document.getElementById(`panel-${panelId}`);
+    if (panel) {
+        panel.style.zIndex = maxZ + 1;
+    }
+}
+
+function createPanels() {
+    const container = document.getElementById('canvasContainer');
     container.innerHTML = '';
+    panels = {};
     
-    // Brug CSS Grid med template areas
-    container.style.display = 'grid';
-    container.style.gridTemplateColumns = '1fr 1fr 1fr';
-    container.style.gridTemplateRows = '1fr 1fr';
-    container.style.gap = '15px';
-    
-    // Opret paneler
-    const panelConfigs = [
-        { id: 'tree', title: '📁 Opgavetræ', area: 'tree', col: 0, row: 0, colSpan: 1, rowSpan: 1 },
-        { id: 'llm', title: '📡 LLM Output', area: 'llm', col: 1, row: 0, colSpan: 1, rowSpan: 1 },
-        { id: 'log', title: '📋 Agent Log', area: 'log', col: 2, row: 0, colSpan: 1, rowSpan: 1 }
-    ];
-    
-    for (const config of panelConfigs) {
+    for (const def of panelDefinitions) {
         const panel = document.createElement('div');
         panel.className = 'panel';
-        panel.id = `panel-${config.id}`;
-        panel.setAttribute('data-panel-id', config.id);
-        panel.style.gridColumn = `${config.col + 1} / span ${config.colSpan}`;
-        panel.style.gridRow = `${config.row + 1} / span ${config.rowSpan}`;
+        panel.id = `panel-${def.id}`;
+        panel.setAttribute('data-panel-id', def.id);
+        panel.style.left = `${def.defaultLeft}px`;
+        panel.style.top = `${def.defaultTop}px`;
+        panel.style.width = `${def.defaultWidth}px`;
+        panel.style.height = `${def.defaultHeight}px`;
+        panel.style.zIndex = '1';
         
         panel.innerHTML = `
             <div class="panel-header">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="drag-icon" style="cursor: grab;">⋮⋮</span>
-                    <h3>${config.title}</h3>
+                    <span class="drag-icon">⋮⋮</span>
+                    <h3>${def.title}</h3>
                 </div>
                 <div class="panel-controls">
-                    <button onclick="toggleMinimize('${config.id}')">−</button>
-                    <button onclick="removePanel('${config.id}')">×</button>
+                    <button onclick="toggleMinimize('${def.id}')">−</button>
+                    <button onclick="removePanel('${def.id}')">×</button>
                 </div>
             </div>
-            <div class="panel-content" id="${config.id}Content">
-                <div style="color: #64748b;">Indhold for ${config.title}</div>
+            <div class="panel-content" id="${def.id}Content">
+                <div style="color: #64748b;">Indhold for ${def.title}</div>
             </div>
             <div class="resize-handle"></div>
         `;
         
         container.appendChild(panel);
+        panels[def.id] = panel;
         
-        // Tilføj indhold
-        const contentDiv = document.getElementById(`${config.id}Content`);
-        if (config.id === 'tree') {
+        // Add content based on type
+        const contentDiv = document.getElementById(`${def.id}Content`);
+        if (def.id === 'tree') {
             contentDiv.innerHTML = '<div id="treeContent" class="tree-container"><div style="color: #64748b;">Klik "Nedbryd til træ"</div></div>';
-        } else if (config.id === 'llm') {
+        } else if (def.id === 'llm') {
             contentDiv.innerHTML = `
                 <div id="progressContainer" style="display: none;">
                     <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
@@ -479,8 +520,10 @@ function initGridLayout() {
                 </div>
                 <div id="llmContent" class="llm-box"><div style="color: #64748b;">Tryk "Udfør med streaming"</div></div>
             `;
-        } else if (config.id === 'log') {
+        } else if (def.id === 'log') {
             contentDiv.innerHTML = '<div id="logContent" class="log-box"><div style="color: #64748b;">Logger venter på aktivitet...</div></div>';
+        } else if (def.id === 'history') {
+            contentDiv.innerHTML = '<div id="historyContent" class="history-box"><div style="color: #64748b;">Vælg en session for at se prompt historik</div></div>';
         }
     }
     
@@ -492,57 +535,36 @@ function setupDragAndDrop() {
     const dragIcons = document.querySelectorAll('.drag-icon');
     
     dragIcons.forEach(icon => {
-        icon.addEventListener('mousedown', startDrag);
+        icon.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const panel = icon.closest('.panel');
+            if (!panel) return;
+            
+            const panelId = panel.getAttribute('data-panel-id');
+            bringToFront(panelId);
+            
+            const rect = panel.getBoundingClientRect();
+            const containerRect = document.getElementById('canvasContainer').getBoundingClientRect();
+            
+            dragState = {
+                active: true,
+                panelId: panelId,
+                startMouseX: e.clientX,
+                startMouseY: e.clientY,
+                startLeft: rect.left - containerRect.left,
+                startTop: rect.top - containerRect.top,
+                startWidth: rect.width,
+                startHeight: rect.height
+            };
+            
+            panel.classList.add('dragging');
+            
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', stopDrag);
+        });
     });
-}
-
-function startDrag(e) {
-    const dragIcon = e.target.closest('.drag-icon');
-    if (!dragIcon) return;
-    
-    const panel = dragIcon.closest('.panel');
-    if (!panel) return;
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const rect = panel.getBoundingClientRect();
-    const container = document.getElementById('gridLayout');
-    const containerRect = container.getBoundingClientRect();
-    
-    // Gem start positioner
-    dragState = {
-        active: true,
-        panelId: panel.getAttribute('data-panel-id'),
-        startX: rect.left - containerRect.left,
-        startY: rect.top - containerRect.top,
-        startMouseX: e.clientX,
-        startMouseY: e.clientY,
-        startWidth: rect.width,
-        startHeight: rect.height,
-        panel: panel,
-        containerRect: containerRect
-    };
-    
-    // Skift til absolute positioning midlertidigt
-    const originalPosition = window.getComputedStyle(panel).position;
-    const originalMargin = window.getComputedStyle(panel).margin;
-    
-    panel.style.position = 'absolute';
-    panel.style.margin = '0';
-    panel.style.left = `${dragState.startX}px`;
-    panel.style.top = `${dragState.startY}px`;
-    panel.style.width = `${rect.width}px`;
-    panel.style.height = `${rect.height}px`;
-    panel.style.zIndex = '1000';
-    panel.style.cursor = 'grabbing';
-    
-    // Gem original styles til restore
-    dragState.originalPosition = originalPosition;
-    dragState.originalMargin = originalMargin;
-    
-    document.addEventListener('mousemove', onDrag);
-    document.addEventListener('mouseup', stopDrag);
 }
 
 function onDrag(e) {
@@ -552,32 +574,27 @@ function onDrag(e) {
     const deltaX = e.clientX - dragState.startMouseX;
     const deltaY = e.clientY - dragState.startMouseY;
     
-    let newLeft = dragState.startX + deltaX;
-    let newTop = dragState.startY + deltaY;
+    let newLeft = dragState.startLeft + deltaX;
+    let newTop = dragState.startTop + deltaY;
     
-    // Begræns til container (ingen hop)
-    const maxLeft = dragState.containerRect.width - dragState.startWidth;
-    const maxTop = dragState.containerRect.height - dragState.startHeight;
+    const container = document.getElementById('canvasContainer');
+    const containerRect = container.getBoundingClientRect();
+    const panel = document.getElementById(`panel-${dragState.panelId}`);
     
-    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-    newTop = Math.max(0, Math.min(newTop, maxTop));
+    newLeft = Math.max(-dragState.startWidth + 50, Math.min(newLeft, containerRect.width - 50));
+    newTop = Math.max(-dragState.startHeight + 50, Math.min(newTop, containerRect.height - 50));
     
-    dragState.panel.style.left = `${newLeft}px`;
-    dragState.panel.style.top = `${newTop}px`;
+    panel.style.left = `${newLeft}px`;
+    panel.style.top = `${newTop}px`;
 }
 
 function stopDrag(e) {
     if (!dragState.active) return;
     
-    // Returner til grid layout
-    dragState.panel.style.position = '';
-    dragState.panel.style.margin = '';
-    dragState.panel.style.left = '';
-    dragState.panel.style.top = '';
-    dragState.panel.style.width = '';
-    dragState.panel.style.height = '';
-    dragState.panel.style.zIndex = '';
-    dragState.panel.style.cursor = '';
+    const panel = document.getElementById(`panel-${dragState.panelId}`);
+    if (panel) {
+        panel.classList.remove('dragging');
+    }
     
     dragState.active = false;
     document.removeEventListener('mousemove', onDrag);
@@ -590,59 +607,53 @@ function setupResize() {
     const resizeHandles = document.querySelectorAll('.resize-handle');
     
     resizeHandles.forEach(handle => {
-        handle.addEventListener('mousedown', startResize);
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const panel = handle.closest('.panel');
+            if (!panel) return;
+            
+            const panelId = panel.getAttribute('data-panel-id');
+            bringToFront(panelId);
+            
+            const rect = panel.getBoundingClientRect();
+            
+            resizeState = {
+                active: true,
+                panelId: panelId,
+                startMouseX: e.clientX,
+                startMouseY: e.clientY,
+                startWidth: rect.width,
+                startHeight: rect.height
+            };
+            
+            document.addEventListener('mousemove', onResize);
+            document.addEventListener('mouseup', stopResize);
+        });
     });
-}
-
-function startResize(e) {
-    const panel = e.target.closest('.panel');
-    if (!panel) return;
-    
-    const panelId = panel.getAttribute('data-panel-id');
-    const rect = panel.getBoundingClientRect();
-    const gridContainer = document.getElementById('gridLayout');
-    const gridRect = gridContainer.getBoundingClientRect();
-    
-    // Find current grid position
-    const colWidth = gridRect.width / gridCols;
-    const rowHeight = gridRect.height / gridRows;
-    
-    resizeState = {
-        active: true,
-        panelId: panelId,
-        startX: e.clientX,
-        startY: e.clientY,
-        startWidth: rect.width,
-        startHeight: rect.height,
-        startColSpan: Math.round(rect.width / colWidth),
-        startRowSpan: Math.round(rect.height / rowHeight),
-        panel: panel
-    };
-    
-    document.addEventListener('mousemove', onResize);
-    document.addEventListener('mouseup', stopResize);
-    e.preventDefault();
-    e.stopPropagation();
 }
 
 function onResize(e) {
     if (!resizeState.active) return;
+    e.preventDefault();
     
-    const deltaX = e.clientX - resizeState.startX;
-    const deltaY = e.clientY - resizeState.startY;
+    const deltaX = e.clientX - resizeState.startMouseX;
+    const deltaY = e.clientY - resizeState.startMouseY;
     
     let newWidth = Math.max(200, resizeState.startWidth + deltaX);
     let newHeight = Math.max(150, resizeState.startHeight + deltaY);
     
-    const gridContainer = document.getElementById('gridLayout');
-    const gridRect = gridContainer.getBoundingClientRect();
+    const container = document.getElementById('canvasContainer');
+    const containerRect = container.getBoundingClientRect();
+    const panel = document.getElementById(`panel-${resizeState.panelId}`);
+    const panelRect = panel.getBoundingClientRect();
     
-    // Begræns til container
-    newWidth = Math.min(newWidth, gridRect.width - 20);
-    newHeight = Math.min(newHeight, gridRect.height - 20);
+    newWidth = Math.min(newWidth, containerRect.width - (panelRect.left - containerRect.left) - 20);
+    newHeight = Math.min(newHeight, containerRect.height - (panelRect.top - containerRect.top) - 20);
     
-    resizeState.panel.style.width = `${newWidth}px`;
-    resizeState.panel.style.height = `${newHeight}px`;
+    panel.style.width = `${newWidth}px`;
+    panel.style.height = `${newHeight}px`;
 }
 
 function stopResize(e) {
@@ -663,9 +674,16 @@ function toggleMinimize(panelId) {
     if (content.style.display === 'none') {
         content.style.display = '';
         btn.textContent = '−';
+        const savedHeight = panel.getAttribute('data-saved-height');
+        if (savedHeight) {
+            panel.style.height = savedHeight;
+            panel.removeAttribute('data-saved-height');
+        }
     } else {
+        panel.setAttribute('data-saved-height', panel.style.height);
         content.style.display = 'none';
         btn.textContent = '+';
+        panel.style.height = 'auto';
     }
     saveLayoutToSession();
 }
@@ -680,26 +698,45 @@ function removePanel(panelId) {
 
 function getCurrentLayout() {
     const layout = {};
-    for (const panel of panels) {
-        const element = document.getElementById(`panel-${panel.id}`);
-        if (element) {
-            layout[panel.id] = {
-                display: element.style.display !== 'none',
-                width: element.style.width,
-                height: element.style.height,
-                left: element.style.left,
-                top: element.style.top,
-                minimized: element.querySelector('.panel-content')?.style.display === 'none'
+    for (const def of panelDefinitions) {
+        const panel = document.getElementById(`panel-${def.id}`);
+        if (panel && panel.style.display !== 'none') {
+            layout[def.id] = {
+                left: panel.style.left,
+                top: panel.style.top,
+                width: panel.style.width,
+                height: panel.style.height,
+                minimized: panel.querySelector('.panel-content')?.style.display === 'none'
             };
         }
     }
     return layout;
 }
 
+function applyLayout(layout) {
+    if (!layout) return;
+    for (const def of panelDefinitions) {
+        const panel = document.getElementById(`panel-${def.id}`);
+        if (panel && layout[def.id]) {
+            const l = layout[def.id];
+            if (l.left) panel.style.left = l.left;
+            if (l.top) panel.style.top = l.top;
+            if (l.width) panel.style.width = l.width;
+            if (l.height) panel.style.height = l.height;
+            if (l.minimized) {
+                const content = panel.querySelector('.panel-content');
+                const btn = panel.querySelector('.panel-controls button:first-child');
+                if (content) content.style.display = 'none';
+                if (btn) btn.textContent = '+';
+            }
+        }
+    }
+}
+
 async function saveLayoutToSession() {
     if (!currentSessionId) return;
     const layout = getCurrentLayout();
-    const response = await fetch('/api/sessions/save-layout', {
+    await fetch('/api/sessions/save-layout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: currentSessionId, layout: layout })
@@ -707,40 +744,21 @@ async function saveLayoutToSession() {
 }
 
 function resetLayout() {
-    for (const panel of panels) {
-        const element = document.getElementById(`panel-${panel.id}`);
-        if (element) {
-            element.style.display = '';
-            element.style.width = '';
-            element.style.height = '';
-            element.style.left = '';
-            element.style.top = '';
-            element.style.position = '';
-            const content = element.querySelector('.panel-content');
+    for (const def of panelDefinitions) {
+        const panel = document.getElementById(`panel-${def.id}`);
+        if (panel) {
+            panel.style.display = '';
+            panel.style.left = `${def.defaultLeft}px`;
+            panel.style.top = `${def.defaultTop}px`;
+            panel.style.width = `${def.defaultWidth}px`;
+            panel.style.height = `${def.defaultHeight}px`;
+            const content = panel.querySelector('.panel-content');
             if (content) content.style.display = '';
-            const btn = element.querySelector('.panel-controls button:first-child');
+            const btn = panel.querySelector('.panel-controls button:first-child');
             if (btn) btn.textContent = '−';
         }
     }
     saveLayoutToSession();
-}
-
-function applyLayout(layout) {
-    if (!layout) return;
-    for (const panelId in layout) {
-        const element = document.getElementById(`panel-${panelId}`);
-        if (element && layout[panelId]) {
-            element.style.display = layout[panelId].display ? '' : 'none';
-            if (layout[panelId].width) element.style.width = layout[panelId].width;
-            if (layout[panelId].height) element.style.height = layout[panelId].height;
-            if (layout[panelId].minimized) {
-                const content = element.querySelector('.panel-content');
-                if (content) content.style.display = 'none';
-                const btn = element.querySelector('.panel-controls button:first-child');
-                if (btn) btn.textContent = '+';
-            }
-        }
-    }
 }
 
 // Session management
@@ -751,7 +769,7 @@ async function refreshSessions() {
         const select = document.getElementById('sessionSelect');
         select.innerHTML = '<option value="">-- Vælg eller opret ny session --</option>';
         for (const session of data.sessions) {
-            select.innerHTML += `<option value="${session.id}">${escapeHtml(session.name)} (${session.task_count} opgaver)</option>`;
+            select.innerHTML += `<option value="${session.id}">${escapeHtml(session.name)} (${session.prompt_count || 0} prompts)</option>`;
         }
     }
 }
@@ -770,6 +788,7 @@ async function createNewSession() {
             addLogEntry('INFO', 'Ny session oprettet', `${name} (${data.session_id})`);
             refreshSessions();
             resetLayout();
+            await updatePromptHistory(currentSessionId);
         }
     }
 }
@@ -786,22 +805,30 @@ async function loadSelectedSession() {
     if (data.success) {
         currentSessionId = sessionId;
         
-        // Load layout
         if (data.session.layout) {
             applyLayout(data.session.layout);
         }
         
-        // Load tree
         if (data.session.tree) {
             currentTree = data.session.tree;
             updateTreeDisplay();
         }
         
-        // Load log
         if (data.session.agent_log) {
-            updateLogDisplay(data.session.agent_log);
+            const logBox = document.getElementById('logContent');
+            if (logBox) {
+                logBox.innerHTML = '';
+                for (const log of data.session.agent_log) {
+                    const time = new Date(log.timestamp * 1000).toLocaleTimeString();
+                    logBox.innerHTML += `<div class="log-entry log-${log.level}">
+                        <strong>[${time}] ${log.level}</strong>: ${escapeHtml(log.message)}<br>
+                        <span style="font-size: 10px;">${escapeHtml(log.detail || '')}</span>
+                    </div>`;
+                }
+            }
         }
         
+        await updatePromptHistory(sessionId);
         addLogEntry('INFO', 'Session indlæst', data.session.name);
     }
 }
@@ -816,9 +843,10 @@ async function saveCurrentSession() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             session_id: currentSessionId,
-            name: document.getElementById('promptInput').value.slice(0, 30),
+            name: document.getElementById('promptInput').value.slice(0, 30) || 'Session',
             tree: currentTree,
-            layout: layout
+            layout: layout,
+            prompt_history: []  // Will be merged server-side
         })
     });
     const data = await response.json();
@@ -849,13 +877,8 @@ async function decompose() {
         currentTree = data.tree;
         currentSessionId = data.session_id;
         updateTreeDisplay();
+        await updatePromptHistory(currentSessionId);
         addLogEntry('INFO', 'Nedbrydning færdig', `${data.session_id}`);
-        
-        if (data.log) {
-            for (const log of data.log) {
-                addLogEntry(log.level, log.message, log.detail);
-            }
-        }
         refreshSessions();
         await saveCurrentSession();
     } else {
@@ -881,7 +904,8 @@ function executeWithStream() {
     
     const llmBox = document.getElementById('llmContent');
     if (llmBox) llmBox.innerHTML = '<div class="loading"></div> Forbinder til streaming...';
-    document.getElementById('progressContainer').style.display = 'block';
+    const progressContainer = document.getElementById('progressContainer');
+    if (progressContainer) progressContainer.style.display = 'block';
     
     eventSource = new EventSource('/api/execute-stream');
     let currentOutputs = {};
@@ -904,10 +928,9 @@ function executeWithStream() {
                 break;
                 
             case 'task_start':
-                if (llmBox) {
-                    const currentTask = document.getElementById('currentTask');
-                    if (currentTask) currentTask.innerHTML = `📌 ${escapeHtml(data.task)} <span class="loading"></span>`;
-                }
+                const currentTask = document.getElementById('currentTask');
+                if (currentTask) currentTask.innerHTML = `📌 ${escapeHtml(data.task)} <span class="loading"></span>`;
+                
                 function markRunning(node) {
                     if (node.name === data.task) node.status = 'running';
                     if (node.children) node.children.forEach(markRunning);
@@ -944,8 +967,9 @@ function executeWithStream() {
                 break;
                 
             case 'task_done':
-                const currentTask = document.getElementById('currentTask');
-                if (currentTask) currentTask.innerHTML = `<span style="color:#10b981;">✓ ${escapeHtml(data.task)} færdig</span>`;
+                const taskElem = document.getElementById('currentTask');
+                if (taskElem) taskElem.innerHTML = `<span style="color:#10b981;">✓ ${escapeHtml(data.task)} færdig</span>`;
+                
                 function markDone(node) {
                     if (node.name === data.task) node.status = 'done';
                     if (node.children) node.children.forEach(markDone);
@@ -955,13 +979,15 @@ function executeWithStream() {
                     updateTreeDisplay();
                 }
                 addLogEntry('INFO', 'Opgave færdig', data.task);
+                saveCurrentSession();
                 break;
                 
             case 'complete':
                 if (llmBox) llmBox.innerHTML += `<div style="color:#10b981; margin-top: 15px;">✅ Alle opgaver færdige!</div>`;
-                document.getElementById('progressContainer').style.display = 'none';
+                if (progressContainer) progressContainer.style.display = 'none';
                 addLogEntry('INFO', 'Streaming færdig', 'Alle opgaver udført');
                 saveCurrentSession();
+                updatePromptHistory(currentSessionId);
                 eventSource.close();
                 break;
                 
@@ -974,13 +1000,13 @@ function executeWithStream() {
     };
     
     eventSource.onerror = function() {
-        addLogEntry('ERROR', 'Forbindelse tabt', 'Forsøger at genoprette...');
+        addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
     };
 }
 
-// Initialize on load
+// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    initGridLayout();
+    createPanels();
     refreshSessions();
 });
 </script>
