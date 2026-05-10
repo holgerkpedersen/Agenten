@@ -5,32 +5,123 @@ from session_manager import SessionManager
 import json
 import time
 import threading
+import os
+import tkinter as tk
+from tkinter import filedialog
+import threading
 
-# ============ DEFINER APP FØRST ============
 app = Flask(__name__, static_folder="static")
 CORS(app)
 
-# ============ INITIALISERING ============
 agent = Agent()
 session_manager = SessionManager()
 current_session_id = None
 execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
+export_folder = None  # Gem brugerens valgte mappe
 
-# ============ STATIC ROUTES ============
-@app.route("/")
-def index():
-    return send_from_directory("static", "index.html")
+# ============ FILHÅNDTERING ENDPOINTS ============
+
+@app.route("/api/folder/select", methods=["POST"])
+def select_folder():
+    """Åben dialog for at vælge mappe (kører i separat tråd)"""
+    global export_folder
+    
+    def select():
+        global export_folder
+        root = tk.Tk()
+        root.withdraw()  # Skjul hovedvinduet
+        root.attributes('-topmost', True)  # Sæt dialog øverst
+        folder_selected = filedialog.askdirectory(title="Vælg mappe til at gemme eksporterede filer")
+        root.destroy()
+        
+        if folder_selected:
+            export_folder = folder_selected
+            print(f"📁 Eksportmappe valgt: {export_folder}")
+    
+    # Kør i separat tråd for ikke at blokere
+    thread = threading.Thread(target=select)
+    thread.start()
+    
+    return jsonify({"success": True, "message": "Vælg mappe i det åbnede vindue"})
+
+@app.route("/api/folder/status", methods=["GET"])
+def folder_status():
+    """Hent nuværende eksportmappe"""
+    global export_folder
+    if export_folder and os.path.exists(export_folder):
+        return jsonify({"success": True, "folder": export_folder})
+    return jsonify({"success": False, "folder": None})
+
+@app.route("/api/folder/save", methods=["POST"])
+def save_to_folder():
+    """Gem fil til den valgte mappe"""
+    global export_folder
+    data = request.json
+    filename = data.get("filename", "export.md")
+    content = data.get("content", "")
+    
+    if not export_folder:
+        return jsonify({"success": False, "error": "Ingen mappe valgt"}), 400
+    
+    try:
+        os.makedirs(export_folder, exist_ok=True)
+        filepath = os.path.join(export_folder, filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return jsonify({"success": True, "filepath": filepath})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/folder/list", methods=["POST"])
+def list_folder_contents():
+    """List indhold af en mappe"""
+    data = request.json
+    folder_path = data.get("path", export_folder)
+    
+    if not folder_path or not os.path.exists(folder_path):
+        return jsonify({"success": False, "error": "Mappe findes ikke"}), 400
+    
+    try:
+        items = []
+        for item in os.listdir(folder_path):
+            full_path = os.path.join(folder_path, item)
+            items.append({
+                "name": item,
+                "is_dir": os.path.isdir(full_path),
+                "size": os.path.getsize(full_path) if os.path.isfile(full_path) else 0,
+                "modified": os.path.getmtime(full_path)
+            })
+        return jsonify({"success": True, "items": items, "current_path": folder_path})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/folder/delete", methods=["POST"])
+def delete_file():
+    """Slet en fil eller mappe"""
+    data = request.json
+    filepath = data.get("path")
+    
+    if not filepath or not os.path.exists(filepath):
+        return jsonify({"success": False, "error": "Fil/mappe findes ikke"}), 400
+    
+    try:
+        if os.path.isdir(filepath):
+            os.rmdir(filepath)
+        else:
+            os.remove(filepath)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # ============ SESSION ENDPOINTS ============
+
 @app.route("/api/sessions", methods=["GET"])
 def list_sessions():
-    """Hent alle gemte sessioner"""
     sessions = session_manager.list_sessions()
     return jsonify({"success": True, "sessions": sessions})
 
 @app.route("/api/sessions/current", methods=["GET"])
 def get_current_session():
-    """Hent nuværende session uden at skifte"""
     global current_session_id
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
@@ -39,7 +130,6 @@ def get_current_session():
 
 @app.route("/api/sessions/create", methods=["POST"])
 def create_session():
-    """Opret ny session"""
     data = request.json
     name = data.get("name", f"Session {len(session_manager.list_sessions()) + 1}")
     session_id, session_data = session_manager.create_session(name)
@@ -49,7 +139,6 @@ def create_session():
 
 @app.route("/api/sessions/load/<session_id>", methods=["GET"])
 def load_session(session_id):
-    """Indlæs eksisterende session"""
     session_data = session_manager.load_session(session_id)
     if session_data:
         global current_session_id
@@ -59,7 +148,6 @@ def load_session(session_id):
 
 @app.route("/api/sessions/save", methods=["POST"])
 def save_current_session():
-    """Gem nuværende session"""
     global current_session_id
     data = request.json
     session_id = data.get("session_id", current_session_id)
@@ -83,7 +171,6 @@ def save_current_session():
 
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():
-    """Gem layout for en session"""
     data = request.json
     session_id = data.get("session_id")
     layout = data.get("layout")
@@ -100,7 +187,6 @@ def save_layout():
 
 @app.route("/api/sessions/load-layout/<session_id>", methods=["GET"])
 def load_layout(session_id):
-    """Hent layout for en session"""
     session_data = session_manager.load_session(session_id)
     if session_data and "layout" in session_data:
         return jsonify({"success": True, "layout": session_data["layout"]})
@@ -108,13 +194,11 @@ def load_layout(session_id):
 
 @app.route("/api/sessions/prompts/<session_id>", methods=["GET"])
 def get_session_prompts(session_id):
-    """Hent alle prompts og resultater for en session"""
     prompts = session_manager.get_prompt_history(session_id)
     return jsonify({"success": True, "prompts": prompts})
 
 @app.route("/api/sessions/context", methods=["POST"])
 def get_context_for_prompt():
-    """Hent relevant kontekst baseret på tidligere viden"""
     data = request.json
     session_id = data.get("session_id", current_session_id)
     prompt = data.get("prompt", "")
@@ -126,7 +210,6 @@ def get_context_for_prompt():
 
 @app.route("/api/sessions/add-prompt", methods=["POST"])
 def add_prompt_to_session():
-    """Tilføj en prompt og resultat til sessionen"""
     data = request.json
     session_id = data.get("session_id", current_session_id)
     prompt = data.get("prompt", "")
@@ -139,11 +222,13 @@ def add_prompt_to_session():
     return jsonify({"success": False})
 
 # ============ AGENT ENDPOINTS ============
+
 @app.route("/api/decompose", methods=["POST"])
 def decompose():
     data = request.json
     prompt = data.get("prompt", "")
     session_id = data.get("session_id")
+    show_thinking = data.get("show_thinking", True)  # Ny parameter
     
     if not prompt:
         return jsonify({"error": "Ingen prompt angivet"}), 400
@@ -152,13 +237,14 @@ def decompose():
     if session_id:
         current_session_id = session_id
     elif not current_session_id:
-        # Opret automatisk ny session
         current_session_id, _ = session_manager.create_session(prompt[:30])
+    
+    # Sæt thinking mode på agenten
+    agent.show_thinking = show_thinking
     
     # Hent relevant kontekst fra sessionens tidligere viden
     session_context = session_manager.get_knowledge_for_context(current_session_id, prompt)
     
-    # Tilføj kontekst til prompten
     enriched_prompt = prompt
     if session_context:
         enriched_prompt = f"{prompt}\n\n{session_context}"
@@ -168,10 +254,8 @@ def decompose():
         print(f"🌳 Nedbryder: {enriched_prompt[:50]}...")
         tree = agent.decompose_prompt(enriched_prompt)
         
-        # Gem prompt i historik
         session_manager.add_prompt_result(current_session_id, prompt, "Nedbrudt til træ", tree)
         
-        # Gem automatisk efter nedbrydning
         session_data = {
             "id": current_session_id,
             "name": prompt[:30],
@@ -196,17 +280,17 @@ def decompose():
 
 @app.route("/api/execute-stream")
 def execute_stream():
-    """Server-Sent Events med logging"""
+    """Server-Sent Events med valgfri tænkning"""
     def generate():
         if agent.task_tree is None:
             yield f"data: {json.dumps({'type': 'error', 'message': 'Nedbryd en opgave først'})}\n\n"
             return
         
         original_prompt = agent.original_prompt
+        show_thinking = getattr(agent, 'show_thinking', True)
         
-        yield f"data: {json.dumps({'type': 'context', 'original_prompt': original_prompt})}\n\n"
+        yield f"data: {json.dumps({'type': 'context', 'original_prompt': original_prompt, 'show_thinking': show_thinking})}\n\n"
         
-        # Send initial log
         for log in agent.agent_log[-10:]:
             yield f"data: {json.dumps({'type': 'log', 'log': log})}\n\n"
         
@@ -226,7 +310,6 @@ def execute_stream():
             
             yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
             
-            # Udfør børn først
             for child in node.children:
                 yield from execute_with_stream(child)
             
@@ -239,9 +322,15 @@ DELOPGAVE: {node.name}
 Svar på dansk:"""
             
             full_response = ""
+            chunk_count = 0
+            
             for chunk in agent.llm.generate_stream(solve_prompt):
                 full_response += chunk
-                yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': chunk})}\n\n"
+                chunk_count += 1
+                
+                # Send chunk (kun hvis thinking er aktiveret eller kun resultat)
+                if show_thinking or chunk_count % 10 == 0:
+                    yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': chunk})}\n\n"
                 time.sleep(0.01)
             
             if not full_response:
@@ -255,7 +344,6 @@ Svar på dansk:"""
             yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
             yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': full_response[:500]})}\n\n"
             
-            # Log afsluttet opgave
             agent.agent_log.append({
                 "timestamp": time.time(),
                 "level": "INFO",
@@ -264,14 +352,12 @@ Svar på dansk:"""
             })
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
             
-            # Gem resultat i prompt historik
             if current_session_id:
                 session_manager.add_prompt_result(current_session_id, node.name, full_response[:500], None)
         
         try:
             yield from execute_with_stream(agent.task_tree.root)
             
-            # Gem session efter udførsel
             session_data = {
                 "id": current_session_id,
                 "name": original_prompt[:30] if original_prompt else "Session",
@@ -299,17 +385,14 @@ Svar på dansk:"""
 
 @app.route("/api/log", methods=["GET"])
 def get_log():
-    """Hent agent log"""
     return jsonify({"log": agent.agent_log})
 
 @app.route("/api/status", methods=["GET"])
 def status():
-    """Hent agent status"""
     return jsonify(agent.get_agent_status())
 
 @app.route("/api/search", methods=["POST"])
 def search():
-    """Søg på nettet"""
     data = request.json
     query = data.get("query", "")
     if not query:
@@ -319,7 +402,6 @@ def search():
 
 @app.route("/api/build-module", methods=["POST"])
 def build_module():
-    """Byg nyt modul baseret på gentagne handlinger"""
     result = agent.suggest_new_module()
     return jsonify({"success": True, "module_result": result})
 
@@ -329,6 +411,7 @@ if __name__ == "__main__":
     print("🚀 Dansk Agent API starter...")
     print("📍 http://localhost:5000")
     print("💾 Sessions gemmes i ./sessions/")
-    print("📜 Prompt historik aktiveret")
+    print("📁 Filhåndtering via Python (tkinter)")
+    print("🧠 Toggle thinking mode understøttet")
     print("=" * 50)
     app.run(debug=True, port=5000, threaded=True)
