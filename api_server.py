@@ -6,25 +6,36 @@ import json
 import time
 import threading
 
+# ============ DEFINER APP FØRST ============
 app = Flask(__name__, static_folder="static")
 CORS(app)
 
+# ============ INITIALISERING ============
 agent = Agent()
 session_manager = SessionManager()
 current_session_id = None
 execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
 
+# ============ STATIC ROUTES ============
 @app.route("/")
 def index():
     return send_from_directory("static", "index.html")
 
 # ============ SESSION ENDPOINTS ============
-
 @app.route("/api/sessions", methods=["GET"])
 def list_sessions():
     """Hent alle gemte sessioner"""
     sessions = session_manager.list_sessions()
     return jsonify({"success": True, "sessions": sessions})
+
+@app.route("/api/sessions/current", methods=["GET"])
+def get_current_session():
+    """Hent nuværende session uden at skifte"""
+    global current_session_id
+    if current_session_id:
+        session_data = session_manager.load_session(current_session_id)
+        return jsonify({"success": True, "session": session_data})
+    return jsonify({"success": False, "session": None})
 
 @app.route("/api/sessions/create", methods=["POST"])
 def create_session():
@@ -43,11 +54,6 @@ def load_session(session_id):
     if session_data:
         global current_session_id
         current_session_id = session_id
-        # Genskab agent state fra session data
-        if session_data.get("tree"):
-            from task_tree import TaskTree, TaskNode
-            # Rebuild tree from saved data
-            pass
         return jsonify({"success": True, "session": session_data})
     return jsonify({"success": False, "error": "Session not found"}), 404
 
@@ -68,7 +74,8 @@ def save_current_session():
         "layout": data.get("layout"),
         "execution_log": agent.execution_log,
         "agent_log": agent.agent_log,
-        "original_prompt": agent.original_prompt
+        "original_prompt": agent.original_prompt,
+        "prompt_history": data.get("prompt_history", [])
     }
     session_manager.save_session(session_id, session_data)
     current_session_id = session_id
@@ -99,8 +106,39 @@ def load_layout(session_id):
         return jsonify({"success": True, "layout": session_data["layout"]})
     return jsonify({"success": False, "layout": None}), 404
 
-# ============ AGENT ENDPOINTS ============
+@app.route("/api/sessions/prompts/<session_id>", methods=["GET"])
+def get_session_prompts(session_id):
+    """Hent alle prompts og resultater for en session"""
+    prompts = session_manager.get_prompt_history(session_id)
+    return jsonify({"success": True, "prompts": prompts})
 
+@app.route("/api/sessions/context", methods=["POST"])
+def get_context_for_prompt():
+    """Hent relevant kontekst baseret på tidligere viden"""
+    data = request.json
+    session_id = data.get("session_id", current_session_id)
+    prompt = data.get("prompt", "")
+    
+    if session_id and prompt:
+        context = session_manager.get_knowledge_for_context(session_id, prompt)
+        return jsonify({"success": True, "context": context})
+    return jsonify({"success": False, "context": ""})
+
+@app.route("/api/sessions/add-prompt", methods=["POST"])
+def add_prompt_to_session():
+    """Tilføj en prompt og resultat til sessionen"""
+    data = request.json
+    session_id = data.get("session_id", current_session_id)
+    prompt = data.get("prompt", "")
+    result = data.get("result", "")
+    tree = data.get("tree")
+    
+    if session_id and prompt:
+        session_manager.add_prompt_result(session_id, prompt, result, tree)
+        return jsonify({"success": True})
+    return jsonify({"success": False})
+
+# ============ AGENT ENDPOINTS ============
 @app.route("/api/decompose", methods=["POST"])
 def decompose():
     data = request.json
@@ -117,9 +155,21 @@ def decompose():
         # Opret automatisk ny session
         current_session_id, _ = session_manager.create_session(prompt[:30])
     
+    # Hent relevant kontekst fra sessionens tidligere viden
+    session_context = session_manager.get_knowledge_for_context(current_session_id, prompt)
+    
+    # Tilføj kontekst til prompten
+    enriched_prompt = prompt
+    if session_context:
+        enriched_prompt = f"{prompt}\n\n{session_context}"
+        print(f"📚 Tilføjet session-kontekst: {session_context[:100]}...")
+    
     try:
-        print(f"🌳 Nedbryder: {prompt[:50]}...")
-        tree = agent.decompose_prompt(prompt)
+        print(f"🌳 Nedbryder: {enriched_prompt[:50]}...")
+        tree = agent.decompose_prompt(enriched_prompt)
+        
+        # Gem prompt i historik
+        session_manager.add_prompt_result(current_session_id, prompt, "Nedbrudt til træ", tree)
         
         # Gem automatisk efter nedbrydning
         session_data = {
@@ -137,6 +187,7 @@ def decompose():
             "tree": tree,
             "original_prompt": agent.original_prompt,
             "session_id": current_session_id,
+            "has_context": bool(session_context),
             "log": agent.agent_log[-20:] if agent.agent_log else []
         })
     except Exception as e:
@@ -212,6 +263,10 @@ Svar på dansk:"""
                 "detail": full_response[:100]
             })
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+            
+            # Gem resultat i prompt historik
+            if current_session_id:
+                session_manager.add_prompt_result(current_session_id, node.name, full_response[:500], None)
         
         try:
             yield from execute_with_stream(agent.task_tree.root)
@@ -268,11 +323,12 @@ def build_module():
     result = agent.suggest_new_module()
     return jsonify({"success": True, "module_result": result})
 
+# ============ MAIN ============
 if __name__ == "__main__":
     print("=" * 50)
     print("🚀 Dansk Agent API starter...")
     print("📍 http://localhost:5000")
     print("💾 Sessions gemmes i ./sessions/")
-    print("🎨 Drag & Drop layout understøttet")
+    print("📜 Prompt historik aktiveret")
     print("=" * 50)
     app.run(debug=True, port=5000, threaded=True)

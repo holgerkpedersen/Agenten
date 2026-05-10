@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime
 import uuid
+import re
 
 class SessionManager:
     def __init__(self, storage_dir="sessions"):
@@ -9,13 +10,8 @@ class SessionManager:
         os.makedirs(storage_dir, exist_ok=True)
         
     def save_session(self, session_id, session_data):
-        """Gem en session til disk inklusiv layout"""
+        """Gem en session til disk"""
         session_data["last_modified"] = datetime.now().isoformat()
-        
-        # Sikr at layout er gemt
-        if "layout" not in session_data:
-            session_data["layout"] = None
-            
         filepath = os.path.join(self.storage_dir, f"{session_id}.json")
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(session_data, f, ensure_ascii=False, indent=2)
@@ -43,6 +39,7 @@ class SessionManager:
                         "name": data.get("name", session_id[:8]),
                         "created": data.get("created", ""),
                         "last_modified": data.get("last_modified", ""),
+                        "prompt_count": len(data.get("prompt_history", [])),
                         "task_count": len(data.get("execution_log", []))
                     })
         return sorted(sessions, key=lambda x: x["last_modified"], reverse=True)
@@ -54,9 +51,12 @@ class SessionManager:
             "id": session_id,
             "name": name,
             "created": datetime.now().isoformat(),
+            "prompt_history": [],
             "tree": None,
             "execution_log": [],
             "agent_log": [],
+            "learned_knowledge": [],
+            "original_prompt": "",
             "layout": {
                 "items": [
                     {"id": "tree", "x": 0, "y": 0, "w": 4, "h": 2},
@@ -67,3 +67,134 @@ class SessionManager:
         }
         self.save_session(session_id, session_data)
         return session_id, session_data
+    
+    def add_prompt_result(self, session_id, prompt, result, tree=None):
+        """Gem en prompt og dens resultat i sessionen"""
+        session_data = self.load_session(session_id)
+        if session_data:
+            if "prompt_history" not in session_data:
+                session_data["prompt_history"] = []
+            
+            session_data["prompt_history"].append({
+                "id": str(uuid.uuid4())[:6],
+                "prompt": prompt,
+                "result": result[:500] if result else "",
+                "tree": tree,
+                "timestamp": datetime.now().isoformat(),
+                "type": "user_prompt"
+            })
+            
+            # Behold kun de sidste 50 prompts
+            if len(session_data["prompt_history"]) > 50:
+                session_data["prompt_history"] = session_data["prompt_history"][-50:]
+            
+            # Udtræk viden fra resultatet
+            self._extract_knowledge(session_data, prompt, result)
+            
+            self.save_session(session_id, session_data)
+            return True
+        return False
+    
+    def get_prompt_history(self, session_id):
+        """Hent prompt historik for en session"""
+        session_data = self.load_session(session_id)
+        if session_data:
+            return session_data.get("prompt_history", [])
+        return []
+    
+    def _extract_knowledge(self, session_data, prompt, result):
+        """Udtræk relevant viden fra prompt/resultat"""
+        knowledge = session_data.get("learned_knowledge", [])
+        
+        prompt_lower = prompt.lower()
+        result_lower = result.lower() if result else ""
+        
+        # Matematisk viden
+        if "2 + 2" in prompt_lower or "2 plus 2" in prompt_lower or "plus" in prompt_lower:
+            new_knowledge = {
+                "type": "mathematical_fact",
+                "content": "2 + 2 = 4 er sandt per definition af addition og naturlige tal",
+                "source_prompt": prompt[:50],
+                "timestamp": datetime.now().isoformat()
+            }
+            if new_knowledge not in knowledge:
+                knowledge.append(new_knowledge)
+        
+        # Token optimering
+        if "token" in prompt_lower or "komprimere" in prompt_lower:
+            new_knowledge = {
+                "type": "optimization",
+                "content": "Token-forbrug kan reduceres med caching af LLM svar, komprimering af prompts (fjern whitespace, brug kortere synonymer), og brug af mindre modeller til simple opgaver",
+                "source_prompt": prompt[:50],
+                "timestamp": datetime.now().isoformat()
+            }
+            if new_knowledge not in knowledge:
+                knowledge.append(new_knowledge)
+        
+        # Generel viden fra resultat (hvis resultatet er meningsfuldt)
+        if len(result) > 100 and "fejl" not in result_lower and "error" not in result_lower:
+            new_knowledge = {
+                "type": "solution_pattern",
+                "content": result[:300],
+                "source_prompt": prompt[:50],
+                "timestamp": datetime.now().isoformat()
+            }
+            # Undgå dubletter
+            if not any(k.get("content") == new_knowledge["content"] for k in knowledge):
+                knowledge.append(new_knowledge)
+        
+        # Behold kun de sidste 20 vidensstykker
+        session_data["learned_knowledge"] = knowledge[-20:]
+    
+    def get_knowledge_for_context(self, session_id, current_prompt):
+        """Hent relevant viden baseret på nuværende prompt"""
+        session_data = self.load_session(session_id)
+        if not session_data:
+            return ""
+        
+        knowledge = session_data.get("learned_knowledge", [])
+        if not knowledge:
+            return ""
+        
+        current_lower = current_prompt.lower()
+        relevant = []
+        
+        for k in knowledge[-10:]:  # Seneste 10
+            content = k.get("content", "").lower()
+            # Tjek om nøgleord fra prompt matcher viden
+            keywords = current_lower.split()[:5]
+            if any(keyword in content for keyword in keywords if len(keyword) > 3):
+                relevant.append(k)
+        
+        if relevant:
+            context = "\n\n## 🧠 Tidligere erfaringer fra denne session:\n"
+            for k in relevant[:3]:
+                context += f"- {k.get('content', '')[:200]}\n"
+            context += "\nBrug denne viden til at besvare den nye forespørgsel.\n"
+            return context
+        
+        return ""
+    
+    def get_all_knowledge(self, session_id):
+        """Hent al gemt viden fra en session"""
+        session_data = self.load_session(session_id)
+        if session_data:
+            return session_data.get("learned_knowledge", [])
+        return []
+    
+    def delete_session(self, session_id):
+        """Slet en session"""
+        filepath = os.path.join(self.storage_dir, f"{session_id}.json")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            return True
+        return False
+    
+    def update_session_name(self, session_id, new_name):
+        """Opdater navnet på en session"""
+        session_data = self.load_session(session_id)
+        if session_data:
+            session_data["name"] = new_name
+            self.save_session(session_id, session_data)
+            return True
+        return False

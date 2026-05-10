@@ -1,12 +1,11 @@
-agent_system/
+C:/dev/Agenten/
+├── api_server.py
 ├── agent_core.py
 ├── llm_wrapper.py
 ├── web_searcher.py
-├── module_builder.py
 ├── task_tree.py
-├── api_server.py
+├── module_builder.py
+├── session_manager.py    ← Denne fil skal have klassen SessionManager
 ├── static/
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-└── requirements.txt
+│   └── index.html
+└── sessions/             (oprettes automatisk)
