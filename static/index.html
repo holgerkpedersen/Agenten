@@ -1649,11 +1649,12 @@ async function executeWithStream() {
                     }
                 }
                 currentOutputs[data.task] += data.chunk;
+                const clean = currentOutputs[data.task].replace(/<think>[\s\S]*?<\/think>/g, '');
                 if (showThinking) {
                     const outputId = `output-${escapeHtml(data.task).replace(/[^a-zA-Z0-9]/g, '_')}`;
                     const outputDiv = document.getElementById(outputId);
                     if (outputDiv) {
-                        outputDiv.textContent = currentOutputs[data.task];
+                        outputDiv.textContent = clean;
                     }
                 }
                 if (llmBox) llmBox.scrollTop = llmBox.scrollHeight;
