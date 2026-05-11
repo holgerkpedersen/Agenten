@@ -87,7 +87,7 @@ def execute(self, tool_name, args):
         if tool_name in ("navn", "name", "nombre", "名称"):
             names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
             tools_hint = ', '.join(names)
-            return {"success": False, "error": f"'{tool_name}' er ikke et værktøj. Tilgængelige værktøjer: {tools_hint}"}
+            return {"success": False, "error": t("tool_hallucinated", self.lang).format(tool=tool_name, tools=tools_hint)}
         if tool_name not in self.tools:
             return {"success": False, "error": t("tool_unknown", self.lang).format(tool=tool_name)}
         if self.active_tools is not None and tool_name not in self.active_tools:
