@@ -1618,8 +1618,8 @@ async function executeWithStream() {
                 break;
                 
             case 'start':
-                if (llmBox) llmBox.innerHTML = `<div style="color:#60a5fa;">🎬 ${data.total_tasks} opgaver</div>`;
-                addLogEntry('INFO', 'Streaming startet', `${data.total_tasks} opgaver`);
+                if (llmBox) llmBox.innerHTML = `<div style="color:#60a5fa;">🎬 ${_('N_tasks').replace('{n}', data.total_tasks)}</div>`;
+                addLogEntry('INFO', _('streaming_started'), _('N_tasks').replace('{n}', data.total_tasks));
                 break;
                 
             case 'task_start':
@@ -1634,7 +1634,7 @@ async function executeWithStream() {
                     markRunning(currentTree);
                     updateTreeDisplay();
                 }
-                addLogEntry('INFO', 'Påbegynder opgave', data.task);
+                addLogEntry('INFO', _('task_started'), data.task);
                 break;
                 
             case 'progress_chunk':
@@ -1705,17 +1705,17 @@ async function executeWithStream() {
                 break;
                 
             case 'complete':
-                if (llmBox) llmBox.innerHTML += `<div style="color:#10b981; margin-top: 15px;">✅ Alle opgaver færdige!</div>`;
+                if (llmBox) llmBox.innerHTML += `<div style="color:#10b981; margin-top: 15px;">${_('all_done')}</div>`;
                 if (progressContainer) progressContainer.style.display = 'none';
-                addLogEntry('INFO', 'Streaming færdig', 'Alle opgaver udført');
+                addLogEntry('INFO', _('stream_done'), _('all_executed'));
                 saveCurrentSession();
                 updatePromptHistory(currentSessionId);
                 eventSource.close();
                 break;
                 
             case 'error':
-                if (llmBox) llmBox.innerHTML += `<div style="color:#ef4444;">❌ Fejl: ${data.message}</div>`;
-                addLogEntry('ERROR', 'Streaming fejl', data.message);
+                if (llmBox) llmBox.innerHTML += `<div style="color:#ef4444;">❌ ${_('error_prefix')}${data.message}</div>`;
+                addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
                 break;
         }
