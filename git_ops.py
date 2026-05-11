@@ -1,6 +1,8 @@
 import os
 import subprocess
 import shlex
+from i18n import K
+from lang import t
 
 def _run_git(args, cwd=None):
     if cwd is None:

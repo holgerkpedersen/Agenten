@@ -63,9 +63,9 @@ def set_folder():
             export_folder = folder
             return jsonify({"success": True, "folder": export_folder})
         except Exception as e:
-            return jsonify({"success": False, "error": f"Kunne ikke oprette mappe: {e}"})
+            return jsonify({"success": False, "error": t(K.ERR_CREATE_FOLDER, agent.lang).format(e=str(e))})
     else:
-        return jsonify({"success": False, "error": "Ugyldig mappesti"})
+        return jsonify({"success": False, "error": t(K.ERR_INVALID_PATH, agent.lang)})
 
 @app.route("/api/folder/status", methods=["GET"])
 def folder_status():
@@ -83,7 +83,7 @@ def save_to_folder():
     path = data.get("path") or export_folder
     
     if not path:
-        return jsonify({"success": False, "error": "Ingen mappe valgt"}), 400
+        return jsonify({"success": False, "error": t(K.ERR_NO_FOLDER, agent.lang)}), 400
     
     try:
         os.makedirs(path, exist_ok=True)
@@ -100,7 +100,7 @@ def list_folder_contents():
     data = request.json
     folder_path = data.get("path", export_folder)
     if not folder_path or not os.path.exists(folder_path):
-        return jsonify({"success": False, "error": "Mappe findes ikke"}), 400
+        return jsonify({"success": False, "error": t(K.ERR_FOLDER_NOT_FOUND, agent.lang)}), 400
     try:
         items = []
         for item in os.listdir(folder_path):
@@ -125,10 +125,10 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 def upload_file():
     """Upload en fil fra browseren og gem den med original navn"""
     if 'file' not in request.files:
-        return jsonify({"success": False, "error": "Ingen fil modtaget"}), 400
+        return jsonify({"success": False, "error": t(K.ERR_NO_FILE, agent.lang)}), 400
     file = request.files['file']
     if file.filename == '':
-        return jsonify({"success": False, "error": "Tomt filnavn"}), 400
+        return jsonify({"success": False, "error": t(K.ERR_EMPTY_FILENAME, agent.lang)}), 400
     try:
         safe_filename = "".join(c for c in file.filename if c.isalnum() or c in '._- ')
         filepath = os.path.join(UPLOAD_DIR, safe_filename)
@@ -144,11 +144,11 @@ def read_file():
     filepath = data.get("filepath", "")
     
     if not filepath:
-        return jsonify({"success": False, "error": "Ingen sti angivet"}), 400
+        return jsonify({"success": False, "error": t(K.ERR_NO_PATH, agent.lang)}), 400
     
     try:
         if not os.path.exists(filepath):
-            return jsonify({"success": False, "error": f"Filen findes ikke: {filepath}"}), 404
+            return jsonify({"success": False, "error": t(K.ERR_FILE_NOT_FOUND, agent.lang).format(path=filepath)}), 404
         
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -171,7 +171,7 @@ def list_python_files():
     folder_path = data.get("folder", BASE_DIR)
     
     if not os.path.exists(folder_path):
-        return jsonify({"success": False, "error": "Mappe findes ikke"}), 404
+        return jsonify({"success": False, "error": t(K.ERR_FOLDER_NOT_FOUND, agent.lang)}), 404
     
     try:
         python_files = []
@@ -207,7 +207,7 @@ def get_current_session():
 @app.route("/api/sessions/create", methods=["POST"])
 def create_session():
     data = request.json
-    name = data.get("name", f"Session {len(session_manager.list_sessions()) + 1}")
+    name = data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=len(session_manager.list_sessions())+1))
     session_id, session_data = session_manager.create_session(name)
     global current_session_id
     current_session_id = session_id
@@ -226,7 +226,7 @@ def load_session(session_id):
             agent.full_prompt_with_context = session_data.get("full_prompt_with_context", "")
             agent.show_thinking = session_data.get("show_thinking", True)
         return jsonify({"success": True, "session": session_data})
-    return jsonify({"success": False, "error": "Session not found"}), 404
+    return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
 @app.route("/api/sessions/save", methods=["POST"])
 def save_current_session():
@@ -235,11 +235,11 @@ def save_current_session():
     session_id = data.get("session_id", current_session_id)
     
     if not session_id:
-        return jsonify({"error": "No active session"}), 400
+        return jsonify({"error": t(K.ERR_NO_SESSION, agent.lang)}), 400
     
     session_data = {
         "id": session_id,
-        "name": data.get("name", f"Session {session_id}"),
+        "name": data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=session_id[:8])),
         "tree": data.get("tree") or (agent.task_tree_to_dict() if agent.task_tree else None),
         "layout": data.get("layout"),
         "execution_log": agent.execution_log,
@@ -262,10 +262,10 @@ def rename_session():
     session_id = data.get("session_id")
     new_name = data.get("name", "")
     if not session_id or not new_name:
-        return jsonify({"error": "Missing session_id or name"}), 400
+        return jsonify({"error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
     if session_manager.rename_session(session_id, new_name):
         return jsonify({"success": True})
-    return jsonify({"error": "Session not found"}), 404
+    return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
 @app.route("/api/tools/token", methods=["GET", "POST"])
 def manage_token():
@@ -293,13 +293,13 @@ def save_layout():
     session_id = data.get("session_id")
     layout = data.get("layout")
     if not session_id:
-        return jsonify({"error": "No session_id"}), 400
+        return jsonify({"error": t(K.ERR_NO_SESSION_ID, agent.lang)}), 400
     session_data = session_manager.load_session(session_id)
     if session_data:
         session_data["layout"] = layout
         session_manager.save_session(session_id, session_data)
         return jsonify({"success": True})
-    return jsonify({"error": "Session not found"}), 404
+    return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
 @app.route("/api/sessions/load-layout/<session_id>", methods=["GET"])
 def load_layout(session_id):
@@ -339,13 +339,13 @@ def add_prompt_to_session():
 @app.route("/api/reset-execution", methods=["POST"])
 def reset_execution():
     agent.reset_execution()
-    return jsonify({"success": True, "message": "Udførelsesstatus nulstillet"})
+    return jsonify({"success": True, "message": t(K.UI_STREAM_RESET, agent.lang)})
 
 @app.route("/api/execute-without-stream", methods=["POST"])
 def execute_without_stream():
     global execution_status
     if agent.task_tree is None:
-        return jsonify({"error": "Nedbryd en opgave først"}), 400
+        return jsonify({"error": t(K.ERR_DECOMPOSE_FIRST, agent.lang)}), 400
     
     execution_status = {"running": True, "progress": 0, "current_task": "", "log": []}
     
@@ -407,7 +407,7 @@ def decompose():
     
     try:
         tree = agent.decompose_prompt(prompt, files=files, template=template)
-        session_manager.add_prompt_result(current_session_id, prompt, "Nedbrudt til træ", tree)
+        session_manager.add_prompt_result(current_session_id, prompt, t(K.LOG_DECOMPOSED, agent.lang), tree)
         
         session_data = {
             "id": current_session_id,
@@ -518,7 +518,7 @@ def execute_stream():
                 elif event["type"] == "done":
                     full_response = event["result"]
             if not full_response:
-                full_response = "Løsning: " + node.name
+                full_response = t(K.UI_TASK_RESULT_PREFIX, agent.lang) + ": " + node.name
             node.status = "done"
             node.result = full_response
             completed += 1
@@ -526,7 +526,7 @@ def execute_stream():
             yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
             result_preview = full_response[:500] if show_thinking else full_response
             yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': result_preview})}\n\n"
-            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": "Færdig: " + node.name, "detail": full_response[:100]})
+            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, agent.lang) + ": " + node.name, "detail": full_response[:100]})
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
             if current_session_id:
                 session_manager.add_prompt_result(current_session_id, node.name, full_response[:500], None)
@@ -535,7 +535,7 @@ def execute_stream():
             yield from execute_with_stream(agent.task_tree.root)
             session_data = {
                 "id": current_session_id,
-                "name": original_prompt[:30] if original_prompt else "Session",
+                "name": original_prompt[:30] if original_prompt else t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=""),
                 "tree": agent.task_tree_to_dict(),
                 "execution_log": agent.execution_log,
                 "agent_log": agent.agent_log,
@@ -573,7 +573,7 @@ def build_module():
 
 @app.route("/api/test", methods=["GET"])
 def test():
-    return jsonify({"status": "ok", "message": "Agent API kører", "static_folder": STATIC_DIR, "has_agent": agent is not None})
+    return jsonify({"status": "ok", "message": t(K.UI_API_RUNNING, agent.lang), "static_folder": STATIC_DIR, "has_agent": agent is not None})
 
 if __name__ == "__main__":
     print("=" * 50)
