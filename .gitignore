@@ -19,3 +19,6 @@ agent_session_*.md
 
 # Environment
 .env
+
+# Export folder
+exports/
