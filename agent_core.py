@@ -411,13 +411,13 @@ class Agent:
 
             for i in range(max_iterations):
                 prompt = conversation
-                if i > 0:
+                if i >= 0:
                     tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
                     prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
                         tools_list=tools_list,
                         TOOL_MARKER=self.tool_registry.TOOL_MARKER,
                         DONE_MARKER=self.tool_registry.DONE_MARKER
-                    )
+                    ) + f"\nKald KUN ét værktøj ad gangen."
 
                 response = ""
                 for chunk in self.llm.generate_stream(prompt, max_tokens=1024):
@@ -468,13 +468,13 @@ class Agent:
 
             for i in range(max_iterations):
                 prompt = conversation
-                if i > 0:
+                if i >= 0:
                     tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
                     prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
                         tools_list=tools_list,
                         TOOL_MARKER=self.tool_registry.TOOL_MARKER,
                         DONE_MARKER=self.tool_registry.DONE_MARKER
-                    )
+                    ) + f"\nKald KUN ét værktøj ad gangen."
 
                 response = ""
                 for chunk in self.llm.generate_stream(prompt, max_tokens=1024):
