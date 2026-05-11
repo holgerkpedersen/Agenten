@@ -79,14 +79,15 @@ def save_to_folder():
     data = request.json
     filename = data.get("filename", "export.md")
     content = data.get("content", "")
+    path = data.get("path") or export_folder
     
-    if not export_folder:
+    if not path:
         return jsonify({"success": False, "error": "Ingen mappe valgt"}), 400
     
     try:
-        os.makedirs(export_folder, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
         safe_filename = "".join(c for c in filename if c.isalnum() or c in '._- ')
-        filepath = os.path.join(export_folder, safe_filename)
+        filepath = os.path.join(path, safe_filename)
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(content)
         return jsonify({"success": True, "filepath": filepath})

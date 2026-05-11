@@ -1848,7 +1848,7 @@ async function exportToMarkdown() {
     const saveResponse = await fetch('/api/folder/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: filename, content: md })
+        body: JSON.stringify({ filename: filename, content: md, path: chosenFolder })
     });
     const saveData = await saveResponse.json();
     
