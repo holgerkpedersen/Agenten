@@ -84,6 +84,9 @@ class ToolRegistry:
         return {"type": "text", "text": response}
 
     def execute(self, tool_name, args):
+        if tool_name in ("navn", "name", "navn", "nombre", "名称"):
+            tools_hint = ', '.join(list(self.tools.keys())[:5]) + "..."
+            return {"success": False, "error": f"'{tool_name}' er ikke et værktøj. Findes disse: {tools_hint}. Kald KUN et af de viste værktøjer."}
         if tool_name not in self.tools:
             return {"success": False, "error": t("tool_unknown", self.lang).format(tool=tool_name)}
         if self.active_tools is not None and tool_name not in self.active_tools:
