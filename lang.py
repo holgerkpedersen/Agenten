@@ -18,18 +18,7 @@ LANG = {
             "fri": """Nedbryd følgende opgave i delopgaver. Brug 2 mellemrum per niveau.
 Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.
 
-Opgave: {prompt}
-
-Eksempel på format:
-Forstå problemet
-  Identificer krav
-  Saml information
-Find løsning
-  Overvej muligheder
-  Vælg metode
-Konkluder
-
-Nedbryd nu opgaven (KUN træstruktur):""",
+Opgave: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"],
@@ -309,18 +298,7 @@ Nedbryd nu opgaven (KUN træstruktur):""",
             "fri": """Break down the following task into subtasks. Use 2 spaces per level.
 Return ONLY the tree structure. No explanations, no thought process.
 
-Task: {prompt}
-
-Format example:
-Understand the problem
-  Identify requirements
-  Gather information
-Find solution
-  Consider options
-  Choose method
-Conclude
-
-Now break down the task (ONLY tree structure):""",
+Task: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overview", "Key Points", "Conclusion", "Recommendations"],
@@ -600,18 +578,7 @@ Now break down the task (ONLY tree structure):""",
             "fri": """Descompón la siguiente tarea en subtareas. Usa 2 espacios por nivel.
 Devuelve SOLO la estructura de árbol. Sin explicaciones, sin proceso de pensamiento.
 
-Tarea: {prompt}
-
-Ejemplo de formato:
-Entender el problema
-  Identificar requisitos
-  Recopilar información
-Encontrar solución
-  Considerar opciones
-  Elegir método
-Concluir
-
-Ahora descompón la tarea (SOLO estructura de árbol):""",
+Tarea: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Descripción General", "Puntos Clave", "Conclusión", "Recomendaciones"],
@@ -891,18 +858,7 @@ Ahora descompón la tarea (SOLO estructura de árbol):""",
             "fri": """将以下任务分解为子任务。每级使用2个空格。
 只返回树结构。不要解释，不要思考过程。
 
-任务：{prompt}
-
-格式示例：
-理解问题
-  识别需求
-  收集信息
-寻找解决方案
-  考虑选项
-  选择方法
-总结
-
-现在分解任务（仅树结构）：""",
+任务：{prompt}""",
         },
         "template_fallback": {
             "resume": ["概述", "要点", "结论", "建议"],

@@ -154,6 +154,18 @@ class Agent:
             r'^I will output exactly.*$',
             r'^Ready. Output matches exactly.*$',
             r'^✅$',
+            r'^Nedbryd nu opgaven.*$',
+            r'^KUN træstruktur.*$',
+            r'^Returnér KUN træstruktur.*$',
+            r'^Returner KUN træstruktur.*$',
+            r'^Now break down the task.*$',
+            r'^ONLY tree structure.*$',
+            r'^Return ONLY the tree structure.*$',
+            r'^Ahora descompón la tarea.*$',
+            r'^SOLO estructura de árbol.*$',
+            r'^Devuelve SOLO la estructura.*$',
+            r'^\u73b0\u5728\u5206\u89e3\u4efb\u52a1.*$',
+            r'^\u4ec5\u6811\u7ed3\u6784.*$',
         ]
         for pattern in patterns:
             name = re.sub(pattern, '', name, flags=re.IGNORECASE | re.DOTALL)
