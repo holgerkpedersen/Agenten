@@ -246,7 +246,7 @@ def save_current_session():
         "original_prompt": data.get("original_prompt") or agent.original_prompt or "",
         "full_prompt_with_context": getattr(agent, 'full_prompt_with_context', '') or '',
         "show_thinking": data.get("show_thinking", agent.show_thinking),
-        "template": data.get("template") or getattr(agent, 'active_template', None),
+        "template": data.get("template") or getattr(agent, 'active_template', None) or "fri",
         "lang": data.get("lang") or getattr(agent, 'lang', 'da'),
         "prompt_history": data.get("prompt_history", []),
         "file_context": data.get("file_context", "")
