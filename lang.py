@@ -1152,7 +1152,7 @@ def t(key, lang="da"):
             d = d.get(k, f"?{key}")
         else:
             return f"?{key}"
-    return d if isinstance(d, str) else f"?{key}"
+    return d if isinstance(d, (str, list)) else str(d)
 
 
 def get_ui_translations(lang):
