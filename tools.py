@@ -70,7 +70,11 @@ class ToolRegistry:
         if tool_match:
             try:
                 data = json.loads(tool_match.group(1))
-                return {"type": "tool", "tool": data.get("tool"), "args": data.get("args", {})}
+                tool_name = data.get("tool", "")
+                if tool_name in ("navn", "name", "nombre", "名称"):
+                    names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
+                    return {"type": "error", "message": t("tool_hallucinated", self.lang).format(tool=tool_name, tools=', '.join(names))}
+                return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
             except json.JSONDecodeError:
                 return {"type": "error", "message": t("tool_invalid_json", self.lang)}
 
