@@ -47,3 +47,16 @@ def git_set_remote(url, path="."):
     if existing["success"]:
         _run_git(["remote", "remove", "origin"], cwd=path)
     return _run_git(["remote", "add", "origin", url], cwd=path)
+
+
+def git_diff(older="HEAD~1", newer="HEAD", max_chars=8000):
+    r = _run_git(["diff", "--unified=3", older, newer])
+    if r["success"] and len(r["output"]) > max_chars:
+        files = _run_git(["diff", "--name-only", older, newer])
+        header = "AEndrede filer:\n" + files.get("output", "") if files["success"] else ""
+        r["output"] = header + "\n" + r["output"][:max_chars] + "\n... (trunkeret)"
+    return r
+
+
+def git_log(count=10):
+    return _run_git(["log", f"-{count}", "--oneline", "--decorate"])

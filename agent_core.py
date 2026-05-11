@@ -88,6 +88,18 @@ class Agent:
             [],
             lambda: git_ops.git_remote_exists()
         ))
+        self.tool_registry.register(Tool(
+            "git_diff",
+            t("tools.git_diff", self.lang),
+            ["older", "newer"],
+            lambda older="HEAD~1", newer="HEAD": git_ops.git_diff(older, newer)
+        ))
+        self.tool_registry.register(Tool(
+            "git_log",
+            t("tools.git_log", self.lang),
+            ["count"],
+            lambda count=10: git_ops.git_log(int(count))
+        ))
 
     def _get_templates(self):
         lang_instr = t("answer_in", self.lang)
@@ -101,6 +113,11 @@ class Agent:
                 "name": t("templates.kodeanalyse", self.lang),
                 "prompt": t("template_prompts.kodeanalyse", self.lang).replace("{lang_instruction}", lang_instr),
                 "fallback": t("template_fallback.kodeanalyse", self.lang),
+            },
+            "diffanalyse": {
+                "name": t("templates.diffanalyse", self.lang),
+                "prompt": t("template_prompts.diffanalyse", self.lang).replace("{lang_instruction}", lang_instr),
+                "fallback": t("template_fallback.diffanalyse", self.lang),
             },
             "fri": {
                 "name": t("templates.fri", self.lang),

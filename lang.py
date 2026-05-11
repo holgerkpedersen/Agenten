@@ -10,11 +10,13 @@ LANG = {
         "templates": {
             "resume": "📄 Resumé",
             "kodeanalyse": "🔍 Kodeanalyse",
+            "diffanalyse": "📊 Diff-analyse",
             "fri": "🌳 Fri nedbrydning",
         },
         "template_prompts": {
             "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
             "kodeanalyse": "Analyser følgende kode struktureret. Returnér KUN følgende sektioner:\n## Formål\n## Imports og afhængigheder\n## Arkitektur\n## Kodekvalitet\n## Sikkerhed\n\n{lang_instruction}. Brug ikke <think> tags.",
+            "diffanalyse": "Analyser følgende git diff struktureret. Brug git_diff og git_log værktøjerne for at hente ændringer først. Returnér KUN følgende sektioner:\n## Oversigt\n## Risikovurdering (høj/middel/lav per fil)\n## Breaking Changes\n## Kodekvalitet\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
             "fri": """Nedbryd følgende opgave i delopgaver. Brug 2 mellemrum per niveau.
 Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.
 
@@ -23,6 +25,7 @@ Opgave: {prompt}""",
         "template_fallback": {
             "resume": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"],
             "kodeanalyse": ["Formål", "Imports og afhængigheder", "Arkitektur", "Kodekvalitet", "Sikkerhed"],
+            "diffanalyse": ["Oversigt", "Risikovurdering", "Breaking Changes", "Kodekvalitet", "Anbefalinger"],
         },
         "fallback_tree": {
             "understand_purpose": "Forstå filens formål",
@@ -54,6 +57,8 @@ Opgave: {prompt}""",
             "git_push": "Push til remote. Default branch: master",
             "git_set_remote": "Sæt remote origin URL. Kræver: url",
             "git_remote_status": "Tjek om git remote er konfigureret",
+            "git_diff": "Vis ændringer mellem commits (git diff). Kræver: older (fx HEAD~1), newer (fx HEAD)",
+            "git_log": "Vis seneste commits (git log). Kræver: count (fx 5)",
         },
         "tool_system_prompt": "/no_think Du er Agenten. Svar KUN med præcis ét af disse formater:\n\nVÆRKTØJ:\n{TOOL_MARKER}{{\"tool\":\"navn\",\"args\":{{\"param\":\"værdi\"}}}}{END_MARKER}\n\nAFSLUT:\n{DONE_MARKER}{{\"result\":\"dit færdige svar\"}}{END_MARKER}\n\nEksempel værktøjskald:\n{TOOL_MARKER}{{\"tool\":\"git_status\",\"args\":{{}}}}{END_MARKER}\n\nVærktøjer:\n{tools_desc}\n\nOPGAVE: {task}",
         "tool_continuation": "Tilgængelige: {tools_list}. Brug {TOOL_MARKER} eller afslut {DONE_MARKER}.",
@@ -290,11 +295,13 @@ Opgave: {prompt}""",
         "templates": {
             "resume": "📄 Summary",
             "kodeanalyse": "🔍 Code Analysis",
+            "diffanalyse": "📊 Diff Analysis",
             "fri": "🌳 Free Decomposition",
         },
         "template_prompts": {
             "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
             "kodeanalyse": "Analyze the following code structurally. Return ONLY the following sections:\n## Purpose\n## Imports and Dependencies\n## Architecture\n## Code Quality\n## Security\n\n{lang_instruction}. Do not use <think> tags.",
+            "diffanalyse": "Analyze the following git diff structurally. Use git_diff and git_log tools to fetch changes first. Return ONLY the following sections:\n## Change Overview\n## Risk Assessment (high/medium/low per file)\n## Breaking Changes\n## Code Quality\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
             "fri": """Break down the following task into subtasks. Use 2 spaces per level.
 Return ONLY the tree structure. No explanations, no thought process.
 
@@ -303,6 +310,7 @@ Task: {prompt}""",
         "template_fallback": {
             "resume": ["Overview", "Key Points", "Conclusion", "Recommendations"],
             "kodeanalyse": ["Purpose", "Imports and Dependencies", "Architecture", "Code Quality", "Security"],
+            "diffanalyse": ["Overview", "Risk Assessment", "Breaking Changes", "Code Quality", "Recommendations"],
         },
         "fallback_tree": {
             "understand_purpose": "Understand file purpose",
@@ -334,6 +342,8 @@ Task: {prompt}""",
             "git_push": "Push to remote. Default branch: master",
             "git_set_remote": "Set remote origin URL. Requires: url",
             "git_remote_status": "Check if git remote is configured",
+            "git_diff": "Show changes between commits (git diff). Requires: older (e.g. HEAD~1), newer (e.g. HEAD)",
+            "git_log": "Show recent commits (git log). Requires: count (e.g. 5)",
         },
         "tool_system_prompt": "/no_think You are Agenten. Reply ONLY with exactly one of these formats:\n\nTOOL:\n{TOOL_MARKER}{{\"tool\":\"name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nDONE:\n{DONE_MARKER}{{\"result\":\"your finished answer\"}}{END_MARKER}\n\nExample tool call:\n{TOOL_MARKER}{{\"tool\":\"git_status\",\"args\":{{}}}}{END_MARKER}\n\nTools:\n{tools_desc}\n\nTASK: {task}",
         "tool_continuation": "Available: {tools_list}. Use {TOOL_MARKER} or finish with {DONE_MARKER}.",
@@ -570,11 +580,13 @@ Task: {prompt}""",
         "templates": {
             "resume": "📄 Resumen",
             "kodeanalyse": "🔍 Análisis de Código",
+            "diffanalyse": "📊 Análisis de Diff",
             "fri": "🌳 Descomposición Libre",
         },
         "template_prompts": {
             "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
             "kodeanalyse": "Analiza el siguiente código de forma estructurada. Devuelve SOLO estas secciones:\n## Propósito\n## Imports y Dependencias\n## Arquitectura\n## Calidad del Código\n## Seguridad\n\n{lang_instruction}. No uses etiquetas <think>.",
+            "diffanalyse": "Analiza el siguiente git diff de forma estructurada. Usa git_diff y git_log para obtener cambios primero. Devuelve SOLO estas secciones:\n## Resumen de Cambios\n## Evaluación de Riesgos (alto/medio/bajo por archivo)\n## Cambios Rupturistas\n## Calidad del Código\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
             "fri": """Descompón la siguiente tarea en subtareas. Usa 2 espacios por nivel.
 Devuelve SOLO la estructura de árbol. Sin explicaciones, sin proceso de pensamiento.
 
@@ -583,6 +595,7 @@ Tarea: {prompt}""",
         "template_fallback": {
             "resume": ["Descripción General", "Puntos Clave", "Conclusión", "Recomendaciones"],
             "kodeanalyse": ["Propósito", "Imports y Dependencias", "Arquitectura", "Calidad del Código", "Seguridad"],
+            "diffanalyse": ["Resumen", "Riesgos", "Cambios Rupturistas", "Calidad del Código", "Recomendaciones"],
         },
         "fallback_tree": {
             "understand_purpose": "Entender el propósito del archivo",
@@ -614,6 +627,8 @@ Tarea: {prompt}""",
             "git_push": "Push al remoto. Rama por defecto: master",
             "git_set_remote": "Establecer URL del remoto origin. Requiere: url",
             "git_remote_status": "Verificar si git remote está configurado",
+            "git_diff": "Mostrar cambios entre commits (git diff). Requiere: older (ej. HEAD~1), newer (ej. HEAD)",
+            "git_log": "Mostrar commits recientes (git log). Requiere: count (ej. 5)",
         },
         "tool_system_prompt": "/no_think Eres Agenten. Responde SOLO con uno de estos formatos:\n\nHERRAMIENTA:\n{TOOL_MARKER}{{\"tool\":\"nombre\",\"args\":{{\"param\":\"valor\"}}}}{END_MARKER}\n\nTERMINADO:\n{DONE_MARKER}{{\"result\":\"tu respuesta final\"}}{END_MARKER}\n\nEjemplo de llamada:\n{TOOL_MARKER}{{\"tool\":\"git_status\",\"args\":{{}}}}{END_MARKER}\n\nHerramientas:\n{tools_desc}\n\nTAREA: {task}",
         "tool_continuation": "Disponible: {tools_list}. Usa {TOOL_MARKER} o termina con {DONE_MARKER}.",
@@ -850,11 +865,13 @@ Tarea: {prompt}""",
         "templates": {
             "resume": "📄 摘要",
             "kodeanalyse": "🔍 代码分析",
+            "diffanalyse": "📊 差异分析",
             "fri": "🌳 自由分解",
         },
         "template_prompts": {
             "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
             "kodeanalyse": "分析以下代码结构。只返回以下部分：\n## 目的\n## 导入和依赖\n## 架构\n## 代码质量\n## 安全性\n\n{lang_instruction}。不要使用 <think> 标签。",
+            "diffanalyse": "分析以下git差异结构。首先使用git_diff和git_log工具获取更改。只返回以下部分：\n## 更改概述\n## 风险评估（高/中/低 按文件）\n## 破坏性更改\n## 代码质量\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
             "fri": """将以下任务分解为子任务。每级使用2个空格。
 只返回树结构。不要解释，不要思考过程。
 
@@ -863,6 +880,7 @@ Tarea: {prompt}""",
         "template_fallback": {
             "resume": ["概述", "要点", "结论", "建议"],
             "kodeanalyse": ["目的", "导入和依赖", "架构", "代码质量", "安全性"],
+            "diffanalyse": ["概述", "风险评估", "破坏性更改", "代码质量", "建议"],
         },
         "fallback_tree": {
             "understand_purpose": "理解文件目的",
@@ -894,6 +912,8 @@ Tarea: {prompt}""",
             "git_push": "推送到远程。默认分支：master",
             "git_set_remote": "设置远程origin URL。需要：url",
             "git_remote_status": "检查git remote是否已配置",
+            "git_diff": "显示提交之间的更改（git diff）。需要：older（如 HEAD~1）、newer（如 HEAD）",
+            "git_log": "显示最近的提交（git log）。需要：count（如 5）",
         },
         "tool_system_prompt": "/no_think 你是Agenten。只使用以下格式之一回复：\n\n工具：\n{TOOL_MARKER}{{\"tool\":\"名称\",\"args\":{{\"param\":\"值\"}}}}{END_MARKER}\n\n完成：\n{DONE_MARKER}{{\"result\":\"你的最终答案\"}}{END_MARKER}\n\n工具调用示例：\n{TOOL_MARKER}{{\"tool\":\"git_status\",\"args\":{{}}}}{END_MARKER}\n\n工具：\n{tools_desc}\n\n任务：{task}",
         "tool_continuation": "可用：{tools_list}。使用 {TOOL_MARKER} 或用 {DONE_MARKER} 完成。",
