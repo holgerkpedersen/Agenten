@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Session data
+sessions/
+
+# Uploaded files
+uploads/
+
+# Generated preview/report files
+agenten_preview_*.md
+agent_session_*.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store

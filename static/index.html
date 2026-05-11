@@ -61,6 +61,65 @@
             flex: 1;
         }
         
+        .toolbar-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 8px 0;
+            flex-wrap: wrap;
+        }
+        
+        .toolbar-label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            min-width: 70px;
+            flex-shrink: 0;
+        }
+        
+        .tools-toggle {
+            background: #334155;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            position: relative;
+        }
+        
+        .tools-dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 8px;
+            z-index: 1000;
+            min-width: 200px;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .tools-dropdown.show {
+            display: flex;
+        }
+        
+        .tools-dropdown button {
+            width: 100%;
+            text-align: left;
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+        
+        .tools-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
         button {
             background: #3b82f6;
             border: none;
@@ -337,48 +396,67 @@
 <body>
 <div class="app-container">
     <div class="header">
-        <h1>🤖 Agenten</h1>
-        <p>🎯 Træk i ⋮⋮ ikonet • Træk i hjørnet for resize • Vinduer kan overlappe</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+            <h1>🤖 Agenten</h1>
+            <div class="tools-wrapper">
+                <button class="tools-toggle" onclick="toggleTools()" title="Flere værktøjer">⚙️</button>
+                <div class="tools-dropdown" id="toolsDropdown">
+                    <button onclick="resetExecution()" title="Nulstil alle opgavers status">🔄 Nulstil træ</button>
+                    <button onclick="deleteTree()" title="Slet hele opgavetræet">🗑 Slet træ</button>
+                    <button onclick="previewMarkdown()" title="Forhåndsvis session">👁 Preview</button>
+                    <button onclick="exportToMarkdown()" title="Eksporter til Markdown">📄 Eksporter MD</button>
+                    <button onclick="saveLayoutToLocal()" title="Gem layout permanent">💾 Gem layout</button>
+                    <button onclick="resetLayout()" title="Nulstil layout">🔄 Reset layout</button>
+                    <button onclick="selectExportFolder()" title="Vælg eksportmappe">📁 Eksportmappe</button>
+                </div>
+            </div>
+        </div>
+        <div id="folderStatus" style="font-size: 11px; margin-bottom: 5px;"></div>
         
-        <div class="session-bar">
+        <div class="toolbar-row">
+            <span class="toolbar-label">Sessions</span>
             <select id="sessionSelect" class="session-select">
-                <option value="">-- Vælg eller opret ny session --</option>
+                <option value="">-- Vælg eller opret ny --</option>
             </select>
-            <button onclick="refreshSessions(); console.log('Sessions refreshed')" title="Opdater sessions liste">🔄</button>
-            <button onclick="createNewSession()" title="Opret en ny session">➕ Ny</button>
-            <button onclick="loadSelectedSession()" title="Indlæs valgt session">📂 Indlæs</button>
-            <button onclick="saveCurrentSession()" title="Gemmer session med filer, træ og layout">💾 Gem session</button>
-            <button onclick="resetLayout()" title="Nulstil vindueslayout til standard">🔄 Reset layout</button>
-            <button onclick="resetExecution()" style="background:#f59e0b;" title="Nulstil alle opgavers status til ikke-udført">🔄 Nulstil</button>
-            <button onclick="deleteTree()" style="background:#ef4444;" title="Slet hele opgavetræet">🗑 Slet træ</button>
-            <button onclick="saveLayoutToLocal()" title="Gem layout permanent (overlever browser genstart)">💾 Gem layout</button>
-            <label style="display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;padding:8px 12px;border-radius:6px;cursor:pointer;">
-    <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
-    <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
-</label>
-            <button onclick="selectExportFolder()" style="background:#10b981;" title="Vælg mappe til at gemme eksporterede filer">📁 Vælg eksportmappe</button>
-            <button onclick="previewMarkdown()" style="background:#8b5cf6;" title="Forhåndsvis session i modal vindue">👁 Preview</button>
-            <button onclick="exportToMarkdown()" style="background:#ef4444;" title="Eksporter session til Markdown fil">📄 Eksporter til MD</button>
+            <button onclick="refreshSessions()" title="Opdater">🔄</button>
+            <button onclick="loadSelectedSession()" title="Indlæs">📂 Indlæs</button>
+            <button onclick="saveCurrentSession()" title="Gem">💾 Gem</button>
+            <button onclick="renameSession()" title="Omdøb">✏️ Omdøb</button>
+            <button onclick="createNewSession()" title="Ny session">➕ Ny</button>
         </div>
-        <div id="folderStatus" style="font-size: 11px; margin-top: 5px;"></div>
         
-        <div class="flex-row" style="margin-top: 10px;">
-            <input type="text" id="filePathInput" placeholder="Vælg fil(er) med Gennemse, derefter Læs fil" style="flex:1; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:8px; color:#e2e8f0;" readonly>
-            <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
-            <button onclick="document.getElementById('filePicker').click()" style="background:#475569;" title="Vælg en eller flere filer fra computeren">📂 Gennemse</button>
-            <button onclick="readFiles()" style="background:#8b5cf6;" title="Læs valgte filer og vis indhold">📖 Læs fil</button>
+        <div class="toolbar-row">
+            <span class="toolbar-label">Skabelon</span>
+            <select id="templateSelect" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;">
+                <option value="fri">🌳 Fri nedbrydning</option>
+                <option value="resume">📄 Resumé</option>
+                <option value="kodeanalyse">🔍 Kodeanalyse</option>
+            </select>
+            <label style="display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;padding:8px 12px;border-radius:6px;cursor:pointer;">
+                <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
+                <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
+            </label>
         </div>
-        <div id="fileSectionToggle" style="margin: 5px 0; cursor: pointer; color:#60a5fa; font-size:12px;" onclick="toggleFileSection()" title="Klik for at vise/skjule filer">▶ Vis filer</div>
+        
+        <div class="toolbar-row">
+            <span class="toolbar-label">Filer</span>
+            <input type="text" id="filePathInput" placeholder="Vælg fil(er) med Gennemse, derefter Læs fil" style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#e2e8f0;" readonly>
+            <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
+            <button onclick="document.getElementById('filePicker').click()" style="background:#475569;">📂 Gennemse</button>
+            <button onclick="readFiles()" style="background:#8b5cf6;">📖 Læs fil</button>
+        </div>
+        <div id="fileSectionToggle" style="margin: 2px 0; cursor: pointer; color:#60a5fa; font-size:12px;" onclick="toggleFileSection()">▶ Vis filer</div>
         <div id="fileSection" style="display:none;">
             <div id="selectedFilesDisplay" style="font-size:11px; color:#64748b; margin: 5px 0;"></div>
             <div id="fileContentPreview" class="file-preview"></div>
         </div>
         
-        <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?"></textarea>
-        <div>
-            <button onclick="decompose()" title="Nedbryd opgaven til et træ af delopgaver">🌳 Nedbryd til træ</button>
-            <button onclick="executeWithStream()" style="background:#10b981;" title="Udfør alle opgaver med live streaming">⚡ Udfør med streaming</button>
-            <button onclick="stopStream()" style="background:#ef4444;" title="Stop streaming">⏹️ Stop</button>
+        <div class="toolbar-row">
+            <span class="toolbar-label">Prompt</span>
+            <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?" style="flex:1;"></textarea>
+            <button onclick="decompose()">🌳 Nedbryd</button>
+            <button onclick="executeWithStream()" style="background:#10b981;">⚡ Udfør</button>
+            <button onclick="stopStream()" style="background:#ef4444;">⏹ Stop</button>
         </div>
     </div>
     
@@ -688,6 +766,19 @@ function toggleFileSection() {
         toggle.textContent = '▶ Vis filer';
     }
 }
+
+function toggleTools() {
+    const dropdown = document.getElementById('toolsDropdown');
+    dropdown.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('toolsDropdown');
+    const toggle = document.querySelector('.tools-toggle');
+    if (dropdown && toggle && !toggle.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.remove('show');
+    }
+});
 
 function toggleFileIncluded(index, included) {
     if (loadedFilesContent[index]) {
@@ -1072,6 +1163,29 @@ function resetLayout() {
     saveLayoutToSession();
 }
 
+async function renameSession() {
+    const select = document.getElementById('sessionSelect');
+    const sessionId = select.value;
+    if (!sessionId) {
+        alert('Vælg en session at omdøbe');
+        return;
+    }
+    const currentName = select.options[select.selectedIndex].text;
+    const newName = prompt('Nyt navn:', currentName);
+    if (!newName || newName === currentName) return;
+    
+    const response = await fetch('/api/sessions/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, name: newName })
+    });
+    const data = await response.json();
+    if (data.success) {
+        addLogEntry('INFO', 'Session omdøbt', newName);
+        refreshSessions();
+    }
+}
+
 async function refreshSessions() {
     console.log('Refreshing sessions...');
     try {
@@ -1200,6 +1314,8 @@ async function loadSelectedSession() {
         const promptInput = document.getElementById('promptInput');
         if (promptInput && data.session.original_prompt) {
             promptInput.value = data.session.original_prompt;
+        } else if (promptInput && data.session.tree && data.session.tree.name) {
+            promptInput.value = data.session.tree.name;
         }
         
         if (data.session.file_context && data.session.file_context.length > 0) {
@@ -1310,7 +1426,8 @@ async function decompose() {
             prompt, 
             session_id: currentSessionId,
             show_thinking: showThinking,
-            files: filesData
+            files: filesData,
+            template: document.getElementById('templateSelect').value
         })
     });
     const data = await response.json();

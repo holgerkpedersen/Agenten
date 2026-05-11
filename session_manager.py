@@ -56,6 +56,14 @@ class SessionManager:
         self.save_session(session_id, session_data)
         return session_id, session_data
     
+    def rename_session(self, session_id, new_name):
+        session_data = self.load_session(session_id)
+        if session_data:
+            session_data["name"] = new_name
+            self.save_session(session_id, session_data)
+            return True
+        return False
+
     def add_prompt_result(self, session_id, prompt, result, tree=None):
         session_data = self.load_session(session_id)
         if session_data:

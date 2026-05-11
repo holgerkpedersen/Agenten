@@ -240,7 +240,7 @@ def save_current_session():
         "layout": data.get("layout"),
         "execution_log": agent.execution_log,
         "agent_log": agent.agent_log,
-        "original_prompt": agent.original_prompt,
+        "original_prompt": data.get("original_prompt") or agent.original_prompt or "",
         "full_prompt_with_context": getattr(agent, 'full_prompt_with_context', '') or '',
         "show_thinking": data.get("show_thinking", agent.show_thinking),
         "prompt_history": data.get("prompt_history", []),
@@ -249,6 +249,17 @@ def save_current_session():
     session_manager.save_session(session_id, session_data)
     current_session_id = session_id
     return jsonify({"success": True, "session_id": session_id})
+
+@app.route("/api/sessions/rename", methods=["POST"])
+def rename_session():
+    data = request.json
+    session_id = data.get("session_id")
+    new_name = data.get("name", "")
+    if not session_id or not new_name:
+        return jsonify({"error": "Missing session_id or name"}), 400
+    if session_manager.rename_session(session_id, new_name):
+        return jsonify({"success": True})
+    return jsonify({"error": "Session not found"}), 404
 
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():
@@ -348,6 +359,7 @@ def decompose():
     session_id = data.get("session_id")
     show_thinking = data.get("show_thinking", True)
     files = data.get("files", [])
+    template = data.get("template")
     
     if not prompt:
         return jsonify({"error": "Ingen prompt angivet"}), 400
@@ -361,12 +373,12 @@ def decompose():
     agent.show_thinking = show_thinking
     session_context = session_manager.get_knowledge_for_context(current_session_id, prompt)
     
-    print(f"🌳 Nedbryder: {prompt[:50]}...")
+    print(f"🌳 Nedbryder: {prompt[:50]}..." + (f" skabelon: {template}" if template else ""))
     if files:
         print(f"📄 Med {len(files)} filer")
     
     try:
-        tree = agent.decompose_prompt(prompt, files=files)
+        tree = agent.decompose_prompt(prompt, files=files, template=template)
         session_manager.add_prompt_result(current_session_id, prompt, "Nedbrudt til træ", tree)
         
         session_data = {
@@ -449,10 +461,18 @@ def execute_stream():
         def execute_with_stream(node):
             nonlocal completed
             yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
+            
+            child_results = []
             for child in node.children:
                 yield from execute_with_stream(child)
+                if child.result:
+                    child_results.append(f"- {child.name}: {child.result}")
+            
             node.status = "running"
-            solve_prompt = f"Løs delopgave i kontekst af: {original_prompt}\n\nDELOPGAVE: {node.name}\n\nSvar på dansk:"
+            solve_prompt = f"Løs delopgave i kontekst af: {original_prompt}\n\nDELOPGAVE: {node.name}\n\n"
+            if child_results:
+                solve_prompt += "RESULTATER FRA UNDEROPGAVER:\n" + "\n".join(child_results) + "\n\n"
+            solve_prompt += "Svar på dansk:"
             full_response = ""
             chunk_count = 0
             for chunk in agent.llm.generate_stream(solve_prompt):
@@ -483,7 +503,7 @@ def execute_stream():
                 "tree": agent.task_tree_to_dict(),
                 "execution_log": agent.execution_log,
                 "agent_log": agent.agent_log,
-                "original_prompt": original_prompt
+                "original_prompt": agent.original_prompt or (agent.task_tree.root.name if agent.task_tree else "")
             }
             if current_session_id:
                 session_manager.save_session(current_session_id, session_data)

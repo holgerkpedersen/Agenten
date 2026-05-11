@@ -18,6 +18,51 @@ class Agent:
         self.full_prompt_with_context = ""
         self.show_thinking = True
 
+    TEMPLATES = {
+        "resume": {
+            "name": "📄 Resumé",
+            "prompt": """Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:
+## Overblik
+## Nøglepunkter
+## Konklusion
+## Anbefalinger
+
+Svar på dansk. Brug ikke <think> tags. Ingen anden tekst:""",
+            "fallback": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"]
+        },
+        "kodeanalyse": {
+            "name": "🔍 Kodeanalyse",
+            "prompt": """Analyser følgende kode struktureret. Returnér KUN følgende sektioner:
+## Formål
+## Imports og afhængigheder
+## Arkitektur
+## Kodekvalitet
+## Sikkerhed
+
+Svar på dansk. Brug ikke <think> tags. Ingen anden tekst:""",
+            "fallback": ["Formål", "Imports og afhængigheder", "Arkitektur", "Kodekvalitet", "Sikkerhed"]
+        },
+        "fri": {
+            "name": "🌳 Fri nedbrydning",
+            "prompt": """Nedbryd følgende opgave i delopgaver. Brug 2 mellemrum per niveau.
+Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.
+
+Opgave: {prompt}
+
+Eksempel på format:
+Forstå problemet
+  Identificer krav
+  Saml information
+Find løsning
+  Overvej muligheder
+  Vælg metode
+Konkluder
+
+Nedbryd nu opgaven (KUN træstruktur):""",
+            "fallback": None
+        }
+    }
+
     def _log(self, level, message, detail=""):
         log_entry = {
             "timestamp": time.time(),
@@ -183,10 +228,11 @@ class Agent:
         self._log("INFO", f"Parsede {added_count} opgaver fra LLM", "")
         return tree
 
-    def decompose_prompt(self, prompt, files=None):
+    def decompose_prompt(self, prompt, files=None, template=None):
         self.agent_log = []
         self.original_prompt = prompt
-        self._log("INFO", "Starter nedbrydning", prompt[:100])
+        template_config = self.TEMPLATES.get(template, self.TEMPLATES["fri"]) if template else self.TEMPLATES["fri"]
+        self._log("INFO", "Starter nedbrydning", f"{prompt[:100]} (skabelon: {template_config['name']})")
         
         file_context = ""
         if files and len(files) > 0:
@@ -203,21 +249,19 @@ class Agent:
         
         self.full_prompt_with_context = prompt + file_context
         
-        decomposition_prompt = """Nedbryd følgende opgave i delopgaver. Brug 2 mellemrum per niveau.
-Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.
-
-Opgave: """ + prompt + file_context + """
-
-Eksempel på format:
-Forstå problemet
-  Identificer krav
-  Saml information
-Find løsning
-  Overvej muligheder
-  Vælg metode
-Konkluder
-
-Nedbryd nu opgaven (KUN træstruktur):"""
+        if template and template != "fri" and template_config.get("fallback"):
+            if template_config.get("fallback"):
+                tree = TaskTree(prompt)
+                for section in template_config["fallback"]:
+                    tree.root.add_child(TaskNode(section))
+                self.task_tree = tree
+                task_count = len(template_config["fallback"]) + 1
+                self._log("INFO", "Bruger skabelon", f"{task_count} opgaver oprettet")
+                return self.task_tree_to_dict()
+        
+        decomposition_prompt = template_config["prompt"].replace("{prompt}", prompt)
+        file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
+        decomposition_prompt += file_context_entry
 
         self._log("LLM", "Sender forespørgsel til LLM", f"Med filkontekst: {bool(file_context)}")
         response = self.llm.generate(decomposition_prompt, temperature=0.3, max_tokens=32000)
