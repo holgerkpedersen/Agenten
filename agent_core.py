@@ -2,9 +2,13 @@ from llm_wrapper import LMStudioWrapper
 from web_searcher import WebSearcher
 from task_tree import TaskTree, TaskNode
 from module_builder import ModuleBuilder
+from tools import Tool, ToolRegistry
+from github_wrapper import GithubAPI
+import git_ops
 import re
 import time
 import os
+import json
 
 class Agent:
     def __init__(self):
@@ -17,6 +21,71 @@ class Agent:
         self.original_prompt = ""
         self.full_prompt_with_context = ""
         self.show_thinking = True
+        self.tool_registry = ToolRegistry()
+        self._register_tools()
+
+    def _register_tools(self):
+        gh = GithubAPI()
+        self.tool_registry.register(Tool(
+            "github_create_repo",
+            "Opret et nyt GitHub repository",
+            ["name", "description", "private"],
+            lambda name, description="", private=False: gh.create_repo(name, description, private)
+        ))
+        self.tool_registry.register(Tool(
+            "github_list_repos",
+            "List alle GitHub repositories",
+            [],
+            lambda: gh.list_repos()
+        ))
+        self.tool_registry.register(Tool(
+            "github_create_issue",
+            "Opret et GitHub issue",
+            ["owner", "repo", "title", "body"],
+            lambda owner, repo, title, body="": gh.create_issue(owner, repo, title, body)
+        ))
+        self.tool_registry.register(Tool(
+            "github_create_pr",
+            "Opret en Pull Request på GitHub",
+            ["owner", "repo", "title", "head", "base"],
+            lambda owner, repo, title, head, base="master": gh.create_pr(owner, repo, title, head, base)
+        ))
+        self.tool_registry.register(Tool(
+            "git_status",
+            "Tjek status for git repository (ændrede filer)",
+            [],
+            lambda: git_ops.git_status()
+        ))
+        self.tool_registry.register(Tool(
+            "git_add_all",
+            "Stage alle ændringer (git add -A)",
+            [],
+            lambda: git_ops.git_add_all()
+        ))
+        self.tool_registry.register(Tool(
+            "git_commit",
+            "Commit staged ændringer",
+            ["message"],
+            lambda message: git_ops.git_commit(message)
+        ))
+        self.tool_registry.register(Tool(
+            "git_push",
+            "Push commits til remote origin",
+            ["branch"],
+            lambda branch="master": git_ops.git_push(branch)
+        ))
+        self.tool_registry.register(Tool(
+            "git_set_remote",
+            "Sæt remote origin URL",
+            ["url"],
+            lambda url: git_ops.git_set_remote(url)
+        ))
+        self.tool_registry.register(Tool(
+            "git_remote_status",
+            "Tjek om der er konfigureret et remote",
+            [],
+            lambda: git_ops.git_remote_exists()
+        ))
 
     TEMPLATES = {
         "resume": {
@@ -314,17 +383,109 @@ Nedbryd nu opgaven (KUN træstruktur):""",
     def solve_task(self, task_node, original_prompt):
         task_node.status = "running"
         self._log("INFO", "Påbegynder opgave", task_node.name)
-        solve_prompt = "Løs følgende delopgave i kontekst af den overordnede opgave.\n\nOVERORDNET OPGAVE: " + original_prompt + "\n\nDELOPGAVE: " + task_node.name + "\n\nSvar kort og præcist på dansk:"
+
+        safe_prompt = self.tool_registry.strip_markers(original_prompt)
+        system_prompt = self.tool_registry.build_system_prompt(task_node.name)
+
+        conversation = system_prompt
         full_response = ""
-        for chunk in self.llm.generate_stream(solve_prompt):
-            full_response += chunk
+        max_iterations = 10
+
+        for i in range(max_iterations):
+            prompt = conversation
+            if i > 0:
+                prompt += f"\n\nFortsæt. Brug et værktøj hvis nødvendigt, eller afslut med {self.tool_registry.DONE_MARKER}."
+
+            response = ""
+            for chunk in self.llm.generate_stream(prompt):
+                response += chunk
+
+            parsed = self.tool_registry.parse_response(response)
+            self._log("LLM", f"Iteration {i+1}", f"Type: {parsed.get('type')}")
+
+            if parsed["type"] == "tool":
+                self._log("TOOL", f"Kalder {parsed['tool']}", str(parsed.get("args", {}))[:100])
+                result = self.tool_registry.execute(parsed["tool"], parsed["args"])
+                result_str = json.dumps(result, ensure_ascii=False)
+                self._log("TOOL", f"Resultat {parsed['tool']}", result_str[:200])
+                conversation += f"\n\nVÆRKTØJ-RESULTAT for {parsed['tool']}:\n{result_str}"
+                continue
+
+            if parsed["type"] == "done":
+                full_response = parsed["result"]
+                break
+
+            if parsed["type"] == "error":
+                conversation += f"\n\nFEJL: {parsed['message']}"
+                continue
+
+            full_response = response
+            if i >= 2:
+                break
+
         if not full_response or "ERROR" in full_response:
-            full_response = "Løsning på '" + task_node.name + "':\n1. Analyser krav\n2. Implementer\n3. Verificer"
+            full_response = "Løsning på '" + task_node.name + "':\nKunne ikke fuldføre opgaven automatisk."
+
         task_node.status = "done"
         task_node.result = full_response
         self.action_history.append(task_node.name.split()[0] if task_node.name else "unknown")
         self._log("INFO", "Opgave færdig", task_node.name)
         return full_response
+
+    def solve_task_stream(self, task_node, original_prompt):
+        task_node.status = "running"
+        self._log("INFO", "Påbegynder opgave", task_node.name)
+
+        safe_prompt = self.tool_registry.strip_markers(original_prompt)
+        system_prompt = self.tool_registry.build_system_prompt(task_node.name)
+
+        conversation = system_prompt
+        full_response = ""
+        max_iterations = 10
+
+        for i in range(max_iterations):
+            prompt = conversation
+            if i > 0:
+                prompt += f"\n\nFortsæt. Brug et værktøj hvis nødvendigt, eller afslut med {self.tool_registry.DONE_MARKER}."
+
+            response = ""
+            for chunk in self.llm.generate_stream(prompt):
+                response += chunk
+                yield {"type": "chunk", "chunk": chunk}
+
+            parsed = self.tool_registry.parse_response(response)
+            self._log("LLM", f"Iteration {i+1}", f"Type: {parsed.get('type')}")
+
+            if parsed["type"] == "tool":
+                self._log("TOOL", f"Kalder {parsed['tool']}", str(parsed.get("args", {}))[:100])
+                result = self.tool_registry.execute(parsed["tool"], parsed["args"])
+                result_str = json.dumps(result, ensure_ascii=False)
+                self._log("TOOL", f"Resultat {parsed['tool']}", result_str[:200])
+                yield {"type": "tool_call", "tool": parsed["tool"], "args": parsed.get("args", {})}
+                yield {"type": "tool_result", "tool": parsed["tool"], "result": result}
+                conversation += f"\n\nVÆRKTØJ-RESULTAT for {parsed['tool']}:\n{result_str}"
+                continue
+
+            if parsed["type"] == "done":
+                full_response = parsed["result"]
+                break
+
+            if parsed["type"] == "error":
+                conversation += f"\n\nFEJL: {parsed['message']}"
+                continue
+
+            full_response = response
+            if i >= 2:
+                break
+
+        if not full_response or "ERROR" in full_response:
+            full_response = "Løsning på '" + task_node.name + "':\nKunne ikke fuldføre opgaven automatisk."
+
+        task_node.status = "done"
+        task_node.result = full_response
+        self.action_history.append(task_node.name.split()[0] if task_node.name else "unknown")
+        self._log("INFO", "Opgave færdig", task_node.name)
+        yield {"type": "done", "result": full_response}
 
     def execute_tree(self, node=None):
         if node is None:

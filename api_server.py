@@ -261,6 +261,22 @@ def rename_session():
         return jsonify({"success": True})
     return jsonify({"error": "Session not found"}), 404
 
+@app.route("/api/tools/token", methods=["GET", "POST"])
+def manage_token():
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if request.method == "GET":
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return jsonify({"success": True, "exists": True, "content": content})
+        return jsonify({"success": True, "exists": False, "content": "GITHUB_TOKEN=dit_token_her"})
+    
+    data = request.json
+    content = data.get("content", "")
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.write(content)
+    return jsonify({"success": True, "message": ".env gemt"})
+
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():
     data = request.json
@@ -469,18 +485,18 @@ def execute_stream():
                     child_results.append(f"- {child.name}: {child.result}")
             
             node.status = "running"
-            solve_prompt = f"Løs delopgave i kontekst af: {original_prompt}\n\nDELOPGAVE: {node.name}\n\n"
-            if child_results:
-                solve_prompt += "RESULTATER FRA UNDEROPGAVER:\n" + "\n".join(child_results) + "\n\n"
-            solve_prompt += "Svar på dansk:"
             full_response = ""
-            chunk_count = 0
-            for chunk in agent.llm.generate_stream(solve_prompt):
-                full_response += chunk
-                chunk_count += 1
-                if show_thinking:
-                    yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': chunk})}\n\n"
-                time.sleep(0.01)
+            for event in agent.solve_task_stream(node, original_prompt):
+                if event["type"] == "chunk":
+                    full_response += event["chunk"]
+                    if show_thinking:
+                        yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']})}\n\n"
+                elif event["type"] == "tool_call":
+                    yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
+                elif event["type"] == "tool_result":
+                    yield f"data: {json.dumps({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']})}\n\n"
+                elif event["type"] == "done":
+                    full_response = event["result"]
             if not full_response:
                 full_response = "Løsning: " + node.name
             node.status = "done"
