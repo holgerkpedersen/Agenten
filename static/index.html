@@ -1351,6 +1351,11 @@ async function loadSelectedSession() {
             }
         }
         
+        if (data.session.template) {
+            document.getElementById('templateSelect').value = data.session.template;
+            lastDecomposeTemplate = data.session.template;
+        }
+        
         if (data.session.agent_log) {
             const logBox = document.getElementById('logContent');
             if (logBox) {
