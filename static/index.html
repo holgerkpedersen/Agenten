@@ -1509,6 +1509,7 @@ async function decompose() {
     if (data.success) {
         currentTree = data.tree;
         currentSessionId = data.session_id;
+        lastDecomposeTemplate = document.getElementById('templateSelect').value;
         updateTreeDisplay();
         await updatePromptHistory(currentSessionId);
         addLogEntry('INFO', 'Nedbrydning færdig', `${data.session_id}`);
@@ -1571,13 +1572,15 @@ async function deleteTree() {
     await saveCurrentSession();
 }
 
+let lastDecomposeTemplate = null;
+
 async function executeWithStream() {
-    if (!currentTree) {
-        const template = document.getElementById('templateSelect').value;
+    const template = document.getElementById('templateSelect').value;
+    if (!currentTree || (template !== 'fri' && template !== lastDecomposeTemplate)) {
         if (template !== 'fri') {
             await decompose();
             if (!currentTree) return;
-        } else {
+        } else if (!currentTree) {
             alert('Nedbryd en opgave først');
             return;
         }
