@@ -1774,35 +1774,36 @@ async function exportToMarkdown() {
     const session = data.session;
     const timestamp = new Date().toLocaleString();
     
-    let md = `# 📊 Agenten - Session Rapport\n\n`;
+let md = `${_('export_md_report_header')}\n\n`;
     md += `**Session ID:** ${session.id}\n`;
     md += `**Navn:** ${session.name}\n`;
     md += `**Oprettet:** ${session.created}\n`;
     md += `**Eksporteret:** ${timestamp}\n\n`;
     md += `---\n\n`;
     
-    md += `## 📝 Original Prompt\n\n`;
-    md += `\`\`\`\n${session.original_prompt || 'Ingen prompt'}\n\`\`\`\n\n`;
+    md += `${_('export_md_prompt')}\n\n`;
+    md += `\`\`\`\n${session.original_prompt || _('export_md_no_prompt')}\n\`\`\`\n\n`;
     
-    md += `## 🌲 Opgavetræ\n\n`;
+    md += `${_('export_md_tree')}\n\n`;
     if (currentTree) {
         md += generateTreeMarkdown(currentTree);
     } else if (session.tree) {
         md += generateTreeMarkdown(session.tree);
     } else {
-        md += `*Intet træ genereret endnu*\n\n`;
+        md += `${_('export_md_no_tree')}\n\n`;
     }
     md += `\n`;
     
-    md += `## 📡 LLM Output (Streaming)\n\n`;
+    md += `${_('export_md_llm')}\n\n`;
     const llmContent = document.getElementById('llmContent');
-    if (llmContent && llmContent.innerText && llmContent.innerText !== 'Tryk "Udfør med streaming"') {
-        md += `${llmContent.innerText}\n\n`;
+    if (llmContent && llmContent.innerText && llmContent.innerText !== 'Tryk "Udfør med streaming"' && llmContent.innerText !== _('click_stream_hint')) {
+        md += `\`\`\`\n${llmContent.innerText}\n\`\`\`\n\n`;
     } else {
-        md += `*Ingen LLM output endnu*\n\n`;
+        md += `${_('export_md_no_llm')}\n\n`;
     }
+    md += `\n`;
     
-    md += `## 📋 Agent Log\n\n`;
+    md += `${_('export_md_log')}\n\n`;
     if (session.agent_log && session.agent_log.length > 0) {
         for (const log of session.agent_log) {
             const time = new Date(log.timestamp * 1000).toLocaleTimeString();
@@ -1812,52 +1813,52 @@ async function exportToMarkdown() {
         }
         md += `\n`;
     } else {
-        md += `*Ingen log entries*\n\n`;
+        md += `${_('export_md_no_log')}\n\n`;
     }
     
-    md += `## 📜 Prompt Historik\n\n`;
+    md += `${_('export_md_history')}\n\n`;
     if (session.prompt_history && session.prompt_history.length > 0) {
         for (let i = 0; i < session.prompt_history.length; i++) {
             const item = session.prompt_history[i];
             const time = new Date(item.timestamp).toLocaleTimeString();
             md += `### ${i + 1}. ${item.prompt}\n`;
-            md += `- **Tid:** ${time}\n`;
-            md += `- **Resultat:**\n`;
-            md += `  \`\`\`\n  ${(item.result || 'Ingen resultat').slice(0, 500)}\n  \`\`\`\n`;
+            md += `- ${_('export_md_time')}${time}\n`;
+            md += `- ${_('export_md_result')}\n`;
+            md += `  \`\`\`\n  ${(item.result || _('export_md_no_result_yet')).slice(0, 500)}\n  \`\`\`\n`;
             if (item.tree) {
-                md += `- **Træstruktur:**\n`;
+                md += `- ${_('export_md_treestructure')}\n`;
                 md += `  \`\`\`\n  ${JSON.stringify(item.tree, null, 2).slice(0, 1000)}\n  \`\`\`\n`;
             }
             md += `\n`;
         }
     } else {
-        md += `*Ingen prompts endnu*\n\n`;
+        md += `${_('export_md_no_prompts')}\n\n`;
     }
     
-    md += `## 🧠 Gemt Viden (Learned Knowledge)\n\n`;
+    md += `${_('export_md_knowledge')}\n\n`;
     if (session.learned_knowledge && session.learned_knowledge.length > 0) {
         for (const knowledge of session.learned_knowledge) {
             md += `- **[${knowledge.type}]** ${knowledge.content}\n`;
-            md += `  - *Kilde:* ${knowledge.source_prompt}\n`;
+            md += `  - ${_('export_md_source')}${knowledge.source_prompt}\n`;
         }
         md += `\n`;
     } else {
-        md += `*Ingen gemt viden endnu*\n\n`;
+        md += `${_('export_md_no_knowledge')}\n\n`;
     }
     
-    md += `## 🖥️ Layout Information\n\n`;
+    md += `${_('export_md_layout')}\n\n`;
     if (session.layout) {
         md += `\`\`\`json\n${JSON.stringify(session.layout, null, 2)}\n\`\`\`\n\n`;
     }
     
-    md += `## 🔍 Problemer / Observationer\n\n`;
-    md += `*Skriv dine observationer her:*\n\n`;
+    md += `${_('export_md_issues')}\n\n`;
+    md += `${_('export_md_observations')}\n\n`;
     md += `- \n`;
     md += `- \n`;
     md += `- \n\n`;
     
     md += `---\n`;
-    md += `*Rapport genereret af Agenten - Dansk AI Opgaveplanlægger*\n`;
+    md += `${_('export_md_footer')}\n`;
     
     const filename = `agent_session_${currentSessionId}_${Date.now()}.md`;
     
