@@ -415,6 +415,7 @@ def decompose():
             "original_prompt": agent.original_prompt,
             "full_prompt_with_context": agent.full_prompt_with_context,
             "show_thinking": agent.show_thinking,
+            "template": template,
             "file_context": files
         }
         session_manager.save_session(current_session_id, session_data)
@@ -447,6 +448,9 @@ def execute_stream():
             if session_data.get("lang"):
                 agent.lang = session_data["lang"]
                 agent.tool_registry.lang = agent.lang
+            if session_data.get("template"):
+                allowed = agent.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent.TEMPLATE_TOOLS else None
+                agent.tool_registry.set_active_tools(allowed)
             
             fpc = session_data.get("full_prompt_with_context", "")
             if not fpc:
