@@ -1467,7 +1467,9 @@ async function saveCurrentSession() {
             prompt_history: [],
             file_context: fileContext,
             original_prompt: currentPrompt,
-            show_thinking: showThinking
+            show_thinking: showThinking,
+            lang: currentLang,
+            template: document.getElementById('templateSelect').value
         })
     });
     const data = await response.json();

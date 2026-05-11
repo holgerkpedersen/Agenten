@@ -246,6 +246,8 @@ def save_current_session():
         "original_prompt": data.get("original_prompt") or agent.original_prompt or "",
         "full_prompt_with_context": getattr(agent, 'full_prompt_with_context', '') or '',
         "show_thinking": data.get("show_thinking", agent.show_thinking),
+        "template": data.get("template") or getattr(agent, 'active_template', None),
+        "lang": data.get("lang") or getattr(agent, 'lang', 'da'),
         "prompt_history": data.get("prompt_history", []),
         "file_context": data.get("file_context", "")
     }
@@ -416,6 +418,7 @@ def decompose():
             "full_prompt_with_context": agent.full_prompt_with_context,
             "show_thinking": agent.show_thinking,
             "template": template,
+            "lang": agent.lang,
             "file_context": files
         }
         session_manager.save_session(current_session_id, session_data)
