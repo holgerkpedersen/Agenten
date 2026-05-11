@@ -32,25 +32,19 @@ class ToolRegistry:
 
     def build_system_prompt(self, task):
         tools_desc = self.get_tool_descriptions()
-        prompt = f"""Du er Agenten, en AI-assistent med direkte adgang til værktøjer.
+        prompt = f"""/no_think Du er Agenten. Svar KUN med præcis ét af disse formater:
 
-TILGÆNGELIGE VÆRKTØJER:
+VÆRKTØJ:
+{self.TOOL_MARKER}{{"tool":"navn","args":{{"param":"værdi"}}}}{self.END_MARKER}
+
+AFSLUT:
+{self.DONE_MARKER}{{"result":"dit færdige svar"}}{self.END_MARKER}
+
+Eksempel værktøjskald:
+{self.TOOL_MARKER}{{"tool":"git_status","args":{{}}}}{self.END_MARKER}
+
+Værktøjer:
 {tools_desc}
-
-Du kan udføre opgaver selvstændigt ved at bruge disse værktøjer.
-Brug IKKE <think> tags. Svar på dansk.
-
-Når du vil bruge et værktøj, svar KUN med ét af følgende formater:
-
-For at kalde et værktøj:
-{self.TOOL_MARKER}
-{{"tool": "navn", "args": {{"param1": "værdi", ...}}}}
-{self.END_MARKER}
-
-Når opgaven er fuldstændigt løst:
-{self.DONE_MARKER}
-{{"result": "din samlede konklusion og resultat"}}
-{self.END_MARKER}
 
 OPGAVE: {task}"""
         return prompt
@@ -60,6 +54,10 @@ OPGAVE: {task}"""
         return re.sub(r'<<<TOOL>>>|<<<DONE>>>|<<<END>>>', '', text)
 
     def parse_response(self, response):
+        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+        response = re.sub(r'```\w*\n?', '', response)
+        response = re.sub(r'```', '', response)
+
         tool_match = re.search(
             re.escape(self.TOOL_MARKER) + r'\s*(.*?)\s*' + re.escape(self.END_MARKER),
             response, re.DOTALL

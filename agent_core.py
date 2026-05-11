@@ -28,31 +28,31 @@ class Agent:
         gh = GithubAPI()
         self.tool_registry.register(Tool(
             "github_create_repo",
-            "Opret et nyt GitHub repository",
-            ["name", "description", "private"],
-            lambda name, description="", private=False: gh.create_repo(name, description, private)
+            "Opret nyt GitHub repo. Kræver: repo_navn (fx 'Agenten'), beskrivelse",
+            ["repo_navn", "beskrivelse", "privat"],
+            lambda repo_navn, beskrivelse="", privat=False: gh.create_repo(name=repo_navn, description=beskrivelse, private=privat)
         ))
         self.tool_registry.register(Tool(
             "github_list_repos",
-            "List alle GitHub repositories",
+            "List alle dine GitHub repositories",
             [],
             lambda: gh.list_repos()
         ))
         self.tool_registry.register(Tool(
             "github_create_issue",
-            "Opret et GitHub issue",
-            ["owner", "repo", "title", "body"],
-            lambda owner, repo, title, body="": gh.create_issue(owner, repo, title, body)
+            "Opret et GitHub issue. Kræver: ejer, repo, titel, body",
+            ["ejer", "repo", "titel", "body"],
+            lambda ejer, repo, titel, body="": gh.create_issue(owner=ejer, repo=repo, title=titel, body=body)
         ))
         self.tool_registry.register(Tool(
             "github_create_pr",
-            "Opret en Pull Request på GitHub",
-            ["owner", "repo", "title", "head", "base"],
-            lambda owner, repo, title, head, base="master": gh.create_pr(owner, repo, title, head, base)
+            "Opret Pull Request. Kræver: ejer, repo, titel, branch",
+            ["ejer", "repo", "titel", "branch"],
+            lambda ejer, repo, titel, branch, base="master": gh.create_pr(owner=ejer, repo=repo, title=titel, head=branch, base=base)
         ))
         self.tool_registry.register(Tool(
             "git_status",
-            "Tjek status for git repository (ændrede filer)",
+            "Vis ændrede filer i git (git status)",
             [],
             lambda: git_ops.git_status()
         ))
@@ -64,25 +64,25 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "git_commit",
-            "Commit staged ændringer",
-            ["message"],
-            lambda message: git_ops.git_commit(message)
+            "Commit med besked. Kræver: besked",
+            ["besked"],
+            lambda besked: git_ops.git_commit(message=besked)
         ))
         self.tool_registry.register(Tool(
             "git_push",
-            "Push commits til remote origin",
+            "Push til remote. Default branch: master",
             ["branch"],
-            lambda branch="master": git_ops.git_push(branch)
+            lambda branch="master": git_ops.git_push(branch=branch)
         ))
         self.tool_registry.register(Tool(
             "git_set_remote",
-            "Sæt remote origin URL",
+            "Sæt remote origin URL. Kræver: url",
             ["url"],
-            lambda url: git_ops.git_set_remote(url)
+            lambda url: git_ops.git_set_remote(url=url)
         ))
         self.tool_registry.register(Tool(
             "git_remote_status",
-            "Tjek om der er konfigureret et remote",
+            "Tjek om git remote er konfigureret",
             [],
             lambda: git_ops.git_remote_exists()
         ))
@@ -333,7 +333,7 @@ Nedbryd nu opgaven (KUN træstruktur):""",
         decomposition_prompt += file_context_entry
 
         self._log("LLM", "Sender forespørgsel til LLM", f"Med filkontekst: {bool(file_context)}")
-        response = self.llm.generate(decomposition_prompt, temperature=0.3, max_tokens=32000)
+        response = self.llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)
         self._log("LLM", "Modtog svar fra LLM", f"{len(response)} tegn")
         
         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
@@ -384,20 +384,19 @@ Nedbryd nu opgaven (KUN træstruktur):""",
         task_node.status = "running"
         self._log("INFO", "Påbegynder opgave", task_node.name)
 
-        safe_prompt = self.tool_registry.strip_markers(original_prompt)
         system_prompt = self.tool_registry.build_system_prompt(task_node.name)
 
         conversation = system_prompt
         full_response = ""
-        max_iterations = 10
+        max_iterations = 8
 
         for i in range(max_iterations):
             prompt = conversation
             if i > 0:
-                prompt += f"\n\nFortsæt. Brug et værktøj hvis nødvendigt, eller afslut med {self.tool_registry.DONE_MARKER}."
+                prompt += f"\n\nBrug {self.tool_registry.TOOL_MARKER} for værktøj eller {self.tool_registry.DONE_MARKER} for at afslutte. Ingen anden tekst."
 
             response = ""
-            for chunk in self.llm.generate_stream(prompt):
+            for chunk in self.llm.generate_stream(prompt, max_tokens=1024):
                 response += chunk
 
             parsed = self.tool_registry.parse_response(response)
@@ -419,8 +418,9 @@ Nedbryd nu opgaven (KUN træstruktur):""",
                 conversation += f"\n\nFEJL: {parsed['message']}"
                 continue
 
+            conversation += f"\n\nIntet værktøj eller done fundet. Prøv igen."
             full_response = response
-            if i >= 2:
+            if i >= 3:
                 break
 
         if not full_response or "ERROR" in full_response:
@@ -436,20 +436,19 @@ Nedbryd nu opgaven (KUN træstruktur):""",
         task_node.status = "running"
         self._log("INFO", "Påbegynder opgave", task_node.name)
 
-        safe_prompt = self.tool_registry.strip_markers(original_prompt)
         system_prompt = self.tool_registry.build_system_prompt(task_node.name)
 
         conversation = system_prompt
         full_response = ""
-        max_iterations = 10
+        max_iterations = 8
 
         for i in range(max_iterations):
             prompt = conversation
             if i > 0:
-                prompt += f"\n\nFortsæt. Brug et værktøj hvis nødvendigt, eller afslut med {self.tool_registry.DONE_MARKER}."
+                prompt += f"\n\nBrug {self.tool_registry.TOOL_MARKER} for værktøj eller {self.tool_registry.DONE_MARKER} for at afslutte. Ingen anden tekst."
 
             response = ""
-            for chunk in self.llm.generate_stream(prompt):
+            for chunk in self.llm.generate_stream(prompt, max_tokens=1024):
                 response += chunk
                 yield {"type": "chunk", "chunk": chunk}
 
@@ -474,8 +473,9 @@ Nedbryd nu opgaven (KUN træstruktur):""",
                 conversation += f"\n\nFEJL: {parsed['message']}"
                 continue
 
+            conversation += f"\n\nIntet værktøj eller done fundet. Prøv igen."
             full_response = response
-            if i >= 2:
+            if i >= 3:
                 break
 
         if not full_response or "ERROR" in full_response:
