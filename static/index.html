@@ -734,11 +734,11 @@ async function updatePromptHistory(sessionId) {
                 `;
             }
         } else {
-            historyContainer.innerHTML = '<div style="color: #64748b;">Ingen prompts endnu. Skriv en opgave og klik "Nedbryd til træ"</div>';
+            historyContainer.innerHTML = `<div style="color: #64748b;">${_('no_prompts_yet')}</div>`;
         }
     } catch (e) {
         console.error('Failed to load history:', e);
-        historyContainer.innerHTML = '<div style="color: #ef4444;">Fejl ved indlæsning af historik</div>';
+        historyContainer.innerHTML = `<div style="color: #ef4444;">${_('history_error')}</div>`;
     }
 }
 
@@ -1008,19 +1008,19 @@ function createPanels() {
         
         const contentDiv = document.getElementById(`${def.id}Content`);
         if (def.id === 'tree') {
-            contentDiv.innerHTML = '<div id="treeContent" class="tree-container"><div style="color: #64748b;">Klik "Nedbryd til træ"</div></div>';
+            contentDiv.innerHTML = `<div id="treeContent" class="tree-container"><div style="color: #64748b;">${_('click_tree_hint')}</div></div>`;
         } else if (def.id === 'llm') {
             contentDiv.innerHTML = `
                 <div id="progressContainer" style="display: none;">
                     <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
                     <div id="currentTask" style="margin-bottom: 8px; font-size: 12px;"></div>
                 </div>
-                <div id="llmContent" class="llm-box"><div style="color: #64748b;">Tryk "Udfør med streaming"</div></div>
+                <div id="llmContent" class="llm-box"><div style="color: #64748b;">${_('click_stream_hint')}</div></div>
             `;
         } else if (def.id === 'log') {
-            contentDiv.innerHTML = '<div id="logContent" class="log-box"><div style="color: #64748b;">Logger venter på aktivitet...</div></div>';
+            contentDiv.innerHTML = `<div id="logContent" class="log-box"><div style="color: #64748b;">${_('log_waiting')}</div></div>`;
         } else if (def.id === 'history') {
-            contentDiv.innerHTML = '<div id="historyContent" class="history-box"><div style="color: #64748b;">Vælg en session for at se prompt historik</div></div>';
+            contentDiv.innerHTML = `<div id="historyContent" class="history-box"><div style="color: #64748b;">${_('history_waiting')}</div></div>`;
         }
     }
     
@@ -1305,9 +1305,9 @@ async function createNewSession() {
             const fileToggle = document.getElementById('fileSectionToggle');
             if (fileToggle) fileToggle.textContent = '▶ Vis filer';
             const treeContent = document.getElementById('treeContent');
-            if (treeContent) treeContent.innerHTML = '<div style="color:#64748b;">Klik "Nedbryd til træ"</div>';
+            if (treeContent) treeContent.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
             const llmContent = document.getElementById('llmContent');
-            if (llmContent) llmContent.innerHTML = '<div style="color:#64748b;">Tryk "Udfør med streaming"</div>';
+            if (llmContent) llmContent.innerHTML = `<div style="color:#64748b;">${_('click_stream_hint')}</div>`;
             addLogEntry('INFO', 'Ny session oprettet', `${name} (${data.session_id})`);
             refreshSessions();
             loadLayoutFromLocal();
@@ -1557,7 +1557,7 @@ async function resetExecution() {
     
     updateTreeDisplay();
     const llmContent = document.getElementById('llmContent');
-    if (llmContent) llmContent.innerHTML = '<div style="color:#64748b;">Tryk "Udfør med streaming"</div>';
+    if (llmContent) llmContent.innerHTML = `<div style="color:#64748b;">${_('click_stream_hint')}</div>`;
     addLogEntry('INFO', 'Opgavetræ nulstillet', '');
     
     if (currentSessionId) saveCurrentSession();
@@ -1574,9 +1574,9 @@ async function deleteTree() {
     currentTree = null;
     await fetch('/api/reset-execution', { method: 'POST' });
     const treeContent = document.getElementById('treeContent');
-    if (treeContent) treeContent.innerHTML = '<div style="color:#64748b;">Klik "Nedbryd til træ"</div>';
+    if (treeContent) treeContent.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
     const llmContent = document.getElementById('llmContent');
-    if (llmContent) llmContent.innerHTML = '<div style="color:#64748b;">Tryk "Udfør med streaming"</div>';
+    if (llmContent) llmContent.innerHTML = `<div style="color:#64748b;">${_('click_stream_hint')}</div>`;
     addLogEntry('INFO', 'Opgavetræ slettet', '');
     await saveCurrentSession();
 }
@@ -1917,11 +1917,11 @@ async function previewMarkdown() {
         html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px;">📝 Prompt</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(promptText)}</pre>`;
     }
     
-    if (treeContent && treeContent !== 'Klik "Nedbryd til træ"') {
+    if (treeContent && treeContent !== _('click_tree_hint')) {
         html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">🌲 Opgavetræ</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(treeContent)}</pre>`;
     }
     
-    if (llmContent && llmContent !== 'Tryk "Udfør med streaming"') {
+    if (llmContent && llmContent !== _('click_stream_hint')) {
         html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📡 LLM Output</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap; max-height:400px; overflow:auto;">${escapeHtml(llmContent)}</pre>`;
     }
     
@@ -1953,15 +1953,15 @@ function downloadFromPreview() {
     const treeContent = document.getElementById('treeContent')?.innerText || '';
     const llmContent = document.getElementById('llmContent')?.innerText || '';
     
-    let md = `# 📊 Agenten - Session Preview\n\n`;
-    if (promptText) md += `## 📝 Prompt\n\n${promptText}\n\n`;
-    if (treeContent && treeContent !== 'Klik "Nedbryd til træ"') md += `## 🌲 Opgavetræ\n\n${treeContent}\n\n`;
-    if (llmContent && llmContent !== 'Tryk "Udfør med streaming"') md += `## 📡 LLM Output\n\n${llmContent}\n\n`;
+    let md = `${_('preview_title')}\n\n`;
+    if (promptText) md += `## ${_('export_md_prompt').replace('## ','')}\n\n${promptText}\n\n`;
+    if (treeContent && treeContent !== _('click_tree_hint')) md += `${_('export_md_tree')}\n\n${treeContent}\n\n`;
+    if (llmContent && llmContent !== _('click_stream_hint')) md += `${_('export_md_llm')}\n\n${llmContent}\n\n`;
     
     if (loadedFilesContent.length > 0) {
-        md += `## 📎 Filer inkluderet\n\n`;
+        md += `${_('file_included_section')}\n\n`;
         for (const fc of loadedFilesContent.filter(f => f.included)) {
-            md += `### ${fc.filename}\n\nSti: \`${fc.filepath}\`\n\n`;
+            md += `### ${fc.filename}\n\n${_('file_included_path')}: \`${fc.filepath}\`\n\n`;
         }
     }
     
