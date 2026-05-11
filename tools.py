@@ -40,6 +40,8 @@ class ToolRegistry:
 
     def build_system_prompt(self, task):
         tools_desc = self.get_tool_descriptions()
+        active_names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
+        example_tool = active_names[0] if active_names else "ingen_tools"
         prompt = t("tool_system_prompt", self.lang).format(
             TOOL_MARKER=self.TOOL_MARKER,
             DONE_MARKER=self.DONE_MARKER,
@@ -47,6 +49,9 @@ class ToolRegistry:
             tools_desc=tools_desc,
             task=task,
         )
+        if active_names:
+            prompt += f"\n\nEksempel: {self.TOOL_MARKER}{{\"tool\":\"{example_tool}\",\"args\":{{}}}}{self.END_MARKER}"
+        prompt += f"\n\nADVARSEL: Brug KUN '{self.TOOL_MARKER}' og '{self.DONE_MARKER}' markører. Ingen andre markører."
         return prompt
 
     @staticmethod
