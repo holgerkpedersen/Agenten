@@ -51,7 +51,7 @@ class ToolRegistry:
         )
         if active_names:
             prompt += f"\n\nEksempel: {self.TOOL_MARKER}{{\"tool\":\"{example_tool}\",\"args\":{{}}}}{self.END_MARKER}"
-        prompt += f"\n\nADVARSEL: Brug KUN '{self.TOOL_MARKER}' og '{self.DONE_MARKER}' markører. Ingen andre markører."
+        prompt += f"\n\n{t('answer_in', self.lang)}. Brug KUN '{self.TOOL_MARKER}' og '{self.DONE_MARKER}' markører."
         return prompt
 
     @staticmethod
