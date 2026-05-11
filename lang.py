@@ -16,7 +16,7 @@ LANG = {
         "template_prompts": {
             "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
             "kodeanalyse": "Analyser følgende kode struktureret. Returnér KUN følgende sektioner:\n## Formål\n## Imports og afhængigheder\n## Arkitektur\n## Kodekvalitet\n## Sikkerhed\n\n{lang_instruction}. Brug ikke <think> tags.",
-            "diffanalyse": "Analyser følgende git diff struktureret. Brug git_diff og git_log værktøjerne for at hente ændringer først. Returnér KUN følgende sektioner:\n## Oversigt\n## Risikovurdering (høj/middel/lav per fil)\n## Breaking Changes\n## Kodekvalitet\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
+            "diffanalyse": "DU SKAL starte med at kalde git_log(5) og git_diff(HEAD~1,HEAD). Brug IKKE andre værktøjer. Analyser dernæst diff'en struktureret. Returnér KUN følgende sektioner:\n## Oversigt\n## Risikovurdering (høj/middel/lav per fil)\n## Breaking Changes\n## Kodekvalitet\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
             "fri": """Nedbryd følgende opgave i delopgaver. Brug 2 mellemrum per niveau.
 Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.
 
@@ -301,7 +301,7 @@ Opgave: {prompt}""",
         "template_prompts": {
             "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
             "kodeanalyse": "Analyze the following code structurally. Return ONLY the following sections:\n## Purpose\n## Imports and Dependencies\n## Architecture\n## Code Quality\n## Security\n\n{lang_instruction}. Do not use <think> tags.",
-            "diffanalyse": "Analyze the following git diff structurally. Use git_diff and git_log tools to fetch changes first. Return ONLY the following sections:\n## Change Overview\n## Risk Assessment (high/medium/low per file)\n## Breaking Changes\n## Code Quality\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
+            "diffanalyse": "YOU MUST start by calling git_log(5) and git_diff(HEAD~1,HEAD). Do NOT use any other tools. Then analyze the diff structurally. Return ONLY the following sections:\n## Change Overview\n## Risk Assessment (high/medium/low per file)\n## Breaking Changes\n## Code Quality\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
             "fri": """Break down the following task into subtasks. Use 2 spaces per level.
 Return ONLY the tree structure. No explanations, no thought process.
 
@@ -586,7 +586,7 @@ Task: {prompt}""",
         "template_prompts": {
             "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
             "kodeanalyse": "Analiza el siguiente código de forma estructurada. Devuelve SOLO estas secciones:\n## Propósito\n## Imports y Dependencias\n## Arquitectura\n## Calidad del Código\n## Seguridad\n\n{lang_instruction}. No uses etiquetas <think>.",
-            "diffanalyse": "Analiza el siguiente git diff de forma estructurada. Usa git_diff y git_log para obtener cambios primero. Devuelve SOLO estas secciones:\n## Resumen de Cambios\n## Evaluación de Riesgos (alto/medio/bajo por archivo)\n## Cambios Rupturistas\n## Calidad del Código\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
+            "diffanalyse": "DEBES comenzar llamando a git_log(5) y git_diff(HEAD~1,HEAD). NO uses otras herramientas. Luego analiza el diff. Devuelve SOLO estas secciones:\n## Resumen de Cambios\n## Evaluación de Riesgos (alto/medio/bajo por archivo)\n## Cambios Rupturistas\n## Calidad del Código\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
             "fri": """Descompón la siguiente tarea en subtareas. Usa 2 espacios por nivel.
 Devuelve SOLO la estructura de árbol. Sin explicaciones, sin proceso de pensamiento.
 
@@ -871,7 +871,7 @@ Tarea: {prompt}""",
         "template_prompts": {
             "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
             "kodeanalyse": "分析以下代码结构。只返回以下部分：\n## 目的\n## 导入和依赖\n## 架构\n## 代码质量\n## 安全性\n\n{lang_instruction}。不要使用 <think> 标签。",
-            "diffanalyse": "分析以下git差异结构。首先使用git_diff和git_log工具获取更改。只返回以下部分：\n## 更改概述\n## 风险评估（高/中/低 按文件）\n## 破坏性更改\n## 代码质量\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
+            "diffanalyse": "你必须先调用 git_log(5) 和 git_diff(HEAD~1,HEAD)。不要使用其他工具。然后分析差异。只返回以下部分：\n## 更改概述\n## 风险评估（高/中/低 按文件）\n## 破坏性更改\n## 代码质量\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
             "fri": """将以下任务分解为子任务。每级使用2个空格。
 只返回树结构。不要解释，不要思考过程。
 
