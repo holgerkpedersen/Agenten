@@ -408,6 +408,8 @@
                     <button onclick="saveLayoutToLocal()" title="Gem layout permanent">💾 Gem layout</button>
                     <button onclick="resetLayout()" title="Nulstil layout">🔄 Reset layout</button>
                     <button onclick="selectExportFolder()" title="Vælg eksportmappe">📁 Eksportmappe</button>
+                    <hr style="border-color:#334155;margin:4px 0;">
+                    <button onclick="setGithubToken()" title="Opsæt GitHub Token">🔑 GitHub Token</button>
                 </div>
             </div>
         </div>
@@ -779,6 +781,26 @@ document.addEventListener('click', function(e) {
         dropdown.classList.remove('show');
     }
 });
+
+async function setGithubToken() {
+    const resp = await fetch('/api/tools/token');
+    const data = await resp.json();
+    const token = prompt('Indtast GitHub Personal Access Token:\n(Opret på https://github.com/settings/tokens)\n\nScopes: repo, workflow', 
+        data.exists ? '********' : '');
+    if (!token || token === '********') return;
+    
+    const content = `GITHUB_TOKEN=${token}\n`;
+    const saveResp = await fetch('/api/tools/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+    });
+    const saveData = await saveResp.json();
+    if (saveData.success) {
+        addLogEntry('INFO', 'GitHub Token gemt', 'Genstart server for at aktivere');
+        alert('✅ Token gemt i .env\nGenstart serveren for at aktivere GitHub værktøjer.');
+    }
+}
 
 function toggleFileIncluded(index, included) {
     if (loadedFilesContent[index]) {
@@ -1596,6 +1618,24 @@ function executeWithStream() {
                 }
                 addLogEntry('INFO', 'Opgave færdig', data.task);
                 saveCurrentSession();
+                break;
+                
+            case 'tool_call':
+                addLogEntry('TOOL', `🔧 ${data.tool}`, JSON.stringify(data.args));
+                if (llmBox) {
+                    llmBox.innerHTML += `<div style="color:#f59e0b; margin:5px 0; padding:5px; background:#1e293b; border-left:3px solid #f59e0b; font-size:12px;">🔧 Kalder værktøj: <strong>${escapeHtml(data.tool)}</strong></div>`;
+                    llmBox.scrollTop = llmBox.scrollHeight;
+                }
+                break;
+                
+            case 'tool_result':
+                const success = data.result?.success;
+                const icon = success ? '✅' : '❌';
+                addLogEntry(success ? 'TOOL' : 'ERROR', `${icon} ${data.tool}`, JSON.stringify(data.result).slice(0, 100));
+                if (llmBox) {
+                    llmBox.innerHTML += `<div style="color:${success ? '#10b981' : '#ef4444'}; margin:5px 0; padding:5px; background:#1e293b; border-left:3px solid ${success ? '#10b981' : '#ef4444'}; font-size:12px;">${icon} <strong>${escapeHtml(data.tool)}</strong>: ${escapeHtml(success ? (data.result.result?.url || data.result.result?.output || 'OK') : data.result.error).slice(0, 150)}</div>`;
+                    llmBox.scrollTop = llmBox.scrollHeight;
+                }
                 break;
                 
             case 'complete':
