@@ -23,6 +23,10 @@ class ToolRegistry:
     def __init__(self):
         self.tools = {}
         self.lang = "da"
+        self.active_tools = None
+
+    def set_active_tools(self, names):
+        self.active_tools = names
 
     def register(self, tool):
         self.tools[tool.name] = tool
@@ -30,7 +34,8 @@ class ToolRegistry:
     def get_tool_descriptions(self):
         lines = []
         for name, tool in self.tools.items():
-            lines.append(tool.to_prompt_desc())
+            if self.active_tools is None or name in self.active_tools:
+                lines.append(tool.to_prompt_desc())
         return "\n".join(lines)
 
     def build_system_prompt(self, task):
@@ -81,6 +86,8 @@ class ToolRegistry:
     def execute(self, tool_name, args):
         if tool_name not in self.tools:
             return {"success": False, "error": t("tool_unknown", self.lang).format(tool=tool_name)}
+        if self.active_tools is not None and tool_name not in self.active_tools:
+            return {"success": False, "error": f"Tool '{tool_name}' er ikke tilgængelig i denne skabelon. Brug en af: {', '.join(self.active_tools)}"}
         try:
             result = self.tools[tool_name].function(**args)
             return {"success": True, "result": result}

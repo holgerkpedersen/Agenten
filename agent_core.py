@@ -101,6 +101,13 @@ class Agent:
             lambda count=10: git_ops.git_log(int(count))
         ))
 
+    TEMPLATE_TOOLS = {
+        "resume": [],
+        "kodeanalyse": [],
+        "diffanalyse": ["git_diff", "git_log"],
+        "fri": None,
+    }
+
     def _get_templates(self):
         lang_instr = t("answer_in", self.lang)
         return {
@@ -309,6 +316,9 @@ class Agent:
         self.tool_registry.lang = self.lang
         templates = self._get_templates()
         template_config = templates.get(template, templates["fri"]) if template else templates["fri"]
+        self.active_template = template
+        allowed = self.TEMPLATE_TOOLS.get(template) if template else None
+        self.tool_registry.set_active_tools(allowed)
         self._log("INFO", t("log.decompose_start", self.lang), f"{prompt[:100]} ({t('ui.using_template', self.lang).format(name=template_config['name'])})")
 
         file_context = ""
@@ -401,7 +411,7 @@ class Agent:
             for i in range(max_iterations):
                 prompt = conversation
                 if i > 0:
-                    tools_list = ', '.join(list(self.tool_registry.tools.keys()))
+                    tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
                     prompt += f"\n\n" + t("tool_continuation", self.lang).format(
                         tools_list=tools_list,
                         TOOL_MARKER=self.tool_registry.TOOL_MARKER,
@@ -458,7 +468,7 @@ class Agent:
             for i in range(max_iterations):
                 prompt = conversation
                 if i > 0:
-                    tools_list = ', '.join(list(self.tool_registry.tools.keys()))
+                    tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
                     prompt += f"\n\n" + t("tool_continuation", self.lang).format(
                         tools_list=tools_list,
                         TOOL_MARKER=self.tool_registry.TOOL_MARKER,
