@@ -22,3 +22,6 @@ agent_session_*.md
 
 # Export folder
 exports/
+
+# Brainstorms folder
+.brainstorms/
