@@ -2,6 +2,7 @@ import json
 import re
 import traceback
 from lang import t
+from i18n import K
 
 
 class Tool:
@@ -42,7 +43,7 @@ class ToolRegistry:
         tools_desc = self.get_tool_descriptions()
         active_names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
         example_tool = active_names[0] if active_names else "ingen_tools"
-        prompt = t("tool_system_prompt", self.lang).format(
+        prompt = t(K.TOOL_SYSTEM_PROMPT, self.lang).format(
             TOOL_MARKER=self.TOOL_MARKER,
             DONE_MARKER=self.DONE_MARKER,
             END_MARKER=self.END_MARKER,
@@ -78,10 +79,10 @@ class ToolRegistry:
                 tool_name = data.get("tool", "")
                 if tool_name in ("navn", "name", "nombre", "名称"):
                     names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
-                    return {"type": "error", "message": t("tool_hallucinated", self.lang).format(tool=tool_name, tools=', '.join(names))}
+                    return {"type": "error", "message": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=', '.join(names))}
                 return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
             except json.JSONDecodeError:
-                return {"type": "error", "message": t("tool_invalid_json", self.lang)}
+                return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
 
         if done_match:
             try:
@@ -96,9 +97,9 @@ class ToolRegistry:
         if tool_name in ("navn", "name", "nombre", "\u540d\u79f0"):
             names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
             tools_hint = ', '.join(names)
-            return {"success": False, "error": t("tool_hallucinated", self.lang).format(tool=tool_name, tools=tools_hint)}
+            return {"success": False, "error": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=tools_hint)}
         if tool_name not in self.tools:
-            return {"success": False, "error": t("tool_unknown", self.lang).format(tool=tool_name)}
+            return {"success": False, "error": t(K.TOOL_UNKNOWN, self.lang).format(tool=tool_name)}
         if self.active_tools is not None and tool_name not in self.active_tools:
             return {"success": False, "error": f"Tool '{tool_name}' er ikke tilgængelig i denne skabelon. Brug en af: {', '.join(self.active_tools)}"}
         try:

@@ -1,0 +1,179 @@
+"""Type-safe translation keys for Agenten. Used as K.KEY instead of "string.key"."""
+from enum import StrEnum
+
+
+class K(StrEnum):
+    # === Templates ===
+    T_RESUME           = "templates.resume"
+    T_KODEANALYSE      = "templates.kodeanalyse"
+    T_DIFFANALYSE      = "templates.diffanalyse"
+    T_FRI              = "templates.fri"
+
+    # === Template prompts ===
+    TP_RESUME          = "template_prompts.resume"
+    TP_KODEANALYSE     = "template_prompts.kodeanalyse"
+    TP_DIFFANALYSE     = "template_prompts.diffanalyse"
+    TP_FRI             = "template_prompts.fri"
+
+    # === Template fallback sections ===
+    TF_RESUME          = "template_fallback.resume"
+    TF_KODEANALYSE     = "template_fallback.kodeanalyse"
+    TF_DIFFANALYSE     = "template_fallback.diffanalyse"
+
+    # === Fallback tree node names ===
+    FT_UNDERSTAND_PURPOSE    = "fallback_tree.understand_purpose"
+    FT_READ_IMPORTS          = "fallback_tree.read_imports"
+    FT_IDENTIFY_FRAMEWORKS   = "fallback_tree.identify_frameworks"
+    FT_ANALYZE_STRUCTURE     = "fallback_tree.analyze_structure"
+    FT_REVIEW_ENDPOINTS      = "fallback_tree.review_endpoints"
+    FT_CHECK_CONFIG          = "fallback_tree.check_config"
+    FT_ASSESS_QUALITY        = "fallback_tree.assess_quality"
+    FT_SECURITY_ANALYSIS     = "fallback_tree.security_analysis"
+    FT_ERROR_HANDLING        = "fallback_tree.error_handling"
+    FT_DOCUMENT_FINDINGS     = "fallback_tree.document_findings"
+    FT_UNDERSTAND_NUMBERS    = "fallback_tree.understand_numbers"
+    FT_PERFORM_ADDITION      = "fallback_tree.perform_addition"
+    FT_CONCLUDE              = "fallback_tree.conclude"
+    FT_ANALYZE_PROBLEM       = "fallback_tree.analyze_problem"
+    FT_FIND_STRATEGY         = "fallback_tree.find_strategy"
+    FT_IMPLEMENT_SOLUTION    = "fallback_tree.implement_solution"
+    FT_TEST_VALIDATE         = "fallback_tree.test_validate"
+
+    # === Tool descriptions ===
+    TOOL_GITHUB_CREATE_REPO  = "tools.github_create_repo"
+    TOOL_GITHUB_LIST_REPOS   = "tools.github_list_repos"
+    TOOL_GITHUB_CREATE_ISSUE = "tools.github_create_issue"
+    TOOL_GITHUB_CREATE_PR    = "tools.github_create_pr"
+    TOOL_GIT_STATUS          = "tools.git_status"
+    TOOL_GIT_ADD_ALL         = "tools.git_add_all"
+    TOOL_GIT_COMMIT          = "tools.git_commit"
+    TOOL_GIT_PUSH            = "tools.git_push"
+    TOOL_GIT_SET_REMOTE      = "tools.git_set_remote"
+    TOOL_GIT_REMOTE_STATUS   = "tools.git_remote_status"
+    TOOL_GIT_DIFF            = "tools.git_diff"
+    TOOL_GIT_LOG             = "tools.git_log"
+
+    # === Tool system prompt ===
+    TOOL_SYSTEM_PROMPT  = "tool_system_prompt"
+
+    # === Tool messages (LLM-facing) ===
+    TOOL_CONTINUATION   = "tool_continuation"
+    TOOL_RESULT_PREFIX  = "tool_result_prefix"
+    TOOL_NO_RESULT      = "tool_no_result"
+    TOOL_INVALID_JSON   = "tool_invalid_json"
+    TOOL_UNKNOWN        = "tool_unknown"
+    TOOL_HALLUCINATED   = "tool_hallucinated"
+    TOOL_BLOCKED        = "tool_blocked"
+
+    # === System prompt fragments ===
+    SYS_EXAMPLE_PREFIX  = "sys_example_prefix"
+    SYS_MARKER_WARNING  = "sys_marker_warning"
+    SYS_ERROR_PREFIX    = "sys_error_prefix"
+    SYS_FALLBACK_TOOL   = "sys_fallback_tool"
+    SYS_FILE_CONTEXT    = "sys_file_context"
+
+    # === File context ===
+    FILE_CONTEXT_HEADER  = "file_context_header"
+    FILE_CONTEXT_PYTHON  = "file_context_python"
+    FILE_TRUNCATED       = "file_truncated"
+    FILE_DIFF_HEADER     = "file_diff_header"
+    FILE_LOG_HEADER      = "file_log_header"
+
+    # === GitHub messages ===
+    GH_TOKEN_MISSING   = "github_token_missing"
+    GH_AUTH_FAILED     = "github_auth_failed"
+    GH_API_ERROR       = "github_api_error"
+
+    # === Git messages ===
+    GIT_NO_REMOTE         = "no_remote_origin"
+    GIT_DIFF_CHANGED_FILES = "git_diff_changed_files"
+    GIT_DIFF_TRUNCATED    = "git_diff_truncated"
+    GIT_EXIT_CODE         = "git_exit_code"
+
+    # === Log messages ===
+    LOG_DECOMPOSE_START     = "log.decompose_start"
+    LOG_ADDING_FILES        = "log.adding_files"
+    LOG_N_FILES             = "log.N_files"
+    LOG_USING_TEMPLATE      = "log.using_template"
+    LOG_TASKS_CREATED       = "log.tasks_created"
+    LOG_SENDING_LLM         = "log.sending_llm"
+    LOG_RECEIVED_LLM        = "log.received_llm"
+    LOG_N_CHARS             = "log.N_chars"
+    LOG_LLM_ERROR_FALLBACK  = "log.llm_error_fallback"
+    LOG_EMPTY_RESPONSE      = "log.empty_response"
+    LOG_NO_VALID_TASKS      = "log.no_valid_tasks"
+    LOG_PARSED_TASKS        = "log.parsed_tasks"
+    LOG_DECOMPOSE_DONE      = "log.decompose_done"
+    LOG_EXECUTION_RESET     = "log.execution_reset"
+    LOG_TASK_START          = "log.task_start"
+    LOG_TASK_DONE           = "log.task_done"
+    LOG_TASK_FAILED         = "log.task_failed"
+    LOG_TREE_EXECUTION      = "log.tree_execution_start"
+    LOG_READING_FILE        = "log.reading_file"
+    LOG_FILE_FOUND          = "log.file_found"
+    LOG_FILE_NOT_FOUND      = "log.file_not_found"
+    LOG_READ_ERROR          = "log.read_error"
+    LOG_TOOL_CALLING        = "log.tool_calling"
+    LOG_TOOL_RESULT         = "log.tool_result"
+    LOG_MODULE_READY        = "log.module_ready"
+    LOG_ITERATION           = "log.iteration"
+    LOG_TYPE                = "log.type"
+    LOG_DECOMPOSED          = "log.decomposed"
+
+    # === Error messages ===
+    ERR_NO_PROMPT           = "errors.no_prompt"
+    ERR_DECOMPOSE_FIRST     = "errors.decompose_first"
+    ERR_NO_SESSION          = "errors.no_session"
+    ERR_SESSION_NOT_FOUND   = "errors.session_not_found"
+    ERR_MISSING_SESSION     = "errors.missing_session_name"
+    ERR_FOLDER_NOT_FOUND    = "errors.folder_not_found"
+    ERR_FILE_NOT_FOUND      = "errors.file_not_found"
+    ERR_INVALID_PATH        = "errors.invalid_path"
+    ERR_NO_FOLDER           = "errors.no_folder_selected"
+    ERR_NO_FILE             = "errors.no_file_received"
+    ERR_EMPTY_FILENAME      = "errors.empty_filename"
+    ERR_NO_PATH             = "errors.no_path_given"
+    ERR_INDEX_MISSING       = "errors.index_missing"
+    ERR_CREATE_FOLDER       = "errors.cannot_create_folder"
+    ERR_NO_SESSION_ID       = "errors.no_session_id"
+
+    # === Misc ===
+    ANSWER_IN       = "answer_in"
+    UNKNOWN         = "unknown"
+    LANGUAGE        = "language"
+    LANGUAGE_CODE   = "language_code"
+
+    # === UI (used in Python server responses) ===
+    UI_TITLE              = "ui.title"
+    UI_USING_TEMPLATE     = "ui.using_template"
+    UI_DECOMPOSE_START    = "ui.decompose_start"
+    UI_TEMPLATE_PREFIX    = "ui.template_prefix"
+    UI_FILES_PREFIX       = "ui.files_prefix"
+    UI_DECOMPOSE_ERROR    = "ui.decompose_error"
+    UI_STREAM_RESET       = "ui.stream_reset"
+    UI_TASK_RESULT_PREFIX = "ui.task_result_prefix"
+    UI_TASK_DONE_PREFIX   = "ui.task_done_prefix"
+    UI_ALL_DONE           = "ui.all_done"
+    UI_SERVER_STARTING    = "ui.server_starting"
+    UI_SERVER_LOCATION    = "ui.server_location"
+    UI_STATIC_FOLDER      = "ui.static_folder"
+    UI_SESSIONS_FOLDER    = "ui.sessions_folder"
+    UI_FILE_HANDLING      = "ui.file_handling"
+    UI_API_RUNNING        = "ui.api_running"
+
+    # === LLM wrapper messages ===
+    LLM_CACHE_HIT         = "llm.cache_hit"
+    LLM_SENDING           = "llm.sending"
+    LLM_RECEIVED          = "llm.received"
+    LLM_TIMEOUT           = "llm.timeout"
+    LLM_ERROR             = "llm.error"
+    LLM_STREAMING         = "llm.streaming"
+    LLM_HTTP_ERROR        = "llm.http_error"
+    LLM_PARSE_ERROR       = "llm.parse_error"
+    LLM_CONNECT_ERROR     = "llm.connect_error"
+
+    # === Module builder ===
+    MODULE_CREATED = "module.created"
+
+    # === Session defaults ===
+    SESSION_DEFAULT_NAME = "session.default_name"

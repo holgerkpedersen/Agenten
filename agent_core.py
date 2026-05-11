@@ -5,6 +5,7 @@ from module_builder import ModuleBuilder
 from tools import Tool, ToolRegistry
 from github_wrapper import GithubAPI
 from lang import t
+from i18n import K
 import git_ops
 import re
 import time
@@ -30,73 +31,73 @@ class Agent:
         gh = GithubAPI()
         self.tool_registry.register(Tool(
             "github_create_repo",
-            t("tools.github_create_repo", self.lang),
+            t(K.TOOL_GITHUB_CREATE_REPO, self.lang),
             ["repo_navn", "beskrivelse", "privat"],
             lambda repo_navn, beskrivelse="", privat=False: gh.create_repo(name=repo_navn, description=beskrivelse, private=privat)
         ))
         self.tool_registry.register(Tool(
             "github_list_repos",
-            t("tools.github_list_repos", self.lang),
+            t(K.TOOL_GITHUB_LIST_REPOS, self.lang),
             [],
             lambda: gh.list_repos()
         ))
         self.tool_registry.register(Tool(
             "github_create_issue",
-            t("tools.github_create_issue", self.lang),
+            t(K.TOOL_GITHUB_CREATE_ISSUE, self.lang),
             ["ejer", "repo", "titel", "body"],
             lambda ejer, repo, titel, body="": gh.create_issue(owner=ejer, repo=repo, title=titel, body=body)
         ))
         self.tool_registry.register(Tool(
             "github_create_pr",
-            t("tools.github_create_pr", self.lang),
+            t(K.TOOL_GITHUB_CREATE_PR, self.lang),
             ["ejer", "repo", "titel", "branch"],
             lambda ejer, repo, titel, branch, base="master": gh.create_pr(owner=ejer, repo=repo, title=titel, head=branch, base=base)
         ))
         self.tool_registry.register(Tool(
             "git_status",
-            t("tools.git_status", self.lang),
+            t(K.TOOL_GIT_STATUS, self.lang),
             [],
             lambda: git_ops.git_status()
         ))
         self.tool_registry.register(Tool(
             "git_add_all",
-            t("tools.git_add_all", self.lang),
+            t(K.TOOL_GIT_ADD_ALL, self.lang),
             [],
             lambda: git_ops.git_add_all()
         ))
         self.tool_registry.register(Tool(
             "git_commit",
-            t("tools.git_commit", self.lang),
+            t(K.TOOL_GIT_COMMIT, self.lang),
             ["besked"],
             lambda besked: git_ops.git_commit(message=besked)
         ))
         self.tool_registry.register(Tool(
             "git_push",
-            t("tools.git_push", self.lang),
+            t(K.TOOL_GIT_PUSH, self.lang),
             ["branch"],
             lambda branch="master": git_ops.git_push(branch=branch)
         ))
         self.tool_registry.register(Tool(
             "git_set_remote",
-            t("tools.git_set_remote", self.lang),
+            t(K.TOOL_GIT_SET_REMOTE, self.lang),
             ["url"],
             lambda url: git_ops.git_set_remote(url=url)
         ))
         self.tool_registry.register(Tool(
             "git_remote_status",
-            t("tools.git_remote_status", self.lang),
+            t(K.TOOL_GIT_REMOTE_STATUS, self.lang),
             [],
             lambda: git_ops.git_remote_exists()
         ))
         self.tool_registry.register(Tool(
             "git_diff",
-            t("tools.git_diff", self.lang),
+            t(K.TOOL_GIT_DIFF, self.lang),
             ["older", "newer"],
             lambda older="HEAD~1", newer="HEAD": git_ops.git_diff(older, newer)
         ))
         self.tool_registry.register(Tool(
             "git_log",
-            t("tools.git_log", self.lang),
+            t(K.TOOL_GIT_LOG, self.lang),
             ["count"],
             lambda count=10: git_ops.git_log(int(count))
         ))
@@ -109,26 +110,26 @@ class Agent:
     }
 
     def _get_templates(self):
-        lang_instr = t("answer_in", self.lang)
+        lang_instr = t(K.ANSWER_IN, self.lang)
         return {
             "resume": {
-                "name": t("templates.resume", self.lang),
-                "prompt": t("template_prompts.resume", self.lang).replace("{lang_instruction}", lang_instr),
-                "fallback": t("template_fallback.resume", self.lang),
+                "name": t(K.T_RESUME, self.lang),
+                "prompt": t(K.TP_RESUME, self.lang).replace("{lang_instruction}", lang_instr),
+                "fallback": t(K.TF_RESUME, self.lang),
             },
             "kodeanalyse": {
-                "name": t("templates.kodeanalyse", self.lang),
-                "prompt": t("template_prompts.kodeanalyse", self.lang).replace("{lang_instruction}", lang_instr),
-                "fallback": t("template_fallback.kodeanalyse", self.lang),
+                "name": t(K.T_KODEANALYSE, self.lang),
+                "prompt": t(K.TP_KODEANALYSE, self.lang).replace("{lang_instruction}", lang_instr),
+                "fallback": t(K.TF_KODEANALYSE, self.lang),
             },
             "diffanalyse": {
-                "name": t("templates.diffanalyse", self.lang),
-                "prompt": t("template_prompts.diffanalyse", self.lang).replace("{lang_instruction}", lang_instr),
-                "fallback": t("template_fallback.diffanalyse", self.lang),
+                "name": t(K.T_DIFFANALYSE, self.lang),
+                "prompt": t(K.TP_DIFFANALYSE, self.lang).replace("{lang_instruction}", lang_instr),
+                "fallback": t(K.TF_DIFFANALYSE, self.lang),
             },
             "fri": {
-                "name": t("templates.fri", self.lang),
-                "prompt": t("template_prompts.fri", self.lang),
+                "name": t(K.T_FRI, self.lang),
+                "prompt": t(K.TP_FRI, self.lang),
                 "fallback": None
             },
         }
@@ -319,20 +320,20 @@ class Agent:
         self.active_template = template
         allowed = self.TEMPLATE_TOOLS.get(template) if template else None
         self.tool_registry.set_active_tools(allowed)
-        self._log("INFO", t("log.decompose_start", self.lang), f"{prompt[:100]} ({t('ui.using_template', self.lang).format(name=template_config['name'])})")
+        self._log("INFO", t(K.LOG_DECOMPOSE_START, self.lang), f"{prompt[:100]} ({t('ui.using_template', self.lang).format(name=template_config['name'])})")
 
         file_context = ""
         if files and len(files) > 0:
-            file_context = t("file_context_header", self.lang)
+            file_context = t(K.FILE_CONTEXT_HEADER, self.lang)
             for f in files:
-                filename = f.get('filename', t("unknown", self.lang))
+                filename = f.get('filename', t(K.UNKNOWN, self.lang))
                 content = f.get('content', '')
                 file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
-            self._log("INFO", t("log.adding_files", self.lang), t("log.N_files", self.lang).format(n=len(files)))
+            self._log("INFO", t(K.LOG_ADDING_FILES, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(files)))
         else:
             file_path, file_content = self._get_file_context(prompt)
             if file_content:
-                file_context = t("file_context_header", self.lang) + os.path.basename(file_path) + t("file_context_python", self.lang).replace("{content}", file_content)
+                file_context = t(K.FILE_CONTEXT_HEADER, self.lang) + os.path.basename(file_path) + t(K.FILE_CONTEXT_PYTHON, self.lang).replace("{content}", file_content)
 
         self.full_prompt_with_context = prompt + file_context
 
@@ -343,22 +344,22 @@ class Agent:
                     tree.root.add_child(TaskNode(section))
                 self.task_tree = tree
                 task_count = len(template_config["fallback"]) + 1
-                self._log("INFO", t("log.using_template", self.lang), t("log.tasks_created", self.lang).format(n=task_count))
+                self._log("INFO", t(K.LOG_USING_TEMPLATE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
                 return self.task_tree_to_dict()
 
         decomposition_prompt = template_config["prompt"].replace("{prompt}", prompt)
         file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
         decomposition_prompt += file_context_entry
 
-        self._log("LLM", t("log.sending_llm", self.lang), f"Med filkontekst: {bool(file_context)}")
+        self._log("LLM", t(K.LOG_SENDING_LLM, self.lang), f"Med filkontekst: {bool(file_context)}")
         response = self.llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)
-        self._log("LLM", t("log.received_llm", self.lang), t("log.N_chars", self.lang).format(n=len(response)))
+        self._log("LLM", t(K.LOG_RECEIVED_LLM, self.lang), t(K.LOG_N_CHARS, self.lang).format(n=len(response)))
 
         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
 
         self.task_tree = self._parse_tree_from_llm(prompt, response)
         task_count = self._count_tasks(self.task_tree.root)
-        self._log("INFO", t("log.decompose_done", self.lang), t("log.tasks_created", self.lang).format(n=task_count))
+        self._log("INFO", t(K.LOG_DECOMPOSE_DONE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
 
         return self.task_tree_to_dict()
 
@@ -372,7 +373,7 @@ class Agent:
                 reset_node(child)
         reset_node(self.task_tree.root)
         self.execution_log = []
-        self._log("INFO", t("log.execution_reset", self.lang), "")
+        self._log("INFO", t(K.LOG_EXECUTION_RESET, self.lang), "")
 
     def _count_tasks(self, node):
         count = 1
@@ -400,7 +401,7 @@ class Agent:
 
     def solve_task(self, task_node, original_prompt):
             task_node.status = "running"
-            self._log("INFO", t("log.task_start", self.lang), task_node.name)
+            self._log("INFO", t(K.LOG_TASK_START, self.lang), task_node.name)
 
             system_prompt = self.tool_registry.build_system_prompt(task_node.name)
 
@@ -412,7 +413,7 @@ class Agent:
                 prompt = conversation
                 if i > 0:
                     tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
-                    prompt += f"\n\n" + t("tool_continuation", self.lang).format(
+                    prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
                         tools_list=tools_list,
                         TOOL_MARKER=self.tool_registry.TOOL_MARKER,
                         DONE_MARKER=self.tool_registry.DONE_MARKER
@@ -423,14 +424,14 @@ class Agent:
                     response += chunk
 
                 parsed = self.tool_registry.parse_response(response)
-                self._log("LLM", t("log.iteration", self.lang).format(n=i+1), t("log.type", self.lang).format(type=parsed.get('type')))
+                self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
 
                 if parsed["type"] == "tool":
-                    self._log("TOOL", t("log.tool_calling", self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
+                    self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
                     result = self.tool_registry.execute(parsed["tool"], parsed["args"])
                     result_str = json.dumps(result, ensure_ascii=False)
-                    self._log("TOOL", t("log.tool_result", self.lang).format(tool=parsed['tool']), result_str[:200])
-                    conversation += f"\n\n" + t("tool_result_prefix", self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
+                    self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str[:200])
+                    conversation += f"\n\n" + t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
                     continue
 
                 if parsed["type"] == "done":
@@ -441,23 +442,23 @@ class Agent:
                     conversation += f"\n\nFEJL: {parsed['message']}"
                     continue
 
-                conversation += f"\n\n" + t("tool_no_result", self.lang)
+                conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
                 full_response = response
                 if i >= 3:
                     break
 
             if not full_response or "ERROR" in full_response:
-                full_response = t("log.task_failed", self.lang)
+                full_response = t(K.LOG_TASK_FAILED, self.lang)
 
             task_node.status = "done"
             task_node.result = full_response
-            self.action_history.append(task_node.name.split()[0] if task_node.name else "unknown")
-            self._log("INFO", t("log.task_done", self.lang), task_node.name)
+            self.action_history.append(task_node.name.split()[0] if task_node.name else K.UNKNOWN)
+            self._log("INFO", t(K.LOG_TASK_DONE, self.lang), task_node.name)
             return full_response
 
     def solve_task_stream(self, task_node, original_prompt):
             task_node.status = "running"
-            self._log("INFO", t("log.task_start", self.lang), task_node.name)
+            self._log("INFO", t(K.LOG_TASK_START, self.lang), task_node.name)
 
             system_prompt = self.tool_registry.build_system_prompt(task_node.name)
 
@@ -469,7 +470,7 @@ class Agent:
                 prompt = conversation
                 if i > 0:
                     tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
-                    prompt += f"\n\n" + t("tool_continuation", self.lang).format(
+                    prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
                         tools_list=tools_list,
                         TOOL_MARKER=self.tool_registry.TOOL_MARKER,
                         DONE_MARKER=self.tool_registry.DONE_MARKER
@@ -481,16 +482,16 @@ class Agent:
                     yield {"type": "chunk", "chunk": chunk}
 
                 parsed = self.tool_registry.parse_response(response)
-                self._log("LLM", t("log.iteration", self.lang).format(n=i+1), t("log.type", self.lang).format(type=parsed.get('type')))
+                self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
 
                 if parsed["type"] == "tool":
-                    self._log("TOOL", t("log.tool_calling", self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
+                    self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
                     result = self.tool_registry.execute(parsed["tool"], parsed["args"])
                     result_str = json.dumps(result, ensure_ascii=False)
-                    self._log("TOOL", t("log.tool_result", self.lang).format(tool=parsed['tool']), result_str[:200])
+                    self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str[:200])
                     yield {"type": "tool_call", "tool": parsed["tool"], "args": parsed.get("args", {})}
                     yield {"type": "tool_result", "tool": parsed["tool"], "result": result}
-                    conversation += f"\n\n" + t("tool_result_prefix", self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
+                    conversation += f"\n\n" + t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
                     continue
 
                 if parsed["type"] == "done":
@@ -501,25 +502,25 @@ class Agent:
                     conversation += f"\n\nFEJL: {parsed['message']}"
                     continue
 
-                conversation += f"\n\n" + t("tool_no_result", self.lang)
+                conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
                 full_response = response
                 if i >= 3:
                     break
 
             if not full_response or "ERROR" in full_response:
-                full_response = t("log.task_failed", self.lang)
+                full_response = t(K.LOG_TASK_FAILED, self.lang)
 
             task_node.status = "done"
             task_node.result = full_response
-            self.action_history.append(task_node.name.split()[0] if task_node.name else "unknown")
-            self._log("INFO", t("log.task_done", self.lang), task_node.name)
+            self.action_history.append(task_node.name.split()[0] if task_node.name else K.UNKNOWN)
+            self._log("INFO", t(K.LOG_TASK_DONE, self.lang), task_node.name)
             yield {"type": "done", "result": full_response}
 
     def execute_tree(self, node=None):
         if node is None:
             if not self.task_tree:
                 return {"error": "No task tree"}
-            self._log("INFO", t("log.tree_execution_start", self.lang), "")
+            self._log("INFO", t(K.LOG_TREE_EXECUTION, self.lang), "")
             node = self.task_tree.root
         results = {}
         for child in node.children:
@@ -537,4 +538,4 @@ class Agent:
         }
 
     def suggest_new_module(self):
-        return {"message": t("log.module_ready", self.lang)}
+        return {"message": t(K.LOG_MODULE_READY, self.lang)}

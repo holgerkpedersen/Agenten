@@ -8,6 +8,7 @@ import threading
 import os
 import tempfile
 from lang import t, get_ui_translations
+from i18n import K
 
 # ============ KONFIGURATION ============
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -388,7 +389,7 @@ def decompose():
     lang = data.get("lang", "da")
     
     if not prompt:
-        return jsonify({"error": t("errors.no_prompt", lang)}), 400
+        return jsonify({"error": t(K.ERR_NO_PROMPT, lang)}), 400
     
     global current_session_id
     if session_id:
