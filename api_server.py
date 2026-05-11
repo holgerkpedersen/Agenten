@@ -6,6 +6,8 @@ import json
 import time
 import threading
 import os
+import tempfile
+from lang import t, get_ui_translations
 
 # ============ KONFIGURATION ============
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -277,6 +279,10 @@ def manage_token():
         f.write(content)
     return jsonify({"success": True, "message": ".env gemt"})
 
+@app.route("/api/lang/<lang>")
+def get_lang(lang):
+    return jsonify(get_ui_translations(lang))
+
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():
     data = request.json
@@ -376,9 +382,10 @@ def decompose():
     show_thinking = data.get("show_thinking", True)
     files = data.get("files", [])
     template = data.get("template")
+    lang = data.get("lang", "da")
     
     if not prompt:
-        return jsonify({"error": "Ingen prompt angivet"}), 400
+        return jsonify({"error": t("errors.no_prompt", lang)}), 400
     
     global current_session_id
     if session_id:
@@ -387,6 +394,7 @@ def decompose():
         current_session_id, _ = session_manager.create_session(prompt[:30])
     
     agent.show_thinking = show_thinking
+    agent.lang = lang
     session_context = session_manager.get_knowledge_for_context(current_session_id, prompt)
     
     print(f"🌳 Nedbryder: {prompt[:50]}..." + (f" skabelon: {template}" if template else ""))
@@ -435,6 +443,9 @@ def execute_stream():
                 agent.original_prompt = session_data["original_prompt"]
             if session_data.get("tree"):
                 agent.task_tree_from_dict(session_data["tree"])
+            if session_data.get("lang"):
+                agent.lang = session_data["lang"]
+                agent.tool_registry.lang = agent.lang
             
             fpc = session_data.get("full_prompt_with_context", "")
             if not fpc:

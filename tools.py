@@ -1,6 +1,8 @@
 import json
 import re
 import traceback
+from lang import t
+
 
 class Tool:
     def __init__(self, name, description, parameters, function):
@@ -20,6 +22,7 @@ class ToolRegistry:
 
     def __init__(self):
         self.tools = {}
+        self.lang = "da"
 
     def register(self, tool):
         self.tools[tool.name] = tool
@@ -32,21 +35,13 @@ class ToolRegistry:
 
     def build_system_prompt(self, task):
         tools_desc = self.get_tool_descriptions()
-        prompt = f"""/no_think Du er Agenten. Svar KUN med præcis ét af disse formater:
-
-VÆRKTØJ:
-{self.TOOL_MARKER}{{"tool":"navn","args":{{"param":"værdi"}}}}{self.END_MARKER}
-
-AFSLUT:
-{self.DONE_MARKER}{{"result":"dit færdige svar"}}{self.END_MARKER}
-
-Eksempel værktøjskald:
-{self.TOOL_MARKER}{{"tool":"git_status","args":{{}}}}{self.END_MARKER}
-
-Værktøjer:
-{tools_desc}
-
-OPGAVE: {task}"""
+        prompt = t("tool_system_prompt", self.lang).format(
+            TOOL_MARKER=self.TOOL_MARKER,
+            DONE_MARKER=self.DONE_MARKER,
+            END_MARKER=self.END_MARKER,
+            tools_desc=tools_desc,
+            task=task,
+        )
         return prompt
 
     @staticmethod
@@ -72,7 +67,7 @@ OPGAVE: {task}"""
                 data = json.loads(tool_match.group(1))
                 return {"type": "tool", "tool": data.get("tool"), "args": data.get("args", {})}
             except json.JSONDecodeError:
-                return {"type": "error", "message": "Ugyldigt JSON i tool-kald"}
+                return {"type": "error", "message": t("tool_invalid_json", self.lang)}
 
         if done_match:
             try:
@@ -85,7 +80,7 @@ OPGAVE: {task}"""
 
     def execute(self, tool_name, args):
         if tool_name not in self.tools:
-            return {"success": False, "error": f"Ukendt værktøj: {tool_name}"}
+            return {"success": False, "error": t("tool_unknown", self.lang).format(tool=tool_name)}
         try:
             result = self.tools[tool_name].function(**args)
             return {"success": True, "result": result}

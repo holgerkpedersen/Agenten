@@ -407,7 +407,6 @@
                     <button onclick="exportToMarkdown()" title="Eksporter til Markdown">📄 Eksporter MD</button>
                     <button onclick="saveLayoutToLocal()" title="Gem layout permanent">💾 Gem layout</button>
                     <button onclick="resetLayout()" title="Nulstil layout">🔄 Reset layout</button>
-                    <button onclick="selectExportFolder()" title="Vælg eksportmappe">📁 Eksportmappe</button>
                     <hr style="border-color:#334155;margin:4px 0;">
                     <button onclick="setGithubToken()" title="Opsæt GitHub Token">🔑 GitHub Token</button>
                 </div>
@@ -438,6 +437,12 @@
                 <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
                 <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
             </label>
+            <select id="langSelect" onchange="switchLang(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;">
+                <option value="da">🇩🇰</option>
+                <option value="en">🇬🇧</option>
+                <option value="es">🇪🇸</option>
+                <option value="zh">🇨🇳</option>
+            </select>
         </div>
         
         <div class="toolbar-row">
@@ -466,6 +471,51 @@
 </div>
 
 <script>
+// === Multi-language translation system (DRY) ===
+window.AGENTEN_LANG = {};
+let currentLang = localStorage.getItem('agenten_lang') || 'da';
+
+async function loadLang(lang) {
+    const resp = await fetch(`/api/lang/${lang}`);
+    window.AGENTEN_LANG = await resp.json();
+    document.getElementById('langSelect').value = lang;
+    currentLang = lang;
+    localStorage.setItem('agenten_lang', lang);
+    updateAllUIText();
+}
+
+function _(key) {
+    return window.AGENTEN_LANG[key] || `?${key}`;
+}
+
+function switchLang(lang) {
+    loadLang(lang);
+}
+
+function updateAllUIText() {
+    updatePanelTitles();
+}
+
+function updatePanelTitles() {
+    const titles = {
+        'tree': _('tree_panel') || '📁 Opgavetræ',
+        'llm': _('llm_panel') || '📡 LLM Output',
+        'log': _('log_panel') || '📋 Agent Log',
+        'history': _('history_panel') || '📜 Prompt Historik',
+    };
+    for (const def of panelDefinitions) {
+        if (titles[def.id]) def.title = titles[def.id];
+        const panel = document.getElementById(`panel-${def.id}`);
+        if (panel) {
+            const h3 = panel.querySelector('h3');
+            if (h3) h3.textContent = titles[def.id];
+        }
+    }
+}
+
+loadLang(currentLang);
+// === End translation system ===
+
 // Panel definitioner med alle 4 paneler
 const panelDefinitions = [
     { id: 'tree', title: '📁 Opgavetræ', defaultLeft: 20, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
@@ -1449,7 +1499,8 @@ async function decompose() {
             session_id: currentSessionId,
             show_thinking: showThinking,
             files: filesData,
-            template: document.getElementById('templateSelect').value
+            template: document.getElementById('templateSelect').value,
+            lang: currentLang
         })
     });
     const data = await response.json();
@@ -1680,6 +1731,18 @@ async function exportToMarkdown() {
     if (!currentSessionId) {
         alert('Ingen aktiv session at eksportere');
         return;
+    }
+    
+    const folderStatus = await fetch('/api/folder/status');
+    const folderData = await folderStatus.json();
+    const currentFolder = folderData.success ? folderData.folder : 'C:\\Dev\\Agenten\\exports';
+    
+    const chosenFolder = prompt('Gem rapport i mappe:\n(Klik OK for at bruge nuværende, eller indtast ny sti)', currentFolder);
+    if (!chosenFolder) return;
+    
+    if (chosenFolder !== currentFolder) {
+        await fetch('/api/folder/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({folder: chosenFolder}) });
+        document.getElementById('folderStatus').innerHTML = `📁 Gemmer i: ${chosenFolder} <span class="folder-status">Aktiv</span>`;
     }
     
     addLogEntry('INFO', 'Eksporterer session til Markdown', currentSessionId);
