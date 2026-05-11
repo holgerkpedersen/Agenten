@@ -1571,10 +1571,16 @@ async function deleteTree() {
     await saveCurrentSession();
 }
 
-function executeWithStream() {
+async function executeWithStream() {
     if (!currentTree) {
-        alert('Nedbryd en opgave først');
-        return;
+        const template = document.getElementById('templateSelect').value;
+        if (template !== 'fri') {
+            await decompose();
+            if (!currentTree) return;
+        } else {
+            alert('Nedbryd en opgave først');
+            return;
+        }
     }
     
     stopStream();

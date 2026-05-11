@@ -9,7 +9,7 @@ def _run_git(args, cwd=None):
     safe_path = os.path.realpath(cwd)
     cmd = ["git"] + args
 
-    result = subprocess.run(cmd, cwd=safe_path, capture_output=True, text=True, timeout=30)
+    result = subprocess.run(cmd, cwd=safe_path, capture_output=True, text=True, timeout=30, encoding='utf-8', errors='replace')
     if result.returncode == 0:
         return {"success": True, "output": result.stdout.strip(), "error": result.stderr.strip()}
     return {"success": False, "output": result.stdout.strip(), "error": result.stderr.strip() or f"exit code {result.returncode}"}
