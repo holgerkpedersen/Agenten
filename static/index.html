@@ -476,9 +476,58 @@
 window.AGENTEN_LANG = {};
 let currentLang = localStorage.getItem('agenten_lang') || 'da';
 
+// Danish fallback — bruges indtil oversættelser er loadet
+const LANG_FALLBACK = {
+    click_tree_hint: 'Klik "Nedbryd til træ"',
+    click_stream_hint: 'Tryk "Udfør med streaming"',
+    log_waiting: 'Logger venter på aktivitet...',
+    history_waiting: 'Vælg en session for at se prompt historik',
+    no_prompts_yet: 'Ingen prompts endnu',
+    history_error: 'Fejl ved indlæsning af historik',
+    N_tasks: '{n} opgaver',
+    streaming_started: 'Streaming startet',
+    task_started: 'Påbegynder opgave',
+    all_done: '✅ Alle opgaver færdige!',
+    stream_done: 'Streaming færdig',
+    all_executed: 'Alle opgaver udført',
+    stream_error: 'Streaming fejl',
+    error_prefix: 'Fejl: ',
+    export_md_report_header: '# 📊 Agenten - Session Rapport',
+    export_md_prompt: '## 📝 Original Prompt',
+    export_md_tree: '## 🌲 Opgavetræ',
+    export_md_llm: '## 📡 LLM Output (Streaming)',
+    export_md_log: '## 📋 Agent Log',
+    export_md_history: '## 📜 Prompt Historik',
+    export_md_knowledge: '## 🧠 Gemt Viden (Learned Knowledge)',
+    export_md_layout: '## 🖥️ Layout Information',
+    export_md_issues: '## 🔍 Problemer / Observationer',
+    export_md_footer: '*Rapport genereret af Agenten - AI Opgaveplanlægger*',
+    export_md_time: '**Tid:**',
+    export_md_result: '**Resultat:**',
+    export_md_treestructure: '**Træstruktur:**',
+    export_md_source: '*Kilde:*',
+    export_md_no_prompt: 'Ingen prompt',
+    export_md_no_tree: '*Intet træ genereret endnu*',
+    export_md_no_llm: '*Ingen LLM output endnu*',
+    export_md_no_log: '*Ingen log entries*',
+    export_md_no_prompts: '*Ingen prompts endnu*',
+    export_md_no_knowledge: '*Ingen gemt viden endnu*',
+    export_md_no_result_yet: 'Ingen resultat',
+    export_md_observations: '*Skriv dine observationer her:*',
+    file_included_section: '📎 Filer inkluderet',
+    file_included_path: 'Sti',
+    preview_title: '📊 Agenten - Session Preview',
+};
+
 async function loadLang(lang) {
-    const resp = await fetch(`/api/lang/${lang}`);
-    window.AGENTEN_LANG = await resp.json();
+    try {
+        const resp = await fetch(`/api/lang/${lang}`);
+        const data = await resp.json();
+        for (const k of Object.keys(LANG_FALLBACK)) {
+            if (data[k]) LANG_FALLBACK[k] = data[k];
+        }
+        window.AGENTEN_LANG = data;
+    } catch(e) {}
     document.getElementById('langSelect').value = lang;
     currentLang = lang;
     localStorage.setItem('agenten_lang', lang);
@@ -486,7 +535,7 @@ async function loadLang(lang) {
 }
 
 function _(key) {
-    return window.AGENTEN_LANG[key] || `?${key}`;
+    return window.AGENTEN_LANG[key] || LANG_FALLBACK[key] || key;
 }
 
 function switchLang(lang) {
