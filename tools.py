@@ -83,8 +83,8 @@ class ToolRegistry:
 
         return {"type": "text", "text": response}
 
-def execute(self, tool_name, args):
-        if tool_name in ("navn", "name", "nombre", "名称"):
+    def execute(self, tool_name, args):
+        if tool_name in ("navn", "name", "nombre", "\u540d\u79f0"):
             names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
             tools_hint = ', '.join(names)
             return {"success": False, "error": t("tool_hallucinated", self.lang).format(tool=tool_name, tools=tools_hint)}
