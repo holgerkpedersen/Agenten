@@ -1,9 +1,8 @@
 import os
-import ast
 
 class ModuleBuilder:
     def __init__(self, action_history):
-        self.action_history = action_history  # list of action signatures
+        self.action_history = action_history
 
     def get_repeated_actions(self, threshold=2):
         from collections import Counter

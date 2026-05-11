@@ -18,7 +18,6 @@ class TaskNode:
             "children": [c.to_dict() for c in self.children]
         }
 
-
 class TaskTree:
     def __init__(self, root_name):
         self.root = TaskNode(root_name)

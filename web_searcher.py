@@ -26,10 +26,7 @@ class WebSearcher:
 
     @staticmethod
     def evaluate_techstack(tech_name):
-        robust = ["React", "Flask", "FastAPI", "PostgreSQL", "Redis", "Docker", "Next.js"]
-        moderate = ["Express", "MongoDB", "Vue", "Django"]
+        robust = ["React", "Flask", "FastAPI", "PostgreSQL", "Redis", "Docker"]
         if tech_name in robust:
             return "robust"
-        elif tech_name in moderate:
-            return "moderat"
         return "ukendt"

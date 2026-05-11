@@ -2,7 +2,8 @@
 <html lang="da">
 <head>
     <meta charset="UTF-8">
-    <title>Agenten – Frit layout med filadgang</title>
+    <title>Agenten</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         * {
             box-sizing: border-box;
@@ -30,16 +31,17 @@
             background: #1e293b;
             padding: 15px 20px;
             border-radius: 16px;
-            text-align: center;
+            text-align: left;
             flex-shrink: 0;
         }
         
         h1 {
             margin: 0;
-            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            background: linear-gradient(135deg, #f59e0b, #fbbf24);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
+            display: inline-block;
         }
         
         .session-bar {
@@ -295,6 +297,23 @@
             margin-left: 10px;
         }
         
+        .file-preview {
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: left;
+        }
+        
+        .file-preview pre {
+            text-align: left;
+            margin: 0;
+        }
+        
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -318,28 +337,48 @@
 <body>
 <div class="app-container">
     <div class="header">
-        <h1>🤖 Agenten – Frit layout med filadgang</h1>
+        <h1>🤖 Agenten</h1>
         <p>🎯 Træk i ⋮⋮ ikonet • Træk i hjørnet for resize • Vinduer kan overlappe</p>
         
         <div class="session-bar">
             <select id="sessionSelect" class="session-select">
                 <option value="">-- Vælg eller opret ny session --</option>
             </select>
-            <button onclick="createNewSession()">➕ Ny</button>
-            <button onclick="loadSelectedSession()">📂 Indlæs</button>
-            <button onclick="saveCurrentSession()">💾 Gem layout</button>
-            <button onclick="resetLayout()">🔄 Reset layout</button>
-            <button onclick="toggleThinkingMode()" id="thinkingToggle" style="background:#8b5cf6;">🧠 Vis tænkning</button>
-            <button onclick="selectExportFolder()" style="background:#10b981;">📁 Vælg eksportmappe</button>
-            <button onclick="exportToMarkdown()" style="background:#f59e0b;">📄 Eksporter til MD</button>
+            <button onclick="refreshSessions(); console.log('Sessions refreshed')" title="Opdater sessions liste">🔄</button>
+            <button onclick="createNewSession()" title="Opret en ny session">➕ Ny</button>
+            <button onclick="loadSelectedSession()" title="Indlæs valgt session">📂 Indlæs</button>
+            <button onclick="saveCurrentSession()" title="Gemmer session med filer, træ og layout">💾 Gem session</button>
+            <button onclick="resetLayout()" title="Nulstil vindueslayout til standard">🔄 Reset layout</button>
+            <button onclick="resetExecution()" style="background:#f59e0b;" title="Nulstil alle opgavers status til ikke-udført">🔄 Nulstil</button>
+            <button onclick="deleteTree()" style="background:#ef4444;" title="Slet hele opgavetræet">🗑 Slet træ</button>
+            <button onclick="saveLayoutToLocal()" title="Gem layout permanent (overlever browser genstart)">💾 Gem layout</button>
+            <label style="display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;padding:8px 12px;border-radius:6px;cursor:pointer;">
+    <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
+    <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
+</label>
+            <button onclick="selectExportFolder()" style="background:#10b981;" title="Vælg mappe til at gemme eksporterede filer">📁 Vælg eksportmappe</button>
+            <button onclick="previewMarkdown()" style="background:#8b5cf6;" title="Forhåndsvis session i modal vindue">👁 Preview</button>
+            <button onclick="exportToMarkdown()" style="background:#ef4444;" title="Eksporter session til Markdown fil">📄 Eksporter til MD</button>
         </div>
         <div id="folderStatus" style="font-size: 11px; margin-top: 5px;"></div>
         
+        <div class="flex-row" style="margin-top: 10px;">
+            <input type="text" id="filePathInput" placeholder="Vælg fil(er) med Gennemse, derefter Læs fil" style="flex:1; background:#0f172a; border:1px solid #334155; border-radius:8px; padding:8px; color:#e2e8f0;" readonly>
+            <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
+            <button onclick="document.getElementById('filePicker').click()" style="background:#475569;" title="Vælg en eller flere filer fra computeren">📂 Gennemse</button>
+            <button onclick="readFiles()" style="background:#8b5cf6;" title="Læs valgte filer og vis indhold">📖 Læs fil</button>
+        </div>
+        <div id="fileSectionToggle" style="margin: 5px 0; cursor: pointer; color:#60a5fa; font-size:12px;" onclick="toggleFileSection()" title="Klik for at vise/skjule filer">▶ Vis filer</div>
+        <div id="fileSection" style="display:none;">
+            <div id="selectedFilesDisplay" style="font-size:11px; color:#64748b; margin: 5px 0;"></div>
+            <div id="fileContentPreview" class="file-preview"></div>
+        </div>
+        
         <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?"></textarea>
         <div>
-            <button onclick="decompose()">🌳 Nedbryd til træ</button>
-            <button onclick="executeWithStream()" style="background:#10b981;">⚡ Udfør med streaming</button>
-            <button onclick="stopStream()" style="background:#ef4444;">⏹️ Stop</button>
+            <button onclick="decompose()" title="Nedbryd opgaven til et træ af delopgaver">🌳 Nedbryd til træ</button>
+            <button onclick="executeWithStream()" style="background:#10b981;" title="Udfør alle opgaver med live streaming">⚡ Udfør med streaming</button>
+            <button onclick="stopStream()" style="background:#ef4444;" title="Stop streaming">⏹️ Stop</button>
         </div>
     </div>
     
@@ -355,11 +394,48 @@ const panelDefinitions = [
     { id: 'history', title: '📜 Prompt Historik', defaultLeft: 20, defaultTop: 340, defaultWidth: 1240, defaultHeight: 200 }
 ];
 
+function getCurrentLayout() {
+    const layout = {};
+    for (const def of panelDefinitions) {
+        const panel = document.getElementById(`panel-${def.id}`);
+        if (panel) {
+            layout[def.id] = {
+                left: panel.style.left,
+                top: panel.style.top,
+                width: panel.style.width,
+                height: panel.style.height,
+                minimized: panel.querySelector('.panel-content')?.style.display === 'none'
+            };
+        }
+    }
+    return layout;
+}
+
+function saveLayoutToLocal() {
+    const layout = getCurrentLayout();
+    localStorage.setItem('agenten_layout', JSON.stringify(layout));
+    addLogEntry('INFO', 'Layout gemt permanent', 'Gemmer i browser');
+}
+
+function loadLayoutFromLocal() {
+    const saved = localStorage.getItem('agenten_layout');
+    if (saved) {
+        try {
+            const layout = JSON.parse(saved);
+            applyLayout(layout);
+            addLogEntry('INFO', 'Layout genoprettet', 'Fra tidligere session');
+        } catch(e) { console.log('Kunne ikke genoprette layout:', e); }
+    }
+}
+
+setTimeout(loadLayoutFromLocal, 500);
+
 let currentSessionId = null;
 let currentTree = null;
 let eventSource = null;
 let panels = {};
 let showThinking = true;
+let treeEditMode = false;
 
 // Drag state
 let dragState = {
@@ -394,7 +470,13 @@ function escapeHtml(str) {
 function addLogEntry(level, message, detail) {
     const logBox = document.getElementById('logContent');
     if (!logBox) return;
-    const time = new Date().toLocaleTimeString();
+    const now = new Date();
+    const time = String(now.getDate()).padStart(2,'0') + '-' + 
+                 String(now.getMonth()+1).padStart(2,'0') + '-' + 
+                 now.getFullYear() + ' ' +
+                 String(now.getHours()).padStart(2,'0') + ':' + 
+                 String(now.getMinutes()).padStart(2,'0') + ':' + 
+                 String(now.getSeconds()).padStart(2,'0');
     const logHtml = `<div class="log-entry log-${level}">
         <strong>[${time}] ${level}</strong>: ${escapeHtml(message)}<br>
         <span style="font-size: 10px; color: #64748b;">${escapeHtml(detail || '')}</span>
@@ -403,31 +485,92 @@ function addLogEntry(level, message, detail) {
     logBox.scrollTop = logBox.scrollHeight;
 }
 
-function renderTree(node) {
+function renderTree(node, path = []) {
     if (!node) return '';
     const statusClass = node.status === 'done' ? 'status-done' : (node.status === 'running' ? 'status-running' : 'status-pending');
     const statusText = node.status === 'done' ? '✓' : (node.status === 'running' ? '⏳' : '○');
-    
-    let html = `<div>
-        <div class="tree-node-content">
-            📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span>
-        </div>`;
-    
-    if (node.children && node.children.length > 0) {
-        html += `<div class="tree-children">`;
-        for (const child of node.children) {
-            html += renderTree(child);
-        }
-        html += `</div>`;
+    const pathStr = path.join('.');
+    let html = `<div data-path="${pathStr}"><div class="tree-node-content">`;
+    if (treeEditMode) {
+        html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="Rediger" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="Slet" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="Tilføj underopgave" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
     }
-    html += `</div>`;
+    html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>`;
+    if (node.children && node.children.length > 0) { 
+        html += `<div class="tree-children">`; 
+        for (let i = 0; i < node.children.length; i++) { 
+            html += renderTree(node.children[i], [...path, i]); 
+        } 
+        html += `</div>`; 
+    }
+    html += `</div>`; 
     return html;
 }
 
 function updateTreeDisplay() {
     const treeContainer = document.getElementById('treeContent');
     if (treeContainer && currentTree) {
-        treeContainer.innerHTML = renderTree(currentTree);
+        let html = `<div style="margin-bottom:10px;">`;
+        html += `<button onclick="toggleTreeEditMode()" style="background:${treeEditMode?'#10b981':'#475569'};border:none;padding:6px 12px;border-radius:6px;color:white;cursor:pointer;font-size:12px;">${treeEditMode?'✅ Gem ændringer':'✏️ Rediger træ'}</button>`;
+        if (treeEditMode) html += ` <button onclick="addTreeChild('')" style="background:#3b82f6;border:none;padding:6px 12px;border-radius:6px;color:white;cursor:pointer;font-size:12px;">➕ Ny hovedopgave</button>`;
+        html += `</div>`;
+        html += renderTree(currentTree);
+        treeContainer.innerHTML = html;
+    }
+}
+
+function toggleTreeEditMode() {
+    treeEditMode = !treeEditMode;
+    updateTreeDisplay();
+}
+
+function getNodeByPath(node, path) {
+    if (!path) return node;
+    const parts = path.split('.').filter(p => p !== '');
+    for (const p of parts) {
+        if (node.children && node.children[p]) {
+            node = node.children[p];
+        } else return null;
+    }
+    return node;
+}
+
+function editTreeNode(path) {
+    const node = getNodeByPath(currentTree, path);
+    if (!node) return;
+    const newName = prompt('Ny navn for opgaven:', node.name);
+    if (newName && newName.trim()) {
+        node.name = newName.trim().substring(0, 80);
+        updateTreeDisplay();
+        addLogEntry('INFO', 'Opgave omdøbt', node.name);
+    }
+}
+
+function deleteTreeNode(path) {
+    if (!path) {
+        alert('Kan ikke slette hovedroden - brug "Slet træ" i stedet');
+        return;
+    }
+    if (!confirm('Slet denne opgave og alle underopgaver?')) return;
+    const parts = path.split('.').filter(p => p !== '');
+    let parent = currentTree;
+    for (let i = 0; i < parts.length - 1; i++) {
+        parent = parent.children[parts[i]];
+    }
+    const idx = parseInt(parts[parts.length - 1]);
+    const deleted = parent.children.splice(idx, 1)[0];
+    updateTreeDisplay();
+    addLogEntry('INFO', 'Opgave slettet', deleted?.name || '');
+}
+
+function addTreeChild(path) {
+    const parent = path ? getNodeByPath(currentTree, path) : currentTree;
+    if (!parent) return;
+    const name = prompt('Navn på ny opgave:', 'Ny opgave');
+    if (name && name.trim()) {
+        if (!parent.children) parent.children = [];
+        parent.children.push({ name: name.trim().substring(0, 80), status: 'pending', children: [], result: null });
+        updateTreeDisplay();
+        addLogEntry('INFO', 'Opgave tilføjet', name);
     }
 }
 
@@ -475,32 +618,31 @@ function reusePrompt(prompt) {
 }
 
 function toggleThinkingMode() {
-    showThinking = !showThinking;
-    const btn = document.getElementById('thinkingToggle');
+    const checkbox = document.getElementById('thinkingToggle');
+    const label = document.getElementById('thinkingLabel');
+    showThinking = checkbox.checked;
+    label.textContent = showThinking ? 'Vis tænkning' : 'Skjul tænkning';
     if (showThinking) {
-        btn.innerHTML = '🧠 Vis tænkning';
-        btn.style.background = '#8b5cf6';
         addLogEntry('INFO', 'Tænkning aktiveret', 'Viser LLM\'s tankeprocess');
     } else {
-        btn.innerHTML = '🤫 Skjul tænkning';
-        btn.style.background = '#475569';
         addLogEntry('INFO', 'Tænkning deaktiveret', 'Kun resultater vises');
+    }
+    if (currentSessionId) {
+        saveCurrentSession();
     }
 }
 
 async function selectExportFolder() {
-    addLogEntry('INFO', 'Åbner mappevalg', 'Vælg en mappe i det åbnede vindue');
-    
-    const response = await fetch('/api/folder/select', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-    });
-    const data = await response.json();
-    
-    if (data.success) {
-        addLogEntry('INFO', 'Mappevalg åbnet', 'Vælg mappe i dialogboksen');
-        setTimeout(checkFolderStatus, 2000);
+    const folder = prompt('Indtast sti til eksportmappe (f.eks. C:\\Dev\\Agenten\\exports):');
+    if (!folder) return;
+    addLogEntry('INFO', 'Sætter eksportmappe', folder);
+    const resp = await fetch('/api/folder/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({folder: folder}) });
+    const data = await resp.json();
+    if(data.success) {
+        document.getElementById('folderStatus').innerHTML = `📁 Gemmer i: ${data.folder} <span class="folder-status">Aktiv</span>`;
+        addLogEntry('INFO','Eksportmappe valgt',data.folder);
+    } else {
+        addLogEntry('ERROR','Kunne ikke sætte mappe',data.error);
     }
 }
 
@@ -511,6 +653,136 @@ async function checkFolderStatus() {
     if (data.success && data.folder) {
         addLogEntry('INFO', 'Eksportmappe valgt', data.folder);
         document.getElementById('folderStatus').innerHTML = `📁 Gemmer i: ${data.folder} <span class="folder-status">Aktiv</span>`;
+    }
+}
+
+let selectedFiles = [];
+let loadedFilesContent = [];
+
+async function onFilePicked(event) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    selectedFiles = [];
+    const fileNames = [];
+    
+    for (const file of files) {
+        selectedFiles.push({ name: file.name, file: file });
+        fileNames.push(file.name);
+    }
+    
+    const nameDisplay = fileNames.length === 1 ? fileNames[0] : `${fileNames.length} filer valgt`;
+    document.getElementById('filePathInput').value = nameDisplay;
+    addLogEntry('INFO', 'Filer valgt', nameDisplay);
+    event.target.value = '';
+}
+
+function toggleFileSection() {
+    const section = document.getElementById('fileSection');
+    const toggle = document.getElementById('fileSectionToggle');
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        toggle.textContent = '▼ Skjul filer';
+    } else {
+        section.style.display = 'none';
+        toggle.textContent = '▶ Vis filer';
+    }
+}
+
+function toggleFileIncluded(index, included) {
+    if (loadedFilesContent[index]) {
+        loadedFilesContent[index].included = included;
+        readFiles();
+    }
+}
+
+async function readFiles() {
+    const preview = document.getElementById('fileContentPreview');
+    const fileSection = document.getElementById('fileSection');
+    const fileToggle = document.getElementById('fileSectionToggle');
+    fileSection.style.display = 'block';
+    fileToggle.textContent = '▼ Skjul filer';
+    preview.style.display = 'block';
+    preview.innerHTML = '';
+    
+    if (loadedFilesContent.length > 0) {
+        let filesDisplay = '<div style="color:#10b981; margin-bottom:8px;"><strong>📎 Filvalg for LLM kontekst:</strong><br>';
+        for (let i = 0; i < loadedFilesContent.length; i++) {
+            const fc = loadedFilesContent[i];
+            const ext = fc.filename.split('.').pop().toLowerCase();
+            const langMap = { 'py': 'python', 'js': 'javascript', 'json': 'json', 'html': 'html', 'css': 'css', 'md': 'markdown' };
+            const langClass = langMap[ext] || 'plaintext';
+            const checked = fc.included ? 'checked' : '';
+            preview.innerHTML += `<label style="display:flex; align-items:center; gap:8px; margin:8px 0;"><input type="checkbox" ${checked} onchange="toggleFileIncluded(${i}, this.checked)"> <strong>📄 ${fc.filename}</strong></label><pre class="language-${langClass}" style="max-height:150px;overflow-y:auto;margin:8px 0;${fc.included?'':'opacity:0.4'}"><code>${escapeHtml(fc.content.slice(0,3000))}${fc.content.length>3000?'...':''}</code></pre>`;
+            try { Prism.highlightElement(preview.querySelectorAll('pre')[i].querySelector('code')); } catch(e) {}
+            const status = fc.included ? '✓' : '✗';
+            filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" ${checked} onchange="toggleFileIncluded(${i}, this.checked)"> <span style="${fc.included?'color:#10b981':'color:#ef4444'}">${status}</span> ${fc.filename}</label>`;
+            addLogEntry('INFO', 'Fil vist', fc.filename);
+        }
+        filesDisplay += '</div>';
+        document.getElementById('selectedFilesDisplay').innerHTML = filesDisplay;
+        const includedCount = loadedFilesContent.filter(f => f.included).length;
+        document.getElementById('filePathInput').value = includedCount === 0 ? 'Ingen filer valgt' : (includedCount === 1 ? loadedFilesContent.find(f => f.included).filename : `${includedCount} filer valgt`);
+        return;
+    }
+    
+    if (selectedFiles.length === 0) {
+        alert('Vælg først fil(er) med Gennemse');
+        return;
+    }
+    
+    loadedFilesContent = [];
+    
+    let filesDisplay = '<div style="color:#10b981; margin-bottom:8px;">📎 <strong>Filer inkluderet i LLM kontekst:</strong><br>';
+    
+    for (const { name, file } of selectedFiles) {
+        addLogEntry('INFO', 'Læser fil', name);
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            const resp = await fetch('/api/file/upload', { method: 'POST', body: formData });
+            const data = await resp.json();
+            
+            if (data.success) {
+                const readResp = await fetch('/api/file/read', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({filepath: data.filepath}) 
+                });
+                const readData = await readResp.json();
+                
+                if (readData.success) {
+                    const ext = readData.filename.split('.').pop().toLowerCase();
+                    const langMap = { 'py': 'python', 'js': 'javascript', 'json': 'json', 'html': 'html', 'css': 'css', 'md': 'markdown' };
+                    const langClass = langMap[ext] || 'plaintext';
+                    const idx = loadedFilesContent.length;
+                    preview.innerHTML += `<label style="display:flex; align-items:center; gap:8px; margin:8px 0;"><input type="checkbox" checked onchange="toggleFileIncluded(${idx}, this.checked)"> <strong>📄 ${readData.filename}</strong> (${readData.lines} linjer)</label><pre class="language-${langClass}" style="max-height:300px;overflow-y:auto;margin:8px 0;"><code>${escapeHtml(readData.content)}</code></pre>`;
+                    Prism.highlightElement(preview.lastElementChild.querySelector('code'));
+                    
+                    loadedFilesContent.push({ filename: readData.filename, filepath: readData.filepath, content: readData.content, included: true });
+                    filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" checked onchange="toggleFileIncluded(${loadedFilesContent.length-1}, this.checked)"> <span style="color:#10b981">✓</span> ${readData.filename}</label>`;
+                    
+                    addLogEntry('INFO', 'Fil indlæst', `${readData.filename} (${readData.lines} linjer)`);
+                } else {
+                    preview.innerHTML += `<div style="color:#ef4444;">Fejl ved læsning af ${name}: ${readData.error}</div><br>`;
+                }
+            } else {
+                preview.innerHTML += `<div style="color:#ef4444;">Fejl ved upload af ${name}: ${data.error}</div><br>`;
+            }
+        } catch(e) {
+            preview.innerHTML += `<div style="color:#ef4444;">Fejl: ${e.message}</div><br>`;
+        }
+    }
+    
+    filesDisplay += '</div>';
+    document.getElementById('selectedFilesDisplay').innerHTML = filesDisplay;
+    
+    if (selectedFiles.length === 1) {
+        document.getElementById('promptInput').value = `Analyser ${selectedFiles[0].name} grundigt. Giv en struktureret analyse af koden.`;
+    } else {
+        document.getElementById('promptInput').value = `Analyser ${selectedFiles.length} filer grundigt. Giv en struktureret analyse af koden og sammenlign dem.`;
     }
 }
 
@@ -526,6 +798,11 @@ function bringToFront(panelId) {
     if (panel) {
         panel.style.zIndex = maxZ + 1;
     }
+}
+
+function removePanel(panelId) {
+    const panel = document.getElementById(`panel-${panelId}`);
+    if (panel) panel.style.display = panel.style.display === 'none' ? '' : 'none';
 }
 
 function createPanels() {
@@ -552,6 +829,7 @@ function createPanels() {
                 </div>
                 <div class="panel-controls">
                     <button onclick="toggleMinimize('${def.id}')">−</button>
+                    <button onclick="toggleMaximize('${def.id}')">□</button>
                     <button onclick="removePanel('${def.id}')">×</button>
                 </div>
             </div>
@@ -584,6 +862,41 @@ function createPanels() {
     
     setupDragAndDrop();
     setupResize();
+}
+
+function setupResize() {
+    const handles = document.querySelectorAll('.resize-handle');
+    
+    handles.forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const panel = handle.closest('.panel');
+            if (!panel) return;
+            
+            panel.style.zIndex = '2';
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startWidth = panel.offsetWidth;
+            const startHeight = panel.offsetHeight;
+            
+            function onResize(e2) {
+                panel.style.width = `${startWidth + e2.clientX - startX}px`;
+                panel.style.height = `${startHeight + e2.clientY - startY}px`;
+            }
+            
+            function stopResize() {
+                panel.style.zIndex = '1';
+                document.removeEventListener('mousemove', onResize);
+                document.removeEventListener('mouseup', stopResize);
+                saveLayoutToSession();
+            }
+            
+            document.addEventListener('mousemove', onResize);
+            document.addEventListener('mouseup', stopResize);
+        });
+    });
 }
 
 function setupDragAndDrop() {
@@ -658,69 +971,6 @@ function stopDrag(e) {
     saveLayoutToSession();
 }
 
-function setupResize() {
-    const resizeHandles = document.querySelectorAll('.resize-handle');
-    
-    resizeHandles.forEach(handle => {
-        handle.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const panel = handle.closest('.panel');
-            if (!panel) return;
-            
-            const panelId = panel.getAttribute('data-panel-id');
-            bringToFront(panelId);
-            
-            const rect = panel.getBoundingClientRect();
-            
-            resizeState = {
-                active: true,
-                panelId: panelId,
-                startMouseX: e.clientX,
-                startMouseY: e.clientY,
-                startWidth: rect.width,
-                startHeight: rect.height
-            };
-            
-            document.addEventListener('mousemove', onResize);
-            document.addEventListener('mouseup', stopResize);
-        });
-    });
-}
-
-function onResize(e) {
-    if (!resizeState.active) return;
-    e.preventDefault();
-    
-    const deltaX = e.clientX - resizeState.startMouseX;
-    const deltaY = e.clientY - resizeState.startMouseY;
-    
-    let newWidth = Math.max(200, resizeState.startWidth + deltaX);
-    let newHeight = Math.max(150, resizeState.startHeight + deltaY);
-    
-    const container = document.getElementById('canvasContainer');
-    const containerRect = container.getBoundingClientRect();
-    const panel = document.getElementById(`panel-${resizeState.panelId}`);
-    const panelRect = panel.getBoundingClientRect();
-    
-    newWidth = Math.min(newWidth, containerRect.width - (panelRect.left - containerRect.left) - 20);
-    newHeight = Math.min(newHeight, containerRect.height - (panelRect.top - containerRect.top) - 20);
-    
-    panel.style.width = `${newWidth}px`;
-    panel.style.height = `${newHeight}px`;
-}
-
-function stopResize(e) {
-    if (!resizeState.active) return;
-    
-    resizeState.active = false;
-    document.removeEventListener('mousemove', onResize);
-    document.removeEventListener('mouseup', stopResize);
-    
-    saveLayoutToSession();
-}
-
 function toggleMinimize(panelId) {
     const panel = document.getElementById(`panel-${panelId}`);
     const content = panel.querySelector('.panel-content');
@@ -743,29 +993,35 @@ function toggleMinimize(panelId) {
     saveLayoutToSession();
 }
 
-function removePanel(panelId) {
+function toggleMaximize(panelId) {
     const panel = document.getElementById(`panel-${panelId}`);
-    if (panel) {
-        panel.style.display = 'none';
-        saveLayoutToSession();
+    const btn = panel.querySelector('.panel-controls button:nth-child(2)');
+    
+    if (panel.getAttribute('data-maximized') === 'true') {
+        const savedLeft = panel.getAttribute('data-saved-left');
+        const savedTop = panel.getAttribute('data-saved-top');
+        const savedWidth = panel.getAttribute('data-saved-width');
+        const savedHeight = panel.getAttribute('data-saved-height');
+        if (savedLeft) panel.style.left = savedLeft;
+        if (savedTop) panel.style.top = savedTop;
+        if (savedWidth) panel.style.width = savedWidth;
+        if (savedHeight) panel.style.height = savedHeight;
+        panel.removeAttribute('data-maximized');
+        btn.textContent = '□';
+    } else {
+        panel.setAttribute('data-saved-left', panel.style.left);
+        panel.setAttribute('data-saved-top', panel.style.top);
+        panel.setAttribute('data-saved-width', panel.style.width);
+        panel.setAttribute('data-saved-height', panel.style.height);
+        panel.style.left = '20px';
+        panel.style.top = '60px';
+        panel.style.width = 'calc(100vw - 40px)';
+        panel.style.height = 'calc(100vh - 140px)';
+        panel.style.zIndex = '100';
+        panel.setAttribute('data-maximized', 'true');
+        btn.textContent = '❐';
     }
-}
-
-function getCurrentLayout() {
-    const layout = {};
-    for (const def of panelDefinitions) {
-        const panel = document.getElementById(`panel-${def.id}`);
-        if (panel && panel.style.display !== 'none') {
-            layout[def.id] = {
-                left: panel.style.left,
-                top: panel.style.top,
-                width: panel.style.width,
-                height: panel.style.height,
-                minimized: panel.querySelector('.panel-content')?.style.display === 'none'
-            };
-        }
-    }
-    return layout;
+    saveLayoutToSession();
 }
 
 function applyLayout(layout) {
@@ -817,14 +1073,24 @@ function resetLayout() {
 }
 
 async function refreshSessions() {
-    const response = await fetch('/api/sessions');
-    const data = await response.json();
-    if (data.success) {
-        const select = document.getElementById('sessionSelect');
-        select.innerHTML = '<option value="">-- Vælg eller opret ny session --</option>';
-        for (const session of data.sessions) {
-            select.innerHTML += `<option value="${session.id}">${escapeHtml(session.name)} (${session.prompt_count || 0} prompts)</option>`;
+    console.log('Refreshing sessions...');
+    try {
+        const response = await fetch('/api/sessions');
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Sessions data:', data);
+        if (data.success) {
+            const select = document.getElementById('sessionSelect');
+            select.innerHTML = '<option value="">-- Vælg eller opret ny session --</option>';
+            for (const session of data.sessions) {
+                select.innerHTML += `<option value="${session.id}">${escapeHtml(session.name)} (${session.prompt_count || 0} prompts)</option>`;
+            }
+            console.log('Loaded', data.sessions.length, 'sessions');
+        } else {
+            console.log('Failed to load sessions:', data);
         }
+    } catch(e) {
+        console.error('Error loading sessions:', e);
     }
 }
 
@@ -839,9 +1105,25 @@ async function createNewSession() {
         const data = await response.json();
         if (data.success) {
             currentSessionId = data.session_id;
+            currentTree = null;
+            selectedFiles = [];
+            loadedFilesContent = [];
+            document.getElementById('promptInput').value = '';
+            document.getElementById('filePathInput').value = '';
+            document.getElementById('selectedFilesDisplay').innerHTML = '';
+            const filePreview = document.getElementById('fileContentPreview');
+            if (filePreview) { filePreview.innerHTML = ''; filePreview.style.display = 'none'; }
+            const fileSection = document.getElementById('fileSection');
+            if (fileSection) fileSection.style.display = 'none';
+            const fileToggle = document.getElementById('fileSectionToggle');
+            if (fileToggle) fileToggle.textContent = '▶ Vis filer';
+            const treeContent = document.getElementById('treeContent');
+            if (treeContent) treeContent.innerHTML = '<div style="color:#64748b;">Klik "Nedbryd til træ"</div>';
+            const llmContent = document.getElementById('llmContent');
+            if (llmContent) llmContent.innerHTML = '<div style="color:#64748b;">Tryk "Udfør med streaming"</div>';
             addLogEntry('INFO', 'Ny session oprettet', `${name} (${data.session_id})`);
             refreshSessions();
-            resetLayout();
+            loadLayoutFromLocal();
             await updatePromptHistory(currentSessionId);
         }
     }
@@ -861,11 +1143,25 @@ async function loadSelectedSession() {
         
         if (data.session.layout) {
             applyLayout(data.session.layout);
+        } else {
+            loadLayoutFromLocal();
         }
         
         if (data.session.tree) {
             currentTree = data.session.tree;
             updateTreeDisplay();
+        }
+        
+        if (data.session.show_thinking !== undefined) {
+            showThinking = data.session.show_thinking;
+            const checkbox = document.getElementById('thinkingToggle');
+            if (checkbox) {
+                checkbox.checked = showThinking;
+                const label = document.getElementById('thinkingLabel');
+                if (label) {
+                    label.textContent = showThinking ? 'Vis tænkning' : 'Skjul tænkning';
+                }
+            }
         }
         
         if (data.session.agent_log) {
@@ -883,6 +1179,78 @@ async function loadSelectedSession() {
         }
         
         await updatePromptHistory(sessionId);
+        
+        console.log('Session load - file_context:', data.session.file_context);
+        
+        selectedFiles = [];
+        loadedFilesContent = [];
+        document.getElementById('filePathInput').value = '';
+        document.getElementById('selectedFilesDisplay').innerHTML = '';
+        const filePreviewEl = document.getElementById('fileContentPreview');
+        const fileSectionEl = document.getElementById('fileSection');
+        const fileToggleEl = document.getElementById('fileSectionToggle');
+        if (filePreviewEl) {
+            filePreviewEl.innerHTML = '';
+            filePreviewEl.style.display = 'none';
+        }
+        if (fileSectionEl) {
+            fileSectionEl.style.display = 'none';
+            if (fileToggleEl) fileToggleEl.textContent = '▶ Vis filer';
+        }
+        const promptInput = document.getElementById('promptInput');
+        if (promptInput && data.session.original_prompt) {
+            promptInput.value = data.session.original_prompt;
+        }
+        
+        if (data.session.file_context && data.session.file_context.length > 0) {
+            console.log('Loading files from session:', data.session.file_context);
+            loadedFilesContent = [];
+            let missingFiles = [];
+            for (const fc of data.session.file_context) {
+                console.log('Trying to load file:', fc.filepath);
+                try {
+                    const resp = await fetch('/api/file/read', { 
+                        method: 'POST', 
+                        headers: {'Content-Type': 'application/json'}, 
+                        body: JSON.stringify({filepath: fc.filepath}) 
+                    });
+                    console.log('File read response:', resp.status);
+                    const fileData = await resp.json();
+                    console.log('File data:', fileData);
+                    if (fileData.success) {
+                        loadedFilesContent.push({ 
+                            filename: fileData.filename, 
+                            filepath: fileData.filepath, 
+                            content: fileData.content,
+                            included: true 
+                        });
+                        addLogEntry('INFO', 'Fil genindlæst', fileData.filename);
+                    } else {
+                        missingFiles.push(fc.filename || fc.filepath);
+                    }
+                } catch(e) {
+                    console.log('Error loading file:', e);
+                    missingFiles.push(fc.filename || fc.filepath);
+                }
+            }
+            if (missingFiles.length > 0) {
+                alert('Følgende filer fra sessionen blev ikke fundet og skal vælges igen:\n\n' + missingFiles.join('\n'));
+                loadedFilesContent = [];
+                selectedFiles = [];
+                document.getElementById('filePathInput').value = '';
+                document.getElementById('selectedFilesDisplay').innerHTML = '<div style="color:#ef4444;">Filer mangler - vælg venligst igen</div>';
+            } else {
+                const fileNames = loadedFilesContent.map(f => f.filename).join(', ');
+                document.getElementById('selectedFilesDisplay').innerHTML = `<div style="color:#10b981;">📎 ${loadedFilesContent.length} fil(er) genindlæst: ${fileNames}</div>`;
+                document.getElementById('filePathInput').value = loadedFilesContent.length === 1 ? loadedFilesContent[0].filename : `${loadedFilesContent.length} filer valgt`;
+                if (loadedFilesContent.length > 0 && filePreviewEl) {
+                    document.getElementById('fileSection').style.display = 'block';
+                    document.getElementById('fileSectionToggle').textContent = '▼ Skjul filer';
+                    readFiles();
+                }
+            }
+        }
+        
         addLogEntry('INFO', 'Session indlæst', data.session.name);
     }
 }
@@ -892,15 +1260,20 @@ async function saveCurrentSession() {
         await createNewSession();
     }
     const layout = getCurrentLayout();
+    const currentPrompt = document.getElementById('promptInput').value;
+    const fileContext = loadedFilesContent.map(f => ({ filename: f.filename, filepath: f.filepath, content: f.content || '' }));
     const response = await fetch('/api/sessions/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             session_id: currentSessionId,
-            name: document.getElementById('promptInput').value.slice(0, 30) || 'Session',
+            name: currentPrompt.slice(0, 30) || 'Session',
             tree: currentTree,
             layout: layout,
-            prompt_history: []
+            prompt_history: [],
+            file_context: fileContext,
+            original_prompt: currentPrompt,
+            show_thinking: showThinking
         })
     });
     const data = await response.json();
@@ -917,7 +1290,18 @@ async function decompose() {
         return;
     }
     
+    const filesData = (loadedFilesContent || []).filter(f => f.included);
+    console.log('Sending files to decompose:', filesData.length, filesData.map(f => f.filename));
+    
+    if (selectedFiles.length > 0 && loadedFilesContent.length === 0) {
+        alert('Du har valgt filer men ikke læst dem endnu. Tryk først "📖 Læs fil" for at indlæse filindholdet.');
+        return;
+    }
+    
     addLogEntry('INFO', 'Starter nedbrydning', prompt.slice(0, 50));
+    if (filesData.length > 0) {
+        addLogEntry('INFO', 'Inkluderer filer', `${filesData.length} fil(er)`);
+    }
     
     const response = await fetch('/api/decompose', {
         method: 'POST',
@@ -925,7 +1309,8 @@ async function decompose() {
         body: JSON.stringify({ 
             prompt, 
             session_id: currentSessionId,
-            show_thinking: showThinking
+            show_thinking: showThinking,
+            files: filesData
         })
     });
     const data = await response.json();
@@ -949,6 +1334,50 @@ function stopStream() {
         eventSource = null;
     }
     addLogEntry('INFO', 'Streaming stoppet', 'Af bruger');
+}
+
+async function resetExecution() {
+    if (!currentTree) {
+        alert('Intet opgavetræ at nulstille');
+        return;
+    }
+    if (!confirm('Nulstil alle opgaver til "ikke udført"? Opgaverne forbliver i træet.')) return;
+    
+    await fetch('/api/reset-execution', { method: 'POST' });
+    
+    function resetStatus(node) {
+        node.status = 'pending';
+        node.result = null;
+        if (node.children) {
+            node.children.forEach(child => resetStatus(child));
+        }
+    }
+    resetStatus(currentTree);
+    
+    updateTreeDisplay();
+    const llmContent = document.getElementById('llmContent');
+    if (llmContent) llmContent.innerHTML = '<div style="color:#64748b;">Tryk "Udfør med streaming"</div>';
+    addLogEntry('INFO', 'Opgavetræ nulstillet', '');
+    
+    if (currentSessionId) saveCurrentSession();
+}
+
+async function deleteTree() {
+    if (!currentTree) {
+        alert('Intet opgavetræ at slette');
+        return;
+    }
+    if (!confirm('Er du sikker på at du vil slette hele opgavetræet?')) {
+        return;
+    }
+    currentTree = null;
+    await fetch('/api/reset-execution', { method: 'POST' });
+    const treeContent = document.getElementById('treeContent');
+    if (treeContent) treeContent.innerHTML = '<div style="color:#64748b;">Klik "Nedbryd til træ"</div>';
+    const llmContent = document.getElementById('llmContent');
+    if (llmContent) llmContent.innerHTML = '<div style="color:#64748b;">Tryk "Udfør med streaming"</div>';
+    addLogEntry('INFO', 'Opgavetræ slettet', '');
+    await saveCurrentSession();
 }
 
 function executeWithStream() {
@@ -999,29 +1428,24 @@ function executeWithStream() {
                 addLogEntry('INFO', 'Påbegynder opgave', data.task);
                 break;
                 
+            case 'progress_chunk':
             case 'llm_chunk':
                 if (!currentOutputs[data.task]) {
                     currentOutputs[data.task] = '';
-                    if (llmBox && showThinking) {
+                    if (llmBox) {
                         llmBox.innerHTML += `<div style="margin-bottom: 15px;">
                             <strong style="color:#a78bfa;">💭 ${escapeHtml(data.task)}</strong>
-                            <div id="output-${escapeHtml(data.task).replace(/[^a-zA-Z0-9]/g, '_')}" style="white-space: pre-wrap; margin-top: 5px;"></div>
-                        </div>`;
-                    } else if (llmBox && !showThinking) {
-                        // Only show result when thinking is off
-                        llmBox.innerHTML = `<div style="margin-bottom: 15px;">
-                            <strong style="color:#10b981;">✅ ${escapeHtml(data.task)}</strong>
                             <div id="output-${escapeHtml(data.task).replace(/[^a-zA-Z0-9]/g, '_')}" style="white-space: pre-wrap; margin-top: 5px;"></div>
                         </div>`;
                     }
                 }
                 currentOutputs[data.task] += data.chunk;
-                const outputId = `output-${escapeHtml(data.task).replace(/[^a-zA-Z0-9]/g, '_')}`;
-                const outputDiv = document.getElementById(outputId);
-                if (outputDiv && showThinking) {
-                    outputDiv.innerHTML = escapeHtml(currentOutputs[data.task]);
-                } else if (outputDiv && !showThinking) {
-                    outputDiv.innerHTML = escapeHtml(currentOutputs[data.task]);
+                if (showThinking) {
+                    const outputId = `output-${escapeHtml(data.task).replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    const outputDiv = document.getElementById(outputId);
+                    if (outputDiv) {
+                        outputDiv.textContent = currentOutputs[data.task];
+                    }
                 }
                 if (llmBox) llmBox.scrollTop = llmBox.scrollHeight;
                 break;
@@ -1034,6 +1458,16 @@ function executeWithStream() {
             case 'task_done':
                 const taskElem = document.getElementById('currentTask');
                 if (taskElem) taskElem.innerHTML = `<span style="color:#10b981;">✓ ${escapeHtml(data.task)} færdig</span>`;
+                
+                if (!showThinking && llmBox) {
+                    const output = currentOutputs[data.task] || data.result || '';
+                    const existing = llmBox.querySelector(`[data-task="${data.task}"]`);
+                    if (existing) {
+                        existing.innerHTML = `<strong style="color:#10b981;">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div>`;
+                    } else {
+                        llmBox.innerHTML += `<div data-task="${data.task}" style="margin-bottom:15px;"><strong style="color:#10b981;">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div></div>`;
+                    }
+                }
                 
                 function markDone(node) {
                     if (node.name === data.task) node.status = 'done';
@@ -1126,8 +1560,8 @@ async function exportToMarkdown() {
     
     md += `## 📡 LLM Output (Streaming)\n\n`;
     const llmContent = document.getElementById('llmContent');
-    if (llmContent && llmContent.innerText) {
-        md += `\`\`\`\n${llmContent.innerText.slice(0, 5000)}\n\`\`\`\n\n`;
+    if (llmContent && llmContent.innerText && llmContent.innerText !== 'Tryk "Udfør med streaming"') {
+        md += `${llmContent.innerText}\n\n`;
     } else {
         md += `*Ingen LLM output endnu*\n\n`;
     }
@@ -1217,6 +1651,95 @@ async function exportToMarkdown() {
     }
 }
 
+async function previewMarkdown() {
+    if (!currentSessionId && !currentTree) {
+        alert('Ingen session eller træ at vise');
+        return;
+    }
+    
+    addLogEntry('INFO', 'Genererer preview', '');
+    
+    const treeContent = document.getElementById('treeContent')?.innerText || '';
+    const llmContent = document.getElementById('llmContent')?.innerText || '';
+    const promptText = document.getElementById('promptInput')?.value || '';
+    
+    let html = `
+    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; justify-content:center; align-items:center;">
+        <div style="background:#1e293b; border-radius:16px; width:90%; max-width:1200px; height:90%; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+            <div style="background:#334155; padding:15px 20px; display:flex; justify-content:space-between; align-items:center; border-radius:16px 16px 0 0;">
+                <h2 style="margin:0; color:#e2e8f0;">📊 Agenten - Preview</h2>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="downloadFromPreview()" style="background:#10b981; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">💾 Download MD</button>
+                    <button onclick="closePreview()" style="background:#ef4444; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">✕ Luk</button>
+                </div>
+            </div>
+            <div id="previewContent" style="flex:1; overflow:auto; padding:20px; font-family:monospace; font-size:14px; line-height:1.6; color:#e2e8f0; background:#0f172a;">
+    `;
+    
+    if (promptText) {
+        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px;">📝 Prompt</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(promptText)}</pre>`;
+    }
+    
+    if (treeContent && treeContent !== 'Klik "Nedbryd til træ"') {
+        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">🌲 Opgavetræ</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(treeContent)}</pre>`;
+    }
+    
+    if (llmContent && llmContent !== 'Tryk "Udfør med streaming"') {
+        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📡 LLM Output</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap; max-height:400px; overflow:auto;">${escapeHtml(llmContent)}</pre>`;
+    }
+    
+    if (loadedFilesContent.length > 0) {
+        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📎 Filer inkluderet</h3>`;
+        for (const fc of loadedFilesContent.filter(f => f.included)) {
+            html += `<div style="margin:10px 0; padding:10px; background:#1e293b; border-radius:8px;"><strong style="color:#10b981;">📄 ${fc.filename}</strong><div style="color:#64748b; font-size:11px; margin-top:4px;">Sti: ${fc.filepath}</div></div>`;
+        }
+    }
+    
+    html += `
+            </div>
+        </div>
+    </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    window._previewContent = html;
+}
+
+function closePreview() {
+    const preview = document.querySelector('div[style*="position:fixed"]');
+    if (preview) preview.remove();
+}
+
+function downloadFromPreview() {
+    const promptText = document.getElementById('promptInput')?.value || '';
+    const treeContent = document.getElementById('treeContent')?.innerText || '';
+    const llmContent = document.getElementById('llmContent')?.innerText || '';
+    
+    let md = `# 📊 Agenten - Session Preview\n\n`;
+    if (promptText) md += `## 📝 Prompt\n\n${promptText}\n\n`;
+    if (treeContent && treeContent !== 'Klik "Nedbryd til træ"') md += `## 🌲 Opgavetræ\n\n${treeContent}\n\n`;
+    if (llmContent && llmContent !== 'Tryk "Udfør med streaming"') md += `## 📡 LLM Output\n\n${llmContent}\n\n`;
+    
+    if (loadedFilesContent.length > 0) {
+        md += `## 📎 Filer inkluderet\n\n`;
+        for (const fc of loadedFilesContent.filter(f => f.included)) {
+            md += `### ${fc.filename}\n\nSti: \`${fc.filepath}\`\n\n`;
+        }
+    }
+    
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agenten_preview_${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    addLogEntry('INFO', 'Downloaded preview', a.download);
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     createPanels();
@@ -1224,5 +1747,8 @@ document.addEventListener('DOMContentLoaded', function() {
     checkFolderStatus();
 });
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 </body>
 </html>

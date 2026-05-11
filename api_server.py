@@ -6,47 +6,66 @@ import json
 import time
 import threading
 import os
-import tkinter as tk
-from tkinter import filedialog
-import threading
 
-app = Flask(__name__, static_folder="static")
+# ============ KONFIGURATION ============
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, 'static')
+
+os.makedirs(STATIC_DIR, exist_ok=True)
+
+app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='/static')
 CORS(app)
 
 agent = Agent()
 session_manager = SessionManager()
 current_session_id = None
 execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
-export_folder = None  # Gem brugerens valgte mappe
+export_folder = None
+
+# ============ STATIC ROUTES ============
+@app.route("/")
+def index():
+    index_path = os.path.join(STATIC_DIR, 'index.html')
+    if os.path.exists(index_path):
+        return send_from_directory(STATIC_DIR, 'index.html')
+    else:
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><title>Agenten</title></head>
+        <body style="background:#0f172a; color:#e2e8f0; font-family: monospace; padding: 20px;">
+            <h1>🤖 Agenten</h1>
+            <p>Static mappe: """ + STATIC_DIR + """</p>
+            <p>index.html ikke fundet. Opret venligst filen i static mappen.</p>
+        </body>
+        </html>
+        """
+
+@app.route('/static/<path:path>')
+def serve_static(path):
+    return send_from_directory(STATIC_DIR, path)
 
 # ============ FILHÅNDTERING ENDPOINTS ============
-
-@app.route("/api/folder/select", methods=["POST"])
-def select_folder():
-    """Åben dialog for at vælge mappe (kører i separat tråd)"""
+@app.route("/api/folder/set", methods=["POST"])
+def set_folder():
     global export_folder
-    
-    def select():
-        global export_folder
-        root = tk.Tk()
-        root.withdraw()  # Skjul hovedvinduet
-        root.attributes('-topmost', True)  # Sæt dialog øverst
-        folder_selected = filedialog.askdirectory(title="Vælg mappe til at gemme eksporterede filer")
-        root.destroy()
-        
-        if folder_selected:
-            export_folder = folder_selected
-            print(f"📁 Eksportmappe valgt: {export_folder}")
-    
-    # Kør i separat tråd for ikke at blokere
-    thread = threading.Thread(target=select)
-    thread.start()
-    
-    return jsonify({"success": True, "message": "Vælg mappe i det åbnede vindue"})
+    data = request.json
+    folder = data.get("folder", "")
+    if folder and os.path.isdir(folder):
+        export_folder = folder
+        return jsonify({"success": True, "folder": export_folder})
+    elif folder and not os.path.exists(folder):
+        try:
+            os.makedirs(folder, exist_ok=True)
+            export_folder = folder
+            return jsonify({"success": True, "folder": export_folder})
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Kunne ikke oprette mappe: {e}"})
+    else:
+        return jsonify({"success": False, "error": "Ugyldig mappesti"})
 
 @app.route("/api/folder/status", methods=["GET"])
 def folder_status():
-    """Hent nuværende eksportmappe"""
     global export_folder
     if export_folder and os.path.exists(export_folder):
         return jsonify({"success": True, "folder": export_folder})
@@ -54,7 +73,6 @@ def folder_status():
 
 @app.route("/api/folder/save", methods=["POST"])
 def save_to_folder():
-    """Gem fil til den valgte mappe"""
     global export_folder
     data = request.json
     filename = data.get("filename", "export.md")
@@ -65,7 +83,8 @@ def save_to_folder():
     
     try:
         os.makedirs(export_folder, exist_ok=True)
-        filepath = os.path.join(export_folder, filename)
+        safe_filename = "".join(c for c in filename if c.isalnum() or c in '._- ')
+        filepath = os.path.join(export_folder, safe_filename)
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(content)
         return jsonify({"success": True, "filepath": filepath})
@@ -74,13 +93,10 @@ def save_to_folder():
 
 @app.route("/api/folder/list", methods=["POST"])
 def list_folder_contents():
-    """List indhold af en mappe"""
     data = request.json
     folder_path = data.get("path", export_folder)
-    
     if not folder_path or not os.path.exists(folder_path):
         return jsonify({"success": False, "error": "Mappe findes ikke"}), 400
-    
     try:
         items = []
         for item in os.listdir(folder_path):
@@ -95,26 +111,82 @@ def list_folder_contents():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route("/api/folder/delete", methods=["POST"])
-def delete_file():
-    """Slet en fil eller mappe"""
+# ============ FIL-LÆSNING ENDPOINTS ============
+import tempfile
+
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.route("/api/file/upload", methods=["POST"])
+def upload_file():
+    """Upload en fil fra browseren og gem den med original navn"""
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "Ingen fil modtaget"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"success": False, "error": "Tomt filnavn"}), 400
+    try:
+        safe_filename = "".join(c for c in file.filename if c.isalnum() or c in '._- ')
+        filepath = os.path.join(UPLOAD_DIR, safe_filename)
+        file.save(filepath)
+        return jsonify({"success": True, "filepath": filepath, "filename": file.filename})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/file/read", methods=["POST"])
+def read_file():
+    """Læs indholdet af en fil"""
     data = request.json
-    filepath = data.get("path")
+    filepath = data.get("filepath", "")
     
-    if not filepath or not os.path.exists(filepath):
-        return jsonify({"success": False, "error": "Fil/mappe findes ikke"}), 400
+    if not filepath:
+        return jsonify({"success": False, "error": "Ingen sti angivet"}), 400
     
     try:
-        if os.path.isdir(filepath):
-            os.rmdir(filepath)
-        else:
-            os.remove(filepath)
-        return jsonify({"success": True})
+        if not os.path.exists(filepath):
+            return jsonify({"success": False, "error": f"Filen findes ikke: {filepath}"}), 404
+        
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return jsonify({
+            "success": True, 
+            "filepath": filepath,
+            "filename": os.path.basename(filepath),
+            "content": content,
+            "size": len(content),
+            "lines": len(content.split('\n'))
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/file/list-python", methods=["POST"])
+def list_python_files():
+    """List alle Python filer i en mappe"""
+    data = request.json
+    folder_path = data.get("folder", BASE_DIR)
+    
+    if not os.path.exists(folder_path):
+        return jsonify({"success": False, "error": "Mappe findes ikke"}), 404
+    
+    try:
+        python_files = []
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.endswith('.py'):
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, BASE_DIR)
+                    python_files.append({
+                        "name": file,
+                        "path": full_path,
+                        "rel_path": rel_path,
+                        "size": os.path.getsize(full_path)
+                    })
+        return jsonify({"success": True, "files": python_files, "folder": folder_path})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ============ SESSION ENDPOINTS ============
-
 @app.route("/api/sessions", methods=["GET"])
 def list_sessions():
     sessions = session_manager.list_sessions()
@@ -143,6 +215,12 @@ def load_session(session_id):
     if session_data:
         global current_session_id
         current_session_id = session_id
+        if session_data.get("tree"):
+            from task_tree import TaskTree, TaskNode
+            agent.task_tree = TaskTree(session_data.get("original_prompt", ""))
+            agent.original_prompt = session_data.get("original_prompt", "")
+            agent.full_prompt_with_context = session_data.get("full_prompt_with_context", "")
+            agent.show_thinking = session_data.get("show_thinking", True)
         return jsonify({"success": True, "session": session_data})
     return jsonify({"success": False, "error": "Session not found"}), 404
 
@@ -163,7 +241,10 @@ def save_current_session():
         "execution_log": agent.execution_log,
         "agent_log": agent.agent_log,
         "original_prompt": agent.original_prompt,
-        "prompt_history": data.get("prompt_history", [])
+        "full_prompt_with_context": getattr(agent, 'full_prompt_with_context', '') or '',
+        "show_thinking": data.get("show_thinking", agent.show_thinking),
+        "prompt_history": data.get("prompt_history", []),
+        "file_context": data.get("file_context", "")
     }
     session_manager.save_session(session_id, session_data)
     current_session_id = session_id
@@ -174,10 +255,8 @@ def save_layout():
     data = request.json
     session_id = data.get("session_id")
     layout = data.get("layout")
-    
     if not session_id:
         return jsonify({"error": "No session_id"}), 400
-    
     session_data = session_manager.load_session(session_id)
     if session_data:
         session_data["layout"] = layout
@@ -202,7 +281,6 @@ def get_context_for_prompt():
     data = request.json
     session_id = data.get("session_id", current_session_id)
     prompt = data.get("prompt", "")
-    
     if session_id and prompt:
         context = session_manager.get_knowledge_for_context(session_id, prompt)
         return jsonify({"success": True, "context": context})
@@ -215,20 +293,61 @@ def add_prompt_to_session():
     prompt = data.get("prompt", "")
     result = data.get("result", "")
     tree = data.get("tree")
-    
     if session_id and prompt:
         session_manager.add_prompt_result(session_id, prompt, result, tree)
         return jsonify({"success": True})
     return jsonify({"success": False})
 
 # ============ AGENT ENDPOINTS ============
+@app.route("/api/reset-execution", methods=["POST"])
+def reset_execution():
+    agent.reset_execution()
+    return jsonify({"success": True, "message": "Udførelsesstatus nulstillet"})
+
+@app.route("/api/execute-without-stream", methods=["POST"])
+def execute_without_stream():
+    global execution_status
+    if agent.task_tree is None:
+        return jsonify({"error": "Nedbryd en opgave først"}), 400
+    
+    execution_status = {"running": True, "progress": 0, "current_task": "", "log": []}
+    
+    def count_tasks(node):
+        total = 1
+        for child in node.children:
+            total += count_tasks(child)
+        return total
+    
+    total_tasks = count_tasks(agent.task_tree.root)
+    completed = 0
+    
+    def execute_with_progress(node):
+        nonlocal completed
+        execution_status["current_task"] = node.name
+        for child in node.children:
+            execute_with_progress(child)
+        result = agent.solve_task(node, agent.original_prompt)
+        completed += 1
+        execution_status["progress"] = int((completed / total_tasks) * 100)
+        execution_status["log"].append({"task": node.name, "status": node.status, "result": result[:200]})
+        return result
+    
+    try:
+        results = execute_with_progress(agent.task_tree.root)
+        execution_status["results"] = results
+        execution_status["running"] = False
+        return jsonify({"success": True, "results": results, "total_tasks": total_tasks})
+    except Exception as e:
+        execution_status["running"] = False
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/decompose", methods=["POST"])
 def decompose():
     data = request.json
     prompt = data.get("prompt", "")
     session_id = data.get("session_id")
-    show_thinking = data.get("show_thinking", True)  # Ny parameter
+    show_thinking = data.get("show_thinking", True)
+    files = data.get("files", [])
     
     if not prompt:
         return jsonify({"error": "Ingen prompt angivet"}), 400
@@ -239,21 +358,15 @@ def decompose():
     elif not current_session_id:
         current_session_id, _ = session_manager.create_session(prompt[:30])
     
-    # Sæt thinking mode på agenten
     agent.show_thinking = show_thinking
-    
-    # Hent relevant kontekst fra sessionens tidligere viden
     session_context = session_manager.get_knowledge_for_context(current_session_id, prompt)
     
-    enriched_prompt = prompt
-    if session_context:
-        enriched_prompt = f"{prompt}\n\n{session_context}"
-        print(f"📚 Tilføjet session-kontekst: {session_context[:100]}...")
+    print(f"🌳 Nedbryder: {prompt[:50]}...")
+    if files:
+        print(f"📄 Med {len(files)} filer")
     
     try:
-        print(f"🌳 Nedbryder: {enriched_prompt[:50]}...")
-        tree = agent.decompose_prompt(enriched_prompt)
-        
+        tree = agent.decompose_prompt(prompt, files=files)
         session_manager.add_prompt_result(current_session_id, prompt, "Nedbrudt til træ", tree)
         
         session_data = {
@@ -262,7 +375,10 @@ def decompose():
             "tree": tree,
             "execution_log": agent.execution_log,
             "agent_log": agent.agent_log,
-            "original_prompt": agent.original_prompt
+            "original_prompt": agent.original_prompt,
+            "full_prompt_with_context": agent.full_prompt_with_context,
+            "show_thinking": agent.show_thinking,
+            "file_context": files
         }
         session_manager.save_session(current_session_id, session_data)
         
@@ -280,15 +396,41 @@ def decompose():
 
 @app.route("/api/execute-stream")
 def execute_stream():
-    """Server-Sent Events med valgfri tænkning"""
+    global current_session_id
+    print(f"Execute stream - current_session_id: {current_session_id}")
+    if current_session_id:
+        session_data = session_manager.load_session(current_session_id)
+        if session_data:
+            st = session_data.get("show_thinking", True)
+            print(f"Session show_thinking: {st}")
+            if session_data.get("original_prompt"):
+                agent.original_prompt = session_data["original_prompt"]
+            if session_data.get("tree"):
+                agent.task_tree_from_dict(session_data["tree"])
+            
+            fpc = session_data.get("full_prompt_with_context", "")
+            if not fpc:
+                fc = session_data.get("file_context", "")
+                if fc and isinstance(fc, list):
+                    file_context_content = "\n\n## FILINHOLD TIL ANALYSE:\n"
+                    for f in fc:
+                        filename = f.get('filename', 'ukendt')
+                        content = f.get('content', '')
+                        file_context_content += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
+                    fpc = agent.original_prompt + file_context_content
+                else:
+                    fpc = agent.original_prompt
+            agent.full_prompt_with_context = fpc
+            agent.show_thinking = st
+            print(f"Agent show_thinking set to: {agent.show_thinking}")
+    
     def generate():
         if agent.task_tree is None:
             yield f"data: {json.dumps({'type': 'error', 'message': 'Nedbryd en opgave først'})}\n\n"
             return
         
-        original_prompt = agent.original_prompt
+        original_prompt = getattr(agent, 'full_prompt_with_context', '') or agent.original_prompt
         show_thinking = getattr(agent, 'show_thinking', True)
-        
         yield f"data: {json.dumps({'type': 'context', 'original_prompt': original_prompt, 'show_thinking': show_thinking})}\n\n"
         
         for log in agent.agent_log[-10:]:
@@ -302,62 +444,39 @@ def execute_stream():
         
         total_tasks = count_tasks(agent.task_tree.root)
         completed = 0
-        
         yield f"data: {json.dumps({'type': 'start', 'total_tasks': total_tasks})}\n\n"
         
         def execute_with_stream(node):
             nonlocal completed
-            
             yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
-            
             for child in node.children:
                 yield from execute_with_stream(child)
-            
             node.status = "running"
-            
-            solve_prompt = f"""Løs delopgave i kontekst af: {original_prompt}
-
-DELOPGAVE: {node.name}
-
-Svar på dansk:"""
-            
+            solve_prompt = f"Løs delopgave i kontekst af: {original_prompt}\n\nDELOPGAVE: {node.name}\n\nSvar på dansk:"
             full_response = ""
             chunk_count = 0
-            
             for chunk in agent.llm.generate_stream(solve_prompt):
                 full_response += chunk
                 chunk_count += 1
-                
-                # Send chunk (kun hvis thinking er aktiveret eller kun resultat)
-                if show_thinking or chunk_count % 10 == 0:
+                if show_thinking:
                     yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': chunk})}\n\n"
                 time.sleep(0.01)
-            
             if not full_response:
-                full_response = f"Løsning: {node.name}"
-            
+                full_response = "Løsning: " + node.name
             node.status = "done"
             node.result = full_response
             completed += 1
-            
             progress = int((completed / total_tasks) * 100)
             yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-            yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': full_response[:500]})}\n\n"
-            
-            agent.agent_log.append({
-                "timestamp": time.time(),
-                "level": "INFO",
-                "message": f"Færdig: {node.name}",
-                "detail": full_response[:100]
-            })
+            result_preview = full_response[:500] if show_thinking else full_response
+            yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': result_preview})}\n\n"
+            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": "Færdig: " + node.name, "detail": full_response[:100]})
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
-            
             if current_session_id:
                 session_manager.add_prompt_result(current_session_id, node.name, full_response[:500], None)
         
         try:
             yield from execute_with_stream(agent.task_tree.root)
-            
             session_data = {
                 "id": current_session_id,
                 "name": original_prompt[:30] if original_prompt else "Session",
@@ -368,20 +487,11 @@ Svar på dansk:"""
             }
             if current_session_id:
                 session_manager.save_session(current_session_id, session_data)
-            
             yield f"data: {json.dumps({'type': 'complete', 'message': 'Alle opgaver færdige'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     
-    return Response(
-        stream_with_context(generate()),
-        mimetype='text/event-stream',
-        headers={
-            'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no',
-            'Connection': 'keep-alive'
-        }
-    )
+    return Response(stream_with_context(generate()), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
 
 @app.route("/api/log", methods=["GET"])
 def get_log():
@@ -405,13 +515,16 @@ def build_module():
     result = agent.suggest_new_module()
     return jsonify({"success": True, "module_result": result})
 
-# ============ MAIN ============
+@app.route("/api/test", methods=["GET"])
+def test():
+    return jsonify({"status": "ok", "message": "Agent API kører", "static_folder": STATIC_DIR, "has_agent": agent is not None})
+
 if __name__ == "__main__":
     print("=" * 50)
     print("🚀 Dansk Agent API starter...")
     print("📍 http://localhost:5000")
+    print(f"📁 Static mappe: {STATIC_DIR}")
     print("💾 Sessions gemmes i ./sessions/")
     print("📁 Filhåndtering via Python (tkinter)")
-    print("🧠 Toggle thinking mode understøttet")
     print("=" * 50)
     app.run(debug=True, port=5000, threaded=True)

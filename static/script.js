@@ -1,9 +1,10 @@
 async function decompose() {
     const prompt = document.getElementById("promptInput").value;
-    const response = await fetch("/decompose", {
+    const filesData = window.loadedFilesContent || [];
+    const response = await fetch("/api/decompose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt, files: filesData })
     });
     const data = await response.json();
     visualizeTree(data.tree);
