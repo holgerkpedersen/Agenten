@@ -557,7 +557,6 @@ function updateHtmlLabels() {
     if (e('filesLabel'))   e('filesLabel').textContent    = _('files');
     if (e('filePathInput'))e('filePathInput').placeholder = _('file_path_placeholder');
     if (e('thinkingLabel'))e('thinkingLabel').textContent= showThinking ? _('show_thinking') : _('hide_thinking');
-    if (e('selectSessionOpt')) e('selectSessionOpt').textContent = _('select_session');
 }
 
 function updatePanelTitles() {
@@ -1345,16 +1344,17 @@ async function refreshSessions() {
         if (data.success) {
             const select = document.getElementById('sessionSelect');
             select.innerHTML = '';
-            const placeholder = document.createElement('option');
-            placeholder.value = '';
-            placeholder.id = 'selectSessionOpt';
-            placeholder.textContent = _('select_session');
-            select.appendChild(placeholder);
-            for (const session of data.sessions) {
-                const opt = document.createElement('option');
-                opt.value = session.id;
-                opt.textContent = `${escapeHtml(session.name)} (${session.prompt_count || 0} prompts)`;
-                select.appendChild(opt);
+            const ph = document.createElement('option');
+            ph.value = '';
+            ph.textContent = _('select_session') || '-- Select or create new --';
+            select.appendChild(ph);
+            if (data.sessions && data.sessions.length > 0) {
+                for (const session of data.sessions) {
+                    const opt = document.createElement('option');
+                    opt.value = session.id;
+                    opt.textContent = `${escapeHtml(session.name)} (${session.prompt_count || 0})`;
+                    select.appendChild(opt);
+                }
             }
             console.log('Loaded', data.sessions.length, 'sessions');
         } else {
