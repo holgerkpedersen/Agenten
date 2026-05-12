@@ -64,6 +64,8 @@ class K(StrEnum):
     TOOL_UNKNOWN        = "tool_unknown"
     TOOL_HALLUCINATED   = "tool_hallucinated"
     TOOL_BLOCKED        = "tool_blocked"
+    TOOL_DUPLICATE      = "tool_duplicate"
+    TOOL_DUPLICATE_MSG  = "tool_duplicate_msg"
 
     # === System prompt fragments ===
     SYS_EXAMPLE_PREFIX  = "sys_example_prefix"

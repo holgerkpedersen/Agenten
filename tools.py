@@ -42,7 +42,7 @@ class ToolRegistry:
     def build_system_prompt(self, task):
         tools_desc = self.get_tool_descriptions()
         active_names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
-        example_tool = active_names[0] if active_names else "ingen_tools"
+        example_tool = active_names[0] if active_names else t(K.SYS_FALLBACK_TOOL, self.lang)
         prompt = t(K.TOOL_SYSTEM_PROMPT, self.lang).format(
             TOOL_MARKER=self.TOOL_MARKER,
             DONE_MARKER=self.DONE_MARKER,
@@ -51,8 +51,10 @@ class ToolRegistry:
             task=task,
         )
         if active_names:
-            prompt += f"\n\nEksempel: {self.TOOL_MARKER}{{\"tool\":\"{example_tool}\",\"args\":{{}}}}{self.END_MARKER}"
-        prompt += f"\n\n{t('answer_in', self.lang)}. Brug KUN '{self.TOOL_MARKER}' og '{self.DONE_MARKER}' markører."
+            example_prefix = t(K.SYS_EXAMPLE_PREFIX, self.lang)
+            prompt += f"\n\n{example_prefix}: {self.TOOL_MARKER}{{\"tool\":\"{example_tool}\",\"args\":{{}}}}{self.END_MARKER}"
+        marker_warning = t(K.SYS_MARKER_WARNING, self.lang).format(TOOL=self.TOOL_MARKER, DONE=self.DONE_MARKER)
+        prompt += f"\n\n{t('answer_in', self.lang)}. {marker_warning}."
         return prompt
 
     @staticmethod
@@ -101,7 +103,7 @@ class ToolRegistry:
         if tool_name not in self.tools:
             return {"success": False, "error": t(K.TOOL_UNKNOWN, self.lang).format(tool=tool_name)}
         if self.active_tools is not None and tool_name not in self.active_tools:
-            return {"success": False, "error": f"Tool '{tool_name}' er ikke tilgængelig i denne skabelon. Brug en af: {', '.join(self.active_tools)}"}
+                return {"success": False, "error": t(K.TOOL_BLOCKED, self.lang).format(tool=tool_name, tools=', '.join(self.active_tools))}
         try:
             result = self.tools[tool_name].function(**args)
             return {"success": True, "result": result}

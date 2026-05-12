@@ -208,7 +208,7 @@ class Agent:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
             if len(content) > 50000:
-                content = content[:50000] + "\n... (filen er trunkeret)"
+                content = content[:50000] + "\n" + t(K.FILE_TRUNCATED, self.lang)
             return content
         except Exception as e:
             self._log("ERROR", "Kunne ikke læse fil", str(e))
@@ -248,25 +248,25 @@ class Agent:
         prompt_lower = prompt.lower()
 
         if "analyser" in prompt_lower and (".py" in prompt_lower or "api_server" in prompt_lower):
-            tree.root.add_child(TaskNode("Forstå filens formål"))
-            tree.root.children[0].add_child(TaskNode("Læs filens imports"))
-            tree.root.children[0].add_child(TaskNode("Identificer anvendte rammer"))
-            tree.root.add_child(TaskNode("Analyser kodestrukturen"))
-            tree.root.children[1].add_child(TaskNode("Gennemgå endpoints/routes"))
-            tree.root.children[1].add_child(TaskNode("Tjek konfiguration"))
-            tree.root.add_child(TaskNode("Vurder kodekvalitet"))
-            tree.root.children[2].add_child(TaskNode("Sikkerhedsanalyse"))
-            tree.root.children[2].add_child(TaskNode("Fejlhåndtering"))
-            tree.root.add_child(TaskNode("Dokumentér fund"))
+            tree.root.add_child(TaskNode(t(K.FT_UNDERSTAND_PURPOSE, self.lang)))
+            tree.root.children[0].add_child(TaskNode(t(K.FT_READ_IMPORTS, self.lang)))
+            tree.root.children[0].add_child(TaskNode(t(K.FT_IDENTIFY_FRAMEWORKS, self.lang)))
+            tree.root.add_child(TaskNode(t(K.FT_ANALYZE_STRUCTURE, self.lang)))
+            tree.root.children[1].add_child(TaskNode(t(K.FT_REVIEW_ENDPOINTS, self.lang)))
+            tree.root.children[1].add_child(TaskNode(t(K.FT_CHECK_CONFIG, self.lang)))
+            tree.root.add_child(TaskNode(t(K.FT_ASSESS_QUALITY, self.lang)))
+            tree.root.children[2].add_child(TaskNode(t(K.FT_SECURITY_ANALYSIS, self.lang)))
+            tree.root.children[2].add_child(TaskNode(t(K.FT_ERROR_HANDLING, self.lang)))
+            tree.root.add_child(TaskNode(t(K.FT_DOCUMENT_FINDINGS, self.lang)))
         elif "2 + 2" in prompt_lower or "2 plus 2" in prompt_lower:
-            tree.root.add_child(TaskNode("Forstå hvad tal repræsenterer"))
-            tree.root.add_child(TaskNode("Udfør additionen"))
-            tree.root.add_child(TaskNode("Konkluder"))
+            tree.root.add_child(TaskNode(t(K.FT_UNDERSTAND_NUMBERS, self.lang)))
+            tree.root.add_child(TaskNode(t(K.FT_PERFORM_ADDITION, self.lang)))
+            tree.root.add_child(TaskNode(t(K.FT_CONCLUDE, self.lang)))
         else:
-            tree.root.add_child(TaskNode("Analyser problemet"))
-            tree.root.add_child(TaskNode("Find løsningsstrategi"))
-            tree.root.add_child(TaskNode("Implementer løsningen"))
-            tree.root.add_child(TaskNode("Test og valider"))
+            tree.root.add_child(TaskNode(t(K.FT_ANALYZE_PROBLEM, self.lang)))
+            tree.root.add_child(TaskNode(t(K.FT_FIND_STRATEGY, self.lang)))
+            tree.root.add_child(TaskNode(t(K.FT_IMPLEMENT_SOLUTION, self.lang)))
+            tree.root.add_child(TaskNode(t(K.FT_TEST_VALIDATE, self.lang)))
         return tree
 
     def _parse_tree_from_llm(self, prompt, llm_response):
@@ -430,8 +430,8 @@ class Agent:
                 if parsed["type"] == "tool":
                     tool_key = parsed['tool'] + str(parsed.get('args', {}))
                     if tool_key in called_tools:
-                        self._log("TOOL", "DUPLIKAT — springer over", parsed['tool'])
-                        conversation += f"\n\nFEJL: Du har allerede kaldt {parsed['tool']} med disse argumenter. Kald et andet værktøj eller brug <<<DONE>>> hvis du er færdig."
+                        self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
+                        conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: " + t(K.TOOL_DUPLICATE_MSG, self.lang).format(tool=parsed['tool']) + "\n"
                         continue
                     called_tools.add(tool_key)
                     self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
@@ -446,7 +446,7 @@ class Agent:
                     break
 
                 if parsed["type"] == "error":
-                    conversation += f"\n\nFEJL: {parsed['message']}"
+                    conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}"
                     continue
 
                 conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
@@ -495,8 +495,8 @@ class Agent:
                 if parsed["type"] == "tool":
                     tool_key = parsed['tool'] + str(parsed.get('args', {}))
                     if tool_key in called_tools:
-                        self._log("TOOL", "DUPLIKAT — springer over", parsed['tool'])
-                        conversation += f"\n\nFEJL: Du har allerede kaldt {parsed['tool']} med disse argumenter. Kald et andet værktøj eller brug <<<DONE>>> hvis du er færdig."
+                        self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
+                        conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: " + t(K.TOOL_DUPLICATE_MSG, self.lang).format(tool=parsed['tool']) + "\n"
                         continue
                     called_tools.add(tool_key)
                     self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
@@ -513,7 +513,7 @@ class Agent:
                     break
 
                 if parsed["type"] == "error":
-                    conversation += f"\n\nFEJL: {parsed['message']}"
+                    conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}"
                     continue
 
                 conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)

@@ -460,9 +460,9 @@ def execute_stream():
             if not fpc:
                 fc = session_data.get("file_context", "")
                 if fc and isinstance(fc, list):
-                    file_context_content = "\n\n## FILINHOLD TIL ANALYSE:\n"
+                    file_context_content = "\n\n" + t(K.FILE_CONTEXT_HEADER, agent.lang)
                     for f in fc:
-                        filename = f.get('filename', 'ukendt')
+                        filename = f.get('filename', t(K.UNKNOWN, agent.lang))
                         content = f.get('content', '')
                         file_context_content += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
                     fpc = agent.original_prompt + file_context_content
@@ -474,7 +474,7 @@ def execute_stream():
     
     def generate():
         if agent.task_tree is None:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Nedbryd en opgave først'})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, agent.lang)})}\n\n"
             return
         
         original_prompt = getattr(agent, 'full_prompt_with_context', '') or agent.original_prompt
@@ -543,7 +543,7 @@ def execute_stream():
             }
             if current_session_id:
                 session_manager.save_session(current_session_id, session_data)
-            yield f"data: {json.dumps({'type': 'complete', 'message': 'Alle opgaver færdige'})}\n\n"
+            yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, agent.lang)})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     
