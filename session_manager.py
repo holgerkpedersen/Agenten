@@ -2,6 +2,8 @@ import json
 import os
 from datetime import datetime
 import uuid
+from lang import t
+from i18n import K
 
 class SessionManager:
     def __init__(self, storage_dir="sessions"):
@@ -94,12 +96,12 @@ class SessionManager:
         knowledge = session_data.get("learned_knowledge", [])
         prompt_lower = prompt.lower()
         if "2 + 2" in prompt_lower or "2 plus 2" in prompt_lower:
-            knowledge.append({"type": "mathematical_fact", "content": "2 + 2 = 4 er sandt per definition af addition", "source_prompt": prompt[:50], "timestamp": datetime.now().isoformat()})
+            knowledge.append({"type": "mathematical_fact", "content": t("session.demo_math_fact", "da"), "source_prompt": prompt[:50], "timestamp": datetime.now().isoformat()})
         if "token" in prompt_lower or "komprimere" in prompt_lower:
-            knowledge.append({"type": "optimization", "content": "Token-forbrug kan reduceres med caching, komprimering og mindre modeller", "source_prompt": prompt[:50], "timestamp": datetime.now().isoformat()})
+            knowledge.append({"type": "optimization", "content": t("session.demo_optimization", "da"), "source_prompt": prompt[:50], "timestamp": datetime.now().isoformat()})
         session_data["learned_knowledge"] = knowledge[-20:]
     
-    def get_knowledge_for_context(self, session_id, current_prompt):
+    def get_knowledge_for_context(self, session_id, current_prompt, lang="da"):
         session_data = self.load_session(session_id)
         if not session_data:
             return ""
@@ -114,7 +116,7 @@ class SessionManager:
             if any(keyword in content for keyword in keywords if len(keyword) > 3):
                 relevant.append(k)
         if relevant:
-            context = "\n\n## 🧠 Tidligere erfaringer fra denne session:\n"
+            context = "\n\n" + t(K.DEMO_KNOWLEDGE_HDR, lang)
             for k in relevant[:3]:
                 context += f"- {k.get('content', '')[:200]}\n"
             return context

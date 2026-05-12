@@ -427,11 +427,42 @@
         </div>
         
         <div class="toolbar-row">
+            <span class="toolbar-label" id="templateLabel">Skabelon</span>
+            <select id="templateSelect" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;">
+                <option value="fri">🌳 Fri nedbrydning</option>
+                <option value="resume">📄 Resumé</option>
+                <option value="kodeanalyse">🔍 Kodeanalyse</option>
+                <option value="diffanalyse">📊 Diff-analyse</option>
+            </select>
+            <label style="display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;padding:8px 12px;border-radius:6px;cursor:pointer;">
+                <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
+                <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
+            </label>
+            <select id="langSelect" onchange="switchLang(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;">
+                <option value="da">🇩🇰</option>
+                <option value="en">🇬🇧</option>
+                <option value="es">🇪🇸</option>
+                <option value="zh">🇨🇳</option>
+            </select>
+        </div>
+        
+        <div class="toolbar-row">
+            <span class="toolbar-label" id="llmLangLabel">🤖 LLM Sprog</span>
+            <select id="llmLangSelect" onchange="switchLLMLang(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;">
+                <option value="da">🇩🇰 Dansk</option>
+                <option value="en">🇬🇧 English</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="zh">🇨🇳 中文</option>
+            </select>
+            <select id="modelSelect" onchange="switchModel(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;flex:1;"></select>
+        </div>
+        
+        <div class="toolbar-row">
             <span class="toolbar-label" id="filesLabel">Filer</span>
             <input type="text" id="filePathInput" placeholder="Vælg fil(er) med Gennemse, derefter Læs fil" style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#e2e8f0;" readonly>
             <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
-            <button onclick="document.getElementById('filePicker').click()" style="background:#475569;">📂 Gennemse</button>
-            <button onclick="readFiles()" style="background:#8b5cf6;">📖 Læs fil</button>
+            <button onclick="document.getElementById('filePicker').click()" id="browseBtn" style="background:#475569;">📂 Gennemse</button>
+            <button onclick="readFiles()" id="readFileBtn" style="background:#8b5cf6;">📖 Læs fil</button>
         </div>
         <div id="fileSectionToggle" style="margin: 2px 0; cursor: pointer; color:#60a5fa; font-size:12px;" onclick="toggleFileSection()">▶ Vis filer</div>
         <div id="fileSection" style="display:none;">
@@ -440,11 +471,11 @@
         </div>
         
         <div class="toolbar-row">
-            <span class="toolbar-label">Prompt</span>
+            <span class="toolbar-label" id="promptLabel">Prompt</span>
             <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?" style="flex:1;"></textarea>
-            <button onclick="decompose()">🌳 Nedbryd</button>
-            <button onclick="executeWithStream()" style="background:#10b981;">⚡ Udfør</button>
-            <button onclick="stopStream()" style="background:#ef4444;">⏹ Stop</button>
+            <button onclick="decompose()" id="decomposeBtn">🌳 Nedbryd</button>
+            <button onclick="executeWithStream()" id="executeBtn" style="background:#10b981;">⚡ Udfør</button>
+            <button onclick="stopStream()" id="stopBtn" style="background:#ef4444;">⏹ Stop</button>
         </div>
     </div>
     
@@ -456,6 +487,31 @@
 window.AGENTEN_LANG = {};
 let currentLang = localStorage.getItem('agenten_lang') || 'da';
 let currentLLMLang = localStorage.getItem('agenten_llm_lang') || currentLang;
+let currentModel = localStorage.getItem('agenten_model') || '';
+
+async function fetchModels() {
+    try {
+        const resp = await fetch('/api/models');
+        const data = await resp.json();
+        const sel = document.getElementById('modelSelect');
+        sel.innerHTML = '';
+        for (const m of data.models) {
+            const opt = document.createElement('option');
+            opt.value = m; opt.textContent = m;
+            sel.appendChild(opt);
+        }
+        if (currentModel) sel.value = currentModel;
+        else if (data.current) { sel.value = data.current; currentModel = data.current; }
+    } catch(e) { console.error('fetchModels', e); }
+}
+
+function switchModel(model) {
+    currentModel = model;
+    localStorage.setItem('agenten_model', model);
+    fetch('/api/models/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model}) });
+}
+
+fetchModels();
 
 // Danish fallback — bruges indtil oversættelser er loadet
 const LANG_FALLBACK = {
@@ -641,23 +697,34 @@ function updateAllUIText() {
 
 function updateHtmlLabels() {
     const e = id => document.getElementById(id);
-    if (e('toolsMenu'))     e('toolsMenu').title     = _('tools_menu');
-    if (e('resetTreeBtn'))  e('resetTreeBtn').textContent = '🔄 ' + _('tools_reset_tree').replace('🔄 ','');
-    if (e('deleteTreeBtn')) e('deleteTreeBtn').textContent = '🗑 ' + _('tools_delete_tree').replace('🗑 ','');
-    if (e('previewBtn'))    e('previewBtn').textContent    = '👁 ' + _('tools_preview');
-    if (e('exportMd'))      e('exportMd').textContent      = '📄 ' + _('tools_export_md');
-    if (e('saveLayoutBtn'))e('saveLayoutBtn').textContent = '💾 ' + _('tools_save_layout');
-    if (e('resetLayoutBtn'))e('resetLayoutBtn').textContent= '🔄 ' + _('tools_reset_layout');
-    if (e('githubTokenBtn'))e('githubTokenBtn').textContent= '🔑 ' + _('tools_github_token');
-    if (e('refreshSess'))  e('refreshSess').title         = _('refresh');
-    if (e('loadSess'))      e('loadSess').textContent       = '📂 ' + _('load');
-    if (e('saveSess'))     e('saveSess').textContent       = '💾 ' + _('save');
-    if (e('renameSess'))   e('renameSess').textContent    = '✏️ ' + _('rename');
-    if (e('newSess'))      e('newSess').textContent        = '➕ ' + _('new');
-    if (e('sessionsLabel'))e('sessionsLabel').textContent = _('sessions');
-    if (e('filesLabel'))   e('filesLabel').textContent    = _('files');
-    if (e('filePathInput'))e('filePathInput').placeholder = _('file_path_placeholder');
+    if (e('toolsMenu'))     e('toolsMenu').title          = _('tools_menu');
+    if (e('resetTreeBtn'))  e('resetTreeBtn').textContent  = '🔄 ' + _('tools_reset_tree');
+    if (e('deleteTreeBtn')) e('deleteTreeBtn').textContent  = '🗑 ' + _('tools_delete_tree');
+    if (e('previewBtn'))    e('previewBtn').textContent     = '👁 ' + _('tools_preview');
+    if (e('exportMd'))      e('exportMd').textContent       = '📄 ' + _('tools_export_md');
+    if (e('saveLayoutBtn')) e('saveLayoutBtn').textContent  = '💾 ' + _('tools_save_layout');
+    if (e('resetLayoutBtn'))e('resetLayoutBtn').textContent = '🔄 ' + _('tools_reset_layout');
+    if (e('githubTokenBtn'))e('githubTokenBtn').textContent = '🔑 ' + _('tools_github_token');
+    if (e('refreshSess'))  e('refreshSess').title           = _('refresh');
+    if (e('loadSess'))      e('loadSess').textContent        = '📂 ' + _('load');
+    if (e('saveSess'))     e('saveSess').textContent        = '💾 ' + _('save');
+    if (e('renameSess'))   e('renameSess').textContent      = '✏️ ' + _('rename');
+    if (e('newSess'))      e('newSess').textContent         = '➕ ' + _('new');
+    if (e('sessionsLabel'))e('sessionsLabel').textContent   = _('sessions');
+    if (e('templateLabel'))e('templateLabel').textContent   = _('template');
+    if (e('llmLangLabel')) e('llmLangLabel').textContent    = _('llm_language');
+    if (e('filesLabel'))   e('filesLabel').textContent      = _('files');
+    if (e('promptLabel'))  e('promptLabel').textContent     = _('prompt');
+    if (e('filePathInput'))e('filePathInput').placeholder   = _('file_path_placeholder');
+    if (e('promptInput'))  e('promptInput').placeholder     = _('prompt_placeholder');
+    if (e('browseBtn'))    e('browseBtn').textContent       = '📂 ' + _('browse');
+    if (e('readFileBtn'))  e('readFileBtn').textContent     = '📖 ' + _('read_file');
+    if (e('decomposeBtn')) e('decomposeBtn').textContent    = '🌳 ' + _('decompose');
+    if (e('executeBtn'))   e('executeBtn').textContent      = '⚡ ' + _('execute');
+    if (e('stopBtn'))      e('stopBtn').textContent         = '⏹ ' + _('stop');
+    if (e('fileSectionToggle')) e('fileSectionToggle').textContent = _('show_files');
     if (e('thinkingLabel'))e('thinkingLabel').textContent= showThinking ? _('show_thinking') : _('hide_thinking');
+    if (e('selectSessionOpt')) e('selectSessionOpt').textContent = _('select_session');
 }
 
 function updatePanelTitles() {
@@ -677,9 +744,6 @@ function updatePanelTitles() {
     }
 }
 
-loadLang(currentLang);
-document.getElementById('llmLangSelect').value = currentLLMLang;
-updateHtmlLabels();
 // === End translation system ===
 
 // Panel definitioner med alle 4 paneler
@@ -733,6 +797,11 @@ let panels = {};
 let showThinking = true;
 let treeEditMode = false;
 
+// Initialize language after all variables are declared
+loadLang(currentLang);
+document.getElementById('llmLangSelect').value = currentLLMLang;
+updateHtmlLabels();
+
 // Drag state
 let dragState = {
     active: false,
@@ -752,6 +821,17 @@ let resizeState = {
     startWidth: 0,
     startHeight: 0
 };
+
+function formatDate(iso) {
+    if (!iso) return _('unknown');
+    try { return new Date(iso).toLocaleString(); } catch(e) { return iso; }
+}
+
+function formatLogTime(ts) {
+    const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
+    if (isNaN(d.getTime())) return _('unknown');
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
 
 function escapeHtml(str) {
     if (!str) return '';
@@ -881,7 +961,7 @@ async function updatePromptHistory(sessionId) {
         if (data.success && data.prompts && data.prompts.length > 0) {
             historyContainer.innerHTML = '';
             for (const item of data.prompts.slice().reverse()) {
-                const time = new Date(item.timestamp).toLocaleTimeString();
+                const time = formatLogTime(item.timestamp);
                 const promptShort = item.prompt.length > 60 ? item.prompt.slice(0, 60) + '...' : item.prompt;
                 const resultShort = item.result ? (item.result.length > 100 ? item.result.slice(0, 100) + '...' : item.result) : _('no_result_yet');
                 
@@ -929,7 +1009,7 @@ function toggleThinkingMode() {
 }
 
 async function selectExportFolder() {
-    const folder = prompt(_('enter_export_path');
+    const folder = prompt(_('enter_export_path'));
     if (!folder) return;
     addLogEntry('INFO', _('setting_export_folder'), folder);
     const resp = await fetch('/api/folder/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({folder: folder}) });
@@ -951,17 +1031,7 @@ async function checkFolderStatus() {
         document.getElementById('folderStatus').innerHTML = `${_('export_folder_path')} <span class="folder-status">${_('active')}</span>`.replace('{folder}', data.folder);
     }
 }
-}
 
-async function checkFolderStatus() {
-    const response = await fetch('/api/folder/status');
-    const data = await response.json();
-    
-    if (data.success && data.folder) {
-        addLogEntry('INFO', 'Eksportmappe valgt', data.folder);
-        document.getElementById('folderStatus').innerHTML = `📁 Gemmer i: ${data.folder} <span class="folder-status">Aktiv</span>`;
-    }
-}
 
 let selectedFiles = [];
 let loadedFilesContent = [];
@@ -1560,7 +1630,7 @@ async function loadSelectedSession() {
             if (logBox) {
                 logBox.innerHTML = '';
                 for (const log of data.session.agent_log) {
-                    const time = new Date(log.timestamp * 1000).toLocaleTimeString();
+                    const time = formatLogTime(log.timestamp);
                     logBox.innerHTML += `<div class="log-entry log-${log.level}">
                         <strong>[${time}] ${log.level}</strong>: ${escapeHtml(log.message)}<br>
                         <span style="font-size: 10px;">${escapeHtml(log.detail || '')}</span>
@@ -1952,7 +2022,7 @@ async function exportToMarkdown() {
     const folderData = await folderStatus.json();
     const currentFolder = folderData.success ? folderData.folder : 'C:\\Dev\\Agenten\\exports';
     
-    const chosenFolder = prompt('Gem rapport i mappe:\n(Klik OK for at bruge nuværende, eller indtast ny sti)', currentFolder);
+    const chosenFolder = prompt(_('enter_export_path'), currentFolder);
     if (!chosenFolder) return;
     
     if (chosenFolder !== currentFolder) {
@@ -1974,10 +2044,9 @@ async function exportToMarkdown() {
     const timestamp = new Date().toLocaleString();
     
 let md = `${_('export_md_report_header')}\n\n`;
-    md += `**Session ID:** ${session.id}\n`;
-    md += `**Navn:** ${session.name}\n`;
-    md += `**Oprettet:** ${session.created}\n`;
-    md += `**Eksporteret:** ${timestamp}\n\n`;
+    md += `${_('export_md_name')} ${session.name}\n`;
+    md += `${_('export_md_created')} ${formatDate(session.created)}\n`;
+    md += `${_('export_md_exported')} ${timestamp}\n\n`;
     md += `---\n\n`;
     
     md += `${_('export_md_prompt')}\n\n`;
@@ -2005,7 +2074,7 @@ let md = `${_('export_md_report_header')}\n\n`;
     md += `${_('export_md_log')}\n\n`;
     if (session.agent_log && session.agent_log.length > 0) {
         for (const log of session.agent_log) {
-            const time = new Date(log.timestamp * 1000).toLocaleTimeString();
+            const time = formatLogTime(log.timestamp);
             md += `- **[${time}] ${log.level}:** ${log.message}`;
             if (log.detail) md += ` - ${log.detail}`;
             md += `\n`;
@@ -2019,7 +2088,7 @@ let md = `${_('export_md_report_header')}\n\n`;
     if (session.prompt_history && session.prompt_history.length > 0) {
         for (let i = 0; i < session.prompt_history.length; i++) {
             const item = session.prompt_history[i];
-            const time = new Date(item.timestamp).toLocaleTimeString();
+            const time = formatLogTime(item.timestamp);
             md += `### ${i + 1}. ${item.prompt}\n`;
             md += `- ${_('export_md_time')}${time}\n`;
             md += `- ${_('export_md_result')}\n`;
@@ -2089,7 +2158,7 @@ let md = `${_('export_md_report_header')}\n\n`;
 
 async function previewMarkdown() {
     if (!currentSessionId && !currentTree) {
-        alert('Ingen session eller træ at vise');
+        alert(_('no_preview_data'));
         return;
     }
     
@@ -2103,31 +2172,31 @@ async function previewMarkdown() {
     <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; justify-content:center; align-items:center;">
         <div style="background:#1e293b; border-radius:16px; width:90%; max-width:1200px; height:90%; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.5);">
             <div style="background:#334155; padding:15px 20px; display:flex; justify-content:space-between; align-items:center; border-radius:16px 16px 0 0;">
-                <h2 style="margin:0; color:#e2e8f0;">📊 Agenten - Preview</h2>
+                <h2 style="margin:0; color:#e2e8f0;">📊 ${_('preview_title')}</h2>
                 <div style="display:flex; gap:10px;">
                     <button onclick="downloadFromPreview()" style="background:#10b981; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">💾 Download MD</button>
-                    <button onclick="closePreview()" style="background:#ef4444; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">✕ Luk</button>
+                    <button onclick="closePreview()" style="background:#ef4444; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">✕ ${_('stop')}</button>
                 </div>
             </div>
             <div id="previewContent" style="flex:1; overflow:auto; padding:20px; font-family:monospace; font-size:14px; line-height:1.6; color:#e2e8f0; background:#0f172a;">
     `;
     
     if (promptText) {
-        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px;">📝 Prompt</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(promptText)}</pre>`;
+        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px;">📝 ${_('prompt')}</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(promptText)}</pre>`;
     }
     
     if (treeContent && treeContent !== _('click_tree_hint')) {
-        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">🌲 Opgavetræ</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(treeContent)}</pre>`;
+        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">🌲 ${_('tree_panel')}</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(treeContent)}</pre>`;
     }
     
     if (llmContent && llmContent !== _('click_stream_hint')) {
-        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📡 LLM Output</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap; max-height:400px; overflow:auto;">${escapeHtml(llmContent)}</pre>`;
+        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📡 ${_('llm_panel')}</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap; max-height:400px; overflow:auto;">${escapeHtml(llmContent)}</pre>`;
     }
     
     if (loadedFilesContent.length > 0) {
-        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📎 Filer inkluderet</h3>`;
+        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📎 ${_('files_included')}</h3>`;
         for (const fc of loadedFilesContent.filter(f => f.included)) {
-            html += `<div style="margin:10px 0; padding:10px; background:#1e293b; border-radius:8px;"><strong style="color:#10b981;">📄 ${fc.filename}</strong><div style="color:#64748b; font-size:11px; margin-top:4px;">Sti: ${fc.filepath}</div></div>`;
+            html += `<div style="margin:10px 0; padding:10px; background:#1e293b; border-radius:8px;"><strong style="color:#10b981;">📄 ${fc.filename}</strong><div style="color:#64748b; font-size:11px; margin-top:4px;">${_('file_included_path')}: ${fc.filepath}</div></div>`;
         }
     }
     

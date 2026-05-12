@@ -7,6 +7,7 @@ import time
 import threading
 import os
 import tempfile
+from datetime import datetime
 from lang import t, get_ui_translations
 from i18n import K
 
@@ -237,6 +238,7 @@ def save_current_session():
     if not session_id:
         return jsonify({"error": t(K.ERR_NO_SESSION, agent.lang)}), 400
     
+    existing = session_manager.load_session(session_id) or {}
     session_data = {
         "id": session_id,
         "name": data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=session_id[:8])),
@@ -251,7 +253,9 @@ def save_current_session():
         "lang": data.get("lang") or getattr(agent, 'lang', 'da'),
         "ui_lang": data.get("ui_lang") or data.get("lang") or getattr(agent, 'lang', 'da'),
         "prompt_history": data.get("prompt_history", []),
-        "file_context": data.get("file_context", "")
+        "file_context": data.get("file_context", ""),
+        "created": existing.get("created", datetime.now().isoformat()),
+        "learned_knowledge": existing.get("learned_knowledge", []),
     }
     session_manager.save_session(session_id, session_data)
     current_session_id = session_id
@@ -287,6 +291,19 @@ def manage_token():
 @app.route("/api/lang/<lang>")
 def get_lang(lang):
     return jsonify(get_ui_translations(lang))
+
+@app.route("/api/models")
+def get_models():
+    models = agent.llm.list_models()
+    current = agent.llm.model
+    return jsonify({"models": models, "current": current})
+
+@app.route("/api/models/set", methods=["POST"])
+def set_model():
+    data = request.json
+    model = data.get("model", agent.llm.model)
+    agent.llm.set_model(model)
+    return jsonify({"success": True, "model": model})
 
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():

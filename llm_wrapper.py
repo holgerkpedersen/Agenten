@@ -4,10 +4,23 @@ import hashlib
 import time
 
 class LMStudioWrapper:
-    def __init__(self, base_url="http://localhost:1234/v1", timeout=120):
+    def __init__(self, base_url="http://localhost:1234/v1", timeout=120, model="google/gemma-4-26b-a4b"):
         self.base_url = base_url
         self.cache = {}
         self.timeout = timeout
+        self.model = model
+
+    def list_models(self):
+        try:
+            r = requests.get(f"{self.base_url}/models", timeout=5)
+            if r.status_code == 200:
+                return [m["id"] for m in r.json().get("data", [])]
+        except Exception:
+            pass
+        return [self.model]
+
+    def set_model(self, model):
+        self.model = model
         
     def _get_cache_key(self, prompt):
         return hashlib.md5(prompt.encode()).hexdigest()
@@ -25,6 +38,7 @@ class LMStudioWrapper:
             response = requests.post(
                 f"{self.base_url}/completions",
                 json={
+                    "model": self.model,
                     "prompt": compressed_prompt,
                     "temperature": temperature,
                     "max_tokens": max_tokens

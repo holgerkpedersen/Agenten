@@ -23,6 +23,7 @@ class Agent:
         self.original_prompt = ""
         self.full_prompt_with_context = ""
         self.show_thinking = True
+        self.file_context = []
         self.lang = "da"
         self.tool_registry = ToolRegistry()
         self._register_tools()
@@ -191,6 +192,9 @@ class Agent:
             r'^Devuelve SOLO la estructura.*$',
             r'^\u73b0\u5728\u5206\u89e3\u4efb\u52a1.*$',
             r'^\u4ec5\u6811\u7ed3\u6784.*$',
+            r'^<\|?channel\|?>.*$',
+            r'^thought$',
+            r'^namesekundar.*$',
         ]
         for pattern in patterns:
             name = re.sub(pattern, '', name, flags=re.IGNORECASE | re.DOTALL)
@@ -211,7 +215,7 @@ class Agent:
                 content = content[:50000] + "\n" + t(K.FILE_TRUNCATED, self.lang)
             return content
         except Exception as e:
-            self._log("ERROR", "Kunne ikke læse fil", str(e))
+            self._log("ERROR", t(K.LOG_READ_ERROR, self.lang), str(e))
             return None
 
     def _get_file_context(self, prompt):
@@ -220,7 +224,7 @@ class Agent:
             return None, None
 
         filename = file_match.group(1)
-        self._log("INFO", "Forsøger at læse fil", filename)
+        self._log("INFO", t(K.LOG_READING_FILE, self.lang), filename)
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
         possible_paths = [
@@ -236,10 +240,10 @@ class Agent:
             if os.path.exists(path):
                 content = self._read_file_content(path)
                 if content:
-                    self._log("INFO", "Fil fundet og læst", path)
+                    self._log("INFO", t(K.LOG_FILE_FOUND, self.lang), path)
                     return path, content
 
-        self._log("WARNING", "Fil ikke fundet", filename)
+        self._log("WARNING", t(K.LOG_FILE_NOT_FOUND, self.lang), filename)
         return None, None
 
     def _create_fallback_tree(self, prompt):
@@ -272,7 +276,7 @@ class Agent:
     def _parse_tree_from_llm(self, prompt, llm_response):
         tree = TaskTree(prompt)
         if llm_response.startswith("ERROR") or not llm_response.strip():
-            self._log("ERROR", "LLM fejl, bruger fallback", llm_response[:100] if llm_response else "Tom svar")
+            self._log("ERROR", t(K.LOG_LLM_ERROR_FALLBACK, self.lang), llm_response[:100] if llm_response else t(K.LOG_EMPTY_RESPONSE, self.lang))
             return self._create_fallback_tree(prompt)
 
         lines = llm_response.strip().split('\n')
@@ -289,6 +293,7 @@ class Agent:
                 continue
             skip_words = ['think', 'thinking', 'brainstorm', 'draft', 'constraint',
                          'repetition', 'politeness', 'indentation', 'compliance',
+                         'thought', 'channel', 'namesekundar',
                          'analyze user input', 'deconstruct', 'example provided',
                          'must be a tree', 'output:', 'language:']
             if any(word in task_name.lower() for word in skip_words):
@@ -305,10 +310,10 @@ class Agent:
             added_count += 1
 
         if added_count == 0:
-            self._log("WARNING", "Ingen gyldige opgaver fundet, bruger fallback", "")
+            self._log("WARNING", t(K.LOG_NO_VALID_TASKS, self.lang), "")
             return self._create_fallback_tree(prompt)
 
-        self._log("INFO", f"Parsede {added_count} opgaver fra LLM", "")
+        self._log("INFO", t(K.LOG_PARSED_TASKS, self.lang).format(n=added_count), "")
         return tree
 
     def decompose_prompt(self, prompt, files=None, template=None):
@@ -321,6 +326,8 @@ class Agent:
         allowed = self.TEMPLATE_TOOLS.get(template) if template else None
         self.tool_registry.set_active_tools(allowed)
         self._log("INFO", t(K.LOG_DECOMPOSE_START, self.lang), f"{prompt[:100]} ({t('ui.using_template', self.lang).format(name=template_config['name'])})")
+
+        self.file_context = files or []
 
         file_context = ""
         if files and len(files) > 0:
@@ -351,11 +358,14 @@ class Agent:
         file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
         decomposition_prompt += file_context_entry
 
-        self._log("LLM", t(K.LOG_SENDING_LLM, self.lang), f"Med filkontekst: {bool(file_context)}")
+        self._log("LLM", t(K.LOG_SENDING_LLM, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(self.file_context)) if isinstance(self.file_context, list) and self.file_context else "")
         response = self.llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)
         self._log("LLM", t(K.LOG_RECEIVED_LLM, self.lang), t(K.LOG_N_CHARS, self.lang).format(n=len(response)))
 
         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+        response = re.sub(r'<\|channel>.*?<\|channel>', '', response, flags=re.DOTALL)
+        response = re.sub(r'<\|channel\|>.*$', '', response, flags=re.MULTILINE)
+        response = re.sub(r'<\|channel>', '', response)
 
         self.task_tree = self._parse_tree_from_llm(prompt, response)
         task_count = self._count_tasks(self.task_tree.root)
@@ -400,135 +410,153 @@ class Agent:
         self.task_tree.root = dict_to_node(d)
 
     def solve_task(self, task_node, original_prompt):
-            task_node.status = "running"
-            self._log("INFO", t(K.LOG_TASK_START, self.lang), task_node.name)
+        task_node.status = "running"
+        self._log("INFO", t(K.LOG_TASK_START, self.lang), task_node.name)
 
-            system_prompt = self.tool_registry.build_system_prompt(task_node.name)
+        system_prompt = self.tool_registry.build_system_prompt(task_node.name)
 
-            conversation = system_prompt
-            full_response = ""
-            max_iterations = 5
-            called_tools = set()
+        conversation = system_prompt
+        full_response = ""
+        max_iterations = 5
+        called_tools = set()
 
-            for i in range(max_iterations):
-                prompt = conversation
-                if i >= 0:
-                    tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
-                    prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
-                        tools_list=tools_list,
-                        TOOL_MARKER=self.tool_registry.TOOL_MARKER,
-                        DONE_MARKER=self.tool_registry.DONE_MARKER
-                    )
+        for i in range(max_iterations):
+            prompt = conversation
+            if i >= 0:
+                tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
+                prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
+                    tools_list=tools_list,
+                    TOOL_MARKER=self.tool_registry.TOOL_MARKER,
+                    DONE_MARKER=self.tool_registry.DONE_MARKER
+                )
 
-                response = ""
-                for chunk in self.llm.generate_stream(prompt, max_tokens=1024):
-                    response += chunk
+            response = ""
+            for chunk in self.llm.generate_stream(prompt, temperature=0.3, max_tokens=1024):
+                response += chunk
 
-                parsed = self.tool_registry.parse_response(response)
-                self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
+            parsed = self.tool_registry.parse_response(response)
+            self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
 
-                if parsed["type"] == "tool":
-                    tool_key = parsed['tool'] + str(parsed.get('args', {}))
-                    if tool_key in called_tools:
-                        self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
-                        conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: " + t(K.TOOL_DUPLICATE_MSG, self.lang).format(tool=parsed['tool']) + "\n"
-                        continue
-                    called_tools.add(tool_key)
-                    self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
-                    result = self.tool_registry.execute(parsed["tool"], parsed["args"])
-                    result_str = json.dumps(result, ensure_ascii=False)
-                    self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str[:200])
-                    conversation += f"\n\n" + t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
+            if parsed["type"] == "tool":
+                tool_key = parsed['tool'] + str(parsed.get('args', {}))
+                if tool_key in called_tools:
+                    self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
+                    conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: " + t(K.TOOL_DUPLICATE_MSG, self.lang).format(tool=parsed['tool']) + "\n"
                     continue
+                called_tools.add(tool_key)
+                self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
+                result = self.tool_registry.execute(parsed["tool"], parsed["args"])
+                result_str = json.dumps(result, ensure_ascii=False)
+                self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str[:200])
+                conversation += f"\n\n" + t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
+                continue
 
-                if parsed["type"] == "done":
-                    full_response = parsed["result"]
-                    break
+            if parsed["type"] == "done":
+                full_response = parsed["result"]
+                break
 
-                if parsed["type"] == "error":
-                    conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}"
-                    continue
+            if parsed["type"] == "error":
+                conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}"
+                continue
 
-                conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
-                full_response = response
-                if i >= 3:
-                    break
+            if i == 0 and not called_tools and parsed["type"] != "done":
+                conversation += f"\n{t(K.SYS_ERROR_PREFIX, self.lang)}: Du SKAL bruge værktøjerne. Kald {self.tool_registry.active_tools[0] if self.tool_registry.active_tools else 'et værktøj'} først."
+                continue
 
-            if not full_response or "ERROR" in full_response:
-                full_response = t(K.LOG_TASK_FAILED, self.lang)
+            conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
+            full_response = response
+            if i >= 3:
+                break
 
+        if not full_response or "ERROR" in full_response:
+            full_response = t(K.LOG_TASK_FAILED, self.lang)
+            task_node.status = "failed"
+        else:
             task_node.status = "done"
-            task_node.result = full_response
-            self.action_history.append(task_node.name.split()[0] if task_node.name else K.UNKNOWN)
+
+        task_node.result = full_response
+        self.action_history.append(task_node.name.split()[0] if task_node.name else K.UNKNOWN)
+        if task_node.status == "failed":
+            self._log("INFO", t(K.LOG_TASK_FAILED, self.lang), task_node.name)
+        else:
             self._log("INFO", t(K.LOG_TASK_DONE, self.lang), task_node.name)
-            return full_response
+        return full_response
 
     def solve_task_stream(self, task_node, original_prompt):
-            task_node.status = "running"
-            self._log("INFO", t(K.LOG_TASK_START, self.lang), task_node.name)
+        task_node.status = "running"
+        self._log("INFO", t(K.LOG_TASK_START, self.lang), task_node.name)
 
-            system_prompt = self.tool_registry.build_system_prompt(task_node.name)
+        system_prompt = self.tool_registry.build_system_prompt(task_node.name)
 
-            conversation = system_prompt
-            full_response = ""
-            max_iterations = 5
-            called_tools = set()
+        conversation = system_prompt
+        full_response = ""
+        max_iterations = 5
+        called_tools = set()
 
-            for i in range(max_iterations):
-                prompt = conversation
-                if i >= 0:
-                    tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
-                    prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
-                        tools_list=tools_list,
-                        TOOL_MARKER=self.tool_registry.TOOL_MARKER,
-                        DONE_MARKER=self.tool_registry.DONE_MARKER
-                    )
+        for i in range(max_iterations):
+            prompt = conversation
+            if i >= 0:
+                tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
+                prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
+                    tools_list=tools_list,
+                    TOOL_MARKER=self.tool_registry.TOOL_MARKER,
+                    DONE_MARKER=self.tool_registry.DONE_MARKER
+                )
 
-                response = ""
-                for chunk in self.llm.generate_stream(prompt, max_tokens=1024):
-                    response += chunk
-                    yield {"type": "chunk", "chunk": chunk}
+            response = ""
+            for chunk in self.llm.generate_stream(prompt, temperature=0.3, max_tokens=1024):
+                response += chunk
+                yield {"type": "chunk", "chunk": chunk}
 
-                parsed = self.tool_registry.parse_response(response)
-                self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
+            parsed = self.tool_registry.parse_response(response)
+            self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
 
-                if parsed["type"] == "tool":
-                    tool_key = parsed['tool'] + str(parsed.get('args', {}))
-                    if tool_key in called_tools:
-                        self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
-                        conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: " + t(K.TOOL_DUPLICATE_MSG, self.lang).format(tool=parsed['tool']) + "\n"
-                        continue
-                    called_tools.add(tool_key)
-                    self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
-                    result = self.tool_registry.execute(parsed["tool"], parsed["args"])
-                    result_str = json.dumps(result, ensure_ascii=False)
-                    self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str[:200])
-                    yield {"type": "tool_call", "tool": parsed["tool"], "args": parsed.get("args", {})}
-                    yield {"type": "tool_result", "tool": parsed["tool"], "result": result}
-                    conversation += f"\n\n" + t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
+            if parsed["type"] == "tool":
+                tool_key = parsed['tool'] + str(parsed.get('args', {}))
+                if tool_key in called_tools:
+                    self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
+                    conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: " + t(K.TOOL_DUPLICATE_MSG, self.lang).format(tool=parsed['tool']) + "\n"
                     continue
+                called_tools.add(tool_key)
+                self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
+                result = self.tool_registry.execute(parsed["tool"], parsed["args"])
+                result_str = json.dumps(result, ensure_ascii=False)
+                self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str[:200])
+                yield {"type": "tool_call", "tool": parsed["tool"], "args": parsed.get("args", {})}
+                yield {"type": "tool_result", "tool": parsed["tool"], "result": result}
+                conversation += f"\n\n" + t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
+                continue
 
-                if parsed["type"] == "done":
-                    full_response = parsed["result"]
-                    break
+            if parsed["type"] == "done":
+                full_response = parsed["result"]
+                break
 
-                if parsed["type"] == "error":
-                    conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}"
-                    continue
+            if parsed["type"] == "error":
+                conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}"
+                continue
 
-                conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
-                full_response = response
-                if i >= 3:
-                    break
+            if i == 0 and not called_tools and parsed["type"] != "done":
+                conversation += f"\n{t(K.SYS_ERROR_PREFIX, self.lang)}: Du SKAL bruge værktøjerne. Kald {self.tool_registry.active_tools[0] if self.tool_registry.active_tools else 'et værktøj'} først."
+                continue
 
-            if not full_response or "ERROR" in full_response:
-                full_response = t(K.LOG_TASK_FAILED, self.lang)
+            conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
+            full_response = response
+            if i >= 3:
+                break
 
+        if not full_response or "ERROR" in full_response:
+            full_response = t(K.LOG_TASK_FAILED, self.lang)
+            task_node.status = "failed"
+        else:
             task_node.status = "done"
-            task_node.result = full_response
-            self.action_history.append(task_node.name.split()[0] if task_node.name else K.UNKNOWN)
+
+        task_node.result = full_response
+        self.action_history.append(task_node.name.split()[0] if task_node.name else K.UNKNOWN)
+        if task_node.status == "failed":
+            self._log("INFO", t(K.LOG_TASK_FAILED, self.lang), task_node.name)
+        else:
             self._log("INFO", t(K.LOG_TASK_DONE, self.lang), task_node.name)
-            yield {"type": "done", "result": full_response}
+        yield {"type": "done", "result": full_response}
 
     def execute_tree(self, node=None):
         if node is None:

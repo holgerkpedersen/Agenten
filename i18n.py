@@ -179,6 +179,12 @@ class K(StrEnum):
 
     # === Session defaults ===
     SESSION_DEFAULT_NAME = "session.default_name"
+    LLM_LANGUAGE         = "llm_language"
+
+    # === Session knowledge (demo data) ===
+    DEMO_MATH_FACT      = "session.demo_math_fact"
+    DEMO_OPTIMIZATION   = "session.demo_optimization"
+    DEMO_KNOWLEDGE_HDR  = "session.demo_knowledge_header"
 
     # === UI labels (frontend JS) ===
     UI_LAYOUT_SAVED        = "ui.layout_saved"
