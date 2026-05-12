@@ -249,6 +249,7 @@ def save_current_session():
         "show_thinking": data.get("show_thinking", agent.show_thinking),
         "template": data.get("template") or getattr(agent, 'active_template', None) or "fri",
         "lang": data.get("lang") or getattr(agent, 'lang', 'da'),
+        "ui_lang": data.get("ui_lang") or data.get("lang") or getattr(agent, 'lang', 'da'),
         "prompt_history": data.get("prompt_history", []),
         "file_context": data.get("file_context", "")
     }
@@ -387,9 +388,10 @@ def decompose():
     files = data.get("files", [])
     template = data.get("template")
     lang = data.get("lang", "da")
+    ui_lang = data.get("ui_lang", lang)
     
     if not prompt:
-        return jsonify({"error": t(K.ERR_NO_PROMPT, lang)}), 400
+        return jsonify({"error": t(K.ERR_NO_PROMPT, ui_lang)}), 400
     
     global current_session_id
     if session_id:
@@ -420,6 +422,7 @@ def decompose():
             "show_thinking": agent.show_thinking,
             "template": template,
             "lang": agent.lang,
+            "ui_lang": ui_lang,
             "file_context": files
         }
         session_manager.save_session(current_session_id, session_data)
@@ -439,11 +442,13 @@ def decompose():
 @app.route("/api/execute-stream")
 def execute_stream():
     global current_session_id
+    ui_lang = "da"
     print(f"Execute stream - current_session_id: {current_session_id}")
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
         if session_data:
             st = session_data.get("show_thinking", True)
+            ui_lang = session_data.get("ui_lang", session_data.get("lang", "da"))
             print(f"Session show_thinking: {st}")
             if session_data.get("original_prompt"):
                 agent.original_prompt = session_data["original_prompt"]
@@ -473,8 +478,9 @@ def execute_stream():
             print(f"Agent show_thinking set to: {agent.show_thinking}")
     
     def generate():
+        _ui = ui_lang  # capture in closure
         if agent.task_tree is None:
-            yield f"data: {json.dumps({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, agent.lang)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, _ui)})}\n\n"
             return
         
         original_prompt = getattr(agent, 'full_prompt_with_context', '') or agent.original_prompt
@@ -518,7 +524,7 @@ def execute_stream():
                 elif event["type"] == "done":
                     full_response = event["result"]
             if not full_response:
-                full_response = t(K.UI_TASK_RESULT_PREFIX, agent.lang) + ": " + node.name
+                full_response = t(K.UI_TASK_RESULT_PREFIX, _ui) + ": " + node.name
             node.status = "done"
             node.result = full_response
             completed += 1
@@ -526,7 +532,7 @@ def execute_stream():
             yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
             result_preview = full_response[:500] if show_thinking else full_response
             yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': result_preview})}\n\n"
-            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, agent.lang) + ": " + node.name, "detail": full_response[:100]})
+            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, _ui) + ": " + node.name, "detail": full_response[:100]})
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
             if current_session_id:
                 session_manager.add_prompt_result(current_session_id, node.name, full_response[:500], None)
@@ -535,15 +541,17 @@ def execute_stream():
             yield from execute_with_stream(agent.task_tree.root)
             session_data = {
                 "id": current_session_id,
-                "name": original_prompt[:30] if original_prompt else t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=""),
+                "name": original_prompt[:30] if original_prompt else t(K.SESSION_DEFAULT_NAME, _ui).format(n=""),
                 "tree": agent.task_tree_to_dict(),
                 "execution_log": agent.execution_log,
                 "agent_log": agent.agent_log,
-                "original_prompt": agent.original_prompt or (agent.task_tree.root.name if agent.task_tree else "")
+                "original_prompt": agent.original_prompt or (agent.task_tree.root.name if agent.task_tree else ""),
+                "lang": agent.lang,
+                "ui_lang": ui_lang
             }
             if current_session_id:
                 session_manager.save_session(current_session_id, session_data)
-            yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, agent.lang)})}\n\n"
+            yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, _ui)})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     

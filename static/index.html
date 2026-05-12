@@ -438,11 +438,17 @@
                 <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
                 <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
             </label>
-            <select id="langSelect" onchange="switchLang(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;">
+            <select id="langSelect" onchange="switchLang(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;" title="UI sprog">
                 <option value="da">🇩🇰</option>
                 <option value="en">🇬🇧</option>
                 <option value="es">🇪🇸</option>
                 <option value="zh">🇨🇳</option>
+            </select>
+            <select id="llmLangSelect" onchange="switchLLMLang(this.value)" style="background:#1e293b;border:1px solid #8b5cf6;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;" title="AI svarsprog">
+                <option value="da">🤖🇩🇰</option>
+                <option value="en">🤖🇬🇧</option>
+                <option value="es">🤖🇪🇸</option>
+                <option value="zh">🤖🇨🇳</option>
             </select>
         </div>
         
@@ -475,6 +481,7 @@
 // === Multi-language translation system (DRY) ===
 window.AGENTEN_LANG = {};
 let currentLang = localStorage.getItem('agenten_lang') || 'da';
+let currentLLMLang = localStorage.getItem('agenten_llm_lang') || currentLang;
 
 // Danish fallback — bruges indtil oversættelser er loadet
 const LANG_FALLBACK = {
@@ -542,6 +549,12 @@ function switchLang(lang) {
     loadLang(lang);
 }
 
+function switchLLMLang(lang) {
+    currentLLMLang = lang;
+    localStorage.setItem('agenten_llm_lang', lang);
+    document.getElementById('llmLangSelect').value = lang;
+}
+
 function updateAllUIText() {
     updatePanelTitles();
 }
@@ -564,6 +577,7 @@ function updatePanelTitles() {
 }
 
 loadLang(currentLang);
+document.getElementById('llmLangSelect').value = currentLLMLang;
 // === End translation system ===
 
 // Panel definitioner med alle 4 paneler
@@ -1407,6 +1421,18 @@ async function loadSelectedSession() {
             document.getElementById('templateSelect').value = 'fri';
         }
         
+        if (data.session.ui_lang) {
+            currentLang = data.session.ui_lang;
+            localStorage.setItem('agenten_lang', data.session.ui_lang);
+            await loadLang(data.session.ui_lang);
+        }
+        
+        if (data.session.lang) {
+            currentLLMLang = data.session.lang;
+            localStorage.setItem('agenten_llm_lang', data.session.lang);
+            document.getElementById('llmLangSelect').value = data.session.lang;
+        }
+        
         if (data.session.agent_log) {
             const logBox = document.getElementById('logContent');
             if (logBox) {
@@ -1519,7 +1545,8 @@ async function saveCurrentSession() {
             file_context: fileContext,
             original_prompt: currentPrompt,
             show_thinking: showThinking,
-            lang: currentLang,
+            lang: currentLLMLang,
+            ui_lang: currentLang,
             template: document.getElementById('templateSelect').value
         })
     });
@@ -1559,7 +1586,8 @@ async function decompose() {
             show_thinking: showThinking,
             files: filesData,
             template: document.getElementById('templateSelect').value,
-            lang: currentLang
+            lang: currentLLMLang,
+            ui_lang: currentLang
         })
     });
     const data = await response.json();
