@@ -398,62 +398,36 @@
     <div class="header">
         <div style="display:flex;align-items:center;justify-content:space-between;">
             <h1>🤖 Agenten</h1>
-            <div class="tools-wrapper">
-                <button class="tools-toggle" onclick="toggleTools()" title="Flere værktøjer">⚙️</button>
+<div class="tools-wrapper">
+                <button class="tools-toggle" onclick="toggleTools()" id="toolsMenu" title="Flere værktøjer">⚙️</button>
                 <div class="tools-dropdown" id="toolsDropdown">
-                    <button onclick="resetExecution()" title="Nulstil alle opgavers status">🔄 Nulstil træ</button>
-                    <button onclick="deleteTree()" title="Slet hele opgavetræet">🗑 Slet træ</button>
-                    <button onclick="previewMarkdown()" title="Forhåndsvis session">👁 Preview</button>
-                    <button onclick="exportToMarkdown()" title="Eksporter til Markdown">📄 Eksporter MD</button>
-                    <button onclick="saveLayoutToLocal()" title="Gem layout permanent">💾 Gem layout</button>
-                    <button onclick="resetLayout()" title="Nulstil layout">🔄 Reset layout</button>
+                    <button onclick="resetExecution()" id="resetTreeBtn" title="Nulstil alle opgavers status">🔄 Nulstil træ</button>
+                    <button onclick="deleteTree()" id="deleteTreeBtn" title="Slet hele opgavetræet">🗑 Slet træ</button>
+                    <button onclick="previewMarkdown()" id="previewBtn" title="Forhåndsvis session">👁 Preview</button>
+                    <button onclick="exportToMarkdown()" id="exportMd" title="Eksporter til Markdown">📄 Eksporter MD</button>
+                    <button onclick="saveLayoutToLocal()" id="saveLayoutBtn" title="Gem layout permanent">💾 Gem layout</button>
+                    <button onclick="resetLayout()" id="resetLayoutBtn" title="Nulstil layout">🔄 Reset layout</button>
                     <hr style="border-color:#334155;margin:4px 0;">
-                    <button onclick="setGithubToken()" title="Opsæt GitHub Token">🔑 GitHub Token</button>
+                    <button onclick="setGithubToken()" id="githubTokenBtn" title="Opsæt GitHub Token">🔑 GitHub Token</button>
                 </div>
             </div>
         </div>
         <div id="folderStatus" style="font-size: 11px; margin-bottom: 5px;"></div>
         
         <div class="toolbar-row">
-            <span class="toolbar-label">Sessions</span>
+            <span class="toolbar-label" id="sessionsLabel">Sessions</span>
             <select id="sessionSelect" class="session-select">
-                <option value="">-- Vælg eller opret ny --</option>
+                <option value="" id="selectSessionOpt">-- Vælg eller opret ny --</option>
             </select>
-            <button onclick="refreshSessions()" title="Opdater">🔄</button>
-            <button onclick="loadSelectedSession()" title="Indlæs">📂 Indlæs</button>
-            <button onclick="saveCurrentSession()" title="Gem">💾 Gem</button>
-            <button onclick="renameSession()" title="Omdøb">✏️ Omdøb</button>
-            <button onclick="createNewSession()" title="Ny session">➕ Ny</button>
+            <button onclick="refreshSessions()" id="refreshSess" title="Opdater">🔄</button>
+            <button onclick="loadSelectedSession()" id="loadSess" title="Indlæs">📂 Indlæs</button>
+            <button onclick="saveCurrentSession()" id="saveSess" title="Gem">💾 Gem</button>
+            <button onclick="renameSession()" id="renameSess" title="Omdøb">✏️ Omdøb</button>
+            <button onclick="createNewSession()" id="newSess" title="Ny session">➕ Ny</button>
         </div>
         
         <div class="toolbar-row">
-            <span class="toolbar-label">Skabelon</span>
-            <select id="templateSelect" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;">
-                <option value="fri">🌳 Fri nedbrydning</option>
-                <option value="resume">📄 Resumé</option>
-                <option value="kodeanalyse">🔍 Kodeanalyse</option>
-                <option value="diffanalyse">📊 Diff-analyse</option>
-            </select>
-            <label style="display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;padding:8px 12px;border-radius:6px;cursor:pointer;">
-                <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
-                <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
-            </label>
-            <select id="langSelect" onchange="switchLang(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;" title="UI sprog">
-                <option value="da">🇩🇰</option>
-                <option value="en">🇬🇧</option>
-                <option value="es">🇪🇸</option>
-                <option value="zh">🇨🇳</option>
-            </select>
-            <select id="llmLangSelect" onchange="switchLLMLang(this.value)" style="background:#1e293b;border:1px solid #8b5cf6;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;" title="AI svarsprog">
-                <option value="da">🤖🇩🇰</option>
-                <option value="en">🤖🇬🇧</option>
-                <option value="es">🤖🇪🇸</option>
-                <option value="zh">🤖🇨🇳</option>
-            </select>
-        </div>
-        
-        <div class="toolbar-row">
-            <span class="toolbar-label">Filer</span>
+            <span class="toolbar-label" id="filesLabel">Filer</span>
             <input type="text" id="filePathInput" placeholder="Vælg fil(er) med Gennemse, derefter Læs fil" style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#e2e8f0;" readonly>
             <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
             <button onclick="document.getElementById('filePicker').click()" style="background:#475569;">📂 Gennemse</button>
@@ -524,6 +498,10 @@ const LANG_FALLBACK = {
     file_included_section: '📎 Filer inkluderet',
     file_included_path: 'Sti',
     preview_title: '📊 Agenten - Session Preview',
+    btn_edit: 'Rediger',
+    btn_delete: 'Slet',
+    btn_add_child: 'Tilføj underopgave',
+    panel_placeholder: 'Indhold for {panel}',
 };
 
 async function loadLang(lang) {
@@ -557,6 +535,29 @@ function switchLLMLang(lang) {
 
 function updateAllUIText() {
     updatePanelTitles();
+    updateHtmlLabels();
+}
+
+function updateHtmlLabels() {
+    const e = id => document.getElementById(id);
+    if (e('toolsMenu'))     e('toolsMenu').title     = _('tools_menu');
+    if (e('resetTreeBtn'))  e('resetTreeBtn').textContent = '🔄 ' + _('tools_reset_tree').replace('🔄 ','');
+    if (e('deleteTreeBtn')) e('deleteTreeBtn').textContent = '🗑 ' + _('tools_delete_tree').replace('🗑 ','');
+    if (e('previewBtn'))    e('previewBtn').textContent    = '👁 ' + _('tools_preview');
+    if (e('exportMd'))      e('exportMd').textContent      = '📄 ' + _('tools_export_md');
+    if (e('saveLayoutBtn'))e('saveLayoutBtn').textContent = '💾 ' + _('tools_save_layout');
+    if (e('resetLayoutBtn'))e('resetLayoutBtn').textContent= '🔄 ' + _('tools_reset_layout');
+    if (e('githubTokenBtn'))e('githubTokenBtn').textContent= '🔑 ' + _('tools_github_token');
+    if (e('refreshSess'))  e('refreshSess').title         = _('refresh');
+    if (e('loadSess'))      e('loadSess').textContent       = '📂 ' + _('load');
+    if (e('saveSess'))     e('saveSess').textContent       = '💾 ' + _('save');
+    if (e('renameSess'))   e('renameSess').textContent    = '✏️ ' + _('rename');
+    if (e('newSess'))      e('newSess').textContent        = '➕ ' + _('new');
+    if (e('sessionsLabel'))e('sessionsLabel').textContent = _('sessions');
+    if (e('filesLabel'))   e('filesLabel').textContent    = _('files');
+    if (e('filePathInput'))e('filePathInput').placeholder = _('file_path_placeholder');
+    if (e('thinkingLabel'))e('thinkingLabel').textContent= showThinking ? _('show_thinking') : _('hide_thinking');
+    if (e('selectSessionOpt')) e('selectSessionOpt').textContent = _('select_session');
 }
 
 function updatePanelTitles() {
@@ -578,6 +579,7 @@ function updatePanelTitles() {
 
 loadLang(currentLang);
 document.getElementById('llmLangSelect').value = currentLLMLang;
+updateHtmlLabels();
 // === End translation system ===
 
 // Panel definitioner med alle 4 paneler
@@ -608,7 +610,7 @@ function getCurrentLayout() {
 function saveLayoutToLocal() {
     const layout = getCurrentLayout();
     localStorage.setItem('agenten_layout', JSON.stringify(layout));
-    addLogEntry('INFO', 'Layout gemt permanent', 'Gemmer i browser');
+    addLogEntry('INFO', _('layout_saved'), _('saving_layout'));
 }
 
 function loadLayoutFromLocal() {
@@ -617,8 +619,8 @@ function loadLayoutFromLocal() {
         try {
             const layout = JSON.parse(saved);
             applyLayout(layout);
-            addLogEntry('INFO', 'Layout genoprettet', 'Fra tidligere session');
-        } catch(e) { console.log('Kunne ikke genoprette layout:', e); }
+            addLogEntry('INFO', _('layout_restored'), _('from_previous'));
+        } catch(e) { console.error(_('layout_error'), e); }
     }
 }
 
@@ -686,7 +688,7 @@ function renderTree(node, path = []) {
     const pathStr = path.join('.');
     let html = `<div data-path="${pathStr}"><div class="tree-node-content">`;
     if (treeEditMode) {
-        html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="Rediger" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="Slet" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="Tilføj underopgave" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
+        html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="${_('btn_edit')}" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="${_('btn_delete')}" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="${_('btn_add_child')}" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
     }
     html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>`;
     if (node.children && node.children.length > 0) { 
@@ -704,8 +706,8 @@ function updateTreeDisplay() {
     const treeContainer = document.getElementById('treeContent');
     if (treeContainer && currentTree) {
         let html = `<div style="margin-bottom:10px;">`;
-        html += `<button onclick="toggleTreeEditMode()" style="background:${treeEditMode?'#10b981':'#475569'};border:none;padding:6px 12px;border-radius:6px;color:white;cursor:pointer;font-size:12px;">${treeEditMode?'✅ Gem ændringer':'✏️ Rediger træ'}</button>`;
-        if (treeEditMode) html += ` <button onclick="addTreeChild('')" style="background:#3b82f6;border:none;padding:6px 12px;border-radius:6px;color:white;cursor:pointer;font-size:12px;">➕ Ny hovedopgave</button>`;
+        html += `<button onclick="toggleTreeEditMode()" style="background:${treeEditMode?'#10b981':'#475569'};border:none;padding:6px 12px;border-radius:6px;color:white;cursor:pointer;font-size:12px;">${treeEditMode?_('save_changes'):_('edit_tree')}</button>`;
+        if (treeEditMode) html += ` <button onclick="addTreeChild('')" style="background:#3b82f6;border:none;padding:6px 12px;border-radius:6px;color:white;cursor:pointer;font-size:12px;">${_('new_root_task')}</button>`;
         html += `</div>`;
         html += renderTree(currentTree);
         treeContainer.innerHTML = html;
@@ -731,20 +733,20 @@ function getNodeByPath(node, path) {
 function editTreeNode(path) {
     const node = getNodeByPath(currentTree, path);
     if (!node) return;
-    const newName = prompt('Ny navn for opgaven:', node.name);
+    const newName = prompt(_('new_name_for'), node.name);
     if (newName && newName.trim()) {
         node.name = newName.trim().substring(0, 80);
         updateTreeDisplay();
-        addLogEntry('INFO', 'Opgave omdøbt', node.name);
+        addLogEntry('INFO', _('task_renamed'), node.name);
     }
 }
 
 function deleteTreeNode(path) {
     if (!path) {
-        alert('Kan ikke slette hovedroden - brug "Slet træ" i stedet');
+        alert(_('cant_delete_root'));
         return;
     }
-    if (!confirm('Slet denne opgave og alle underopgaver?')) return;
+    if (!confirm(_('confirm_delete_node'))) return;
     const parts = path.split('.').filter(p => p !== '');
     let parent = currentTree;
     for (let i = 0; i < parts.length - 1; i++) {
@@ -753,18 +755,18 @@ function deleteTreeNode(path) {
     const idx = parseInt(parts[parts.length - 1]);
     const deleted = parent.children.splice(idx, 1)[0];
     updateTreeDisplay();
-    addLogEntry('INFO', 'Opgave slettet', deleted?.name || '');
+    addLogEntry('INFO', _('task_deleted'), deleted?.name || '');
 }
 
 function addTreeChild(path) {
     const parent = path ? getNodeByPath(currentTree, path) : currentTree;
     if (!parent) return;
-    const name = prompt('Navn på ny opgave:', 'Ny opgave');
+    const name = prompt(_('new_task_name'), _('new_task'));
     if (name && name.trim()) {
         if (!parent.children) parent.children = [];
         parent.children.push({ name: name.trim().substring(0, 80), status: 'pending', children: [], result: null });
         updateTreeDisplay();
-        addLogEntry('INFO', 'Opgave tilføjet', name);
+        addLogEntry('INFO', _('task_added'), name);
     }
 }
 
@@ -781,7 +783,7 @@ async function updatePromptHistory(sessionId) {
             for (const item of data.prompts.slice().reverse()) {
                 const time = new Date(item.timestamp).toLocaleTimeString();
                 const promptShort = item.prompt.length > 60 ? item.prompt.slice(0, 60) + '...' : item.prompt;
-                const resultShort = item.result ? (item.result.length > 100 ? item.result.slice(0, 100) + '...' : item.result) : 'Ingen resultat endnu';
+                const resultShort = item.result ? (item.result.length > 100 ? item.result.slice(0, 100) + '...' : item.result) : _('no_result_yet');
                 
                 historyContainer.innerHTML += `
                     <div class="history-item">
@@ -790,9 +792,9 @@ async function updatePromptHistory(sessionId) {
                             <span style="font-size: 10px; color: #64748b; float: right;">${time}</span>
                         </div>
                         <div class="history-result">
-                            💡 Resultat: ${escapeHtml(resultShort)}
+                            💡 ${_('result_label')} ${escapeHtml(resultShort)}
                         </div>
-                        <button class="reuse-btn" onclick="reusePrompt('${escapeHtml(item.prompt).replace(/'/g, "\\'")}')">🔄 Genbrug denne prompt</button>
+                        <button class="reuse-btn" onclick="reusePrompt('${escapeHtml(item.prompt).replace(/'/g, "\\'")}')">${_('reuse_prompt')}</button>
                     </div>
                 `;
             }
@@ -800,14 +802,14 @@ async function updatePromptHistory(sessionId) {
             historyContainer.innerHTML = `<div style="color: #64748b;">${_('no_prompts_yet')}</div>`;
         }
     } catch (e) {
-        console.error('Failed to load history:', e);
+        console.error(_('history_error'), e);
         historyContainer.innerHTML = `<div style="color: #ef4444;">${_('history_error')}</div>`;
     }
 }
 
 function reusePrompt(prompt) {
     document.getElementById('promptInput').value = prompt;
-    addLogEntry('INFO', 'Genbruger tidligere prompt', prompt.slice(0, 50));
+    addLogEntry('INFO', _('reusing_prompt'), prompt.slice(0, 50));
     decompose();
 }
 
@@ -815,11 +817,11 @@ function toggleThinkingMode() {
     const checkbox = document.getElementById('thinkingToggle');
     const label = document.getElementById('thinkingLabel');
     showThinking = checkbox.checked;
-    label.textContent = showThinking ? 'Vis tænkning' : 'Skjul tænkning';
+    label.textContent = showThinking ? _('show_thinking') : _('hide_thinking');
     if (showThinking) {
-        addLogEntry('INFO', 'Tænkning aktiveret', 'Viser LLM\'s tankeprocess');
+        addLogEntry('INFO', _('thinking_enabled'), _('thinking_detail_on'));
     } else {
-        addLogEntry('INFO', 'Tænkning deaktiveret', 'Kun resultater vises');
+        addLogEntry('INFO', _('thinking_disabled'), _('thinking_detail_off'));
     }
     if (currentSessionId) {
         saveCurrentSession();
@@ -827,17 +829,28 @@ function toggleThinkingMode() {
 }
 
 async function selectExportFolder() {
-    const folder = prompt('Indtast sti til eksportmappe (f.eks. C:\\Dev\\Agenten\\exports):');
+    const folder = prompt(_('enter_export_path');
     if (!folder) return;
-    addLogEntry('INFO', 'Sætter eksportmappe', folder);
+    addLogEntry('INFO', _('setting_export_folder'), folder);
     const resp = await fetch('/api/folder/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({folder: folder}) });
     const data = await resp.json();
     if(data.success) {
-        document.getElementById('folderStatus').innerHTML = `📁 Gemmer i: ${data.folder} <span class="folder-status">Aktiv</span>`;
-        addLogEntry('INFO','Eksportmappe valgt',data.folder);
+        document.getElementById('folderStatus').innerHTML = `${_('export_folder_path')} <span class="folder-status">${_('active')}</span>`.replace('{folder}', data.folder);
+        addLogEntry('INFO',_('export_folder_ok'),data.folder);
     } else {
-        addLogEntry('ERROR','Kunne ikke sætte mappe',data.error);
+        addLogEntry('ERROR',_('export_folder_err'),data.error);
     }
+}
+
+async function checkFolderStatus() {
+    const response = await fetch('/api/folder/status');
+    const data = await response.json();
+    
+    if (data.success && data.folder) {
+        addLogEntry('INFO', _('export_folder_ok'), data.folder);
+        document.getElementById('folderStatus').innerHTML = `${_('export_folder_path')} <span class="folder-status">${_('active')}</span>`.replace('{folder}', data.folder);
+    }
+}
 }
 
 async function checkFolderStatus() {
@@ -865,9 +878,9 @@ async function onFilePicked(event) {
         fileNames.push(file.name);
     }
     
-    const nameDisplay = fileNames.length === 1 ? fileNames[0] : `${fileNames.length} filer valgt`;
+    const nameDisplay = fileNames.length === 1 ? fileNames[0] : `${fileNames.length} ${_('N_files_selected_ui')}`;
     document.getElementById('filePathInput').value = nameDisplay;
-    addLogEntry('INFO', 'Filer valgt', nameDisplay);
+    addLogEntry('INFO', _('files_selected'), nameDisplay);
     event.target.value = '';
 }
 
@@ -876,10 +889,10 @@ function toggleFileSection() {
     const toggle = document.getElementById('fileSectionToggle');
     if (section.style.display === 'none') {
         section.style.display = 'block';
-        toggle.textContent = '▼ Skjul filer';
+        toggle.textContent = _('hide_files');
     } else {
         section.style.display = 'none';
-        toggle.textContent = '▶ Vis filer';
+        toggle.textContent = _('show_files');
     }
 }
 
@@ -899,7 +912,7 @@ document.addEventListener('click', function(e) {
 async function setGithubToken() {
     const resp = await fetch('/api/tools/token');
     const data = await resp.json();
-    const token = prompt('Indtast GitHub Personal Access Token:\n(Opret på https://github.com/settings/tokens)\n\nScopes: repo, workflow', 
+    const token = prompt(_('token_prompt_text'),
         data.exists ? '********' : '');
     if (!token || token === '********') return;
     
@@ -911,8 +924,8 @@ async function setGithubToken() {
     });
     const saveData = await saveResp.json();
     if (saveData.success) {
-        addLogEntry('INFO', 'GitHub Token gemt', 'Genstart server for at aktivere');
-        alert('✅ Token gemt i .env\nGenstart serveren for at aktivere GitHub værktøjer.');
+        addLogEntry('INFO', _('token_saved'), _('token_restart'));
+        alert(_('token_saved_dialog'));
     }
 }
 
@@ -928,12 +941,12 @@ async function readFiles() {
     const fileSection = document.getElementById('fileSection');
     const fileToggle = document.getElementById('fileSectionToggle');
     fileSection.style.display = 'block';
-    fileToggle.textContent = '▼ Skjul filer';
+    fileToggle.textContent = _('hide_files');
     preview.style.display = 'block';
     preview.innerHTML = '';
     
     if (loadedFilesContent.length > 0) {
-        let filesDisplay = '<div style="color:#10b981; margin-bottom:8px;"><strong>📎 Filvalg for LLM kontekst:</strong><br>';
+        let filesDisplay = `<div style="color:#10b981; margin-bottom:8px;"><strong>${_('files_for_llm')}</strong><br>`;
         for (let i = 0; i < loadedFilesContent.length; i++) {
             const fc = loadedFilesContent[i];
             const ext = fc.filename.split('.').pop().toLowerCase();
@@ -944,26 +957,26 @@ async function readFiles() {
             try { Prism.highlightElement(preview.querySelectorAll('pre')[i].querySelector('code')); } catch(e) {}
             const status = fc.included ? '✓' : '✗';
             filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" ${checked} onchange="toggleFileIncluded(${i}, this.checked)"> <span style="${fc.included?'color:#10b981':'color:#ef4444'}">${status}</span> ${fc.filename}</label>`;
-            addLogEntry('INFO', 'Fil vist', fc.filename);
+            addLogEntry('INFO', _('file_shown'), fc.filename);
         }
         filesDisplay += '</div>';
         document.getElementById('selectedFilesDisplay').innerHTML = filesDisplay;
         const includedCount = loadedFilesContent.filter(f => f.included).length;
-        document.getElementById('filePathInput').value = includedCount === 0 ? 'Ingen filer valgt' : (includedCount === 1 ? loadedFilesContent.find(f => f.included).filename : `${includedCount} filer valgt`);
+        document.getElementById('filePathInput').value = includedCount === 0 ? _('no_files') : (includedCount === 1 ? loadedFilesContent.find(f => f.included).filename : `${includedCount} ${_('files_selected')}`);
         return;
     }
     
     if (selectedFiles.length === 0) {
-        alert('Vælg først fil(er) med Gennemse');
+        alert(_('select_files_first'));
         return;
     }
     
     loadedFilesContent = [];
     
-    let filesDisplay = '<div style="color:#10b981; margin-bottom:8px;">📎 <strong>Filer inkluderet i LLM kontekst:</strong><br>';
+    let filesDisplay = `<div style="color:#10b981; margin-bottom:8px;">📎 <strong>${_('files_included')}</strong><br>`;
     
     for (const { name, file } of selectedFiles) {
-        addLogEntry('INFO', 'Læser fil', name);
+        addLogEntry('INFO', _('reading_file_title'), name);
         
         const formData = new FormData();
         formData.append('file', file);
@@ -991,15 +1004,15 @@ async function readFiles() {
                     loadedFilesContent.push({ filename: readData.filename, filepath: readData.filepath, content: readData.content, included: true });
                     filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" checked onchange="toggleFileIncluded(${loadedFilesContent.length-1}, this.checked)"> <span style="color:#10b981">✓</span> ${readData.filename}</label>`;
                     
-                    addLogEntry('INFO', 'Fil indlæst', `${readData.filename} (${readData.lines} linjer)`);
+                    addLogEntry('INFO', _('file_read'), `${readData.filename} (${_('N_lines').replace('{n}', readData.lines)})`);
                 } else {
-                    preview.innerHTML += `<div style="color:#ef4444;">Fejl ved læsning af ${name}: ${readData.error}</div><br>`;
+                    preview.innerHTML += `<div style="color:#ef4444;">${_('could_not_read')} ${name}: ${readData.error}</div><br>`;
                 }
             } else {
-                preview.innerHTML += `<div style="color:#ef4444;">Fejl ved upload af ${name}: ${data.error}</div><br>`;
+                preview.innerHTML += `<div style="color:#ef4444;">${_('could_not_upload')} ${name}: ${data.error}</div><br>`;
             }
         } catch(e) {
-            preview.innerHTML += `<div style="color:#ef4444;">Fejl: ${e.message}</div><br>`;
+            preview.innerHTML += `<div style="color:#ef4444;">${_('error_prefix')} ${e.message}</div><br>`;
         }
     }
     
@@ -1007,9 +1020,9 @@ async function readFiles() {
     document.getElementById('selectedFilesDisplay').innerHTML = filesDisplay;
     
     if (selectedFiles.length === 1) {
-        document.getElementById('promptInput').value = `Analyser ${selectedFiles[0].name} grundigt. Giv en struktureret analyse af koden.`;
+        document.getElementById('promptInput').value = _('prompt_auto_analyze').replace('{n}', '1');
     } else {
-        document.getElementById('promptInput').value = `Analyser ${selectedFiles.length} filer grundigt. Giv en struktureret analyse af koden og sammenlign dem.`;
+        document.getElementById('promptInput').value = _('prompt_auto_analyze').replace('{n}', selectedFiles.length);
     }
 }
 
@@ -1061,7 +1074,7 @@ function createPanels() {
                 </div>
             </div>
             <div class="panel-content" id="${def.id}Content">
-                <div style="color: #64748b;">Indhold for ${def.title}</div>
+                <div style="color: #64748b;">${_('panel_placeholder').replace('{panel}', def.title)}</div>
             </div>
             <div class="resize-handle"></div>
         `;
@@ -1303,11 +1316,11 @@ async function renameSession() {
     const select = document.getElementById('sessionSelect');
     const sessionId = select.value;
     if (!sessionId) {
-        alert('Vælg en session at omdøbe');
+        alert(_('select_rename_session'));
         return;
     }
     const currentName = select.options[select.selectedIndex].text;
-    const newName = prompt('Nyt navn:', currentName);
+    const newName = prompt(_('new_name_prompt'), currentName);
     if (!newName || newName === currentName) return;
     
     const response = await fetch('/api/sessions/rename', {
@@ -1317,7 +1330,7 @@ async function renameSession() {
     });
     const data = await response.json();
     if (data.success) {
-        addLogEntry('INFO', 'Session omdøbt', newName);
+        addLogEntry('INFO', _('session_renamed'), newName);
         refreshSessions();
     }
 }
@@ -1383,7 +1396,7 @@ async function loadSelectedSession() {
     const select = document.getElementById('sessionSelect');
     const sessionId = select.value;
     if (!sessionId) {
-        alert('Vælg en session');
+        alert(_('select_session_to_load'));
         return;
     }
     const response = await fetch(`/api/sessions/load/${sessionId}`);
@@ -1495,7 +1508,7 @@ async function loadSelectedSession() {
                             content: fileData.content,
                             included: true 
                         });
-                        addLogEntry('INFO', 'Fil genindlæst', fileData.filename);
+                        addLogEntry('INFO', _('files_reloaded'), fileData.filename);
                     } else {
                         missingFiles.push(fc.filename || fc.filepath);
                     }
@@ -1522,7 +1535,7 @@ async function loadSelectedSession() {
             }
         }
         
-        addLogEntry('INFO', 'Session indlæst', data.session.name);
+        addLogEntry('INFO', _('session_loaded'), data.session.name);
     }
 }
 
@@ -1552,7 +1565,7 @@ async function saveCurrentSession() {
     });
     const data = await response.json();
     if (data.success) {
-        addLogEntry('INFO', 'Session gemt', currentSessionId);
+        addLogEntry('INFO', _('session_saved'), currentSessionId);
         refreshSessions();
     }
 }
@@ -1560,7 +1573,7 @@ async function saveCurrentSession() {
 async function decompose() {
     const prompt = document.getElementById('promptInput').value;
     if (!prompt) {
-        alert('Indtast en opgave');
+        alert(_('enter_task'));
         return;
     }
     
@@ -1568,13 +1581,13 @@ async function decompose() {
     console.log('Sending files to decompose:', filesData.length, filesData.map(f => f.filename));
     
     if (selectedFiles.length > 0 && loadedFilesContent.length === 0) {
-        alert('Du har valgt filer men ikke læst dem endnu. Tryk først "📖 Læs fil" for at indlæse filindholdet.');
+        alert(_('files_not_read'));
         return;
     }
     
-    addLogEntry('INFO', 'Starter nedbrydning', prompt.slice(0, 50));
+    addLogEntry('INFO', _('start_decompose'), prompt.slice(0, 50));
     if (filesData.length > 0) {
-        addLogEntry('INFO', 'Inkluderer filer', `${filesData.length} fil(er)`);
+        addLogEntry('INFO', _('including_files'), `${filesData.length} fil(er)`);
     }
     
     const response = await fetch('/api/decompose', {
@@ -1598,7 +1611,7 @@ async function decompose() {
         lastDecomposeTemplate = document.getElementById('templateSelect').value;
         updateTreeDisplay();
         await updatePromptHistory(currentSessionId);
-        addLogEntry('INFO', 'Nedbrydning færdig', `${data.session_id}`);
+        addLogEntry('INFO', _('decompose_done'), `${data.session_id}`);
         refreshSessions();
         await saveCurrentSession();
     } else {
@@ -1611,15 +1624,15 @@ function stopStream() {
         eventSource.close();
         eventSource = null;
     }
-    addLogEntry('INFO', 'Streaming stoppet', 'Af bruger');
+    addLogEntry('INFO', _('stream_stopped'), _('stopped_by_user'));
 }
 
 async function resetExecution() {
     if (!currentTree) {
-        alert('Intet opgavetræ at nulstille');
+        alert(_('no_tree_to_reset'));
         return;
     }
-    if (!confirm('Nulstil alle opgaver til "ikke udført"? Opgaverne forbliver i træet.')) return;
+    if (!confirm(_('confirm_reset'))) return;
     
     await fetch('/api/reset-execution', { method: 'POST' });
     
@@ -1635,17 +1648,17 @@ async function resetExecution() {
     updateTreeDisplay();
     const llmContent = document.getElementById('llmContent');
     if (llmContent) llmContent.innerHTML = `<div style="color:#64748b;">${_('click_stream_hint')}</div>`;
-    addLogEntry('INFO', 'Opgavetræ nulstillet', '');
+    addLogEntry('INFO', _('tree_reset'), '');
     
     if (currentSessionId) saveCurrentSession();
 }
 
 async function deleteTree() {
     if (!currentTree) {
-        alert('Intet opgavetræ at slette');
+        alert(_('no_tree_to_delete'));
         return;
     }
-    if (!confirm('Er du sikker på at du vil slette hele opgavetræet?')) {
+    if (!confirm(_('confirm_delete_tree'))) {
         return;
     }
     currentTree = null;
@@ -1654,7 +1667,7 @@ async function deleteTree() {
     if (treeContent) treeContent.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
     const llmContent = document.getElementById('llmContent');
     if (llmContent) llmContent.innerHTML = `<div style="color:#64748b;">${_('click_stream_hint')}</div>`;
-    addLogEntry('INFO', 'Opgavetræ slettet', '');
+    addLogEntry('INFO', _('tree_deleted'), '');
     await saveCurrentSession();
 }
 
@@ -1667,7 +1680,7 @@ async function executeWithStream() {
             await decompose();
             if (!currentTree) return;
         } else if (!currentTree) {
-            alert('Nedbryd en opgave først');
+            alert(_('decompose_first'));
             return;
         }
     }
@@ -1687,7 +1700,7 @@ async function executeWithStream() {
         
         switch(data.type) {
             case 'context':
-                addLogEntry('INFO', 'Kontekst modtaget', data.original_prompt?.slice(0, 50));
+                addLogEntry('INFO', _('context_received'), data.original_prompt?.slice(0, 50));
                 break;
                 
             case 'log':
@@ -1764,7 +1777,7 @@ async function executeWithStream() {
                     markDone(currentTree);
                     updateTreeDisplay();
                 }
-                addLogEntry('INFO', 'Opgave færdig', data.task);
+                addLogEntry('INFO', _('task_done_label'), data.task);
                 saveCurrentSession();
                 break;
                 
@@ -1822,7 +1835,7 @@ function generateTreeMarkdown(node, level = 0) {
 
 async function exportToMarkdown() {
     if (!currentSessionId) {
-        alert('Ingen aktiv session at eksportere');
+        alert(_('no_active_session'));
         return;
     }
     
@@ -1838,13 +1851,13 @@ async function exportToMarkdown() {
         document.getElementById('folderStatus').innerHTML = `📁 Gemmer i: ${chosenFolder} <span class="folder-status">Aktiv</span>`;
     }
     
-    addLogEntry('INFO', 'Eksporterer session til Markdown', currentSessionId);
+    addLogEntry('INFO', _('exporting'), currentSessionId);
     
     const response = await fetch(`/api/sessions/load/${currentSessionId}`);
     const data = await response.json();
     
     if (!data.success) {
-        alert('Kunne ikke hente session data');
+        alert(_('cant_fetch_session'));
         return;
     }
     
@@ -1947,7 +1960,7 @@ let md = `${_('export_md_report_header')}\n\n`;
     const saveData = await saveResponse.json();
     
     if (saveData.success) {
-        addLogEntry('INFO', 'Eksporteret til mappe', saveData.filepath);
+        addLogEntry('INFO', _('exported_to'), saveData.filepath);
         alert(`✅ Fil gemt i:\n${saveData.filepath}`);
     } else {
         addLogEntry('WARNING', 'Kunne ikke gemme til mappe', saveData.error);
@@ -1961,7 +1974,7 @@ let md = `${_('export_md_report_header')}\n\n`;
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        addLogEntry('INFO', 'Fil downloadet (fallback)', filename);
+        addLogEntry('INFO', _('downloaded'), filename);
     }
 }
 
@@ -1971,7 +1984,7 @@ async function previewMarkdown() {
         return;
     }
     
-    addLogEntry('INFO', 'Genererer preview', '');
+    addLogEntry('INFO', _('generating_preview'), '');
     
     const treeContent = document.getElementById('treeContent')?.innerText || '';
     const llmContent = document.getElementById('llmContent')?.innerText || '';
@@ -2051,7 +2064,7 @@ function downloadFromPreview() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    addLogEntry('INFO', 'Downloaded preview', a.download);
+    addLogEntry('INFO', _('preview_downloaded'), a.download);
 }
 
 // Initialize
