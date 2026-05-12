@@ -407,7 +407,8 @@ class Agent:
 
             conversation = system_prompt
             full_response = ""
-            max_iterations = 8
+            max_iterations = 5
+            called_tools = set()
 
             for i in range(max_iterations):
                 prompt = conversation
@@ -417,7 +418,7 @@ class Agent:
                         tools_list=tools_list,
                         TOOL_MARKER=self.tool_registry.TOOL_MARKER,
                         DONE_MARKER=self.tool_registry.DONE_MARKER
-                    ) + f"\nKald KUN ét værktøj ad gangen."
+                    )
 
                 response = ""
                 for chunk in self.llm.generate_stream(prompt, max_tokens=1024):
@@ -427,6 +428,12 @@ class Agent:
                 self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
 
                 if parsed["type"] == "tool":
+                    tool_key = parsed['tool'] + str(parsed.get('args', {}))
+                    if tool_key in called_tools:
+                        self._log("TOOL", "DUPLIKAT — springer over", parsed['tool'])
+                        conversation += f"\n\nFEJL: Du har allerede kaldt {parsed['tool']} med disse argumenter. Kald et andet værktøj eller brug <<<DONE>>> hvis du er færdig."
+                        continue
+                    called_tools.add(tool_key)
                     self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
                     result = self.tool_registry.execute(parsed["tool"], parsed["args"])
                     result_str = json.dumps(result, ensure_ascii=False)
@@ -464,7 +471,8 @@ class Agent:
 
             conversation = system_prompt
             full_response = ""
-            max_iterations = 8
+            max_iterations = 5
+            called_tools = set()
 
             for i in range(max_iterations):
                 prompt = conversation
@@ -474,7 +482,7 @@ class Agent:
                         tools_list=tools_list,
                         TOOL_MARKER=self.tool_registry.TOOL_MARKER,
                         DONE_MARKER=self.tool_registry.DONE_MARKER
-                    ) + f"\nKald KUN ét værktøj ad gangen."
+                    )
 
                 response = ""
                 for chunk in self.llm.generate_stream(prompt, max_tokens=1024):
@@ -485,6 +493,12 @@ class Agent:
                 self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
 
                 if parsed["type"] == "tool":
+                    tool_key = parsed['tool'] + str(parsed.get('args', {}))
+                    if tool_key in called_tools:
+                        self._log("TOOL", "DUPLIKAT — springer over", parsed['tool'])
+                        conversation += f"\n\nFEJL: Du har allerede kaldt {parsed['tool']} med disse argumenter. Kald et andet værktøj eller brug <<<DONE>>> hvis du er færdig."
+                        continue
+                    called_tools.add(tool_key)
                     self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
                     result = self.tool_registry.execute(parsed["tool"], parsed["args"])
                     result_str = json.dumps(result, ensure_ascii=False)
