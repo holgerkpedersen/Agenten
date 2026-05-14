@@ -46,6 +46,10 @@ def index():
         </html>
         """
 
+@app.route('/flow')
+def flow_page():
+    return send_from_directory(STATIC_DIR, 'flow.html')
+
 @app.route('/static/<path:path>')
 def serve_static(path):
     return send_from_directory(STATIC_DIR, path)
@@ -705,6 +709,46 @@ def search():
         return jsonify({"error": "No query"}), 400
     results = agent.searcher.search(query)
     return jsonify({"success": True, "search_results": results})
+
+@app.route("/api/flow/search", methods=["POST"])
+def flow_search():
+    data = request.json
+    query = data.get("query", "")
+    max_results = int(data.get("maxResults", 10))
+    if not query:
+        return jsonify({"error": "No query"}), 400
+
+    from ddg_search import websearch
+    results = websearch(query, max_results)
+    return jsonify({"success": True, "query": query, "results": results})
+
+
+@app.route("/api/flow/generate", methods=["POST"])
+def flow_generate():
+    data = request.json
+    topic = data.get("topic", "")
+    max_results = int(data.get("maxResults", 10))
+
+    if not topic:
+        return jsonify({"error": "No topic"}), 400
+
+    from ddg_search import websearch
+    from flow_builder import generate_research_flow, flow_to_mermaid_full, format_flow_json
+
+    results = websearch(topic, max_results)
+    flow = generate_research_flow(topic, results)
+    mermaid = flow_to_mermaid_full(flow)
+    flow_str = format_flow_json(flow)
+
+    return jsonify({
+        "success": True,
+        "topic": topic,
+        "results": results,
+        "flow": flow,
+        "flow_json": flow_str,
+        "mermaid": mermaid
+    })
+
 
 @app.route("/api/build-module", methods=["POST"])
 def build_module():

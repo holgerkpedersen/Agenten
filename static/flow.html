@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flow Builder – Web Research</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .app { max-width: 1400px; margin: 0 auto; }
+        h1 {
+            margin: 0 0 4px 0;
+            background: linear-gradient(135deg, #f59e0b, #fbbf24);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+        }
+        .sub { color: #64748b; font-size: 13px; margin-bottom: 20px; }
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: #1e293b;
+            padding: 16px 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .toolbar input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 14px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-size: 14px;
+        }
+        .toolbar input:focus { outline: none; border-color: #3b82f6; }
+        .toolbar button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .btn-search { background: #3b82f6; color: white; }
+        .btn-search:hover { background: #2563eb; }
+        .btn-apply { background: #10b981; color: white; }
+        .btn-apply:hover { background: #059669; }
+        .label { color: #94a3b8; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #334155;
+        }
+        .card h3 {
+            margin: 0 0 12px 0;
+            font-size: 15px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .mermaid-wrapper {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 250px;
+            overflow-x: auto;
+        }
+        .mermaid-wrapper svg { max-width: 100%; }
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .result-item {
+            background: #0f172a;
+            border-radius: 10px;
+            padding: 12px 14px;
+            border-left: 3px solid #3b82f6;
+        }
+        .result-item a {
+            color: #60a5fa;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .result-item a:hover { text-decoration: underline; }
+        .result-item .snippet {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+        .result-item .url {
+            color: #64748b;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 400px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 13px;
+            padding: 14px;
+            resize: vertical;
+            tab-size: 2;
+        }
+        textarea:focus { outline: none; border-color: #8b5cf6; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .badge {
+            display: inline-block;
+            background: #3b82f6;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <h1>🔍 Flow Builder</h1>
+    <div class="sub">Web Research Flow — Dynamics 365 compatible</div>
+
+    <div class="toolbar">
+        <span class="label">Topic</span>
+        <input type="text" id="topicInput" placeholder="e.g. quantum computing breakthroughs 2025" value="quantum computing">
+        <button class="btn-search" onclick="searchAndBuild()">🔎 Search & Build Flow</button>
+        <span id="status" style="color:#94a3b8;font-size:13px;"></span>
+    </div>
+
+    <div class="layout">
+        <div class="card">
+            <h3>📊 Flow Diagram</h3>
+            <div class="mermaid-wrapper">
+                <pre class="mermaid" id="mermaidContainer">graph TB
+  Trigger["🔷 Manual Trigger"]
+  style Trigger fill:#3b82f6,color:#fff
+  Trigger -->|Succeeded| End["Enter a topic to build a flow"]
+  style End fill:#64748b,color:#fff</pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📄 Search Results <span id="resultCount" class="badge">0</span></h3>
+            <div class="results-list" id="resultsContainer">
+                <div style="color:#64748b;text-align:center;padding:40px;">Search results will appear here</div>
+            </div>
+        </div>
+
+        <div class="card" style="grid-column: 1 / -1;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;">⚙️ Flow JSON</h3>
+                <button class="btn-apply" onclick="applyFlowJson()">🔄 Apply & Re-render</button>
+            </div>
+            <textarea id="flowJsonEditor"></textarea>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+        background: '#0f172a',
+        primaryColor: '#3b82f6',
+        primaryTextColor: '#e2e8f0',
+        primaryBorderColor: '#3b82f6',
+        lineColor: '#475569',
+        secondaryColor: '#1e293b',
+        tertiaryColor: '#0f172a'
+    }
+});
+
+function $(id) { return document.getElementById(id); }
+
+async function searchAndBuild() {
+    const topic = $('topicInput').value.trim();
+    if (!topic) { $('status').textContent = '⚠️ Enter a topic'; return; }
+
+    $('status').textContent = '⏳ Searching...';
+    $('resultsContainer').innerHTML = '<div style="color:#64748b;text-align:center;padding:40px;">Searching...</div>';
+    $('resultCount').textContent = '0';
+
+    try {
+        const resp = await fetch('/api/flow/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic, maxResults: 10 })
+        });
+        const data = await resp.json();
+
+        if (!data.success) {
+            $('status').textContent = '❌ Error: ' + (data.error || 'Unknown');
+            return;
+        }
+
+        // Update results
+        renderResults(data.results);
+        $('resultCount').textContent = data.results.length;
+
+        // Update flow JSON editor
+        $('flowJsonEditor').value = data.flow_json;
+
+        // Render mermaid diagram
+        renderMermaid(data.mermaid);
+
+        $('status').textContent = `✅ ${data.results.length} results for "${data.topic}"`;
+    } catch (e) {
+        $('status').textContent = '❌ ' + e.message;
+    }
+}
+
+function renderResults(results) {
+    const container = $('resultsContainer');
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div style="color:#64748b;text-align:center;padding:40px;">No results found</div>';
+        return;
+    }
+
+    container.innerHTML = results.map(r => `
+        <div class="result-item">
+            <a href="${escapeHtml(r.url)}" target="_blank">${escapeHtml(r.title)}</a>
+            <div class="snippet">${escapeHtml(r.snippet)}</div>
+            <div class="url">${escapeHtml(r.url)}</div>
+        </div>
+    `).join('');
+}
+
+function renderMermaid(diagram) {
+    const container = $('mermaidContainer');
+    container.textContent = diagram || 'graph TB\n  A["No diagram generated"]';
+    // Force re-render by removing and re-adding
+    mermaid.run({ nodes: [container] }).catch(e => {
+        console.error('Mermaid error:', e);
+        container.innerHTML = '<div style="color:#ef4444;">⚠️ Could not render diagram. Check JSON syntax.</div>';
+    });
+}
+
+function applyFlowJson() {
+    const jsonStr = $('flowJsonEditor').value;
+    try {
+        const flow = JSON.parse(jsonStr);
+        // Regenerate mermaid from the edited JSON
+        fetch('/api/flow/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                topic: flow?.definition?.triggers?.manual?.inputs?.schema?.properties?.query?.default || 'custom',
+                maxResults: 10
+            })
+        }).then(resp => resp.json()).then(data => {
+            if (data.mermaid) renderMermaid(data.mermaid);
+            $('status').textContent = '✅ Flow JSON applied & re-rendered';
+        }).catch(e => {
+            $('status').textContent = '❌ Could not regenerate from edited JSON';
+        });
+    } catch (e) {
+        $('status').textContent = '❌ Invalid JSON: ' + e.message;
+    }
+}
+
+function escapeHtml(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+// Auto-run on page load
+window.addEventListener('DOMContentLoaded', () => {
+    searchAndBuild();
+});
+</script>
+</body>
+</html>
