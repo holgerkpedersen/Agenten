@@ -663,7 +663,8 @@ btn_edit: 'Rediger',
     reusing_prompt: 'Genbruger tidligere prompt',
     no_prompts_yet: 'Ingen prompts endnu',
     history_error: 'Fejl ved indlæsning af historik',
-    prompt_auto_analyze: 'Analyser {n} filer grundigt. Giv en struktureret analyse.',
+    prompt_auto_analyze_singular: 'Analyser 1 fil grundigt. Giv en struktureret analyse.',
+    prompt_auto_analyze_plural: 'Analyser {n} filer grundigt. Giv en struktureret analyse.',
     select_rename_session: 'Vælg en session at omdøbe',
     new_name_prompt: 'Nyt navn:',
     select_session_to_load: 'Vælg en session',
@@ -1210,9 +1211,9 @@ async function readFiles() {
     document.getElementById('selectedFilesDisplay').innerHTML = filesDisplay;
     
     if (selectedFiles.length === 1) {
-        document.getElementById('promptInput').value = _('prompt_auto_analyze').replace('{n}', '1');
+        document.getElementById('promptInput').value = _('prompt_auto_analyze_singular');
     } else {
-        document.getElementById('promptInput').value = _('prompt_auto_analyze').replace('{n}', selectedFiles.length);
+        document.getElementById('promptInput').value = _('prompt_auto_analyze_plural').replace('{n}', selectedFiles.length);
     }
 }
 
@@ -1762,7 +1763,9 @@ async function saveCurrentSession() {
             show_thinking: showThinking,
             lang: currentLLMLang,
             ui_lang: currentLang,
-            template: document.getElementById('templateSelect').value
+            template: document.getElementById('templateSelect').value,
+            decompose_model: currentDecomposeModel || undefined,
+            execute_model: currentModel || undefined
         })
     });
     const data = await response.json();
@@ -1802,7 +1805,9 @@ async function decompose() {
             files: filesData,
             template: document.getElementById('templateSelect').value,
             lang: currentLLMLang,
-            ui_lang: currentLang
+            ui_lang: currentLang,
+            decompose_model: currentDecomposeModel || undefined,
+            execute_model: currentModel || undefined
         })
     });
     const data = await response.json();

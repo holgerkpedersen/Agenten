@@ -159,12 +159,14 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "read_chunk",
-            "Indlæs en chunk af en stor fil. Kræver: chunk ('file_filnavn'), index (1..N). Læs ALLE chunks (1,2,3...) før du analyserer — filen er delt i flere chunks.",
+            "Indlæs en chunk af en stor fil. Kræver: chunk (filnavn eller 'file_filnavn'), index (1..N). Læs ALLE chunks (1,2,3...) før du analyserer — filen er delt i flere chunks.",
             ["chunk", "index"],
             lambda chunk, index=1: self._read_chunk(chunk, int(index))
         ))
 
     def _read_chunk(self, chunk, index):
+        if not chunk.startswith("file_"):
+            chunk = "file_" + chunk
         chunks = self.file_chunks.get(chunk)
         if not chunks:
             return {"success": False, "error": f"Ukendt chunk: {chunk}"}
@@ -194,6 +196,29 @@ class Agent:
             "push": ["git_push", "git_remote_status"],
             "pull request": ["github_create_pr", "git_remote_status", "git_diff", "git_log"],
         }
+    }
+
+    SECTION_INSTRUCTIONS = {
+        "resume": {
+            "Overblik": "Skriv afsnittet 'Overblik': beskriv filens formål, struktur og hovedindhold.",
+            "Nøglepunkter": "Skriv afsnittet 'Nøglepunkter': fremhæv de vigtigste tekniske detaljer, features og arkitektur.",
+            "Konklusion": "Skriv afsnittet 'Konklusion': vurder filens kvalitet, styrker og svagheder.",
+            "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå konkrete forbedringer og næste skridt.",
+        },
+        "kodeanalyse": {
+            "Formål": "Skriv afsnittet 'Formål': forklar hvad filen gør og dens rolle i projektet.",
+            "Imports og afhængigheder": "Skriv afsnittet 'Imports og afhængigheder': gennemgå filens imports og eksterne afhængigheder.",
+            "Arkitektur": "Skriv afsnittet 'Arkitektur': analysér filens struktur, klasser og funktioner.",
+            "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder kodens læsbarhed, vedligeholdbarhed og test coverage.",
+            "Sikkerhed": "Skriv afsnittet 'Sikkerhed': identificér potentielle sikkerhedsproblemer og sårbarheder.",
+        },
+        "diffanalyse": {
+            "Oversigt": "Skriv afsnittet 'Oversigt': beskriv hvad diff'en indeholder af ændringer.",
+            "Risikovurdering": "Skriv afsnittet 'Risikovurdering': vurder risikoen (høj/middel/lav) for hver ændret fil.",
+            "Brydende ændringer": "Skriv afsnittet 'Brydende ændringer': identificér breaking changes og bagudkompatibilitet.",
+            "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder ændringernes kvalitet og konsistens.",
+            "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå forbedringer til diff'en.",
+        },
     }
 
     def _get_templates(self):
@@ -702,8 +727,16 @@ class Agent:
 
         is_chunked = any(len(v) > 1 for v in self.file_chunks.values())
         chunk_hint = "\n\n⚠️ FILEN ER STOR OG DELT I CHUNKS. Brug read_chunk(chunk='file_FILNAVN', index=N) for at læse ALLE chunks før du analyserer.\n" if is_chunked else ""
-        task_context = f"\n\nKontekst / Context: {original_prompt}{chunk_hint}"
-        system_prompt = self.tool_registry.build_system_prompt(task_node.name + task_context)
+
+        section_instr = self.SECTION_INSTRUCTIONS.get(self.active_template, {}).get(task_node.name, "")
+        if section_instr:
+            task_prompt = f"{section_instr}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
+        else:
+            task_prompt = f"{task_node.name}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
+        system_prompt = self.tool_registry.build_system_prompt(task_prompt)
+        self._log("DEBUG", f"file_chunks keys: {list(self.file_chunks.keys())}", "")
+        self._log("DEBUG", f"original_prompt length: {len(original_prompt)}", f"starts with: {original_prompt[:100]}")
+        self._log("DEBUG", f"system_prompt length: {len(system_prompt)}", f"contains file content: {'###' in system_prompt}")
 
         tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
         user_guidance = t(K.TOOL_CONTINUATION, self.lang).format(
@@ -826,18 +859,18 @@ class Agent:
                 _truncate_messages()
                 continue
 
-            if i == 0 and parsed["type"] == "text" and not called_tools:
-                if "ERROR" not in response:
-                    text_fallback = response.strip()
-                    active = self.tool_registry.active_tools
-                    has_action_tools = active is None or bool(set(active) - {"read_chunk"})
-                    if not has_action_tools:
+            if i == 0 and not called_tools:
+                all_files_loaded = all(len(v) <= 1 for v in self.file_chunks.values()) if self.file_chunks else True
+                if all_files_loaded and parsed["type"] in ("text", "done"):
+                    text_fallback = response.strip() if parsed["type"] == "text" else parsed.get("result", response.strip())
+                    if text_fallback and "ERROR" not in text_fallback:
                         full_response = text_fallback
                         break
-                tool_for_msg = self.tool_registry.active_tools[0] if self.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, self.lang)
-                _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.FIRST_TOOL_REQUIRED, self.lang).format(tool=tool_for_msg)}")
-                _truncate_messages()
-                continue
+                if parsed["type"] == "text":
+                    tool_for_msg = self.tool_registry.active_tools[0] if self.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, self.lang)
+                    _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.FIRST_TOOL_REQUIRED, self.lang).format(tool=tool_for_msg)}")
+                    _truncate_messages()
+                    continue
 
             clean = response.strip() if "ERROR" not in response else ""
             if clean:

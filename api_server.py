@@ -263,6 +263,7 @@ def save_current_session():
         "ui_lang": data.get("ui_lang") or data.get("lang") or getattr(agent, 'lang', 'da'),
         "prompt_history": data.get("prompt_history", []),
         "file_context": data.get("file_context", ""),
+        "file_chunks": getattr(agent, 'file_chunks', None) or existing.get("file_chunks", {}),
         "created": existing.get("created", datetime.now().isoformat()),
         "learned_knowledge": existing.get("learned_knowledge", []),
         "decompose_model": data.get("decompose_model") or existing.get("decompose_model") or getattr(agent.decompose_llm, 'model', ''),
@@ -305,18 +306,27 @@ def get_lang(lang):
 
 @app.route("/api/models")
 def get_models():
-    models = agent.llm.list_models()
+    openai_models = agent.llm.list_models()
     loaded = model_manager.get_loaded_models()
-    loaded_llm = [k for k, v in loaded.items() if v['is_loaded']]
-    if len(loaded_llm) == 1:
-        only = loaded_llm[0]
-        if agent.llm.model not in models:
-            agent.llm.set_model(only)
-        if agent.decompose_llm.model not in models:
-            agent.decompose_llm.set_model(only)
+    rest_models = model_manager.get_all_rest_models()
+
+    all_ids = set(openai_models)
+    for m in rest_models:
+        all_ids.add(m['id'])
+    for k in loaded:
+        if loaded[k].get('is_loaded'):
+            all_ids.add(k)
+            for inst in loaded[k].get('loaded_instances', []):
+                all_ids.add(inst.get('id', ''))
+    merged = sorted(all_ids)
+
+    print(f'[models] Merged ({len(merged)}): {merged[:10]}{"..." if len(merged) > 10 else ""}')
+
     return jsonify({
-        "models": models,
+        "models": merged,
+        "openai_models": openai_models,
         "loaded": loaded,
+        "rest_models": rest_models,
         "current": agent.llm.model,
         "decompose_model": agent.decompose_llm.model,
     })

@@ -13,25 +13,37 @@ class SessionManager:
     def save_session(self, session_id, session_data):
         session_data["last_modified"] = datetime.now().isoformat()
         filepath = os.path.join(self.storage_dir, f"{session_id}.json")
-        with open(filepath, 'w', encoding='utf-8') as f:
+        tmppath = filepath + ".tmp"
+        with open(tmppath, 'w', encoding='utf-8') as f:
             json.dump(session_data, f, ensure_ascii=False, indent=2)
+        try:
+            os.replace(tmppath, filepath)
+        except PermissionError:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(session_data, f, ensure_ascii=False, indent=2)
+            os.unlink(tmppath)
         return session_id
     
-    def load_session(self, session_id):
+    def load_session(self, session_id, strict=True):
         filepath = os.path.join(self.storage_dir, f"{session_id}.json")
         if os.path.exists(filepath):
-            with open(filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                if strict:
+                    raise
         return None
     
     def list_sessions(self):
         sessions = []
         for filename in os.listdir(self.storage_dir):
-            if filename.endswith('.json'):
+            if filename.endswith('.json') and not filename.endswith('.tmp'):
                 session_id = filename[:-5]
                 filepath = os.path.join(self.storage_dir, filename)
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
                     sessions.append({
                         "id": session_id,
                         "name": data.get("name", session_id[:8]),
@@ -39,6 +51,8 @@ class SessionManager:
                         "last_modified": data.get("last_modified", ""),
                         "prompt_count": len(data.get("prompt_history", []))
                     })
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    pass
         return sorted(sessions, key=lambda x: x["last_modified"], reverse=True)
     
     def create_session(self, name):

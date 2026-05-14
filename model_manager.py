@@ -65,6 +65,38 @@ def get_available_models():
     return []
 
 
+def get_all_rest_models():
+    """Fetch ALL models (local + remote/LM Link) from LM Studio v1 REST API.
+    LM Link is transparent — remote models appear with same key as local ones.
+    Requests to localhost:1234 are automatically routed to the right device."""
+    try:
+        r = requests.get(f'{LM_STUDIO_API}/models', timeout=5)
+        if r.status_code == 200:
+            data = r.json()
+            models = []
+            for m in data.get('models', data.get('data', [])):
+                mtype = m.get('type', '')
+                if mtype and mtype != 'llm':
+                    continue
+                key = m.get('key', m.get('id', ''))
+                loaded_instances = m.get('loaded_instances', [])
+                models.append({
+                    'id': key,
+                    'display_name': m.get('display_name', key),
+                    'publisher': m.get('publisher', ''),
+                    'state': 'loaded' if loaded_instances else 'not-loaded',
+                    'is_loaded': len(loaded_instances) > 0,
+                    'loaded_instances': loaded_instances,
+                    'quantization': m.get('quantization', {}),
+                    'params_string': m.get('params_string', ''),
+                    'max_context_length': m.get('max_context_length', 0),
+                })
+            return models
+    except Exception as e:
+        print(f'[model_manager] Failed to fetch REST models: {e}')
+    return []
+
+
 def resolve_model_key(partial_name):
     """Fuzzy match a partial model name to a full key."""
     available = get_available_models()
