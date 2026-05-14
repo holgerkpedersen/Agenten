@@ -12,6 +12,14 @@ import time
 import os
 import json
 
+CHUNK_SIZE = 150000
+
+def chunk_text(text, size=CHUNK_SIZE):
+    chunks = []
+    for i in range(0, len(text), size):
+        chunks.append(text[i:i+size])
+    return chunks
+
 
 PR_REQUIRED_BEFORE_PR = {"git_add_all", "git_commit", "git_push"}
 PR_COMMIT_TOOLS = {"git_add_all", "git_commit"}
@@ -23,8 +31,8 @@ PR_GIT_TOOLS = {"git_diff", "git_log", "git_status", "git_current_branch", "git_
 
 class Agent:
     def __init__(self):
-        self.llm = LMStudioWrapper(timeout=120, model="qwen/qwen3.5-9b")
-        self.decompose_llm = LMStudioWrapper(timeout=120, model="qwen/qwen3.5-9b")
+        self.llm = LMStudioWrapper(timeout=600, model="qwen/qwen3.5-9b")
+        self.decompose_llm = LMStudioWrapper(timeout=600, model="qwen/qwen3.5-9b")
         self.searcher = WebSearcher()
         self.task_tree = None
         self.action_history = []
@@ -34,6 +42,7 @@ class Agent:
         self.full_prompt_with_context = ""
         self.show_thinking = True
         self.file_context = []
+        self.file_chunks = {}
         self.stop_requested = False
         self.lang = "da"
         self.active_template = None
@@ -148,13 +157,28 @@ class Agent:
             ["branch"],
             lambda branch: git_ops.git_checkout(branch=branch)
         ))
+        self.tool_registry.register(Tool(
+            "read_chunk",
+            "Indlæs en chunk af en stor fil. Kræver: chunk ('file_filnavn'), index (1..N). Læs ALLE chunks (1,2,3...) før du analyserer — filen er delt i flere chunks.",
+            ["chunk", "index"],
+            lambda chunk, index=1: self._read_chunk(chunk, int(index))
+        ))
+
+    def _read_chunk(self, chunk, index):
+        chunks = self.file_chunks.get(chunk)
+        if not chunks:
+            return {"success": False, "error": f"Ukendt chunk: {chunk}"}
+        if index < 1 or index > len(chunks):
+            return {"success": False, "error": f"Chunk {index} findes ikke (1..{len(chunks)})"}
+        return {"success": True, "chunk": chunk, "index": index, "total": len(chunks), "content": chunks[index-1]}
 
     TEMPLATE_TOOLS = {
-        "resume": [],
-        "kodeanalyse": [],
-        "diffanalyse": ["git_diff", "git_log"],
+        "resume": ["read_chunk"],
+        "kodeanalyse": ["read_chunk"],
+        "diffanalyse": ["read_chunk", "git_diff", "git_log"],
         "fri": None,
         "agenten": [
+            "read_chunk",
             "github_create_pr",
             "git_status", "git_add_all", "git_commit", "git_push",
             "git_diff", "git_log",
@@ -398,6 +422,7 @@ class Agent:
         self._log("INFO", t(K.LOG_DECOMPOSE_START, self.lang), f"{prompt[:100]} ({t('ui.using_template', self.lang).format(name=template_config['name'])})")
 
         self.file_context = files or []
+        self.file_chunks = {}
 
         file_context = ""
         if files and len(files) > 0:
@@ -405,7 +430,14 @@ class Agent:
             for f in files:
                 filename = f.get('filename', t(K.UNKNOWN, self.lang))
                 content = f.get('content', '')
-                file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
+                chunk_key = f"file_{filename}"
+                chunks = chunk_text(content)
+                self.file_chunks[chunk_key] = chunks
+                if len(chunks) <= 1:
+                    file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
+                else:
+                    file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
+                    file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(chunk='{chunk_key}', index=2..{len(chunks)})*\n"
             self._log("INFO", t(K.LOG_ADDING_FILES, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(files)))
         else:
             file_path, file_content = self._get_file_context(prompt)
@@ -668,7 +700,9 @@ class Agent:
         self._checkpoint_tools = set()
         self._checkpoint_branch = ""
 
-        task_context = f"\n\nKontekst / Context: {original_prompt}"
+        is_chunked = any(len(v) > 1 for v in self.file_chunks.values())
+        chunk_hint = "\n\n⚠️ FILEN ER STOR OG DELT I CHUNKS. Brug read_chunk(chunk='file_FILNAVN', index=N) for at læse ALLE chunks før du analyserer.\n" if is_chunked else ""
+        task_context = f"\n\nKontekst / Context: {original_prompt}{chunk_hint}"
         system_prompt = self.tool_registry.build_system_prompt(task_node.name + task_context)
 
         conversation = system_prompt
@@ -771,12 +805,21 @@ class Agent:
                 continue
 
             if i == 0 and parsed["type"] == "text" and not called_tools:
-                text_fallback = response.strip()
+                if "ERROR" not in response:
+                    text_fallback = response.strip()
+                    active = self.tool_registry.active_tools
+                    has_action_tools = active is None or bool(set(active) - {"read_chunk"})
+                    if not has_action_tools:
+                        full_response = text_fallback
+                        break
                 tool_for_msg = self.tool_registry.active_tools[0] if self.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, self.lang)
                 conversation += f"\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.FIRST_TOOL_REQUIRED, self.lang).format(tool=tool_for_msg)}"
                 conversation = self._truncate_conversation(conversation, system_prompt)
                 continue
 
+            clean = response.strip() if "ERROR" not in response else ""
+            if clean:
+                text_fallback = clean
             conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
             conversation = self._truncate_conversation(conversation, system_prompt)
             full_response = response
@@ -784,7 +827,7 @@ class Agent:
                 break
 
         if not full_response or "ERROR" in full_response:
-            if text_fallback:
+            if text_fallback and "ERROR" not in text_fallback:
                 full_response = text_fallback
                 task_node.status = "done"
             else:

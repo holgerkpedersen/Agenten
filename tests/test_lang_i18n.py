@@ -213,8 +213,8 @@ class TestLangStructure:
             for section in required:
                 assert section in lang.LANG[lang_code], f"{lang_code} missing '{section}'"
 
-    def test_errors_section_in_en_es_zh(self):
-        for lang_code in ["en", "es", "zh"]:
+    def test_errors_section_in_all_langs(self):
+        for lang_code in ["da", "en", "es", "zh"]:
             assert "errors" in lang.LANG[lang_code], f"{lang_code} missing 'errors'"
 
     def test_templates_all_four(self):

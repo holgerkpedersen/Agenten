@@ -43,7 +43,7 @@ class LMStudioWrapper:
                     "temperature": temperature,
                     "max_tokens": max_tokens
                 },
-                timeout=self.timeout
+                timeout=(30, self.timeout)
             )
             if response.status_code == 200:
                 result = response.json()["choices"][0]["text"].strip()
@@ -62,6 +62,7 @@ class LMStudioWrapper:
     def generate_stream(self, prompt, temperature=0.7, max_tokens=32000):
         compressed_prompt = " ".join(prompt.split())
         print("📡 Streaming request to LLM")
+        stream_timeout = 300
         try:
             response = requests.post(
                 f"{self.base_url}/completions",
@@ -72,7 +73,7 @@ class LMStudioWrapper:
                     "max_tokens": max_tokens,
                     "stream": True
                 },
-                timeout=self.timeout,
+                timeout=(30, stream_timeout),
                 stream=True
             )
             if response.status_code != 200:
@@ -94,7 +95,7 @@ class LMStudioWrapper:
                         print(f"Parse error: {e}")
                         continue
         except requests.exceptions.Timeout:
-            yield f"\n[ERROR: Timeout after {self.timeout}s]"
+            yield f"\n[ERROR: Timeout after {stream_timeout}s — ingen data i 30s]"
         except requests.exceptions.ConnectionError:
             yield f"\n[ERROR: Cannot connect to LM Studio at {self.base_url}]"
         except Exception as e:

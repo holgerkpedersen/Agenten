@@ -41,9 +41,9 @@ class TestAgentInit:
 
     def test_template_tools_mapping(self):
         agent = Agent()
-        assert agent.TEMPLATE_TOOLS["resume"] == []
-        assert agent.TEMPLATE_TOOLS["kodeanalyse"] == []
-        assert agent.TEMPLATE_TOOLS["diffanalyse"] == ["git_diff", "git_log"]
+        assert agent.TEMPLATE_TOOLS["resume"] == ["read_chunk"]
+        assert agent.TEMPLATE_TOOLS["kodeanalyse"] == ["read_chunk"]
+        assert agent.TEMPLATE_TOOLS["diffanalyse"] == ["read_chunk", "git_diff", "git_log"]
         assert agent.TEMPLATE_TOOLS["fri"] is None
 
 

@@ -433,6 +433,7 @@
                 <option value="resume">📄 Resumé</option>
                 <option value="kodeanalyse">🔍 Kodeanalyse</option>
                 <option value="diffanalyse">📊 Diff-analyse</option>
+                <option value="agenten">🔀 PR Agenten</option>
             </select>
             <label style="display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;padding:8px 12px;border-radius:6px;cursor:pointer;">
                 <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
@@ -454,6 +455,9 @@
                 <option value="es">🇪🇸 Español</option>
                 <option value="zh">🇨🇳 中文</option>
             </select>
+            <span class="toolbar-label" id="decomposeModelLabel">🌳 Decompose</span>
+            <select id="decomposeModelSelect" onchange="switchDecomposeModel(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;flex:1;"></select>
+            <span class="toolbar-label" id="executeModelLabel">⚡ Execute</span>
             <select id="modelSelect" onchange="switchModel(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;flex:1;"></select>
         </div>
         
@@ -488,27 +492,40 @@ window.AGENTEN_LANG = {};
 let currentLang = localStorage.getItem('agenten_lang') || 'da';
 let currentLLMLang = localStorage.getItem('agenten_llm_lang') || currentLang;
 let currentModel = localStorage.getItem('agenten_model') || '';
+let currentDecomposeModel = localStorage.getItem('agenten_decompose_model') || '';
 
 async function fetchModels() {
     try {
         const resp = await fetch('/api/models');
         const data = await resp.json();
-        const sel = document.getElementById('modelSelect');
-        sel.innerHTML = '';
-        for (const m of data.models) {
-            const opt = document.createElement('option');
-            opt.value = m; opt.textContent = m;
-            sel.appendChild(opt);
-        }
-        if (currentModel) sel.value = currentModel;
-        else if (data.current) { sel.value = data.current; currentModel = data.current; }
+        const populate = (selId, key) => {
+            const sel = document.getElementById(selId);
+            sel.innerHTML = '';
+            for (const m of data.models) {
+                const opt = document.createElement('option');
+                opt.value = m; opt.textContent = m;
+                sel.appendChild(opt);
+            }
+            if (key === 'execute' && currentModel) sel.value = currentModel;
+            else if (key === 'decompose' && currentDecomposeModel) sel.value = currentDecomposeModel;
+            else if (key === 'execute' && data.current) { sel.value = data.current; currentModel = data.current; }
+            else if (key === 'decompose' && data.decompose_model) { sel.value = data.decompose_model; currentDecomposeModel = data.decompose_model; }
+        };
+        populate('modelSelect', 'execute');
+        populate('decomposeModelSelect', 'decompose');
     } catch(e) { console.error('fetchModels', e); }
 }
 
 function switchModel(model) {
     currentModel = model;
     localStorage.setItem('agenten_model', model);
-    fetch('/api/models/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model}) });
+    fetch('/api/models/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model, type:'execute'}) });
+}
+
+function switchDecomposeModel(model) {
+    currentDecomposeModel = model;
+    localStorage.setItem('agenten_decompose_model', model);
+    fetch('/api/models/set', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model, type:'decompose'}) });
 }
 
 fetchModels();
@@ -713,6 +730,8 @@ function updateHtmlLabels() {
     if (e('sessionsLabel'))e('sessionsLabel').textContent   = _('sessions');
     if (e('templateLabel'))e('templateLabel').textContent   = _('template');
     if (e('llmLangLabel')) e('llmLangLabel').textContent    = _('llm_language');
+    if (e('decomposeModelLabel')) e('decomposeModelLabel').textContent = _('decompose_model');
+    if (e('executeModelLabel')) e('executeModelLabel').textContent = _('execute_model');
     if (e('filesLabel'))   e('filesLabel').textContent      = _('files');
     if (e('promptLabel'))  e('promptLabel').textContent     = _('prompt');
     if (e('filePathInput'))e('filePathInput').placeholder   = _('file_path_placeholder');
@@ -1527,6 +1546,9 @@ async function refreshSessions() {
                     select.appendChild(opt);
                 }
             }
+            if (currentSessionId) {
+                select.value = currentSessionId;
+            }
             console.log('Loaded', data.sessions.length, 'sessions');
         } else {
             console.log('Failed to load sessions:', data);
@@ -1799,6 +1821,7 @@ async function decompose() {
 }
 
 function stopStream() {
+    fetch('/api/stop', { method: 'POST' });
     if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -1918,7 +1941,9 @@ async function executeWithStream() {
                     }
                 }
                 currentOutputs[data.task] += data.chunk;
-                const clean = currentOutputs[data.task].replace(/<think>[\s\S]*?<\/think>/g, '');
+                let clean = currentOutputs[data.task];
+                clean = clean.replace(/<think>[\s\S]*?<\/think>/g, '');
+                clean = stripHarmony(clean);
                 if (showThinking) {
                     const outputId = `output-${escapeHtml(data.task).replace(/[^a-zA-Z0-9]/g, '_')}`;
                     const outputDiv = document.getElementById(outputId);
@@ -1939,7 +1964,7 @@ async function executeWithStream() {
                 if (taskElem) taskElem.innerHTML = `<span style="color:#10b981;">✓ ${escapeHtml(data.task)} færdig</span>`;
                 
                 if (!showThinking && llmBox) {
-                    const output = currentOutputs[data.task] || data.result || '';
+                    const output = stripHarmony(currentOutputs[data.task] || data.result || '');
                     const existing = llmBox.querySelector(`[data-task="${data.task}"]`);
                     if (existing) {
                         existing.innerHTML = `<strong style="color:#10b981;">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div>`;
@@ -1994,6 +2019,19 @@ async function executeWithStream() {
     eventSource.onerror = function() {
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
     };
+}
+
+function stripHarmony(text) {
+    if (!text) return text;
+    // Remove entire analysis channel blocks (private reasoning)
+    text = text.replace(/<\|channel\|>analysis<\|message\|>[\s\S]*?<\|end\|>/g, '');
+    // Remove entire commentary channel blocks (internal tool chatter)
+    text = text.replace(/<\|channel\|>commentary[^<]*<\|message\|>[\s\S]*?<\|end\|>/g, '');
+    // Remove all remaining Harmony format tokens: <|channel|>, <|message|>, <|start|>, <|end|>, <|return|>, <|call|>, <|constrain|>, <|"|>
+    text = text.replace(/<\|[^|]+\|>/g, '');
+    // Clean up excessive whitespace
+    text = text.replace(/\n{3,}/g, '\n\n').trim();
+    return text;
 }
 
 function generateTreeMarkdown(node, level = 0) {
@@ -2065,7 +2103,7 @@ let md = `${_('export_md_report_header')}\n\n`;
     md += `${_('export_md_llm')}\n\n`;
     const llmContent = document.getElementById('llmContent');
     if (llmContent && llmContent.innerText && llmContent.innerText !== 'Tryk "Udfør med streaming"' && llmContent.innerText !== _('click_stream_hint')) {
-        md += `\`\`\`\n${llmContent.innerText}\n\`\`\`\n\n`;
+        md += `\`\`\`\n${stripHarmony(llmContent.innerText)}\n\`\`\`\n\n`;
     } else {
         md += `${_('export_md_no_llm')}\n\n`;
     }
@@ -2224,7 +2262,7 @@ function downloadFromPreview() {
     let md = `${_('preview_title')}\n\n`;
     if (promptText) md += `## ${_('export_md_prompt').replace('## ','')}\n\n${promptText}\n\n`;
     if (treeContent && treeContent !== _('click_tree_hint')) md += `${_('export_md_tree')}\n\n${treeContent}\n\n`;
-    if (llmContent && llmContent !== _('click_stream_hint')) md += `${_('export_md_llm')}\n\n${llmContent}\n\n`;
+    if (llmContent && llmContent !== _('click_stream_hint')) md += `${_('export_md_llm')}\n\n${stripHarmony(llmContent)}\n\n`;
     
     if (loadedFilesContent.length > 0) {
         md += `${_('file_included_section')}\n\n`;

@@ -510,7 +510,8 @@ def decompose():
             "template": template,
             "lang": agent.lang,
             "ui_lang": ui_lang,
-            "file_context": files
+            "file_context": files,
+            "file_chunks": agent.file_chunks
         })
         session_manager.save_session(current_session_id, existing)
         session_manager.add_prompt_result(current_session_id, prompt, t(K.LOG_DECOMPOSED, agent.lang), tree)
@@ -545,6 +546,8 @@ def execute_stream():
             if session_data.get("lang"):
                 agent.lang = session_data["lang"]
                 agent.tool_registry.lang = agent.lang
+            if session_data.get("file_chunks"):
+                agent.file_chunks = session_data["file_chunks"]
             if session_data.get("template"):
                 agent.active_template = session_data["template"]
                 allowed = agent.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent.TEMPLATE_TOOLS else None
@@ -582,6 +585,13 @@ def execute_stream():
         original_prompt = getattr(agent, 'full_prompt_with_context', '') or agent.original_prompt
         show_thinking = getattr(agent, 'show_thinking', True)
         yield f"data: {json.dumps({'type': 'context', 'original_prompt': original_prompt, 'show_thinking': show_thinking})}\n\n"
+
+        def _check_client():
+            return agent.stop_requested
+
+        # Truncate context for subtask prompts
+        MAX_CTX = 150000
+        task_context_prompt = original_prompt[:MAX_CTX] + ("\n\n[... trunkeret — brug read_chunk() for at læse flere chunks ...]" if len(original_prompt) > MAX_CTX else "")
         
         for log in agent.agent_log[-10:]:
             yield f"data: {json.dumps({'type': 'log', 'log': log})}\n\n"
@@ -598,17 +608,23 @@ def execute_stream():
         
         def execute_with_stream(node):
             nonlocal completed
+            if _check_client():
+                return
             yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
             
             child_results = []
             for child in node.children:
+                if _check_client():
+                    return
                 yield from execute_with_stream(child)
                 if child.result:
                     child_results.append(f"- {child.name}: {child.result}")
             
             node.status = "running"
             full_response = ""
-            for event in agent.solve_task_stream(node, original_prompt):
+            for event in agent.solve_task_stream(node, task_context_prompt):
+                if _check_client():
+                    return
                 if event["type"] == "chunk":
                     full_response += event["chunk"]
                     if show_thinking:
@@ -623,6 +639,8 @@ def execute_stream():
                 full_response = t(K.UI_TASK_RESULT_PREFIX, _ui) + ": " + node.name
             node.status = "done"
             node.result = full_response
+            if _check_client():
+                return
             completed += 1
             progress = int((completed / total_tasks) * 100)
             yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
@@ -634,6 +652,9 @@ def execute_stream():
                 session_manager.add_prompt_result(current_session_id, node.name, full_response[:500], None)
         
         try:
+            if _check_client():
+                yield f"data: {json.dumps({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui)})}\n\n"
+                return
             yield from execute_with_stream(agent.task_tree.root)
             existing = session_manager.load_session(current_session_id) or {}
             existing.update({
