@@ -36,6 +36,7 @@ class Agent:
         self.file_context = []
         self.stop_requested = False
         self.lang = "da"
+        self.active_template = None
         self.max_tokens = 4096
         self.max_conversation_chars = 8000
         self.tool_registry = ToolRegistry()
@@ -667,10 +668,12 @@ class Agent:
         self._checkpoint_tools = set()
         self._checkpoint_branch = ""
 
-        system_prompt = self.tool_registry.build_system_prompt(task_node.name)
+        task_context = f"\n\nKontekst / Context: {original_prompt}"
+        system_prompt = self.tool_registry.build_system_prompt(task_node.name + task_context)
 
         conversation = system_prompt
         full_response = ""
+        text_fallback = ""
         max_iterations = 15 if self._is_pr_workflow(task_node.name) else 5
         called_tools = {}
 
@@ -767,7 +770,8 @@ class Agent:
                 conversation = self._truncate_conversation(conversation, system_prompt)
                 continue
 
-            if i == 0 and not called_tools and parsed["type"] != "done":
+            if i == 0 and parsed["type"] == "text" and not called_tools:
+                text_fallback = response.strip()
                 tool_for_msg = self.tool_registry.active_tools[0] if self.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, self.lang)
                 conversation += f"\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.FIRST_TOOL_REQUIRED, self.lang).format(tool=tool_for_msg)}"
                 conversation = self._truncate_conversation(conversation, system_prompt)
@@ -780,8 +784,12 @@ class Agent:
                 break
 
         if not full_response or "ERROR" in full_response:
-            full_response = t(K.LOG_TASK_FAILED, self.lang)
-            task_node.status = "failed"
+            if text_fallback:
+                full_response = text_fallback
+                task_node.status = "done"
+            else:
+                full_response = t(K.LOG_TASK_FAILED, self.lang)
+                task_node.status = "failed"
         else:
             task_node.status = "done"
 

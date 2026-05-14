@@ -74,6 +74,7 @@ class K(StrEnum):
     TOOL_BLOCKED        = "tool_blocked"
     TOOL_DUPLICATE      = "tool_duplicate"
     TOOL_DUPLICATE_MSG  = "tool_duplicate_msg"
+    FIRST_TOOL_REQUIRED = "first_tool_required"
 
     # === System prompt fragments ===
     SYS_EXAMPLE_PREFIX  = "sys_example_prefix"

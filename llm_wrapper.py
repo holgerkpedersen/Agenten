@@ -66,6 +66,7 @@ class LMStudioWrapper:
             response = requests.post(
                 f"{self.base_url}/completions",
                 json={
+                    "model": self.model,
                     "prompt": compressed_prompt,
                     "temperature": temperature,
                     "max_tokens": max_tokens,

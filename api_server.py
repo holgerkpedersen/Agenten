@@ -326,6 +326,11 @@ def set_model():
         agent.decompose_llm.set_model(model)
     else:
         agent.llm.set_model(model)
+    if current_session_id:
+        existing = session_manager.load_session(current_session_id) or {}
+        existing["decompose_model"] = agent.decompose_llm.model
+        existing["execute_model"] = agent.llm.model
+        session_manager.save_session(current_session_id, existing)
     return jsonify({"success": True, "model": model, "type": dtype})
 
 @app.route("/api/models/loaded")
@@ -541,8 +546,13 @@ def execute_stream():
                 agent.lang = session_data["lang"]
                 agent.tool_registry.lang = agent.lang
             if session_data.get("template"):
+                agent.active_template = session_data["template"]
                 allowed = agent.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent.TEMPLATE_TOOLS else None
                 agent.tool_registry.set_active_tools(allowed)
+            if session_data.get("decompose_model"):
+                agent.decompose_llm.set_model(session_data["decompose_model"])
+            if session_data.get("execute_model"):
+                agent.llm.set_model(session_data["execute_model"])
             
             fpc = session_data.get("full_prompt_with_context", "")
             if not fpc:
@@ -633,7 +643,8 @@ def execute_stream():
                 "original_prompt": agent.original_prompt or (agent.task_tree.root.name if agent.task_tree else ""),
                 "prompt_history": existing.get("prompt_history", []),
                 "lang": agent.lang,
-                "ui_lang": ui_lang
+                "ui_lang": ui_lang,
+                "template": agent.active_template
             })
             if current_session_id:
                 session_manager.save_session(current_session_id, existing)
@@ -644,6 +655,7 @@ def execute_stream():
             existing["execution_log"] = agent.execution_log
             existing["agent_log"] = agent.agent_log
             existing["lang"] = agent.lang
+            existing["template"] = agent.active_template
             if current_session_id:
                 session_manager.save_session(current_session_id, existing)
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
