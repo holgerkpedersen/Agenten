@@ -705,26 +705,43 @@ class Agent:
         task_context = f"\n\nKontekst / Context: {original_prompt}{chunk_hint}"
         system_prompt = self.tool_registry.build_system_prompt(task_node.name + task_context)
 
-        conversation = system_prompt
+        tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
+        user_guidance = t(K.TOOL_CONTINUATION, self.lang).format(
+            tools_list=tools_list,
+            TOOL_MARKER=self.tool_registry.TOOL_MARKER,
+            DONE_MARKER=self.tool_registry.DONE_MARKER
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_guidance}
+        ]
         full_response = ""
         text_fallback = ""
         max_iterations = 15 if self._is_pr_workflow(task_node.name) else 5
         called_tools = {}
 
+        def _add_user_msg(content):
+            nonlocal messages
+            messages.append({"role": "user", "content": content})
+
+        def _truncate_messages():
+            nonlocal messages
+            total = sum(len(m["content"]) for m in messages)
+            if total > self.max_conversation_chars and len(messages) > 3:
+                mid = "\n[... tidligere kontekst afkortet ...]"
+                keep = self.max_conversation_chars - len(messages[0]["content"]) - len(messages[1]["content"]) - len(mid)
+                if keep > 0:
+                    tail_content = messages[-1]["content"]
+                    cropped = tail_content[-keep:] if len(tail_content) > keep else tail_content
+                    messages = messages[:2] + [{"role": "user", "content": mid + cropped}]
+
         for i in range(max_iterations):
             if self.stop_requested:
                 break
-            prompt = conversation
-            if i == 0:
-                tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
-                prompt += f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
-                    tools_list=tools_list,
-                    TOOL_MARKER=self.tool_registry.TOOL_MARKER,
-                    DONE_MARKER=self.tool_registry.DONE_MARKER
-                )
 
             response = ""
-            for chunk in self.llm.generate_stream(prompt, temperature=0.3, max_tokens=self.max_tokens):
+            for chunk in self.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=self.max_tokens):
                 if self.stop_requested:
                     break
                 response += chunk
@@ -733,6 +750,8 @@ class Agent:
             if self.stop_requested:
                 break
 
+            messages.append({"role": "assistant", "content": response})
+
             parsed = self.tool_registry.parse_response(response)
             self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
 
@@ -740,15 +759,15 @@ class Agent:
                 tool_key = parsed['tool'] + str(parsed.get('args', {}))
                 dup_count = called_tools.get(tool_key, 0)
                 called_tools[tool_key] = dup_count + 1
-                
+
                 if dup_count >= 2:
-                    conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: Du har allerede dette resultat. Gå videre eller brug <<<DONE>>>."
-                    conversation = self._truncate_conversation(conversation, system_prompt)
+                    _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: Du har allerede dette resultat. Gå videre eller brug <<<DONE>>>.")
+                    _truncate_messages()
                     continue
-                
+
                 if dup_count == 1:
                     self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
-                
+
                 self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
                 result = self.tool_registry.execute(parsed["tool"], parsed["args"])
                 result_str = json.dumps(result, ensure_ascii=False)
@@ -758,50 +777,53 @@ class Agent:
 
                 checkpoint_msg = self._verify_pr_step(parsed["tool"], result, task_node.name, original_prompt)
                 if checkpoint_msg:
-                    conversation += f"\n\n!!! CHECKPOINT - {checkpoint_msg}"
+                    _add_user_msg(f"!!! CHECKPOINT - {checkpoint_msg}")
                     self._log("INFO", "CHECKPOINT", checkpoint_msg)
                     yield {"type": "checkpoint", "message": checkpoint_msg, "tool": parsed["tool"]}
                 else:
                     self._checkpoint_tools.add(parsed["tool"] + str(parsed.get("args", {})))
-                    conversation += f"\n\n" + t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool']) + f"\n{result_str}"
+                    _add_user_msg(f"{t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool'])}\n{result_str}")
 
-                conversation = self._truncate_conversation(conversation, system_prompt)
+                _truncate_messages()
                 continue
 
             if parsed["type"] == "done":
                 if self._is_pr_workflow(task_node.name) and not called_tools:
-                    conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: Du kaldte <<<DONE>>> uden at bruge nogen værktøjer. Brug værktøjerne først."
-                    conversation = self._truncate_conversation(conversation, system_prompt)
+                    _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: Du kaldte <<<DONE>>> uden at bruge nogen værktøjer. Brug værktøjerne først.")
+                    _truncate_messages()
                     continue
 
                 if self._is_pr_workflow(task_node.name):
                     called_names = {t.split("{")[0] for t in self._checkpoint_tools}
                     if "github_create_pr" not in called_names:
-                        conversation += f"\n\n!!! CHECKPOINT - {t(K.CP_PR_FAILED, self.lang)}"
+                        msg = f"!!! CHECKPOINT - {t(K.CP_PR_FAILED, self.lang)}"
+                        _add_user_msg(msg)
                         self._log("INFO", "CHECKPOINT", t(K.CP_PR_FAILED, self.lang))
                         yield {"type": "checkpoint", "message": t(K.CP_PR_FAILED, self.lang), "tool": "done"}
-                        conversation = self._truncate_conversation(conversation, system_prompt)
+                        _truncate_messages()
                         continue
                     missing_commit = PR_COMMIT_TOOLS - called_names
                     if missing_commit:
-                        conversation += f"\n\n!!! CHECKPOINT - {t(K.CP_NO_COMMIT, self.lang)}"
+                        msg = f"!!! CHECKPOINT - {t(K.CP_NO_COMMIT, self.lang)}"
+                        _add_user_msg(msg)
                         self._log("INFO", "CHECKPOINT", t(K.CP_NO_COMMIT, self.lang))
                         yield {"type": "checkpoint", "message": t(K.CP_NO_COMMIT, self.lang), "tool": "done"}
-                        conversation = self._truncate_conversation(conversation, system_prompt)
+                        _truncate_messages()
                         continue
                     if "git_push" not in called_names:
-                        conversation += f"\n\n!!! CHECKPOINT - {t(K.CP_NO_PUSH, self.lang)}"
+                        msg = f"!!! CHECKPOINT - {t(K.CP_NO_PUSH, self.lang)}"
+                        _add_user_msg(msg)
                         self._log("INFO", "CHECKPOINT", t(K.CP_NO_PUSH, self.lang))
                         yield {"type": "checkpoint", "message": t(K.CP_NO_PUSH, self.lang), "tool": "done"}
-                        conversation = self._truncate_conversation(conversation, system_prompt)
+                        _truncate_messages()
                         continue
 
                 full_response = parsed["result"]
                 break
 
             if parsed["type"] == "error":
-                conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}"
-                conversation = self._truncate_conversation(conversation, system_prompt)
+                _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}")
+                _truncate_messages()
                 continue
 
             if i == 0 and parsed["type"] == "text" and not called_tools:
@@ -813,15 +835,15 @@ class Agent:
                         full_response = text_fallback
                         break
                 tool_for_msg = self.tool_registry.active_tools[0] if self.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, self.lang)
-                conversation += f"\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.FIRST_TOOL_REQUIRED, self.lang).format(tool=tool_for_msg)}"
-                conversation = self._truncate_conversation(conversation, system_prompt)
+                _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.FIRST_TOOL_REQUIRED, self.lang).format(tool=tool_for_msg)}")
+                _truncate_messages()
                 continue
 
             clean = response.strip() if "ERROR" not in response else ""
             if clean:
                 text_fallback = clean
-            conversation += f"\n\n" + t(K.TOOL_NO_RESULT, self.lang)
-            conversation = self._truncate_conversation(conversation, system_prompt)
+            _add_user_msg(t(K.TOOL_NO_RESULT, self.lang))
+            _truncate_messages()
             full_response = response
             if i >= 3:
                 break

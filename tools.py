@@ -63,12 +63,10 @@ class ToolRegistry:
 
     def parse_response(self, response):
         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|channel\|>analysis<\|message\|>.*?<\|end\|>', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|channel\|>commentary.*?<\|end\|>', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|channel>.*?<\|channel>', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|channel\|>.*$', '', response, flags=re.MULTILINE)
-        response = re.sub(r'<\|[^|]+\|>', '', response)
-        response = re.sub(r'<\|channel>', '', response)
+        response = re.sub(r'<\|channel\|>.*?<\|end\|>', '', response, flags=re.DOTALL)
+        response = re.sub(r'<\|channel>.*?<\|end>', '', response, flags=re.DOTALL)
+        response = re.sub(r'<\|[^|]*\|>', '', response)
+        response = re.sub(r'<\|[^|]*>', '', response)
         response = re.sub(r'```\w*\n?', '', response)
         response = re.sub(r'```', '', response)
 

@@ -10,7 +10,8 @@ cp .env.example .env   # Rediger .env med din GitHub token
 python api_server.py   # Åbn http://localhost:5000
 ```
 
-**Krav:** [LM Studio](https://lmstudio.ai) kørende på `localhost:1234` med en kompatibel model (Qwen3, Llama, DeepSeek).
+**Krav:** [LM Studio](https://lmstudio.ai) kørende på `localhost:1234` med en kompatibel model (Qwen3, Llama, DeepSeek).  
+**Bemærk:** Agenten bruger `/v1/chat/completions` (chat-format) — modellen skal understøtte dette.
 
 ## 📁 Projektstruktur
 
@@ -37,6 +38,8 @@ Vælg skabelon i dropdown før nedbrydning — LLM får fastlagte sektioner:
 | 🌳 **Fri nedbrydning** | LLM bestemmer opgavetræet dynamisk |
 | 📄 **Resumé** | Overblik → Nøglepunkter → Konklusion → Anbefalinger |
 | 🔍 **Kodeanalyse** | Formål → Imports → Arkitektur → Kodekvalitet → Sikkerhed |
+| 📊 **Diff-analyse** | Git log + diff → Risikovurdering → Anbefalinger |
+| 🔀 **PR Agenten** | Branch → Commit → Push → Pull Request (automatiseret PR workflow) |
 
 ## 🔧 Værktøjer
 
@@ -54,6 +57,14 @@ Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører:
 | `git_push` | Push til remote |
 | `git_set_remote` | Sæt remote origin URL |
 | `git_remote_status` | Tjek remote konfiguration |
+| `git_diff` | Vis ændringer mellem commits |
+| `git_log` | Vis seneste commits |
+| `git_create_branch` | Opret ny branch |
+| `git_current_branch` | Vis aktiv branch |
+| `git_branch_list` | List alle branches |
+| `git_pull` | Hent ændringer fra remote |
+| `git_checkout` | Skift til branch |
+| `read_chunk` | Læs en chunk af en stor fil |
 
 ## 🔐 Sikkerhed — Best Practices
 
@@ -74,6 +85,9 @@ Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører:
 3. Start server på `http://localhost:1234`
 4. Sæt context length til mindst 8192
 
+**Bemærk:** Agenten bruger `/v1/chat/completions` endpointet (chat-format med `messages` array).  
+Sørg for at LM Studio serveren kører med OpenAI-kompatibel API aktiveret.
+
 **Model-valg**: Qwen3 er optimeret til agentic tasks og tool-calling. Mindre modeller fungerer også til simple opgaver.
 
 ## 🏗️ Arkitektur
@@ -89,17 +103,21 @@ Flask API (api_server.py)
     └── sessions/ (JSON persistence)
 ```
 
-**Tool-loop**: `solve_task_stream` → LLM → parse response → hvis TOOL: executér → feed resultat → LLM → ... → DONE
+**Tool-loop**: `solve_task_stream` → LLM (`/v1/chat/completions` med system/user/assistant messages) → parse response → hvis TOOL: executér → feed resultat som user-message → LLM → ... → `<<<DONE>>>`
+
+**PR Workflow**: PR Agenten-skabelonen aktiverer checkpoint-validering — LLM'en tvinges til at branch → commit → push → PR i korrekt rækkefølge. Hvis et trin mangler, afvises `<<<DONE>>>` med en checkpoint-fejl.
 
 ## 📝 Features
 
 - **Sessions**: Gem/indlæs/omdøb — persistent JSON storage
-- **Filanalyse**: Upload filer — LLM får fuld filkontekst
-- **Streaming**: Real-time SSE output med thinking-toggle
+- **Filanalyse**: Upload filer — LLM får fuld filkontekst (store filer deles automatisk i chunks)
+- **Streaming**: Real-time SSE output med thinking-toggle og chat-formatering (`/v1/chat/completions`)
 - **Resultatkaskade**: Forældre-noder modtager børns resultater
 - **Drag/resize paneler**: Frit layout med maximize/minimize/close
 - **Markdown eksport**: Preview + download af session rapporter
 - **Skabeloner**: Fastlagte sektioner — LLM bestemmer IKKE layout
+- **PR Workflow**: Automatiseret branch → commit → push → PR med checkpoint-validering
+- **Multi-sprog**: UI og LLM-instruktioner på dansk, engelsk, spansk og kinesisk
 
 ## 📋 Requirements
 
@@ -113,6 +131,15 @@ python-dotenv==1.2.2
 ```
 
 ## 🔄 Git workflow
+
+Brug **🔀 PR Agenten** skabelonen til automatiseret PR-flow:
+
+1. Vælg "🔀 PR Agenten" i dropdown
+2. Indtast f.eks. "Opret branch 'ny-feature', commit ændringer, push og opret PR til master"
+3. Agenten udfører automatisk: branch → commit → push → PR
+4. Checkpoint-system sikrer korrekt rækkefølge — LLM tvinges til at fuldføre hvert trin
+
+Manuelle git-kommandoer understøttes også via værktøjerne:
 
 ```bash
 git add -A

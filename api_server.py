@@ -579,8 +579,14 @@ def execute_stream():
     def generate():
         _ui = ui_lang  # capture in closure
         if agent.task_tree is None:
-            yield f"data: {json.dumps({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, _ui)})}\n\n"
-            return
+            if current_session_id:
+                session_data = session_manager.load_session(current_session_id)
+                if session_data and session_data.get("tree"):
+                    agent.task_tree_from_dict(session_data["tree"])
+                    print("Tree restored from session in generate()")
+            if agent.task_tree is None:
+                yield f"data: {json.dumps({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, _ui)})}\n\n"
+                return
         
         original_prompt = getattr(agent, 'full_prompt_with_context', '') or agent.original_prompt
         show_thinking = getattr(agent, 'show_thinking', True)
