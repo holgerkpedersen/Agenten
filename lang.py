@@ -49,6 +49,13 @@ Opgave: {prompt}""",
             "implement_solution": "Implementer løsningen",
             "test_validate": "Test og valider",
         },
+        "checkpoint": {
+            "no_commit": "⚠️ Du skal commit'e før du opretter PR. Kald git_add_all og git_commit først.",
+            "no_push": "⚠️ Du skal pushe før du opretter PR. Kald git_push først.",
+            "pr_failed": "⚠️ PR kunne ikke oprettes. Tjek at branch findes og er pushet.",
+            "branch_name": "⚠️ Branch-navn mismatch: oprettede '{actual}', forventede '{expected}'. Brug git_checkout(branch='{expected}') i stedet.",
+            "tool_failed": "⚠️ Værktøj '{tool}' fejlede: {error}",
+        },
         "tools": {
             "github_create_repo": "Opret nyt GitHub repo. Kræver: repo_navn (fx 'Agenten'), beskrivelse",
             "github_list_repos": "List alle dine GitHub repositories",
@@ -328,7 +335,7 @@ Opgave: {prompt}""",
         },
     },
 
-    "en": {
+        "en": {
         "language": "English",
         "language_code": "en",
         "answer_in": "Answer in English",
@@ -375,6 +382,13 @@ Task: {prompt}""",
             "find_strategy": "Find solution strategy",
             "implement_solution": "Implement solution",
             "test_validate": "Test and validate",
+        },
+        "checkpoint": {
+            "no_commit": "⚠️ You must commit before creating PR. Call git_add_all and git_commit first.",
+            "no_push": "⚠️ You must push before creating PR. Call git_push first.",
+            "pr_failed": "⚠️ PR could not be created. Check that the branch exists and is pushed.",
+            "branch_name": "⚠️ Branch name mismatch: created '{actual}', expected '{expected}'. Use git_checkout(branch='{expected}') instead.",
+            "tool_failed": "⚠️ Tool '{tool}' failed: {error}",
         },
         "tools": {
             "github_create_repo": "Create new GitHub repo. Requires: repo_name (e.g. 'Agenten'), description",
@@ -654,7 +668,7 @@ Task: {prompt}""",
         },
     },
 
-    "es": {
+        "es": {
         "language": "Español",
         "language_code": "es",
         "answer_in": "Responde en español",
@@ -701,6 +715,13 @@ Tarea: {prompt}""",
             "find_strategy": "Encontrar estrategia de solución",
             "implement_solution": "Implementar solución",
             "test_validate": "Probar y validar",
+        },
+        "checkpoint": {
+            "no_commit": "⚠️ Debes hacer commit antes de crear PR. Llama a git_add_all y git_commit primero.",
+            "no_push": "⚠️ Debes hacer push antes de crear PR. Llama a git_push primero.",
+            "pr_failed": "⚠️ No se pudo crear la PR. Verifica que la rama exista y esté subida.",
+            "branch_name": "⚠️ Nombre de rama incorrecto: creaste '{actual}', se esperaba '{expected}'. Usa git_checkout(branch='{expected}') en su lugar.",
+            "tool_failed": "⚠️ La herramienta '{tool}' falló: {error}",
         },
         "tools": {
             "github_create_repo": "Crear nuevo repo GitHub. Requiere: repo_navn (ej. 'Agenten'), descripción",
@@ -980,7 +1001,7 @@ Tarea: {prompt}""",
         },
     },
 
-    "zh": {
+        "zh": {
         "language": "中文",
         "language_code": "zh",
         "answer_in": "用中文回答",
@@ -1027,6 +1048,13 @@ Tarea: {prompt}""",
             "find_strategy": "寻找解决方案",
             "implement_solution": "实施解决方案",
             "test_validate": "测试和验证",
+        },
+        "checkpoint": {
+            "no_commit": "⚠️ 创建PR前必须先提交。请先调用 git_add_all 和 git_commit。",
+            "no_push": "⚠️ 创建PR前必须先推送。请先调用 git_push。",
+            "pr_failed": "⚠️ PR创建失败。请检查分支是否存在并已推送。",
+            "branch_name": "⚠️ 分支名称不匹配：创建了 '{actual}'，期望 '{expected}'。请改用 git_checkout(branch='{expected}')。",
+            "tool_failed": "⚠️ 工具 '{tool}' 失败：{error}",
         },
         "tools": {
             "github_create_repo": "创建新的GitHub仓库。需要：repo_navn、描述",

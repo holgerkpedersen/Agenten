@@ -62,3 +62,23 @@ def git_diff(older="HEAD~1", newer="HEAD", max_chars=8000):
 
 def git_log(count=10):
     return _run_git(["log", f"-{count}", "--oneline", "--decorate"])
+
+
+def git_create_branch(name, path="."):
+    return _run_git(["checkout", "-b", name], cwd=path)
+
+
+def git_current_branch(path="."):
+    return _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=path)
+
+
+def git_branch_list(path="."):
+    return _run_git(["branch"], cwd=path)
+
+
+def git_pull(remote="origin", branch="master", path="."):
+    return _run_git(["pull", remote, branch], cwd=path)
+
+
+def git_checkout(branch, path="."):
+    return _run_git(["checkout", branch], cwd=path)

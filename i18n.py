@@ -61,6 +61,13 @@ class K(StrEnum):
     TOOL_GIT_PULL            = "tools.git_pull"
     TOOL_GIT_CHECKOUT        = "tools.git_checkout"
 
+    # === Checkpoint messages (PR workflow) ===
+    CP_NO_COMMIT    = "checkpoint.no_commit"
+    CP_NO_PUSH      = "checkpoint.no_push"
+    CP_PR_FAILED    = "checkpoint.pr_failed"
+    CP_BRANCH_NAME  = "checkpoint.branch_name"
+    CP_TOOL_FAILED  = "checkpoint.tool_failed"
+
     # === Tool system prompt ===
     TOOL_SYSTEM_PROMPT  = "tool_system_prompt"
 
