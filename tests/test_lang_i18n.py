@@ -67,6 +67,11 @@ class TestKEnum:
             K.TOOL_GIT_REMOTE_STATUS,
             K.TOOL_GIT_DIFF,
             K.TOOL_GIT_LOG,
+            K.TOOL_GIT_CREATE_BRANCH,
+            K.TOOL_GIT_CURRENT_BRANCH,
+            K.TOOL_GIT_BRANCH_LIST,
+            K.TOOL_GIT_PULL,
+            K.TOOL_GIT_CHECKOUT,
         ]
         for k in tools:
             assert k.value.startswith("tools.")
@@ -219,14 +224,20 @@ class TestLangStructure:
             assert "kodeanalyse" in tpls
             assert "diffanalyse" in tpls
             assert "fri" in tpls
+            assert "agenten" in tpls, f"{lang_code} missing template 'agenten'"
 
     def test_tool_descriptions_all_four_langs(self):
         for lang_code in ["da", "en", "es", "zh"]:
             tools = lang.LANG[lang_code]["tools"]
-            assert len(tools) >= 12
+            assert len(tools) >= 17
             assert "github_create_repo" in tools
             assert "git_status" in tools
             assert "git_log" in tools
+            assert "git_create_branch" in tools, f"{lang_code} missing git_create_branch"
+            assert "git_checkout" in tools, f"{lang_code} missing git_checkout"
+            assert "git_current_branch" in tools, f"{lang_code} missing git_current_branch"
+            assert "git_branch_list" in tools, f"{lang_code} missing git_branch_list"
+            assert "git_pull" in tools, f"{lang_code} missing git_pull"
 
     def test_sys_error_prefix_all_langs(self):
         for lang_code in ["da", "en", "es", "zh"]:
@@ -251,6 +262,28 @@ class TestLangStructure:
         ui_counts = {lc: len(lang.LANG[lc]["ui"]) for lc in ["da", "en", "es", "zh"]}
         counts = list(ui_counts.values())
         assert max(counts) - min(counts) < 30
+
+    def test_agenten_template_in_all_langs(self):
+        for lc in ["da", "en", "es", "zh"]:
+            tpls = lang.LANG[lc]["template_prompts"]
+            assert "agenten" in tpls, f"{lc} missing agenten prompt"
+            assert isinstance(tpls["agenten"], str)
+            assert len(tpls["agenten"]) > 20
+
+    def test_agenten_fallback_in_all_langs(self):
+        for lc in ["da", "en", "es", "zh"]:
+            fallbacks = lang.LANG[lc]["template_fallback"]
+            assert "agenten" in fallbacks, f"{lc} missing agenten fallback"
+            assert isinstance(fallbacks["agenten"], list)
+            assert len(fallbacks["agenten"]) == 4, f"{lc} agenten fallback should have 4 steps, got {len(fallbacks['agenten'])}"
+
+    def test_K_agenten_template_keys(self):
+        assert K.T_AGENTEN == "templates.agenten"
+        assert K.TP_AGENTEN == "template_prompts.agenten"
+        assert K.TF_AGENTEN == "template_fallback.agenten"
+        assert K.T_AGENTEN in K
+        assert K.TP_AGENTEN in K
+        assert K.TF_AGENTEN in K
 
 
 class TestGetUiTranslations:

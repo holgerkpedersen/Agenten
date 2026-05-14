@@ -143,3 +143,127 @@ class TestAgentStatus:
         assert "total_actions" in status
         assert "log_entries" in status
         assert "has_task_tree" in status
+
+
+class TestExtractBranchName:
+    def test_prefers_original_prompt_over_task_name(self):
+        agent = Agent()
+        result = agent._extract_branch_name(
+            "1. Opret branch og verificer",
+            "Opret en ny branch 'test-ny-branch8', commit ændringerne, og opret PR til master"
+        )
+        assert result == "test-ny-branch8", f"Expected test-ny-branch8, got '{result}'"
+
+    def test_falls_back_to_task_name(self):
+        agent = Agent()
+        result = agent._extract_branch_name(
+            "Opret branch main-feature og verificer",
+            "Nothing to decompose here"
+        )
+        assert result == "main-feature"
+
+    def test_returns_empty_if_no_branch_found(self):
+        agent = Agent()
+        result = agent._extract_branch_name("Just a task name", "Decompose this without referencing any git")
+        assert result == ""
+
+    def test_ignores_opret_substring_in_task_name(self):
+        agent = Agent()
+        result = agent._extract_branch_name(
+            "1. Opret branch og verificer",
+            "Create branch 'test-feature', commit and push"
+        )
+        assert result == "test-feature", f"Should find from original_prompt, not 'og' from task name"
+
+
+class TestIsPrWorkflow:
+    def test_matches_real_pr_in_text(self):
+        agent = Agent()
+        assert agent._is_pr_workflow("Opret en ny branch og opret PR til master") is True
+        assert agent._is_pr_workflow("Create PR for feature") is True
+        assert agent._is_pr_workflow("Opret Pull Request") is True
+
+    def test_does_not_match_opret_substring(self):
+        agent = Agent()
+        assert agent._is_pr_workflow("1. Opret branch og verificer") is False
+        assert agent._is_pr_workflow("2. Stage og commit ændringer") is False
+        assert agent._is_pr_workflow("3. Push til remote") is False
+
+    def test_does_not_match_unrelated_tasks(self):
+        agent = Agent()
+        assert agent._is_pr_workflow("Analyse kode") is False
+        assert agent._is_pr_workflow("Lav et resume") is False
+
+    def test_matches_pull_request_subtask(self):
+        agent = Agent()
+        assert agent._is_pr_workflow("4. Opret Pull Request") is True
+
+    def test_matches_github_keyword(self):
+        agent = Agent()
+        assert agent._is_pr_workflow("GitHub PR setup") is True
+
+
+class TestTemplateTaskTools:
+    def test_has_agenten_entry(self):
+        agent = Agent()
+        assert "agenten" in agent.TEMPLATE_TASK_TOOLS
+
+    def test_agenten_has_four_task_groups(self):
+        agent = Agent()
+        groups = agent.TEMPLATE_TASK_TOOLS["agenten"]
+        assert "branch" in groups
+        assert "commit" in groups
+        assert "push" in groups
+        assert "pull request" in groups
+
+    def test_push_group_excludes_git_status(self):
+        agent = Agent()
+        push_tools = agent.TEMPLATE_TASK_TOOLS["agenten"]["push"]
+        assert "git_push" in push_tools
+        assert "git_remote_status" in push_tools
+        assert "git_status" not in push_tools, "git_status should not be in push tools"
+
+    def test_commit_group_includes_core_tools(self):
+        agent = Agent()
+        commit_tools = agent.TEMPLATE_TASK_TOOLS["agenten"]["commit"]
+        assert "git_add_all" in commit_tools
+        assert "git_commit" in commit_tools
+
+
+class TestSetTaskTools:
+    def test_sets_branch_tools_for_branch_task(self):
+        agent = Agent()
+        agent.active_template = "agenten"
+        agent._set_task_tools("1. Opret branch og verificer")
+        assert agent.tool_registry.active_tools is not None
+        assert "git_create_branch" in agent.tool_registry.active_tools
+        assert "git_checkout" in agent.tool_registry.active_tools
+
+    def test_sets_push_tools_for_push_task(self):
+        agent = Agent()
+        agent.active_template = "agenten"
+        agent._set_task_tools("3. Push til remote")
+        assert agent.tool_registry.active_tools is not None
+        assert "git_push" in agent.tool_registry.active_tools
+        assert "git_status" not in agent.tool_registry.active_tools
+
+    def test_sets_pr_tools_for_pull_request_task(self):
+        agent = Agent()
+        agent.active_template = "agenten"
+        agent._set_task_tools("4. Opret Pull Request")
+        assert agent.tool_registry.active_tools is not None
+        assert "github_create_pr" in agent.tool_registry.active_tools
+
+    def test_no_template_leaves_active_tools_unchanged(self):
+        agent = Agent()
+        agent.tool_registry.set_active_tools(["git_status"])
+        agent.active_template = None
+        agent._set_task_tools("some random task")
+        assert agent.tool_registry.active_tools == ["git_status"]
+
+    def test_falls_back_to_template_tools_if_no_keyword_match(self):
+        agent = Agent()
+        agent.active_template = "agenten"
+        agent._set_task_tools("Some unrelated task name")
+        assert agent.tool_registry.active_tools is not None
+        assert "github_create_pr" in agent.tool_registry.active_tools
