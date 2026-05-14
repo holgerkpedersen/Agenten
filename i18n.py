@@ -8,17 +8,20 @@ class K(StrEnum):
     T_KODEANALYSE      = "templates.kodeanalyse"
     T_DIFFANALYSE      = "templates.diffanalyse"
     T_FRI              = "templates.fri"
+    T_AGENTEN           = "templates.agenten"
 
     # === Template prompts ===
     TP_RESUME          = "template_prompts.resume"
     TP_KODEANALYSE     = "template_prompts.kodeanalyse"
     TP_DIFFANALYSE     = "template_prompts.diffanalyse"
     TP_FRI             = "template_prompts.fri"
+    TP_AGENTEN          = "template_prompts.agenten"
 
     # === Template fallback sections ===
     TF_RESUME          = "template_fallback.resume"
     TF_KODEANALYSE     = "template_fallback.kodeanalyse"
     TF_DIFFANALYSE     = "template_fallback.diffanalyse"
+    TF_AGENTEN          = "template_fallback.agenten"
 
     # === Fallback tree node names ===
     FT_UNDERSTAND_PURPOSE    = "fallback_tree.understand_purpose"
@@ -52,6 +55,11 @@ class K(StrEnum):
     TOOL_GIT_REMOTE_STATUS   = "tools.git_remote_status"
     TOOL_GIT_DIFF            = "tools.git_diff"
     TOOL_GIT_LOG             = "tools.git_log"
+    TOOL_GIT_CREATE_BRANCH   = "tools.git_create_branch"
+    TOOL_GIT_CURRENT_BRANCH  = "tools.git_current_branch"
+    TOOL_GIT_BRANCH_LIST     = "tools.git_branch_list"
+    TOOL_GIT_PULL            = "tools.git_pull"
+    TOOL_GIT_CHECKOUT        = "tools.git_checkout"
 
     # === Tool system prompt ===
     TOOL_SYSTEM_PROMPT  = "tool_system_prompt"
@@ -261,3 +269,5 @@ class K(StrEnum):
     UI_BTN_EDIT            = "ui.btn_edit"
     UI_BTN_DELETE          = "ui.btn_delete"
     UI_BTN_ADD_CHILD       = "ui.btn_add_child"
+    UI_DECOMPOSE_MODEL     = "ui.decompose_model"
+    UI_EXECUTE_MODEL       = "ui.execute_model"

@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory, Response, stream
 from flask_cors import CORS
 from agent_core import Agent
 from session_manager import SessionManager
+import model_manager
 import json
 import time
 import threading
@@ -226,6 +227,10 @@ def load_session(session_id):
             agent.original_prompt = session_data.get("original_prompt", "")
             agent.full_prompt_with_context = session_data.get("full_prompt_with_context", "")
             agent.show_thinking = session_data.get("show_thinking", True)
+            if session_data.get("decompose_model"):
+                agent.decompose_llm.set_model(session_data["decompose_model"])
+            if session_data.get("execute_model"):
+                agent.llm.set_model(session_data["execute_model"])
         return jsonify({"success": True, "session": session_data})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
@@ -256,6 +261,8 @@ def save_current_session():
         "file_context": data.get("file_context", ""),
         "created": existing.get("created", datetime.now().isoformat()),
         "learned_knowledge": existing.get("learned_knowledge", []),
+        "decompose_model": data.get("decompose_model") or existing.get("decompose_model") or getattr(agent.decompose_llm, 'model', ''),
+        "execute_model": data.get("execute_model") or existing.get("execute_model") or getattr(agent.llm, 'model', ''),
     }
     session_manager.save_session(session_id, session_data)
     current_session_id = session_id
@@ -295,15 +302,56 @@ def get_lang(lang):
 @app.route("/api/models")
 def get_models():
     models = agent.llm.list_models()
-    current = agent.llm.model
-    return jsonify({"models": models, "current": current})
+    loaded = model_manager.get_loaded_models()
+    loaded_llm = [k for k, v in loaded.items() if v['is_loaded']]
+    if len(loaded_llm) == 1:
+        only = loaded_llm[0]
+        if agent.llm.model not in models:
+            agent.llm.set_model(only)
+        if agent.decompose_llm.model not in models:
+            agent.decompose_llm.set_model(only)
+    return jsonify({
+        "models": models,
+        "loaded": loaded,
+        "current": agent.llm.model,
+        "decompose_model": agent.decompose_llm.model,
+    })
 
 @app.route("/api/models/set", methods=["POST"])
 def set_model():
     data = request.json
     model = data.get("model", agent.llm.model)
-    agent.llm.set_model(model)
-    return jsonify({"success": True, "model": model})
+    dtype = data.get("type", "execute")
+    if dtype == "decompose":
+        agent.decompose_llm.set_model(model)
+    else:
+        agent.llm.set_model(model)
+    return jsonify({"success": True, "model": model, "type": dtype})
+
+@app.route("/api/models/loaded")
+def loaded_models():
+    return jsonify(model_manager.get_loaded_models())
+
+@app.route("/api/models/load", methods=["POST"])
+def load_model_route():
+    data = request.json
+    key = data.get("key", "")
+    if not key:
+        return jsonify({"success": False, "message": "No model key"}), 400
+    ok, msg = model_manager.load_model(key)
+    return jsonify({"success": ok, "message": msg})
+
+@app.route("/api/models/unload", methods=["POST"])
+def unload_model_route():
+    data = request.json
+    identifier = data.get("identifier", "--all")
+    ok, msg = model_manager.unload_model(identifier)
+    return jsonify({"success": ok, "message": msg})
+
+@app.route("/api/stop", methods=["POST"])
+def stop_execution():
+    agent.stop_requested = True
+    return jsonify({"success": True})
 
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():
@@ -396,6 +444,21 @@ def execute_without_stream():
         execution_status["running"] = False
         return jsonify({"success": False, "error": str(e)}), 500
 
+def _ensure_model_loaded(model_key):
+    if not model_key:
+        return
+    loaded, matched = model_manager.is_model_loaded(model_key)
+    if loaded:
+        print(f"✅ Model already loaded: {matched}")
+        return
+    print(f"⏳ Loading model: {model_key}...")
+    ok, msg = model_manager.load_model(model_key)
+    if ok:
+        print(f"✅ {msg}")
+    else:
+        print(f"⚠️  {msg}")
+
+
 @app.route("/api/decompose", methods=["POST"])
 def decompose():
     data = request.json
@@ -423,12 +486,14 @@ def decompose():
     print(f"🌳 Nedbryder: {prompt[:50]}..." + (f" skabelon: {template}" if template else ""))
     if files:
         print(f"📄 Med {len(files)} filer")
-    
+
+    _ensure_model_loaded(agent.decompose_llm.model)
+
     try:
         tree = agent.decompose_prompt(prompt, files=files, template=template)
-        session_manager.add_prompt_result(current_session_id, prompt, t(K.LOG_DECOMPOSED, agent.lang), tree)
-        
-        session_data = {
+
+        existing = session_manager.load_session(current_session_id) or {}
+        existing.update({
             "id": current_session_id,
             "name": prompt[:30],
             "tree": tree,
@@ -441,8 +506,9 @@ def decompose():
             "lang": agent.lang,
             "ui_lang": ui_lang,
             "file_context": files
-        }
-        session_manager.save_session(current_session_id, session_data)
+        })
+        session_manager.save_session(current_session_id, existing)
+        session_manager.add_prompt_result(current_session_id, prompt, t(K.LOG_DECOMPOSED, agent.lang), tree)
         
         return jsonify({
             "success": True, 
@@ -493,7 +559,10 @@ def execute_stream():
             agent.full_prompt_with_context = fpc
             agent.show_thinking = st
             print(f"Agent show_thinking set to: {agent.show_thinking}")
-    
+            agent.stop_requested = False
+
+    _ensure_model_loaded(agent.llm.model)
+
     def generate():
         _ui = ui_lang  # capture in closure
         if agent.task_tree is None:
@@ -556,20 +625,27 @@ def execute_stream():
         
         try:
             yield from execute_with_stream(agent.task_tree.root)
-            session_data = {
-                "id": current_session_id,
-                "name": original_prompt[:30] if original_prompt else t(K.SESSION_DEFAULT_NAME, _ui).format(n=""),
+            existing = session_manager.load_session(current_session_id) or {}
+            existing.update({
                 "tree": agent.task_tree_to_dict(),
                 "execution_log": agent.execution_log,
                 "agent_log": agent.agent_log,
                 "original_prompt": agent.original_prompt or (agent.task_tree.root.name if agent.task_tree else ""),
+                "prompt_history": existing.get("prompt_history", []),
                 "lang": agent.lang,
                 "ui_lang": ui_lang
-            }
+            })
             if current_session_id:
-                session_manager.save_session(current_session_id, session_data)
+                session_manager.save_session(current_session_id, existing)
             yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, _ui)})}\n\n"
         except Exception as e:
+            existing = session_manager.load_session(current_session_id) or {}
+            existing["tree"] = agent.task_tree_to_dict() if agent.task_tree else existing.get("tree")
+            existing["execution_log"] = agent.execution_log
+            existing["agent_log"] = agent.agent_log
+            existing["lang"] = agent.lang
+            if current_session_id:
+                session_manager.save_session(current_session_id, existing)
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     
     return Response(stream_with_context(generate()), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
