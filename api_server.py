@@ -664,12 +664,11 @@ def execute_stream():
             completed += 1
             progress = int((completed / total_tasks) * 100)
             yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-            result_preview = full_response[:500] if show_thinking else full_response
-            yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': result_preview})}\n\n"
-            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, _ui) + ": " + node.name, "detail": full_response[:100]})
+            yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': full_response[:500]})}\n\n"
+            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, _ui) + ": " + node.name, "detail": full_response})
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
             if current_session_id:
-                session_manager.add_prompt_result(current_session_id, node.name, full_response[:500], None)
+                session_manager.add_prompt_result(current_session_id, node.name, full_response, None)
         
         try:
             if _check_client():

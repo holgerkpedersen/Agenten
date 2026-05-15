@@ -4,6 +4,7 @@ from task_tree import TaskTree, TaskNode
 from module_builder import ModuleBuilder
 from tools import Tool, ToolRegistry
 from github_wrapper import GithubAPI
+from skill_loader import SkillLoader
 from lang import t
 from i18n import K
 import git_ops
@@ -52,6 +53,8 @@ class Agent:
         self._register_tools()
         self._checkpoint_tools = set()
         self._checkpoint_branch = ""
+        self._skills = SkillLoader.load_all(lang=self.lang)
+        self._active_skills = []
 
     def _register_tools(self):
         gh = GithubAPI()
@@ -165,11 +168,13 @@ class Agent:
         ))
 
     def _read_chunk(self, chunk, index):
+        original = chunk
         if not chunk.startswith("file_"):
             chunk = "file_" + chunk
         chunks = self.file_chunks.get(chunk)
         if not chunks:
-            return {"success": False, "error": f"Ukendt chunk: {chunk}"}
+            available = list(self.file_chunks.keys()) or ["ingen"]
+            return {"success": False, "error": f"Ukendt chunk: '{original}'. Tilgængelige: {available}"}
         if index < 1 or index > len(chunks):
             return {"success": False, "error": f"Chunk {index} findes ikke (1..{len(chunks)})"}
         return {"success": True, "chunk": chunk, "index": index, "total": len(chunks), "content": chunks[index-1]}
@@ -221,6 +226,32 @@ class Agent:
         },
     }
 
+    def _refresh_skills(self):
+        self._skills = SkillLoader.load_all(lang=self.lang)
+
+    def _match_skills(self, prompt):
+        scored = SkillLoader.find_all_for_task(prompt, self._skills, top=3)
+        self._active_skills = [s for s in scored if s.get("base") or self._has_matching_intent(s)]
+        if self._active_skills:
+            names = [f"{s['name']}[{'BASE' if s.get('base') else 'MATCH'}]" for s in self._active_skills]
+            self._log("SKILL", f"Aktive skills ({len(self._active_skills)})", ", ".join(names))
+        else:
+            self._log("SKILL", "Ingen skills matchede", "")
+        return self._active_skills
+
+    def _has_matching_intent(self, skill):
+        intent = skill.get("template") or skill.get("intent")
+        return not self.active_template or intent == self.active_template or skill.get("base")
+
+    def _format_skills_for_prompt(self):
+        if not self._active_skills:
+            return ""
+        lines = ["\n## Aktive Skills\n"]
+        for s in self._active_skills:
+            tag = "BASE" if s.get("base") else "MATCH"
+            lines.append(f"- **{s['name']}** [{tag}]: {s.get('description', '')[:120]}")
+        return "\n".join(lines)
+
     def _get_templates(self):
         lang_instr = t(K.ANSWER_IN, self.lang)
         return {
@@ -256,10 +287,10 @@ class Agent:
             "timestamp": time.time(),
             "level": level,
             "message": message,
-            "detail": detail[:200] if detail else ""
+            "detail": detail if detail else ""
         }
         self.agent_log.append(log_entry)
-        print(f"[{level}] {message}: {detail[:100]}")
+        print(f"[{level}] {message}: {detail[:200]}")
 
     def _clean_task_name(self, name):
         name = re.sub(r'^[\*\-+]\s+', '', name.strip())
@@ -439,12 +470,21 @@ class Agent:
         self.agent_log = []
         self.original_prompt = prompt
         self.tool_registry.lang = self.lang
+        self._refresh_skills()
         templates = self._get_templates()
+
+        if not template:
+            suggested = SkillLoader.suggest_template(prompt, self._skills)
+            if suggested and suggested in templates:
+                template = suggested
+
         template_config = templates.get(template, templates["fri"]) if template else templates["fri"]
         self.active_template = template
         allowed = self.TEMPLATE_TOOLS.get(template) if template else None
         self.tool_registry.set_active_tools(allowed)
         self._log("INFO", t(K.LOG_DECOMPOSE_START, self.lang), f"{prompt[:100]} ({t('ui.using_template', self.lang).format(name=template_config['name'])})")
+
+        self._match_skills(prompt)
 
         self.file_context = files or []
         self.file_chunks = {}
@@ -725,21 +765,42 @@ class Agent:
         self._checkpoint_tools = set()
         self._checkpoint_branch = ""
 
+        available_keys = list(self.file_chunks.keys())
         is_chunked = any(len(v) > 1 for v in self.file_chunks.values())
-        chunk_hint = "\n\n⚠️ FILEN ER STOR OG DELT I CHUNKS. Brug read_chunk(chunk='file_FILNAVN', index=N) for at læse ALLE chunks før du analyserer.\n" if is_chunked else ""
+        if is_chunked:
+            chunk_hint_parts = []
+            for key in available_keys:
+                total = len(self.file_chunks[key])
+                display = key.replace("file_", "", 1)
+                chunk_hint_parts.append(f"\n  read_chunk(chunk='{display}', index=2..{total}) eller chunk='{key}', index=2..{total}")
+            chunk_hint = f"\n\n## TILGÆNGELIGE FILER (brug read_chunk for at læse alle chunks):{''.join(chunk_hint_parts)}\n"
+        else:
+            chunk_hint = ""
 
         section_instr = self.SECTION_INSTRUCTIONS.get(self.active_template, {}).get(task_node.name, "")
         if section_instr:
             task_prompt = f"{section_instr}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
         else:
             task_prompt = f"{task_node.name}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
+
+        self._refresh_skills()
+        self._match_skills(original_prompt)
+        skills_block = self._format_skills_for_prompt()
+        if skills_block:
+            task_prompt = skills_block + task_prompt
+            self._log("SKILL", "Skills injectet i prompt", skills_block[:200])
+
         system_prompt = self.tool_registry.build_system_prompt(task_prompt)
         self._log("DEBUG", f"file_chunks keys: {list(self.file_chunks.keys())}", "")
         self._log("DEBUG", f"original_prompt length: {len(original_prompt)}", f"starts with: {original_prompt[:100]}")
         self._log("DEBUG", f"system_prompt length: {len(system_prompt)}", f"contains file content: {'###' in system_prompt}")
 
         tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
-        user_guidance = t(K.TOOL_CONTINUATION, self.lang).format(
+        lang_instr = t(K.ANSWER_IN, self.lang)
+        user_guidance = f"{lang_instr}. "
+        if chunk_hint:
+            user_guidance += chunk_hint.replace("## TILGÆNGELIGE FILER (brug read_chunk for at læse alle chunks):", "FILER:").strip() + " "
+        user_guidance += t(K.TOOL_CONTINUATION, self.lang).format(
             tools_list=tools_list,
             TOOL_MARKER=self.tool_registry.TOOL_MARKER,
             DONE_MARKER=self.tool_registry.DONE_MARKER
@@ -749,6 +810,9 @@ class Agent:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_guidance}
         ]
+        self._log("LLM", "System prompt", f"{len(system_prompt)} chars — {system_prompt[:300]}...")
+        self._log("LLM", "User guidance", user_guidance)
+
         full_response = ""
         text_fallback = ""
         max_iterations = 15 if self._is_pr_workflow(task_node.name) else 5
@@ -787,6 +851,7 @@ class Agent:
 
             parsed = self.tool_registry.parse_response(response)
             self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
+            self._log("LLM", "LLM response (raw)", response)
 
             if parsed["type"] == "tool":
                 tool_key = parsed['tool'] + str(parsed.get('args', {}))
@@ -801,10 +866,10 @@ class Agent:
                 if dup_count == 1:
                     self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
 
-                self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {}))[:100])
+                self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {})))
                 result = self.tool_registry.execute(parsed["tool"], parsed["args"])
                 result_str = json.dumps(result, ensure_ascii=False)
-                self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str[:200])
+                self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str)
                 yield {"type": "tool_call", "tool": parsed["tool"], "args": parsed.get("args", {})}
                 yield {"type": "tool_result", "tool": parsed["tool"], "result": result}
 

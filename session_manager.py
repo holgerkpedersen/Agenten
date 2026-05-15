@@ -2,10 +2,13 @@ import json
 import os
 from datetime import datetime
 import uuid
+import threading
 from lang import t
 from i18n import K
 
 class SessionManager:
+    _lock = threading.Lock()
+
     def __init__(self, storage_dir="sessions"):
         self.storage_dir = storage_dir
         os.makedirs(storage_dir, exist_ok=True)
@@ -13,26 +16,19 @@ class SessionManager:
     def save_session(self, session_id, session_data):
         session_data["last_modified"] = datetime.now().isoformat()
         filepath = os.path.join(self.storage_dir, f"{session_id}.json")
-        tmppath = filepath + ".tmp"
-        with open(tmppath, 'w', encoding='utf-8') as f:
-            json.dump(session_data, f, ensure_ascii=False, indent=2)
-        try:
-            os.replace(tmppath, filepath)
-        except PermissionError:
+        with SessionManager._lock:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(session_data, f, ensure_ascii=False, indent=2)
-            os.unlink(tmppath)
         return session_id
     
-    def load_session(self, session_id, strict=True):
+    def load_session(self, session_id):
         filepath = os.path.join(self.storage_dir, f"{session_id}.json")
         if os.path.exists(filepath):
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                if strict:
-                    raise
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
         return None
     
     def list_sessions(self):
@@ -88,7 +84,7 @@ class SessionManager:
             session_data["prompt_history"].append({
                 "id": str(uuid.uuid4())[:6],
                 "prompt": prompt,
-                "result": result[:500] if result else "",
+                "result": result if result else "",
                 "tree": tree,
                 "timestamp": datetime.now().isoformat(),
                 "type": "user_prompt"

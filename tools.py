@@ -43,7 +43,9 @@ class ToolRegistry:
         tools_desc = self.get_tool_descriptions()
         active_names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
         example_tool = active_names[0] if active_names else t(K.SYS_FALLBACK_TOOL, self.lang)
-        prompt = t(K.TOOL_SYSTEM_PROMPT, self.lang).format(
+        marker_warning = t(K.SYS_MARKER_WARNING, self.lang).format(TOOL=self.TOOL_MARKER, DONE=self.DONE_MARKER)
+        prompt = f"{t('answer_in', self.lang)}. {marker_warning}.\n\n"
+        prompt += t(K.TOOL_SYSTEM_PROMPT, self.lang).format(
             TOOL_MARKER=self.TOOL_MARKER,
             DONE_MARKER=self.DONE_MARKER,
             END_MARKER=self.END_MARKER,
@@ -53,8 +55,6 @@ class ToolRegistry:
         if active_names:
             example_prefix = t(K.SYS_EXAMPLE_PREFIX, self.lang)
             prompt += f"\n\n{example_prefix}: {self.TOOL_MARKER}{{\"tool\":\"{example_tool}\",\"args\":{{}}}}{self.END_MARKER}"
-        marker_warning = t(K.SYS_MARKER_WARNING, self.lang).format(TOOL=self.TOOL_MARKER, DONE=self.DONE_MARKER)
-        prompt += f"\n\n{t('answer_in', self.lang)}. {marker_warning}."
         return prompt
 
     @staticmethod
@@ -93,7 +93,10 @@ class ToolRegistry:
         if done_match:
             try:
                 data = json.loads(done_match.group(1))
-                return {"type": "done", "result": data.get("result", response)}
+                result_val = data.get("result", response)
+                if not isinstance(result_val, str):
+                    result_val = json.dumps(result_val, ensure_ascii=False)
+                return {"type": "done", "result": result_val}
             except json.JSONDecodeError:
                 return {"type": "done", "result": done_match.group(1).strip()}
 
