@@ -232,6 +232,8 @@ class Agent:
     def _match_skills(self, prompt):
         scored = SkillLoader.find_all_for_task(prompt, self._skills, top=3)
         self._active_skills = [s for s in scored if s.get("base") or self._has_matching_intent(s)]
+        template_match = [s for s in self._skills if s.get("template") and s["template"] == self.active_template and s not in self._active_skills]
+        self._active_skills.extend(template_match)
         if self._active_skills:
             names = [f"{s['name']}[{'BASE' if s.get('base') else 'MATCH'}]" for s in self._active_skills]
             self._log("SKILL", f"Aktive skills ({len(self._active_skills)})", ", ".join(names))
@@ -246,7 +248,7 @@ class Agent:
     def _format_skills_for_prompt(self):
         if not self._active_skills:
             return ""
-        lines = ["\n## Aktive Skills\n"]
+        lines = ["\n## 📋 Retningslinjer (ikke værktøjer)\n"]
         for s in self._active_skills:
             tag = "BASE" if s.get("base") else "MATCH"
             lines.append(f"- **{s['name']}** [{tag}]: {s.get('description', '')[:120]}")
@@ -767,6 +769,8 @@ class Agent:
 
         available_keys = list(self.file_chunks.keys())
         is_chunked = any(len(v) > 1 for v in self.file_chunks.values())
+        if not is_chunked and self.tool_registry.active_tools and 'read_chunk' in self.tool_registry.active_tools:
+            self.tool_registry.active_tools = [t for t in self.tool_registry.active_tools if t != 'read_chunk']
         if is_chunked:
             chunk_hint_parts = []
             for key in available_keys:
@@ -800,11 +804,14 @@ class Agent:
         user_guidance = f"{lang_instr}. "
         if chunk_hint:
             user_guidance += chunk_hint.replace("## TILGÆNGELIGE FILER (brug read_chunk for at læse alle chunks):", "FILER:").strip() + " "
-        user_guidance += t(K.TOOL_CONTINUATION, self.lang).format(
-            tools_list=tools_list,
-            TOOL_MARKER=self.tool_registry.TOOL_MARKER,
-            DONE_MARKER=self.tool_registry.DONE_MARKER
-        )
+        if tools_list:
+            user_guidance += t(K.TOOL_CONTINUATION, self.lang).format(
+                tools_list=tools_list,
+                TOOL_MARKER=self.tool_registry.TOOL_MARKER,
+                DONE_MARKER=self.tool_registry.DONE_MARKER
+            )
+        else:
+            user_guidance += t(K.DONE_CONTINUATION, self.lang).format(DONE_MARKER=self.tool_registry.DONE_MARKER)
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -917,6 +924,11 @@ class Agent:
                         continue
 
                 full_response = parsed["result"]
+                done_idx = response.find(self.tool_registry.DONE_MARKER)
+                if done_idx > 0:
+                    pre_done = response[:done_idx].strip()
+                    if len(pre_done.strip()) > max(50, len(full_response) * 2):
+                        full_response = pre_done
                 break
 
             if parsed["type"] == "error":
@@ -928,7 +940,7 @@ class Agent:
                 all_files_loaded = all(len(v) <= 1 for v in self.file_chunks.values()) if self.file_chunks else True
                 if all_files_loaded and parsed["type"] in ("text", "done"):
                     text_fallback = response.strip() if parsed["type"] == "text" else parsed.get("result", response.strip())
-                    if text_fallback and "ERROR" not in text_fallback:
+                    if text_fallback and "ERROR" not in text_fallback and not text_fallback.startswith("<<<"):
                         full_response = text_fallback
                         break
                 if parsed["type"] == "text":

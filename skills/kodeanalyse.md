@@ -1,6 +1,6 @@
 ---
 name: kodeanalyse
-keywords: kodeanalyse, kode, code, python, debug, review, teknisk, arkitektur
+keywords: kodeanalyse, kode, code, python, debug, review, teknisk, arkitektur, analyser, struktur
 template: kodeanalyse
 description: Struktureret kodeanalyse med gennemgang af formal, imports, arkitektur, kodekvalitet og sikkerhed.
 ---

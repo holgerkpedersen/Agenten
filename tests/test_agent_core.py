@@ -128,11 +128,11 @@ class TestAgentLog:
         assert log["message"] == "Test message"
         assert "timestamp" in log
 
-    def test_agent_log_truncates_detail(self):
+    def test_agent_log_does_not_truncate_detail(self):
         agent = Agent()
         long_detail = "x" * 500
         agent._log("INFO", "Test", long_detail)
-        assert len(agent.agent_log[0]["detail"]) <= 200
+        assert len(agent.agent_log[0]["detail"]) == 500
 
 
 class TestAgentStatus:

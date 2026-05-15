@@ -42,7 +42,10 @@ class ToolRegistry:
     def build_system_prompt(self, task):
         tools_desc = self.get_tool_descriptions()
         active_names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
-        example_tool = active_names[0] if active_names else t(K.SYS_FALLBACK_TOOL, self.lang)
+        if not active_names:
+            answer_in = t('answer_in', self.lang)
+            return f'{answer_in}. Svar KUN med <<<DONE>>>{{"result":"din analyse her"}}<<<END>>>. INGEN tekst før eller efter.\n\n{task}'
+        example_tool = active_names[0]
         marker_warning = t(K.SYS_MARKER_WARNING, self.lang).format(TOOL=self.TOOL_MARKER, DONE=self.DONE_MARKER)
         prompt = f"{t('answer_in', self.lang)}. {marker_warning}.\n\n"
         prompt += t(K.TOOL_SYSTEM_PROMPT, self.lang).format(
@@ -52,9 +55,8 @@ class ToolRegistry:
             tools_desc=tools_desc,
             task=task,
         )
-        if active_names:
-            example_prefix = t(K.SYS_EXAMPLE_PREFIX, self.lang)
-            prompt += f"\n\n{example_prefix}: {self.TOOL_MARKER}{{\"tool\":\"{example_tool}\",\"args\":{{}}}}{self.END_MARKER}"
+        example_prefix = t(K.SYS_EXAMPLE_PREFIX, self.lang)
+        prompt += f"\n\n{example_prefix}: {self.TOOL_MARKER}{{\"tool\":\"{example_tool}\",\"args\":{{}}}}{self.END_MARKER}"
         return prompt
 
     @staticmethod
@@ -70,12 +72,13 @@ class ToolRegistry:
         response = re.sub(r'```\w*\n?', '', response)
         response = re.sub(r'```', '', response)
 
+        end_pat = r'<<<END>>>?'
         tool_match = re.search(
-            re.escape(self.TOOL_MARKER) + r'\s*(.*?)\s*' + re.escape(self.END_MARKER),
+            re.escape(self.TOOL_MARKER) + r'\s*(.*?)\s*' + end_pat,
             response, re.DOTALL
         )
         done_match = re.search(
-            re.escape(self.DONE_MARKER) + r'\s*(.*?)\s*' + re.escape(self.END_MARKER),
+            re.escape(self.DONE_MARKER) + r'\s*(.*?)\s*' + end_pat,
             response, re.DOTALL
         )
 

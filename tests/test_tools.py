@@ -86,7 +86,9 @@ class TestBuildSystemPrompt:
         tr.lang = "da"
         tr.active_tools = []
         prompt = tr.build_system_prompt("Test task")
-        assert "<<<TOOL>>>" in prompt
+        assert "<<<TOOL>>>" not in prompt
+        assert "<<<DONE>>>" in prompt
+        assert "KUN med" in prompt
 
     def test_build_system_prompt_error_marker_replaced(self):
         tr = ToolRegistry()
