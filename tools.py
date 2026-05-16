@@ -69,6 +69,7 @@ class ToolRegistry:
         response = re.sub(r'<\|channel>.*?<\|end>', '', response, flags=re.DOTALL)
         response = re.sub(r'<\|[^|]*\|>', '', response)
         response = re.sub(r'<\|[^|]*>', '', response)
+        response = re.sub(r'\bfinal\s*', '', response)
         response = re.sub(r'```\w*\n?', '', response)
         response = re.sub(r'```', '', response)
 
