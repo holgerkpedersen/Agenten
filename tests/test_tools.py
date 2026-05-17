@@ -1,4 +1,6 @@
-"""Test tools.py — build_system_prompt localization."""
+"""Test tools.py — build_system_prompt localization and git_ops validation."""
+import json
+import os
 import pytest
 from tools import ToolRegistry, Tool
 
@@ -148,6 +150,30 @@ class TestToolParsing:
         assert result["type"] == "error"
         assert "Ugyldigt JSON" in result["message"]
 
+    def test_parse_extra_trailing_brace(self):
+        tr = ToolRegistry()
+        tr.register(Tool("git_status", "status", [], lambda: ""))
+        response = '<<<TOOL>>>{"tool":"git_status","args":{}}}<<<END>>>'
+        result = tr.parse_response(response)
+        assert result["type"] == "tool"
+        assert result["tool"] == "git_status"
+
+    def test_parse_extra_trailing_braces(self):
+        tr = ToolRegistry()
+        tr.register(Tool("git_status", "status", [], lambda: ""))
+        response = '<<<TOOL>>>{"tool":"git_status","args":{}}}<<<END>>>'
+        result = tr.parse_response(response)
+        assert result["type"] == "tool"
+        assert result["tool"] == "git_status"
+
+    def test_parse_extra_braces_nested(self):
+        tr = ToolRegistry()
+        tr.register(Tool("git_status", "status", [], lambda: ""))
+        response = '<<<TOOL>>>{"tool":"git_status","args":{"path":"{test}"}}}<<<END>>>'
+        result = tr.parse_response(response)
+        assert result["type"] == "tool"
+        assert result["tool"] == "git_status"
+
     def test_parse_removes_think_tags(self):
         tr = ToolRegistry()
         response = "<think> thinking <result> <<<TOOL>>>{\"tool\":\"git_status\",\"args\":{}}<<<END>>>"
@@ -192,3 +218,159 @@ class TestToolExecution:
         result = tr.execute("git_commit", {"msg": "test message"})
         assert result["success"] is True
         assert "test message" in result["result"]
+
+
+class TestRouteMismatch:
+    def test_extract_fetch_urls(self, tmp_path):
+        from git_ops import _extract_urls, _check_route_mismatch
+        html = '''<script>fetch('/api/data'); fetch("/api/other")</script>'''
+        h = tmp_path / "index.html"
+        h.write_text(html, encoding='utf-8')
+        urls = _extract_urls(html, '.html')
+        assert '/api/data' in urls
+        assert '/api/other' in urls
+
+    def test_extract_action_urls(self, tmp_path):
+        from git_ops import _extract_urls
+        html = '''<form action="/submit" method="post">'''
+        urls = _extract_urls(html, '.html')
+        assert '/submit' in urls
+
+    def test_extract_js_fetch(self, tmp_path):
+        from git_ops import _extract_urls
+        js = '''fetch('/js/data'); axios.get('/api/get'); axios.post('/api/post'); axios.put('/api/put'); axios.delete('/api/delete')'''
+        urls = _extract_urls(js, '.js')
+        assert '/js/data' in urls
+        assert '/api/get' in urls
+        assert '/api/post' in urls
+        assert '/api/put' in urls
+        assert '/api/delete' in urls
+
+    def test_no_mismatch(self, tmp_path):
+        from git_ops import _check_route_mismatch
+        html = '<script>fetch("/api/data")</script>'
+        py = '@app.route("/api/data")\ndef data(): pass'
+        d = tmp_path / "app"
+        p = d / "app.py"
+        h = d / "index.html"
+        d.mkdir()
+        h.write_text(html, encoding='utf-8')
+        p.write_text(py, encoding='utf-8')
+        mismatched = _check_route_mismatch(str(h), '.py')
+        assert mismatched == []
+
+    def test_mismatch_detected(self, tmp_path):
+        from git_ops import _check_route_mismatch
+        html = '<script>fetch("/api/data"); fetch("/api/missing")</script>'
+        py = '@app.route("/api/data")\ndef data(): pass'
+        d = tmp_path / "app"
+        p = d / "app.py"
+        h = d / "index.html"
+        d.mkdir()
+        h.write_text(html, encoding='utf-8')
+        p.write_text(py, encoding='utf-8')
+        mismatched = _check_route_mismatch(str(h), '.py')
+        assert mismatched == ['/api/missing']
+
+    def test_parameterized_route_match(self, tmp_path):
+        from git_ops import _check_route_mismatch
+        html = '<script>fetch("/edit/abc"); fetch("/delete/123")</script>'
+        py = '@app.route("/edit/<key>")\ndef edit(key): pass\n@app.route("/delete/<int:id>")\ndef delete(id): pass'
+        d = tmp_path / "app"
+        p = d / "app.py"
+        h = d / "index.html"
+        d.mkdir()
+        h.write_text(html, encoding='utf-8')
+        p.write_text(py, encoding='utf-8')
+        mismatched = _check_route_mismatch(str(h), '.py')
+        assert mismatched == []
+
+    def test_flask_template_struct(self, tmp_path):
+        from git_ops import _check_route_mismatch
+        html = '<script>fetch("/api/data"); fetch("/api/missing")</script>'
+        py = '@app.route("/api/data")\ndef data(): pass'
+        d = tmp_path / "app"
+        t = d / "templates"
+        t.mkdir(parents=True)
+        p = d / "app.py"
+        h = t / "index.html"
+        h.write_text(html, encoding='utf-8')
+        p.write_text(py, encoding='utf-8')
+        mismatched = _check_route_mismatch(str(h), '.py')
+        assert mismatched == ['/api/missing']
+
+    def test_reverse_py_to_html(self, tmp_path):
+        from git_ops import _check_route_mismatch
+        py = '@bp.route("/api/data")\ndef data(): pass'
+        html = '<script>fetch("/api/data"); fetch("/api/missing")</script>'
+        p = tmp_path / "app.py"
+        h = tmp_path / "index.html"
+        p.write_text(py, encoding='utf-8')
+        h.write_text(html, encoding='utf-8')
+        mismatched = _check_route_mismatch(str(p), '.html')
+        assert mismatched == ['/api/missing']
+
+    def test_no_other_file_returns_empty(self, tmp_path):
+        from git_ops import _check_route_mismatch
+        html = '<script>fetch("/api/data")</script>'
+        h = tmp_path / "index.html"
+        h.write_text(html, encoding='utf-8')
+        mismatched = _check_route_mismatch(str(h), '.py')
+        assert mismatched == []
+
+    def test_done_without_done_in_url(self, tmp_path):
+        from git_ops import _check_route_mismatch
+        html = '<script>fetch("/api/DONE")</script>'
+        py = '@app.route("/api/DONE")\ndef done(): pass'
+        h = tmp_path / "app.py"
+        p = tmp_path / "index.html"
+        h.write_text(py, encoding='utf-8')
+        p.write_text(html, encoding='utf-8')
+        mismatched = _check_route_mismatch(str(h), '.html')
+        assert mismatched == []
+
+    def test_relative_urls_ignored(self, tmp_path):
+        from git_ops import _check_route_mismatch
+        html = '<script>fetch("relative/path"); fetch("/absolute/path")</script>'
+        py = '@app.route("/absolute/path")\ndef ap(): pass'
+        h = tmp_path / "app.py"
+        p = tmp_path / "index.html"
+        h.write_text(py, encoding='utf-8')
+        p.write_text(html, encoding='utf-8')
+        mismatched = _check_route_mismatch(str(h), '.html')
+        assert mismatched == []
+
+    def test_dep_check_missing(self, tmp_path):
+        from git_ops import _check_missing_deps
+        py = "import flask\nimport cryptography\nimport os"
+        req = tmp_path / "requirements.txt"
+        req.write_text("flask==2.3.0\n", encoding='utf-8')
+        missing = _check_missing_deps(py, str(req))
+        assert 'cryptography' in missing
+        assert 'flask' not in missing
+        assert 'os' not in missing
+
+    def test_dep_check_no_requirements(self, tmp_path):
+        from git_ops import _check_missing_deps
+        py = "import flask"
+        req = tmp_path / "nonexistent.txt"
+        missing = _check_missing_deps(py, str(req))
+        assert missing == []
+
+    def test_write_file_route_warning(self, tmp_path):
+        from git_ops import write_file
+        py = tmp_path / "app.py"
+        py.write_text('@app.route("/api/data")\ndef data(): pass\n', encoding='utf-8')
+        html = tmp_path / "index.html"
+        result = write_file(str(html), '<script>fetch("/api/data"); fetch("/api/missing")</script>')
+        assert result.get("route_warnings", {}).get(".py") == ['/api/missing']
+
+    def test_write_file_auto_update_req(self, tmp_path):
+        from git_ops import write_file
+        req = tmp_path / "requirements.txt"
+        req.write_text("flask==2.3.0\n", encoding='utf-8')
+        new_py = tmp_path / "script.py"
+        result = write_file(str(new_py), "import cryptography\nimport flask")
+        assert "cryptography" in result.get("req_updated", [])
+        updated = req.read_text(encoding='utf-8')
+        assert "cryptography" in updated

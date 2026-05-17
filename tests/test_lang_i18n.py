@@ -17,17 +17,23 @@ class TestKEnum:
         assert K.T_KODEANALYSE == "templates.kodeanalyse"
         assert K.T_DIFFANALYSE == "templates.diffanalyse"
         assert K.T_FRI == "templates.fri"
+        assert K.T_PROGRAMMERING == "templates.programmering"
+        assert K.T_PYTHON_ARKITEKTUR == "templates.python-arkitektur"
 
     def test_K_template_prompts(self):
         assert K.TP_RESUME == "template_prompts.resume"
         assert K.TP_KODEANALYSE == "template_prompts.kodeanalyse"
         assert K.TP_DIFFANALYSE == "template_prompts.diffanalyse"
         assert K.TP_FRI == "template_prompts.fri"
+        assert K.TP_PROGRAMMERING == "template_prompts.programmering"
+        assert K.TP_PYTHON_ARKITEKTUR == "template_prompts.python-arkitektur"
 
     def test_K_template_fallback(self):
         assert K.TF_RESUME == "template_fallback.resume"
         assert K.TF_KODEANALYSE == "template_fallback.kodeanalyse"
         assert K.TF_DIFFANALYSE == "template_fallback.diffanalyse"
+        assert K.TF_PROGRAMMERING == "template_fallback.programmering"
+        assert K.TF_PYTHON_ARKITEKTUR == "template_fallback.python-arkitektur"
 
     def test_K_fallback_tree_nodes(self):
         expected = [
@@ -102,6 +108,7 @@ class TestKEnum:
             K.LOG_TASK_START,
             K.LOG_TASK_DONE,
             K.LOG_TASK_FAILED,
+            K.LOG_AUTO_DONE,
             K.LOG_TREE_EXECUTION,
             K.LOG_TOOL_CALLING,
             K.LOG_TOOL_RESULT,
@@ -225,6 +232,8 @@ class TestLangStructure:
             assert "diffanalyse" in tpls
             assert "fri" in tpls
             assert "agenten" in tpls, f"{lang_code} missing template 'agenten'"
+            assert "programmering" in tpls, f"{lang_code} missing template 'programmering'"
+            assert "python-arkitektur" in tpls, f"{lang_code} missing template 'python-arkitektur'"
 
     def test_tool_descriptions_all_four_langs(self):
         for lang_code in ["da", "en", "es", "zh"]:

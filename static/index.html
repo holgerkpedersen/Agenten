@@ -7,7 +7,16 @@
     <style>
         * {
             box-sizing: border-box;
+        }
+        button, input, select, label, .reuse-btn, .tools-toggle, .panel-controls {
             user-select: none;
+        }
+        .tree-container, .llm-box, .log-box, .history-box, .file-preview,
+        .tree-node-content, .history-item, .history-result, .history-prompt,
+        #currentTask, #progressContainer {
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
         }
         
         body {
@@ -435,6 +444,8 @@
                 <option value="kodeanalyse">🔍 Kodeanalyse</option>
                 <option value="diffanalyse">📊 Diff-analyse</option>
                 <option value="agenten">🔀 PR Agenten</option>
+                <option value="programmering">💻 Programmeringsopgave</option>
+                <option value="python-arkitektur">🏗️ Python Arkitektur</option>
             </select>
             <label style="display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;padding:8px 12px;border-radius:6px;cursor:pointer;">
                 <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>

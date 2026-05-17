@@ -166,6 +166,12 @@ class Agent:
             ["chunk", "index"],
             lambda chunk, index=1: self._read_chunk(chunk, int(index))
         ))
+        self.tool_registry.register(Tool(
+            "write_file",
+            "Skriv indhold til en fil. Opretter mappen hvis den ikke findes. Returnerer stien og antal tegn.",
+            ["path", "content"],
+            lambda path, content: git_ops.write_file(path=path, content=content)
+        ))
 
     def _read_chunk(self, chunk, index):
         original = chunk
@@ -192,6 +198,8 @@ class Agent:
             "git_create_branch", "git_current_branch", "git_pull", "git_checkout",
             "git_remote_status"
         ],
+        "programmering": ["read_chunk"],
+        "python-arkitektur": ["read_chunk", "write_file"],
     }
 
     TEMPLATE_TASK_TOOLS = {
@@ -223,6 +231,16 @@ class Agent:
             "Brydende ændringer": "Skriv afsnittet 'Brydende ændringer': identificér breaking changes og bagudkompatibilitet.",
             "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder ændringernes kvalitet og konsistens.",
             "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå forbedringer til diff'en.",
+        },
+        "programmering": {
+            "Kravanalyse": "Analyser kravene grundigt. Identificér funktionelle og ikke-funktionelle krav, input/output, og eventuelle begrænsninger. Beskriv hvad systemet skal kunne.",
+            "Arkitekturdesign": "Design systemarkitekturen: komponenter, moduler, dataflow og afhængigheder. Overvej relevante design patterns og SOLID-principper. Tegn arkitekturen med tekst.",
+            "Implementeringsplan": "Planlæg implementeringen: hvilke filer skal oprettes, i hvilken rækkefølge, og hvad skal hver fil indeholde. Overvej teststrategi og edge cases.",
+            "Sikkerhedsanalyse": "Analyser sikkerhedsaspekter: inputvalidering, autentifikation, kryptering, håndtering af følsomme data (passwords, keys). Følg OWASP best practices og princip om mindste rettighed.",
+            "Kodeimplementering": "Implementér koden baseret på arkitekturdesign og implementeringsplan. Skriv ren, vedligeholdelsesvenlig kode med korrekt fejlhåndtering og logging.",
+        },
+        "python-arkitektur": {
+            "Arkitekturplanlægning": "Analyser projektet og planlæg arkitekturen baseret på Python/Flask/HTML/JS best practices. Brug write_file til at oprette ./docs/arkitektur.md med følgende sektioner:\n\n## Systemoversigt\n- Formål og målsætning\n- Teknologistak (Python, Flask, HTML, JS, database)\n\n## Komponentarkitektur\n- Modulopdeling og ansvar for hvert modul\n- Lagdelt struktur (præsentation, forretningslogik, data)\n- Dataflow mellem komponenter\n\n## Flask-struktur\n- Blueprint-moduler, routes, middleware\n- Request/response-lifecycle\n- Fejlhåndtering og logging\n\n## Database design\n- ORM-modeller (SQLAlchemy) og relationer\n- Migration-strategi (Alembic)\n- Indeksering og query-optimering\n\n## Sikkerhed\n- CSRF, XSS, SQL injection beskyttelse\n- Autentifikation og autorisation (Flask-Login, JWT)\n- Miljøvariabler og secrets-håndtering\n\n## Frontend (HTML/JS)\n- Template-struktur (Jinja2) og statiske filer\n- JS-moduler og event-håndtering\n- API-kommunikation (fetch/AJAX)\n\n## Udviklings-workflow\n- Virtuelt miljø og afhængighedsstyring\n- Testing (pytest, unittest)\n- Kodekvalitet (flake8, black, mypy, type hints)\n\nFølg Python best practices: PEP 8, SOLID, DRY, separation of concerns.",
         },
     }
 
@@ -281,6 +299,16 @@ class Agent:
                 "name": t(K.T_AGENTEN, self.lang),
                 "prompt": t(K.TP_AGENTEN, self.lang).replace("{lang_instruction}", lang_instr),
                 "fallback": t(K.TF_AGENTEN, self.lang),
+            },
+            "programmering": {
+                "name": t(K.T_PROGRAMMERING, self.lang),
+                "prompt": t(K.TP_PROGRAMMERING, self.lang),
+                "fallback": t(K.TF_PROGRAMMERING, self.lang),
+            },
+            "python-arkitektur": {
+                "name": t(K.T_PYTHON_ARKITEKTUR, self.lang),
+                "prompt": t(K.TP_PYTHON_ARKITEKTUR, self.lang),
+                "fallback": t(K.TF_PYTHON_ARKITEKTUR, self.lang),
             },
         }
 
@@ -823,7 +851,7 @@ class Agent:
 
         full_response = ""
         text_fallback = ""
-        max_iterations = 15 if self._is_pr_workflow(task_node.name) else 5
+        max_iterations = 15 if self._is_pr_workflow(task_node.name) else 10
         called_tools = {}
 
         def _add_user_msg(content):
@@ -888,9 +916,18 @@ class Agent:
                     yield {"type": "checkpoint", "message": checkpoint_msg, "tool": parsed["tool"]}
                 else:
                     self._checkpoint_tools.add(parsed["tool"] + str(parsed.get("args", {})))
-                    _add_user_msg(f"{t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool'])}\n{result_str}")
+                    cont_hint = t(K.TOOL_CONTINUATION, self.lang).format(
+                        tools_list=tools_list,
+                        TOOL_MARKER=self.tool_registry.TOOL_MARKER,
+                        DONE_MARKER=self.tool_registry.DONE_MARKER
+                    )
+                    _add_user_msg(f"{t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool'])}\n{result_str}\n\n{cont_hint}")
 
                 _truncate_messages()
+                total_calls = sum(called_tools.values())
+                if total_calls >= 8:
+                    full_response = t(K.LOG_AUTO_DONE, self.lang).format(count=total_calls)
+                    break
                 continue
 
             if parsed["type"] == "done":
@@ -960,7 +997,10 @@ class Agent:
                 break
 
         if not full_response or "ERROR" in full_response:
-            if text_fallback and "ERROR" not in text_fallback:
+            if called_tools:
+                full_response = t(K.LOG_AUTO_DONE, self.lang).format(count=len(called_tools))
+                task_node.status = "done"
+            elif text_fallback and "ERROR" not in text_fallback:
                 full_response = text_fallback
                 task_node.status = "done"
             else:

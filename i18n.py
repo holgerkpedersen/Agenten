@@ -9,6 +9,8 @@ class K(StrEnum):
     T_DIFFANALYSE      = "templates.diffanalyse"
     T_FRI              = "templates.fri"
     T_AGENTEN           = "templates.agenten"
+    T_PROGRAMMERING    = "templates.programmering"
+    T_PYTHON_ARKITEKTUR = "templates.python-arkitektur"
 
     # === Template prompts ===
     TP_RESUME          = "template_prompts.resume"
@@ -16,12 +18,16 @@ class K(StrEnum):
     TP_DIFFANALYSE     = "template_prompts.diffanalyse"
     TP_FRI             = "template_prompts.fri"
     TP_AGENTEN          = "template_prompts.agenten"
+    TP_PROGRAMMERING   = "template_prompts.programmering"
+    TP_PYTHON_ARKITEKTUR = "template_prompts.python-arkitektur"
 
     # === Template fallback sections ===
     TF_RESUME          = "template_fallback.resume"
     TF_KODEANALYSE     = "template_fallback.kodeanalyse"
     TF_DIFFANALYSE     = "template_fallback.diffanalyse"
     TF_AGENTEN          = "template_fallback.agenten"
+    TF_PROGRAMMERING   = "template_fallback.programmering"
+    TF_PYTHON_ARKITEKTUR = "template_fallback.python-arkitektur"
 
     # === Fallback tree node names ===
     FT_UNDERSTAND_PURPOSE    = "fallback_tree.understand_purpose"
@@ -127,6 +133,7 @@ class K(StrEnum):
     LOG_TASK_START          = "log.task_start"
     LOG_TASK_DONE           = "log.task_done"
     LOG_TASK_FAILED         = "log.task_failed"
+    LOG_AUTO_DONE           = "log.auto_done"
     LOG_TREE_EXECUTION      = "log.tree_execution_start"
     LOG_READING_FILE        = "log.reading_file"
     LOG_FILE_FOUND          = "log.file_found"

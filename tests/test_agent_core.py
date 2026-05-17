@@ -27,6 +27,9 @@ class TestAgentInit:
         assert "kodeanalyse" in templates
         assert "diffanalyse" in templates
         assert "fri" in templates
+        assert "agenten" in templates
+        assert "programmering" in templates
+        assert "python-arkitektur" in templates
 
     def test_templates_localized(self):
         agent = Agent()
@@ -45,6 +48,8 @@ class TestAgentInit:
         assert agent.TEMPLATE_TOOLS["kodeanalyse"] == ["read_chunk"]
         assert agent.TEMPLATE_TOOLS["diffanalyse"] == ["read_chunk", "git_diff", "git_log"]
         assert agent.TEMPLATE_TOOLS["fri"] is None
+        assert agent.TEMPLATE_TOOLS["programmering"] == ["read_chunk"]
+        assert agent.TEMPLATE_TOOLS["python-arkitektur"] == ["read_chunk", "write_file"]
 
 
 class TestFallbackTree:

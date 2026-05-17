@@ -13,6 +13,8 @@ LANG = {
             "diffanalyse": "📊 Diff-analyse",
             "fri": "🌳 Fri nedbrydning",
             "agenten": "🔀 PR Agenten",
+            "programmering": "💻 Programmeringsopgave",
+            "python-arkitektur": "🏗️ Python Arkitektur",
         },
         "template_prompts": {
             "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
@@ -23,12 +25,27 @@ Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.
 
 Opgave: {prompt}""",
             "agenten": """Du er en PR workflow-specialist. Brug værktøjerne til at gennemføre en Pull Request. Følg disse trin i rækkefølge:\n1. Opret branch\n2. Stage og commit\n3. Push til remote\n4. Opret Pull Request\n\nOpgave: {prompt}\n\n{lang_instruction}""",
+            "programmering": """Analyser følgende programmeringsopgave og nedbryd den i arkitektoniske faser. Returnér KUN træstrukturen med 2 mellemrum per niveau.
+
+Faserne skal være:
+1. Kravanalyse — forstå kravene
+2. Arkitekturdesign — design komponenter og dataflow
+3. Implementeringsplan — planlæg filstruktur og rækkefølge
+4. Sikkerhedsanalyse — gennemgå sikkerhed og best practices
+5. Kodeimplementering — skriv koden
+
+Opgave: {prompt}""",
+            "python-arkitektur": """Analyser følgende projekt og planlæg Python/Flask-arkitekturen. Returnér KUN træstrukturen med 2 mellemrum per niveau.
+
+Opgave: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"],
             "kodeanalyse": ["Formål", "Imports og afhængigheder", "Arkitektur", "Kodekvalitet", "Sikkerhed"],
             "diffanalyse": ["Oversigt", "Risikovurdering", "Brydende ændringer", "Kodekvalitet", "Anbefalinger"],
             "agenten": ["1. Opret branch og verificer", "2. Stage og commit ændringer", "3. Push til remote", "4. Opret Pull Request"],
+            "programmering": ["Kravanalyse", "Arkitekturdesign", "Implementeringsplan", "Sikkerhedsanalyse", "Kodeimplementering"],
+            "python-arkitektur": ["Arkitekturplanlægning"],
         },
         "fallback_tree": {
             "understand_purpose": "Forstå filens formål",
@@ -122,6 +139,7 @@ Opgave: {prompt}""",
             "task_start": "Påbegynder opgave",
             "task_done": "Opgave færdig",
             "task_failed": "Kunne ikke fuldføre opgaven automatisk.",
+            "auto_done": "Gennemførte {count} værktøjskald. Opgave fuldført automatisk.",
             "tree_execution_start": "Starter udførelse af opgavetræ",
             "reading_file": "Forsøger at læse fil",
             "file_found": "Fil fundet og læst",
@@ -349,6 +367,8 @@ Opgave: {prompt}""",
             "diffanalyse": "📊 Diff Analysis",
             "fri": "🌳 Free Decomposition",
             "agenten": "🔀 PR Agenten",
+            "programmering": "💻 Programming Task",
+            "python-arkitektur": "🏗️ Python Architecture",
         },
         "template_prompts": {
             "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
@@ -359,12 +379,27 @@ Return ONLY the tree structure. No explanations, no thought process.
 
 Task: {prompt}""",
             "agenten": """You are a PR workflow specialist. Use the tools to complete a Pull Request. Follow these steps in order:\n1. Create branch\n2. Stage and commit\n3. Push to remote\n4. Create Pull Request\n\nTask: {prompt}\n\n{lang_instruction}""",
+            "programmering": """Analyze the following programming task and break it down into architectural phases. Return ONLY the tree structure with 2 spaces per level.
+
+The phases must be:
+1. Requirements Analysis — understand the requirements
+2. Architecture Design — design components and data flow
+3. Implementation Plan — plan file structure and order
+4. Security Analysis — review security and best practices
+5. Code Implementation — write the code
+
+Task: {prompt}""",
+            "python-arkitektur": """Analyze the following project and plan the Python/Flask architecture. Return ONLY the tree structure with 2 spaces per level.
+
+Task: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overview", "Key Points", "Conclusion", "Recommendations"],
             "kodeanalyse": ["Purpose", "Imports and Dependencies", "Architecture", "Code Quality", "Security"],
             "diffanalyse": ["Overview", "Risk Assessment", "Breaking Changes", "Code Quality", "Recommendations"],
             "agenten": ["1. Create branch and verify", "2. Stage and commit changes", "3. Push to remote", "4. Create Pull Request"],
+            "programmering": ["Requirements Analysis", "Architecture Design", "Implementation Plan", "Security Analysis", "Code Implementation"],
+            "python-arkitektur": ["Architecture Planning"],
         },
         "fallback_tree": {
             "understand_purpose": "Understand file purpose",
@@ -458,6 +493,7 @@ Task: {prompt}""",
             "task_start": "Starting task",
             "task_done": "Task done",
             "task_failed": "Could not complete task automatically.",
+            "auto_done": "Completed {count} tool calls. Task auto-completed.",
             "tree_execution_start": "Starting task tree execution",
             "reading_file": "Attempting to read file",
             "file_found": "File found and read",
@@ -684,6 +720,8 @@ Task: {prompt}""",
             "diffanalyse": "📊 Análisis de Diff",
             "fri": "🌳 Descomposición Libre",
             "agenten": "🔀 PR Agenten",
+            "programmering": "💻 Tarea de Programación",
+            "python-arkitektur": "🏗️ Arquitectura Python",
         },
         "template_prompts": {
             "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
@@ -694,12 +732,27 @@ Devuelve SOLO la estructura de árbol. Sin explicaciones, sin proceso de pensami
 
 Tarea: {prompt}""",
             "agenten": """Eres un especialista en flujos de trabajo PR. Usa las herramientas para completar un Pull Request. Sigue estos pasos en orden:\n1. Crear rama\n2. Stage y commit\n3. Push al remoto\n4. Crear Pull Request\n\nTarea: {prompt}\n\n{lang_instruction}""",
+            "programmering": """Analiza la siguiente tarea de programación y descompónla en fases arquitectónicas. Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
+
+Las fases deben ser:
+1. Análisis de Requisitos — comprender los requisitos
+2. Diseño de Arquitectura — diseñar componentes y flujo de datos
+3. Plan de Implementación — planificar estructura de archivos y orden
+4. Análisis de Seguridad — revisar seguridad y mejores prácticas
+5. Implementación de Código — escribir el código
+
+Tarea: {prompt}""",
+            "python-arkitektur": """Analiza el siguiente proyecto y planifica la arquitectura Python/Flask. Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
+
+Tarea: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Descripción General", "Puntos Clave", "Conclusión", "Recomendaciones"],
             "kodeanalyse": ["Propósito", "Imports y Dependencias", "Arquitectura", "Calidad del Código", "Seguridad"],
             "diffanalyse": ["Resumen", "Riesgos", "Cambios Rupturistas", "Calidad del Código", "Recomendaciones"],
             "agenten": ["1. Crear rama y verificar", "2. Stage y commit de cambios", "3. Push al remoto", "4. Crear Pull Request"],
+            "programmering": ["Análisis de Requisitos", "Diseño de Arquitectura", "Plan de Implementación", "Análisis de Seguridad", "Implementación de Código"],
+            "python-arkitektur": ["Planificación de Arquitectura"],
         },
         "fallback_tree": {
             "understand_purpose": "Entender el propósito del archivo",
@@ -793,6 +846,7 @@ Tarea: {prompt}""",
             "task_start": "Iniciando tarea",
             "task_done": "Tarea completada",
             "task_failed": "No se pudo completar la tarea automáticamente.",
+            "auto_done": "Completadas {count} llamadas de herramientas. Tarea completada automáticamente.",
             "tree_execution_start": "Iniciando ejecución del árbol de tareas",
             "reading_file": "Intentando leer archivo",
             "file_found": "Archivo encontrado y leído",
@@ -1019,22 +1073,39 @@ Tarea: {prompt}""",
             "diffanalyse": "📊 差异分析",
             "fri": "🌳 自由分解",
             "agenten": "🔀 PR Agenten",
+            "programmering": "💻 编程任务",
+            "python-arkitektur": "🏗️ Python 架构",
         },
         "template_prompts": {
             "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
             "kodeanalyse": "分析以下代码结构。只返回以下部分：\n## 目的\n## 导入和依赖\n## 架构\n## 代码质量\n## 安全性\n\n{lang_instruction}。不要使用 <think> 标签。",
             "diffanalyse": "你必须先调用 git_log(5) 和 git_diff(HEAD~1,HEAD)。不要使用其他工具。然后分析差异。只返回以下部分：\n## 更改概述\n## 风险评估（高/中/低 按文件）\n## 破坏性更改\n## 代码质量\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
             "fri": """将以下任务分解为子任务。每级使用2个空格。
-只返回树结构。不要解释，不要思考过程。
+只返回树形结构。不解释，不需要思考过程。
 
 任务：{prompt}""",
             "agenten": """你是PR工作流专家。使用工具完成Pull Request。按顺序执行以下步骤：\n1. 创建分支\n2. Stage和提交\n3. 推送到远程\n4. 创建Pull Request\n\n任务：{prompt}\n\n{lang_instruction}""",
+            "programmering": """分析以下编程任务并将其分解为架构阶段。只返回树形结构，每级使用2个空格。
+
+阶段必须为：
+1. 需求分析 — 理解需求
+2. 架构设计 — 设计组件和数据流
+3. 实施计划 — 计划文件结构和顺序
+4. 安全分析 — 审查安全性和最佳实践
+5. 代码实施 — 编写代码
+
+任务：{prompt}""",
+            "python-arkitektur": """分析以下项目并规划 Python/Flask 架构。只返回树形结构，每级使用2个空格。
+
+任务：{prompt}""",
         },
         "template_fallback": {
             "resume": ["概述", "要点", "结论", "建议"],
             "kodeanalyse": ["目的", "导入和依赖", "架构", "代码质量", "安全性"],
             "diffanalyse": ["概述", "风险评估", "破坏性更改", "代码质量", "建议"],
             "agenten": ["1. 创建分支并验证", "2. Stage并提交更改", "3. 推送到远程", "4. 创建Pull Request"],
+            "programmering": ["需求分析", "架构设计", "实施计划", "安全分析", "代码实施"],
+            "python-arkitektur": ["架构规划"],
         },
         "fallback_tree": {
             "understand_purpose": "理解文件目的",
@@ -1128,6 +1199,7 @@ Tarea: {prompt}""",
             "task_start": "开始任务",
             "task_done": "任务完成",
             "task_failed": "无法自动完成任务。",
+            "auto_done": "完成了 {count} 个工具调用。任务自动完成。",
             "tree_execution_start": "开始执行任务树",
             "reading_file": "尝试读取文件",
             "file_found": "文件已找到并读取",

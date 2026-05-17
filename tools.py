@@ -84,15 +84,21 @@ class ToolRegistry:
         )
 
         if tool_match:
+            raw = tool_match.group(1)
+            raw = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
             try:
-                data = json.loads(tool_match.group(1))
-                tool_name = data.get("tool", "")
-                if tool_name in ("navn", "name", "nombre", "名称"):
-                    names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
-                    return {"type": "error", "message": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=', '.join(names))}
-                return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
+                data = json.loads(raw)
             except json.JSONDecodeError:
-                return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
+                try:
+                    decoder = json.JSONDecoder()
+                    data, _ = decoder.raw_decode(raw)
+                except (json.JSONDecodeError, ValueError):
+                    return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
+            tool_name = data.get("tool", "")
+            if tool_name in ("navn", "name", "nombre", "名称"):
+                names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
+                return {"type": "error", "message": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=', '.join(names))}
+            return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
 
         if done_match:
             try:
