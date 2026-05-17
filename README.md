@@ -19,14 +19,21 @@ python api_server.py   # Åbn http://localhost:5000
 agent_core.py         # Agent-kerne: LLM-interaktion, opgavetræ, værktøjer
 api_server.py         # Flask API: SSE streaming, sessions, filhåndtering
 llm_wrapper.py        # LM Studio HTTP wrapper (completions + streaming)
-tools.py              # Tool/ToolRegistry — generisk værktøjs-ramme
+tools.py              # Tool/ToolRegistry — generisk værktøjs-ramme (parse_response, build_system_prompt)
 github_wrapper.py     # GitHub API: repos, issues, PRs
-git_ops.py            # Git operationer via subprocess
+git_ops.py            # Git + fil operationer (write_file med syntax/dependency/route-validering)
 task_tree.py          # TaskTree / TaskNode datastruktur
-session_manager.py    # Session persistence (JSON)
+session_manager.py    # Session persistence (JSON), threading lock, corrupt session cleanup
 web_searcher.py       # DuckDuckGo web scraping
+skill_loader.py       # Skills-system — frontmatter, keyword-scoring, sprog-override
 module_builder.py     # Dynamisk modulbygger (eksperimentel)
-static/index.html     # Browser-UI med drag/resize paneler
+model_manager.py      # OpenAI + LM Link REST API model-lister
+lang.py               # Oversættelser (da/en/es/zh)
+i18n.py               # Internacionaliserings-nøgler (K enum)
+static/index.html     # Browser-UI med drag/resize paneler, template dropdown, sprogvælger
+skills/               # Skills i markdown med frontmatter (da/en sprog-overrides)
+skills/base.md        # Base-skill: altid aktiv
+skills/da/            # Dansk-sprogede skills
 ```
 
 ## 🎯 Skabeloner
@@ -40,6 +47,9 @@ Vælg skabelon i dropdown før nedbrydning — LLM får fastlagte sektioner:
 | 🔍 **Kodeanalyse** | Formål → Imports → Arkitektur → Kodekvalitet → Sikkerhed |
 | 📊 **Diff-analyse** | Git log + diff → Risikovurdering → Anbefalinger |
 | 🔀 **PR Agenten** | Branch → Commit → Push → Pull Request (automatiseret PR workflow) |
+| 🐍 **Programmeringsopgave** | 5 faser: Kravanalyse → Arkitekturdesign → Implementeringsplan → Sikkerhedsanalyse → Kodeimplementering (`read_chunk` + `write_file`) |
+| 🏗️ **Python Arkitektur** | 1 task: Arkitekturplanlægning med `write_file` output til `./docs/arkitektur.md` |
+| 👤 **Agenten (3 tasks)** | 3 faser: Forstå formål → Udforsk/læs filer → Planlæg/beslut (generisk agent-workflow) |
 
 ## 🔧 Værktøjer
 
@@ -65,6 +75,19 @@ Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører:
 | `git_pull` | Hent ændringer fra remote |
 | `git_checkout` | Skift til branch |
 | `read_chunk` | Læs en chunk af en stor fil |
+| `write_file` | Skriv fil til disk (validerer syntax, dependencies og routes) |
+
+## ✅ Validering
+
+`write_file` udfører automatisk 3 valideringer på skrevne filer:
+
+| Validering | Hvornår | Beskrivelse |
+|------------|---------|-------------|
+| **Syntax check** | `.py` filer | `ast.parse()` — returnerer `syntax_error` ved fejl (linje + besked) |
+| **Dependency check** | `.py` filer | Scanner imports mod `requirements.txt` — returnerer `missing_deps` og **opdaterer automatisk** `requirements.txt` |
+| **Route mismatch** | `.py` / `.html` / `.js` | Sammenligner `fetch()`/`action` URLs i frontend med `@app.route()` i backend — returnerer `route_warnings` for URL'er uden matchende route |
+
+Valideringsresultater sendes tilbage til LLM som tool-output, så modellen kan **selvrette** fejl i næste iteration.
 
 ## 🔐 Sikkerhed — Best Practices
 
@@ -90,6 +113,8 @@ Sørg for at LM Studio serveren kører med OpenAI-kompatibel API aktiveret.
 
 **Model-valg**: Qwen3 er optimeret til agentic tasks og tool-calling. Mindre modeller fungerer også til simple opgaver.
 
+**LM Link**: Agenten understøtter også eksterne OpenAI-kompatible API'er (f.eks. nemotron på remote LM Studio) via `model_manager.py` — `get_all_rest_models()` merger OpenAI + REST API endpoints. Konfigurer i `.env` med `REST_API_BASE_URL` og `REST_API_KEY`.
+
 ## 🏗️ Arkitektur
 
 ```
@@ -103,36 +128,44 @@ Flask API (api_server.py)
     └── sessions/ (JSON persistence)
 ```
 
-**Tool-loop**: `solve_task_stream` → LLM (`/v1/chat/completions` med system/user/assistant messages) → parse response → hvis TOOL: executér → feed resultat som user-message → LLM → ... → `<<<DONE>>>`
+**Tool-loop**: `solve_task_stream` → LLM (`/v1/chat/completions` med system/user/assistant messages) → parse response (JSON via `raw_decode`) → hvis TOOL: executér → feed resultat som user-message (med `TOOL_CONTINUATION` reminder) → LLM → ... → `<<<DONE>>>` (auto-tvinges efter 8 tool-calls)
 
 **PR Workflow**: PR Agenten-skabelonen aktiverer checkpoint-validering — LLM'en tvinges til at branch → commit → push → PR i korrekt rækkefølge. Hvis et trin mangler, afvises `<<<DONE>>>` med en checkpoint-fejl.
 
+**Skills**: `skill_loader.py` indlæser `skills/*.md` med frontmatter (keywords, template, sprog). `_match_skills()` scorer brugerens prompt og aktiverer relevante skills + deres sprog-overrides. Skills vises som "Retningslinjer (ikke værktøjer)" i prompten.
+
 ## 📝 Features
 
-- **Sessions**: Gem/indlæs/omdøb — persistent JSON storage
+- **Sessions**: Gem/indlæs/omdøb — persistent JSON storage med atomisk write og threading lock
 - **Filanalyse**: Upload filer — LLM får fuld filkontekst (store filer deles automatisk i chunks)
 - **Streaming**: Real-time SSE output med thinking-toggle og chat-formatering (`/v1/chat/completions`)
 - **Resultatkaskade**: Forældre-noder modtager børns resultater
-- **Drag/resize paneler**: Frit layout med maximize/minimize/close
+- **Drag/resize paneler**: Frit layout med maximize/minimize/close + Ctrl+C i output-områder
 - **Markdown eksport**: Preview + download af session rapporter
-- **Skabeloner**: Fastlagte sektioner — LLM bestemmer IKKE layout
+- **Skabeloner**: Fastlagte sektioner med per-template `SECTION_INSTRUCTIONS` — LLM bestemmer IKKE layout
 - **PR Workflow**: Automatiseret branch → commit → push → PR med checkpoint-validering
 - **Multi-sprog**: UI og LLM-instruktioner på dansk, engelsk, spansk og kinesisk
+- **Skills-system**: Markdown-baserede skills med frontmatter, keyword-scoring og template-suggestion; sprog-overrides via `skills/{lang}/` struktur
+- **Validering**: `write_file` tjekker syntax (`ast.parse`), dependencies (mod `requirements.txt`) og frontend/backend route-match
+- **Auto-DONE**: Forhindrer uendelig tool-loop — `<<<DONE>>>` tvinges efter 8 tool-calls og reminders efter hvert tool-resultat
+- **Robust JSON-parsing**: `json.JSONDecoder().raw_decode()` håndterer AI-output med ekstra `}}}` uden crash
+- **LM Link support**: OpenAI-kompatible REST API modeller (f.eks. nemotron på remote LM Studio)
 
 ## 📋 Requirements
 
 ```
-flask==3.1.3
-flask-cors==6.0.2
-requests==2.33.1
-beautifulsoup4==4.14.3
-anytree==2.13.0
-python-dotenv==1.2.2
+flask>=3.1.3
+flask-cors>=6.0.2
+requests>=2.33.1
+beautifulsoup4>=4.14.3
+anytree>=2.13.0
+python-dotenv>=1.2.2
+openai>=1.0.0          # LM Link understøttelse
 ```
 
 ## 🔄 Git workflow
 
-Brug **🔀 PR Agenten** skabelonen til automatiseret PR-flow:
+Brug **🔀 PR Agenten** skabelonen til automatiseret PR workflow, eller **🐍 Programmeringsopgave** og **🏗️ Python Arkitektur** til kodegenerering med `write_file`:
 
 1. Vælg "🔀 PR Agenten" i dropdown
 2. Indtast f.eks. "Opret branch 'ny-feature', commit ændringer, push og opret PR til master"
