@@ -469,6 +469,31 @@
             cursor: pointer;
         }
         
+        .template-warning {
+            background: var(--warning);
+            color: #0f172a;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 8px;
+            white-space: pre-wrap;
+        }
+        [data-theme="light"] .template-warning {
+            color: #0f172a;
+        }
+        .template-warning-close {
+            float: right;
+            cursor: pointer;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.15);
+        }
+        .template-warning-close:hover {
+            background: rgba(0,0,0,0.3);
+        }
+        
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
@@ -567,6 +592,7 @@
             <button onclick="executeWithStream()" id="executeBtn" style="background:#10b981;">⚡ Udfør</button>
             <button onclick="stopStream()" id="stopBtn" style="background:#ef4444;">⏹ Stop</button>
         </div>
+        <div id="templateWarning" class="template-warning" style="display:none;"></div>
     </div>
     
     <div class="canvas-container" id="canvasContainer"></div>
@@ -1922,6 +1948,15 @@ async function decompose() {
         addLogEntry('INFO', _('decompose_done'), `${data.session_id}`);
         refreshSessions();
         await saveCurrentSession();
+
+        // Show template warning if any
+        const warnDiv = document.getElementById('templateWarning');
+        if (data.template_warning) {
+            warnDiv.style.display = 'block';
+            warnDiv.innerHTML = `<span class="template-warning-close" onclick="this.parentElement.style.display='none'">✕</span>${data.template_warning.replace(/\n/g, '<br>')}`;
+        } else {
+            warnDiv.style.display = 'none';
+        }
     } else {
         addLogEntry('ERROR', 'Nedbrydning fejlede', data.error);
     }

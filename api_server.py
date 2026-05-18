@@ -478,6 +478,87 @@ def _ensure_model_loaded(model_key):
         print(f"⚠️  {msg}")
 
 
+TEMPLATE_GUIDANCE = {
+    "resume": {
+        "keywords": ["resume", "referat", "opsummer", "analyser", "review", "beskriv", "sammenfat", "referér", "sammendrag"],
+        "examples": [
+            'Lav et resume af [filnavn.py]',
+            'Opsummer [filnavn] i et kort referat',
+            'Analyser [fil] og lav en struktureret gennemgang',
+        ],
+        "hint": "Vælg resume-skabelonen nar du vil have en struktureret gennemgang af en bestemt fil."
+    },
+    "kodeanalyse": {
+        "keywords": ["analyser", "kode", "gennemgå", "review", "debug", "sikkerhed", "struktur", "arkitektur", "kodekvalitet", "fejl", "sårbarhed"],
+        "examples": [
+            'Analyser koden i [filnavn.py]',
+            'Gennemgå [fil] for fejl og sikkerhedsproblemer',
+            'Review koden i [fil] og vurder kodekvaliteten',
+        ],
+        "hint": "Vælg kodeanalyse-skabelonen nar du skal have analyseret en konkret fil eller kodebase."
+    },
+    "diffanalyse": {
+        "keywords": ["diff", "forskel", "ændring", "change", "commit", "pull", "merge", "version", "gren", "branch"],
+        "examples": [
+            'Analyser forskellen mellem branch-a og branch-b',
+            'Gennemgå de seneste commits og vurder risiko',
+            'Sammenlign to versioner af [fil]',
+        ],
+        "hint": "Vælg diffanalyse-skabelonen nar du sammenligner to versioner eller brances."
+    },
+    "agenten": {
+        "keywords": ["git", "github", "commit", "push", "branch", "pull request", "pr", "workflow", "repository", "repo"],
+        "examples": [
+            'Opret en branch, commit, push og lav en PR',
+            'Git workflow: opret branch commit push PR',
+            'Commit og push mine ændringer, og opret en pull request',
+        ],
+        "hint": "Vælg PR Agenten-skabelonen nar du skal udføre et git/github workflow."
+    },
+    "programmering": {
+        "keywords": ["programmer", "opret", "implementer", "byg", "skriv", "kod", "app", "feature", "funktion", "system", "modul", "klasse", "program", "tool", "værktøj", "library", "bibliotek"],
+        "examples": [
+            'Opret en Flask-app med en health endpoint',
+            'Implementer en funktion der beregner moms i Python',
+            'Byg et kommandolinje-værktøj der kan søge efter filer',
+        ],
+        "hint": "Vælg programmeringsskabelonen nar du skal designe og implementere ny kode."
+    },
+    "python-arkitektur": {
+        "keywords": ["arkitektur", "planlæg", "design", "struktur", "python", "flask", "komponent", "dokumentér", "systemoversigt", "modulopdeling"],
+        "examples": [
+            'Analyser [projekt] og planlæg arkitektur for en Python/Flask version',
+            'Design arkitekturen for et nyt system med Flask og SQLAlchemy',
+            'Planlæg komponentstruktur og dataflow for en webapp',
+        ],
+        "hint": "Vælg Python Arkitektur-skabelonen nar du skal planlægge og dokumentere en systemarkitektur."
+    },
+}
+
+
+def _validate_template_prompt(prompt: str, template: str) -> dict:
+    if not template or template == "fri":
+        return {"warning": "", "matches": 0, "total": 0}
+    guidance = TEMPLATE_GUIDANCE.get(template)
+    if not guidance:
+        return {"warning": "", "matches": 0, "total": 0}
+    
+    prompt_lower = prompt.lower()
+    matches = sum(1 for kw in guidance["keywords"] if kw in prompt_lower)
+    total = len(guidance["keywords"])
+    
+    if matches == 0:
+        examples = "\n".join(f"  • {ex}" for ex in guidance["examples"])
+        warning = (
+            f"⚠️  Din prompt ligner ikke en opgave til skabelonen '{template}'. "
+            f"Her er eksempler på hvad der passer:\n{examples}\n\n"
+            f"{guidance['hint']}"
+        )
+        return {"warning": warning, "matches": matches, "total": total}
+    
+    return {"warning": "", "matches": matches, "total": total}
+
+
 @app.route("/api/decompose", methods=["POST"])
 def decompose():
     data = request.json
@@ -501,6 +582,11 @@ def decompose():
     agent.show_thinking = show_thinking
     agent.lang = lang
     session_context = session_manager.get_knowledge_for_context(current_session_id, prompt)
+    
+    # Validate prompt against selected template
+    validation = _validate_template_prompt(prompt, template)
+    if validation["warning"]:
+        print(f"⚠️ Skabelon-advarsel ({template}): kun {validation['matches']}/{validation['total']} keywords matchede")
     
     print(f"🌳 Nedbryder: {prompt[:50]}..." + (f" skabelon: {template}" if template else ""))
     if files:
@@ -536,7 +622,8 @@ def decompose():
             "original_prompt": agent.original_prompt,
             "session_id": current_session_id,
             "has_context": bool(session_context),
-            "log": agent.agent_log[-20:] if agent.agent_log else []
+            "log": agent.agent_log[-20:] if agent.agent_log else [],
+            "template_warning": validation.get("warning", ""),
         })
     except Exception as e:
         print(f"❌ Fejl: {e}")
