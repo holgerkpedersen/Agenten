@@ -668,6 +668,12 @@ class Agent:
         task_count = self._count_tasks(self.task_tree.root)
         self._log("INFO", t(K.LOG_DECOMPOSE_DONE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
 
+        if task_count <= 1 and template in (None, "", "fri"):
+            self._log("INFO", "Kun én opgave — bruger generisk nedbrydning", "")
+            self.task_tree = self._create_fallback_tree(prompt)
+            task_count = self._count_tasks(self.task_tree.root)
+            self._log("INFO", t(K.LOG_DECOMPOSE_DONE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
+
         return self.task_tree_to_dict()
 
     def reset_execution(self):
