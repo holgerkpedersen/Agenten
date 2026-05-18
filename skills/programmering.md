@@ -1,6 +1,7 @@
 ---
 name: programmering
 keywords: programmer, kode, program, implementer, opret, byg, skriv, kod, kodning, create, app, application, system, develop, development, feature, funktion, build, lav, tool, værktøj, modul, klasse, library, bibliotek
+action_types: [write]
 template: programmering
 description: Arkitektonisk analyse og planlægning af programmeringsopgaver med kravanalyse, design, implementeringsplan, sikkerhed og kodeimplementering.
 ---

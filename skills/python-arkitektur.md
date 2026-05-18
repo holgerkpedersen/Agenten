@@ -1,6 +1,7 @@
 ---
 name: python-arkitektur
 keywords: python, flask, arkitektur, arkitekt, design, struktur, modul, komponent, web, api, rest, database, sqlalchemy, html, javascript, frontend, backend, blueprint, jinja, jwt, oauth, docker, deploy, ci, cd
+action_types: [analyze, write]
 template: python-arkitektur
 description: Planlægning og dokumentation af Python/Flask-projektarkitektur med best practices for webudvikling.
 ---

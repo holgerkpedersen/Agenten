@@ -1,6 +1,7 @@
 ---
 name: resume
 keywords: resume, referat, opsummer, analyser, analyse, review, beskriv, sammenfat
+action_types: [resume, analyze]
 template: resume
 description: Struktureret resume af en fil eller et dokument med Overblik, Noglepunkter, Konklusion og Anbefalinger.
 ---
