@@ -2031,13 +2031,8 @@ let lastDecomposeTemplate = null;
 async function executeWithStream() {
     const template = document.getElementById('templateSelect').value;
     if (!currentTree || (template !== 'fri' && template !== lastDecomposeTemplate)) {
-        if (template !== 'fri') {
-            await decompose();
-            if (!currentTree) return;
-        } else if (!currentTree) {
-            alert(_('decompose_first'));
-            return;
-        }
+        await decompose();
+        if (!currentTree) return;
     }
     
     stopStream();
