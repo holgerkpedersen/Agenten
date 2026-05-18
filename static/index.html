@@ -5,12 +5,78 @@
     <title>Agenten</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
-        * {
-            box-sizing: border-box;
+        :root {
+            --bg: #0f172a;
+            --panel-bg: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --text-muted: #64748b;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --panel-header: #334155;
+            --btn-secondary: #475569;
+            --btn-secondary-hover: #64748b;
+            --input-bg: #0f172a;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --gradient-start: #f59e0b;
+            --gradient-end: #fbbf24;
+            --scrollbar-track: #1e293b;
+            --scrollbar-thumb: #475569;
+            --scrollbar-thumb-hover: #64748b;
+            --shadow: rgba(0,0,0,0.3);
+            --shadow-drag: rgba(0,0,0,0.5);
+            --log-info-border: #60a5fa;
+            --log-info-text: #93c5fd;
+            --log-debug-border: #64748b;
+            --log-debug-text: #94a3b8;
+            --log-error-text: #fca5a5;
+            --log-llm-border: #a78bfa;
+            --log-llm-text: #c4b5fd;
+            --history-border: #60a5fa;
+            --resize-color: #60a5fa;
+            --resize-hover: #a78bfa;
+            --purple-accent: #8b5cf6;
         }
-        button, input, select, label, .reuse-btn, .tools-toggle, .panel-controls {
-            user-select: none;
+
+        [data-theme="light"] {
+            --bg: #f8fafc;
+            --panel-bg: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --panel-header: #f1f5f9;
+            --btn-secondary: #e2e8f0;
+            --btn-secondary-hover: #cbd5e1;
+            --input-bg: #ffffff;
+            --success: #059669;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --gradient-start: #d97706;
+            --gradient-end: #f59e0b;
+            --scrollbar-track: #f1f5f9;
+            --scrollbar-thumb: #cbd5e1;
+            --scrollbar-thumb-hover: #94a3b8;
+            --shadow: rgba(0,0,0,0.1);
+            --shadow-drag: rgba(0,0,0,0.2);
+            --log-info-border: #3b82f6;
+            --log-info-text: #1d4ed8;
+            --log-debug-border: #94a3b8;
+            --log-debug-text: #64748b;
+            --log-error-text: #b91c1c;
+            --log-llm-border: #7c3aed;
+            --log-llm-text: #6d28d9;
+            --history-border: #3b82f6;
+            --resize-color: #3b82f6;
+            --resize-hover: #6366f1;
+            --purple-accent: #7c3aed;
         }
+
+        * { box-sizing: border-box; }
+        button, input, select, label, .reuse-btn, .tools-toggle, .panel-controls { user-select: none; }
         .tree-container, .llm-box, .log-box, .history-box, .file-preview,
         .tree-node-content, .history-item, .history-result, .history-prompt,
         #currentTask, #progressContainer {
@@ -21,12 +87,13 @@
         
         body {
             font-family: 'Segoe UI', system-ui;
-            background: #0f172a;
+            background: var(--bg);
             margin: 0;
             padding: 20px;
-            color: #e2e8f0;
+            color: var(--text);
             overflow: hidden;
             height: 100vh;
+            transition: background 0.3s, color 0.3s;
         }
         
         .app-container {
@@ -37,21 +104,35 @@
         }
         
         .header {
-            background: #1e293b;
+            background: var(--panel-bg);
             padding: 15px 20px;
             border-radius: 16px;
             text-align: left;
             flex-shrink: 0;
+            transition: background 0.3s;
         }
         
         h1 {
             margin: 0;
-            background: linear-gradient(135deg, #f59e0b, #fbbf24);
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
             display: inline-block;
         }
+        
+        .theme-toggle {
+            background: var(--btn-secondary);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 8px;
+            transition: background 0.2s;
+        }
+        .theme-toggle:hover { background: var(--btn-secondary-hover); }
         
         .session-bar {
             display: flex;
@@ -62,11 +143,11 @@
         }
         
         .session-select {
-            background: #1e293b;
-            border: 1px solid #334155;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
             padding: 8px;
             border-radius: 8px;
-            color: #e2e8f0;
+            color: var(--text);
             flex: 1;
         }
         
@@ -80,7 +161,7 @@
         
         .toolbar-label {
             font-size: 11px;
-            color: #64748b;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 1px;
             min-width: 70px;
@@ -88,11 +169,11 @@
         }
         
         .tools-toggle {
-            background: #334155;
+            background: var(--btn-secondary);
             border: none;
             padding: 8px 12px;
             border-radius: 8px;
-            color: white;
+            color: var(--text);
             cursor: pointer;
             font-size: 14px;
             position: relative;
@@ -103,8 +184,8 @@
             position: absolute;
             right: 0;
             top: 100%;
-            background: #1e293b;
-            border: 1px solid #334155;
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
             border-radius: 8px;
             padding: 8px;
             z-index: 1000;
@@ -113,9 +194,7 @@
             gap: 4px;
         }
         
-        .tools-dropdown.show {
-            display: flex;
-        }
+        .tools-dropdown.show { display: flex; }
         
         .tools-dropdown button {
             width: 100%;
@@ -130,7 +209,7 @@
         }
         
         button {
-            background: #3b82f6;
+            background: var(--accent);
             border: none;
             padding: 8px 16px;
             border-radius: 8px;
@@ -138,53 +217,57 @@
             font-weight: bold;
             cursor: pointer;
             font-size: 12px;
+            transition: background 0.2s;
         }
         
-        button:hover { background: #2563eb; }
+        button:hover { background: var(--accent-hover); }
         
         textarea {
             width: 100%;
             padding: 10px;
-            background: #0f172a;
-            border: 1px solid #334155;
+            background: var(--input-bg);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            color: #e2e8f0;
+            color: var(--text);
             font-family: monospace;
             font-size: 13px;
             resize: vertical;
+            transition: background 0.3s, border-color 0.3s, color 0.3s;
         }
         
         .canvas-container {
             flex: 1;
             position: relative;
-            background: #0f172a;
+            background: var(--bg);
             border-radius: 16px;
             overflow: auto;
             min-height: 0;
+            transition: background 0.3s;
         }
         
         .panel {
             position: absolute;
-            background: #1e293b;
+            background: var(--panel-bg);
             border-radius: 16px;
-            border: 1px solid #334155;
+            border: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px var(--shadow);
             min-width: 200px;
             min-height: 150px;
+            transition: background 0.3s, border-color 0.3s;
         }
         
         .panel.dragging {
             opacity: 0.8;
             cursor: grabbing;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 30px var(--shadow-drag);
             z-index: 1000;
         }
         
         .panel-header {
-            background: #334155;
+            background: var(--panel-header);
             padding: 10px 15px;
             cursor: grab;
             border-radius: 15px 15px 0 0;
@@ -192,16 +275,15 @@
             justify-content: space-between;
             align-items: center;
             flex-shrink: 0;
+            transition: background 0.3s;
         }
         
-        .panel-header:active {
-            cursor: grabbing;
-        }
+        .panel-header:active { cursor: grabbing; }
         
         .panel-header h3 {
             margin: 0;
             font-size: 14px;
-            color: #e2e8f0;
+            color: var(--text);
         }
         
         .drag-icon {
@@ -210,29 +292,20 @@
             opacity: 0.6;
             font-size: 16px;
         }
+        .drag-icon:active { cursor: grabbing; }
         
-        .drag-icon:active {
-            cursor: grabbing;
-        }
-        
-        .panel-controls {
-            display: flex;
-            gap: 8px;
-        }
+        .panel-controls { display: flex; gap: 8px; }
         
         .panel-controls button {
-            background: #475569;
+            background: var(--btn-secondary);
             border: none;
             padding: 2px 8px;
             border-radius: 6px;
-            color: white;
+            color: var(--text);
             cursor: pointer;
             font-size: 11px;
         }
-        
-        .panel-controls button:hover {
-            background: #64748b;
-        }
+        .panel-controls button:hover { background: var(--btn-secondary-hover); }
         
         .panel-content {
             flex: 1;
@@ -248,36 +321,34 @@
             width: 20px;
             height: 20px;
             cursor: nw-resize;
-            background: linear-gradient(135deg, transparent 50%, #60a5fa 50%);
+            background: linear-gradient(135deg, transparent 50%, var(--resize-color) 50%);
             border-radius: 0 0 12px 0;
             z-index: 10;
         }
-        
         .resize-handle:hover {
-            background: linear-gradient(135deg, transparent 50%, #a78bfa 50%);
+            background: linear-gradient(135deg, transparent 50%, var(--resize-hover) 50%);
         }
         
         .tree-container, .llm-box, .log-box, .history-box {
-            background: #0f172a;
+            background: var(--input-bg);
             border-radius: 8px;
             padding: 10px;
             height: 100%;
             overflow-y: auto;
             font-family: monospace;
             font-size: 12px;
+            transition: background 0.3s;
         }
         
         .tree-node-content {
             padding: 4px 8px;
             margin: 2px 0;
-            background: #1e293b;
+            background: var(--panel-bg);
             border-radius: 6px;
-            border-left: 3px solid #3b82f6;
+            border-left: 3px solid var(--accent);
         }
         
-        .tree-children {
-            margin-left: 20px;
-        }
+        .tree-children { margin-left: 20px; }
         
         .task-status {
             display: inline-block;
@@ -287,31 +358,30 @@
             margin-left: 8px;
         }
         
-        .status-pending { background: #f59e0b; color: #0f172a; }
-        .status-running { background: #3b82f6; }
-        .status-done { background: #10b981; }
+        .status-pending { background: var(--warning); color: #0f172a; }
+        .status-running { background: var(--accent); color: white; }
+        .status-done { background: var(--success); color: white; }
         
         .loading {
             display: inline-block;
             width: 14px;
             height: 14px;
-            border: 2px solid #3b82f6;
+            border: 2px solid var(--accent);
             border-top-color: transparent;
             border-radius: 50%;
             animation: spin 0.6s linear infinite;
         }
-        
         @keyframes spin { to { transform: rotate(360deg); } }
         
         .progress-bar {
-            background: #334155;
+            background: var(--border);
             border-radius: 10px;
             overflow: hidden;
             margin: 10px 0;
         }
         
         .progress-fill {
-            background: #3b82f6;
+            background: var(--accent);
             width: 0%;
             height: 16px;
             transition: width 0.3s;
@@ -324,28 +394,28 @@
             font-size: 11px;
         }
         
-        .log-INFO { border-left-color: #60a5fa; color: #93c5fd; }
-        .log-DEBUG { border-left-color: #64748b; color: #94a3b8; }
-        .log-ERROR { border-left-color: #ef4444; color: #fca5a5; }
-        .log-LLM { border-left-color: #a78bfa; color: #c4b5fd; }
+        .log-INFO { border-left-color: var(--log-info-border); color: var(--log-info-text); }
+        .log-DEBUG { border-left-color: var(--log-debug-border); color: var(--log-debug-text); }
+        .log-ERROR { border-left-color: var(--danger); color: var(--log-error-text); }
+        .log-LLM { border-left-color: var(--log-llm-border); color: var(--log-llm-text); }
         
         .history-item {
-            background: #1e293b;
+            background: var(--panel-bg);
             border-radius: 8px;
             margin-bottom: 10px;
             padding: 10px;
-            border-left: 3px solid #60a5fa;
+            border-left: 3px solid var(--history-border);
         }
         
         .history-prompt {
             font-weight: bold;
-            color: #60a5fa;
+            color: var(--history-border);
             margin-bottom: 5px;
         }
         
         .history-result {
             font-size: 11px;
-            color: #93c5fd;
+            color: var(--log-info-text);
             margin-top: 5px;
         }
         
@@ -353,20 +423,21 @@
             margin-top: 5px;
             font-size: 10px;
             padding: 2px 8px;
-            background: #475569;
+            background: var(--btn-secondary);
         }
         
         .folder-status {
             display: inline-block;
-            background: #10b981;
+            background: var(--success);
             padding: 4px 10px;
             border-radius: 20px;
             font-size: 11px;
             margin-left: 10px;
+            color: white;
         }
         
         .file-preview {
-            background: #0f172a;
+            background: var(--input-bg);
             border-radius: 8px;
             padding: 10px;
             margin-top: 10px;
@@ -377,29 +448,31 @@
             text-align: left;
         }
         
-        .file-preview pre {
-            text-align: left;
-            margin: 0;
+        .file-preview pre { text-align: left; margin: 0; }
+        
+        .toolbar-select, .lang-select {
+            background: var(--input-bg);
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 8px;
+            color: var(--text);
+            transition: background 0.3s, border-color 0.3s, color 0.3s;
         }
         
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+        .thinking-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--purple-accent);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
         }
         
-        ::-webkit-scrollbar-track {
-            background: #1e293b;
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: #475569;
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
-        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
     </style>
 </head>
 <body>
@@ -409,6 +482,7 @@
             <h1>🤖 Agenten</h1>
 <div class="tools-wrapper">
                 <button class="tools-toggle" onclick="toggleTools()" id="toolsMenu" title="Flere værktøjer">⚙️</button>
+                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Skift tema">☀️</button>
                 <div class="tools-dropdown" id="toolsDropdown">
                     <button onclick="resetExecution()" id="resetTreeBtn" title="Nulstil alle opgavers status">🔄 Nulstil træ</button>
                     <button onclick="deleteTree()" id="deleteTreeBtn" title="Slet hele opgavetræet">🗑 Slet træ</button>
@@ -416,8 +490,8 @@
                     <button onclick="exportToMarkdown()" id="exportMd" title="Eksporter til Markdown">📄 Eksporter MD</button>
                     <button onclick="saveLayoutToLocal()" id="saveLayoutBtn" title="Gem layout permanent">💾 Gem layout</button>
                     <button onclick="resetLayout()" id="resetLayoutBtn" title="Nulstil layout">🔄 Reset layout</button>
-                    <hr style="border-color:#334155;margin:4px 0;">
-                    <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research" style="background:#8b5cf6;">🔍 Flow Builder</button>
+                    <hr style="border-color:var(--border);margin:4px 0;">
+                    <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research" style="background:var(--purple-accent);">🔍 Flow Builder</button>
                     <button onclick="setGithubToken()" id="githubTokenBtn" title="Opsæt GitHub Token">🔑 GitHub Token</button>
                 </div>
             </div>
@@ -438,7 +512,7 @@
         
         <div class="toolbar-row">
             <span class="toolbar-label" id="templateLabel">Skabelon</span>
-            <select id="templateSelect" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;">
+            <select id="templateSelect" class="toolbar-select">
                 <option value="fri">🌳 Fri nedbrydning</option>
                 <option value="resume">📄 Resumé</option>
                 <option value="kodeanalyse">🔍 Kodeanalyse</option>
@@ -447,11 +521,11 @@
                 <option value="programmering">💻 Programmeringsopgave</option>
                 <option value="python-arkitektur">🏗️ Python Arkitektur</option>
             </select>
-            <label style="display:inline-flex;align-items:center;gap:8px;background:#8b5cf6;padding:8px 12px;border-radius:6px;cursor:pointer;">
+            <label class="thinking-label">
                 <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
                 <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
             </label>
-            <select id="langSelect" onchange="switchLang(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;">
+            <select id="langSelect" class="toolbar-select" onchange="switchLang(this.value)" style="min-width:80px;">
                 <option value="da">🇩🇰</option>
                 <option value="en">🇬🇧</option>
                 <option value="es">🇪🇸</option>
@@ -461,16 +535,16 @@
         
         <div class="toolbar-row">
             <span class="toolbar-label" id="llmLangLabel">🤖 LLM Sprog</span>
-            <select id="llmLangSelect" onchange="switchLLMLang(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;min-width:80px;">
+            <select id="llmLangSelect" class="toolbar-select" onchange="switchLLMLang(this.value)" style="min-width:80px;">
                 <option value="da">🇩🇰 Dansk</option>
                 <option value="en">🇬🇧 English</option>
                 <option value="es">🇪🇸 Español</option>
                 <option value="zh">🇨🇳 中文</option>
             </select>
             <span class="toolbar-label" id="decomposeModelLabel">🌳 Decompose</span>
-            <select id="decomposeModelSelect" onchange="switchDecomposeModel(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;flex:1;"></select>
+            <select id="decomposeModelSelect" class="toolbar-select" onchange="switchDecomposeModel(this.value)" style="flex:1;"></select>
             <span class="toolbar-label" id="executeModelLabel">⚡ Execute</span>
-            <select id="modelSelect" onchange="switchModel(this.value)" style="background:#1e293b;border:1px solid #334155;padding:8px;border-radius:8px;color:#e2e8f0;flex:1;"></select>
+            <select id="modelSelect" class="toolbar-select" onchange="switchModel(this.value)" style="flex:1;"></select>
         </div>
         
         <div class="toolbar-row">
@@ -828,6 +902,22 @@ let eventSource = null;
 let panels = {};
 let showThinking = true;
 let treeEditMode = false;
+let currentTheme = localStorage.getItem('agenten_theme') || 'dark';
+
+function toggleTheme() {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    localStorage.setItem('agenten_theme', currentTheme);
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+}
+
+// Apply saved theme on load
+document.documentElement.setAttribute('data-theme', currentTheme);
+setTimeout(() => {
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+}, 0);
 
 // Initialize language after all variables are declared
 loadLang(currentLang);
