@@ -938,6 +938,12 @@ function toggleTheme() {
     if (btn) btn.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
 }
 
+function switchTemplate(template) {
+    document.getElementById('templateSelect').value = template;
+    document.getElementById('templateWarning').style.display = 'none';
+    addLogEntry('INFO', 'Skiftede skabelon', `til '${template}' — gentag nedbrydning`);
+}
+
 // Apply saved theme on load
 document.documentElement.setAttribute('data-theme', currentTheme);
 setTimeout(() => {
@@ -1952,8 +1958,13 @@ async function decompose() {
         // Show template warning if any
         const warnDiv = document.getElementById('templateWarning');
         if (data.template_warning) {
+            let html = `<span class="template-warning-close" onclick="this.parentElement.style.display='none'">✕</span>`;
+            html += data.template_warning.replace(/\n/g, '<br>');
+            if (data.suggested_template) {
+                html += `<br><br><button onclick="switchTemplate('${data.suggested_template}')" style="background:#10b981;border:none;padding:6px 14px;border-radius:6px;color:white;cursor:pointer;font-weight:bold;">Skift til '${data.suggested_template}'</button>`;
+            }
             warnDiv.style.display = 'block';
-            warnDiv.innerHTML = `<span class="template-warning-close" onclick="this.parentElement.style.display='none'">✕</span>${data.template_warning.replace(/\n/g, '<br>')}`;
+            warnDiv.innerHTML = html;
         } else {
             warnDiv.style.display = 'none';
         }

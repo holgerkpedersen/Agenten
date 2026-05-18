@@ -538,23 +538,39 @@ TEMPLATE_GUIDANCE = {
 
 def _validate_template_prompt(prompt: str, template: str) -> dict:
     if not template or template == "fri":
-        return {"warning": "", "matches": 0, "total": 0}
+        return {"warning": "", "suggestion": "", "suggested_template": ""}
     guidance = TEMPLATE_GUIDANCE.get(template)
     if not guidance:
-        return {"warning": "", "matches": 0, "total": 0}
+        return {"warning": "", "suggestion": "", "suggested_template": ""}
     
     prompt_lower = prompt.lower()
     matches = sum(1 for kw in guidance["keywords"] if kw in prompt_lower)
     total = len(guidance["keywords"])
     
     if matches == 0:
+        # Find better template via SkillFlow scoring
+        suggested = ""
+        suggested_template = ""
+        try:
+            from skill_loader import SkillLoader
+            skills = SkillLoader.load_all()
+            better = SkillLoader.suggest_template(prompt, skills)
+            if better and better != template:
+                suggested_template = better
+                better_guidance = TEMPLATE_GUIDANCE.get(better)
+                if better_guidance:
+                    suggested = f"\n\nForslag: Brug skabelonen '{better}' i stedet.\n{better_guidance['hint']}"
+        except Exception:
+            pass
+        
         examples = "\n".join(f"  • {ex}" for ex in guidance["examples"])
         warning = (
-            f"⚠️  Din prompt ligner ikke en opgave til skabelonen '{template}'. "
-            f"Her er eksempler på hvad der passer:\n{examples}\n\n"
-            f"{guidance['hint']}"
+            f"Din prompt ligner ikke en opgave til skabelonen '{template}'.{suggested}\n\n"
+            f"Eksempler på gode prompts til '{template}':\n{examples}"
         )
-        return {"warning": warning, "matches": matches, "total": total}
+        return {"warning": warning, "suggestion": suggested_template, "suggested_template": suggested_template}
+    
+    return {"warning": "", "suggestion": "", "suggested_template": ""}
     
     return {"warning": "", "matches": matches, "total": total}
 
@@ -624,6 +640,7 @@ def decompose():
             "has_context": bool(session_context),
             "log": agent.agent_log[-20:] if agent.agent_log else [],
             "template_warning": validation.get("warning", ""),
+            "suggested_template": validation.get("suggested_template", ""),
         })
     except Exception as e:
         print(f"❌ Fejl: {e}")
