@@ -2,6 +2,7 @@
 name: base
 keywords: 
 base: true
+action_types: [general]
 description: Grundlæggende instruktioner for ALLE tasks i Agenten. Lases altid.
 ---
 # Grundlæggende Agent-instruktioner

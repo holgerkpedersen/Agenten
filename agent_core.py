@@ -55,6 +55,7 @@ class Agent:
         self._checkpoint_branch = ""
         self._skills = SkillLoader.load_all(lang=self.lang)
         self._active_skills = []
+        self._task_start_time = 0
 
     def _register_tools(self):
         gh = GithubAPI()
@@ -262,6 +263,35 @@ class Agent:
     def _has_matching_intent(self, skill):
         intent = skill.get("template") or skill.get("intent")
         return not self.active_template or intent == self.active_template or skill.get("base")
+
+    def _record_outcome(self, task_node):
+        try:
+            from skill_tracker import tracker
+            skill_name = "__none__"
+            for s in self._active_skills:
+                if not s.get("base"):
+                    skill_name = s["name"]
+                    break
+            duration = int((time.time() - self._task_start_time) * 1000) if self._task_start_time else 0
+            tracker.record(
+                skill_name=skill_name,
+                task_summary=task_node.name,
+                success=task_node.status == "done",
+                duration_ms=duration,
+            )
+        except ImportError:
+            pass
+
+    def _evolve_if_needed(self):
+        try:
+            from skill_evolution import evolve_if_needed
+            result = evolve_if_needed(dry_run=True)
+            if result.get("status") == "evolved":
+                self._log("SKILLFLOW", "Evolution triggered", f"{len(result.get('analysis', {}).get('actions', []))} actions")
+            elif result.get("status") == "ok":
+                self._log("SKILLFLOW", "Analysis ready", f"{len(result.get('actions', []))} actions available")
+        except ImportError:
+            pass
 
     def _format_skills_for_prompt(self):
         if not self._active_skills:
@@ -790,6 +820,7 @@ class Agent:
 
     def solve_task_stream(self, task_node, original_prompt):
         task_node.status = "running"
+        self._task_start_time = time.time()
         self._log("INFO", t(K.LOG_TASK_START, self.lang), f"{task_node.name} (model: {self.llm.model})")
         self._set_task_tools(task_node.name)
         self._checkpoint_tools = set()
@@ -1011,10 +1042,12 @@ class Agent:
 
         task_node.result = full_response
         self.action_history.append(task_node.name.split()[0] if task_node.name else K.UNKNOWN)
+        self._record_outcome(task_node)
         if task_node.status == "failed":
             self._log("INFO", t(K.LOG_TASK_FAILED, self.lang), task_node.name)
         else:
             self._log("INFO", t(K.LOG_TASK_DONE, self.lang), task_node.name)
+        self._evolve_if_needed()
         yield {"type": "done", "result": full_response}
 
     def execute_tree(self, node=None):
