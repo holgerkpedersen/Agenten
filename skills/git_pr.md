@@ -2,6 +2,7 @@
 name: git_pr
 keywords: git, github, pull request, commit, push, branch, PR, workflow
 template: agenten
+action_types: [git, github]
 description: Automatiseret Git/GitHub PR workflow — opret branch, commit, push, opret pull request.
 ---
 # PR Agenten — Git/GitHub Workflow
