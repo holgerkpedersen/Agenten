@@ -2109,15 +2109,15 @@ async function executeWithStream() {
                 
             case 'task_done':
                 const taskElem = document.getElementById('currentTask');
-                if (taskElem) taskElem.innerHTML = `<span style="color:#10b981;">✓ ${escapeHtml(data.task)} færdig</span>`;
+                if (taskElem) taskElem.innerHTML = `<span style="color:var(--success);">✓ ${escapeHtml(data.task)} færdig</span>`;
                 
                 if (!showThinking && llmBox) {
                     const output = stripHarmony(currentOutputs[data.task] || data.result || '');
                     const existing = llmBox.querySelector(`[data-task="${data.task}"]`);
                     if (existing) {
-                        existing.innerHTML = `<strong style="color:#10b981;">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div>`;
+                        existing.innerHTML = `<strong style="color:var(--success);">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div>`;
                     } else {
-                        llmBox.innerHTML += `<div data-task="${data.task}" style="margin-bottom:15px;"><strong style="color:#10b981;">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div></div>`;
+                        llmBox.innerHTML += `<div data-task="${data.task}" style="margin-bottom:15px;"><strong style="color:var(--success);">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div></div>`;
                     }
                 }
                 
@@ -2142,13 +2142,13 @@ async function executeWithStream() {
                 const icon = success ? '✅' : '❌';
                 addLogEntry(success ? 'TOOL' : 'ERROR', `${icon} ${data.tool}`, JSON.stringify(data.result).slice(0, 100));
                 if (llmBox && success) {
-                    llmBox.innerHTML += `<div style="color:#10b981; margin:5px 0; padding:5px; background:#1e293b; border-left:3px solid #10b981; font-size:12px;">${icon} <strong>${escapeHtml(data.tool)}</strong>: ${escapeHtml(data.result.result?.url || data.result.result?.output || 'OK').slice(0, 150)}</div>`;
+                    llmBox.innerHTML += `<div style="color:var(--success); margin:5px 0; padding:5px; background:var(--panel-bg); border-left:3px solid var(--success); font-size:12px;">${icon} <strong>${escapeHtml(data.tool)}</strong>: ${escapeHtml(data.result.result?.url || data.result.result?.output || 'OK').slice(0, 150)}</div>`;
                     llmBox.scrollTop = llmBox.scrollHeight;
                 }
                 break;
                 
             case 'complete':
-                if (llmBox) llmBox.innerHTML += `<div style="color:#10b981; margin-top: 15px;">${_('all_done')}</div>`;
+                if (llmBox) llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
                 if (progressContainer) progressContainer.style.display = 'none';
                 addLogEntry('INFO', _('stream_done'), _('all_executed'));
                 saveCurrentSession();
@@ -2157,7 +2157,7 @@ async function executeWithStream() {
                 break;
                 
             case 'error':
-                if (llmBox) llmBox.innerHTML += `<div style="color:#ef4444;">❌ ${_('error_prefix')}${data.message}</div>`;
+                if (llmBox) llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
                 break;
