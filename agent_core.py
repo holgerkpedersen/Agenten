@@ -428,7 +428,12 @@ class Agent:
             self._log("ERROR", t(K.LOG_READ_ERROR, self.lang), str(e))
             return None
 
-    def _get_file_context(self, prompt):
+    FOLDER_SCAN_EXCLUDE = {'node_modules', '.git', 'venv', '.venv', '__pycache__', '.opencode', '.agent_storage'}
+    FOLDER_SCAN_EXTENSIONS = {'.py', '.js', '.json', '.html', '.css', '.yml', '.yaml', '.toml', '.env', '.md', '.txt', '.bat', '.cfg', '.ini', '.sh', '.jsx', '.ts', '.tsx', '.vue', '.svelte'}
+    FOLDER_SCAN_MAX_FILES = 20
+    FOLDER_SCAN_MAX_DEPTH = 2
+
+    def _get_single_file_context(self, prompt):
         file_match = re.search(r'analyser\s+([^\s]+\.py)', prompt, re.IGNORECASE)
         if not file_match:
             return None, None
@@ -455,6 +460,52 @@ class Agent:
 
         self._log("WARNING", t(K.LOG_FILE_NOT_FOUND, self.lang), filename)
         return None, None
+
+    def _get_folder_context(self, prompt):
+        folder_pattern = re.compile(r'(?:[A-Za-z]:[\\/][^\s,;""\']+|/[^\s,;""\']+)')
+        folders = set()
+        for match in folder_pattern.finditer(prompt):
+            path = os.path.normpath(match.group(0))
+            if os.path.isdir(path):
+                folders.add(path)
+
+        if not folders:
+            return None
+
+        self._log("INFO", "Automatisk scanning af mapper", ", ".join(sorted(folders)))
+
+        found_files = []
+        for folder in sorted(folders):
+            for dirpath, dirnames, filenames in os.walk(folder):
+                rel = os.path.relpath(dirpath, folder)
+                depth = 0 if rel == '.' else rel.count(os.sep) + 1
+                if depth > self.FOLDER_SCAN_MAX_DEPTH:
+                    dirnames.clear()
+                    continue
+                dirnames[:] = [d for d in dirnames if d not in self.FOLDER_SCAN_EXCLUDE]
+                for f in sorted(filenames):
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext not in self.FOLDER_SCAN_EXTENSIONS and not f.startswith('.env'):
+                        continue
+                    if len(found_files) >= self.FOLDER_SCAN_MAX_FILES:
+                        break
+                    filepath = os.path.join(dirpath, f)
+                    content = self._read_file_content(filepath)
+                    if content:
+                        relpath = os.path.relpath(filepath, folder)
+                        found_files.append({"filename": relpath, "content": content, "path": filepath})
+                if len(found_files) >= self.FOLDER_SCAN_MAX_FILES:
+                    break
+            if len(found_files) >= self.FOLDER_SCAN_MAX_FILES:
+                break
+
+        if not found_files:
+            self._log("WARNING", "Ingen relevante filer fundet i mapper", ", ".join(sorted(folders)))
+            return None
+
+        for item in found_files:
+            self._log("INFO", "Fundet fil", item["path"])
+        return found_files
 
     def _create_fallback_tree(self, prompt):
         tree = TaskTree(prompt)
@@ -565,9 +616,26 @@ class Agent:
                     file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(chunk='{chunk_key}', index=2..{len(chunks)})*\n"
             self._log("INFO", t(K.LOG_ADDING_FILES, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(files)))
         else:
-            file_path, file_content = self._get_file_context(prompt)
-            if file_content:
-                file_context = t(K.FILE_CONTEXT_HEADER, self.lang) + os.path.basename(file_path) + t(K.FILE_CONTEXT_PYTHON, self.lang).replace("{content}", file_content)
+            scanned_files = self._get_folder_context(prompt)
+            if scanned_files:
+                file_context = t(K.FILE_CONTEXT_HEADER, self.lang)
+                self.file_context = scanned_files
+                for item in scanned_files:
+                    filename = item['filename']
+                    content = item['content']
+                    chunk_key = f"file_{filename}"
+                    chunks = chunk_text(content)
+                    self.file_chunks[chunk_key] = chunks
+                    if len(chunks) <= 1:
+                        file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
+                    else:
+                        file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
+                        file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(chunk='{chunk_key}', index=2..{len(chunks)})*\n"
+                self._log("INFO", t(K.LOG_ADDING_FILES, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(scanned_files)))
+            else:
+                file_path, file_content = self._get_single_file_context(prompt)
+                if file_content:
+                    file_context = t(K.FILE_CONTEXT_HEADER, self.lang) + os.path.basename(file_path) + t(K.FILE_CONTEXT_PYTHON, self.lang).replace("{content}", file_content)
 
         self.full_prompt_with_context = prompt + file_context
 
