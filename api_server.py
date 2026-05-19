@@ -1125,9 +1125,14 @@ def skillflow_report():
 
 @app.route("/api/skillflow/apply")
 def skillflow_apply():
-    from skill_evolution import evolve_if_needed
-    result = evolve_if_needed(dry_run=False)
-    return jsonify({"success": True, "result": result})
+    from skill_evolution import analyze, apply_evolution_actions, _log_applied
+    analysis = analyze()
+    if analysis.get("status") != "ok":
+        return jsonify({"success": False, "error": analysis})
+    results = apply_evolution_actions(analysis["actions"], dry_run=False)
+    if results:
+        _log_applied(results)
+    return jsonify({"success": True, "status": "applied", "actions": len(results), "results": results})
 
 @app.route("/api/skillflow/status")
 def skillflow_status():
