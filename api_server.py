@@ -612,7 +612,7 @@ TEMPLATE_GUIDANCE = {
             'Opsummer [filnavn] i et kort referat',
             'Analyser [fil] og lav en struktureret gennemgang',
         ],
-        "hint": "Vælg resume-skabelonen nar du vil have en struktureret gennemgang af en bestemt fil."
+        "hint": "Vælg resume-skabelonen når du vil have en struktureret gennemgang af en bestemt fil."
     },
     "kodeanalyse": {
         "keywords": ["analyser", "kode", "gennemgå", "review", "debug", "sikkerhed", "struktur", "arkitektur", "kodekvalitet", "fejl", "sårbarhed"],
@@ -621,7 +621,7 @@ TEMPLATE_GUIDANCE = {
             'Gennemgå [fil] for fejl og sikkerhedsproblemer',
             'Review koden i [fil] og vurder kodekvaliteten',
         ],
-        "hint": "Vælg kodeanalyse-skabelonen nar du skal have analyseret en konkret fil eller kodebase."
+        "hint": "Vælg kodeanalyse-skabelonen når du skal have analyseret en konkret fil eller kodebase."
     },
     "diffanalyse": {
         "keywords": ["diff", "forskel", "ændring", "change", "commit", "pull", "merge", "version", "gren", "branch"],
@@ -630,7 +630,7 @@ TEMPLATE_GUIDANCE = {
             'Gennemgå de seneste commits og vurder risiko',
             'Sammenlign to versioner af [fil]',
         ],
-        "hint": "Vælg diffanalyse-skabelonen nar du sammenligner to versioner eller brances."
+        "hint": "Vælg diffanalyse-skabelonen når du sammenligner to versioner eller branches."
     },
     "agenten": {
         "keywords": ["git", "github", "commit", "push", "branch", "pull request", "pr", "workflow", "repository", "repo"],
@@ -639,7 +639,7 @@ TEMPLATE_GUIDANCE = {
             'Git workflow: opret branch commit push PR',
             'Commit og push mine ændringer, og opret en pull request',
         ],
-        "hint": "Vælg PR Agenten-skabelonen nar du skal udføre et git/github workflow."
+        "hint": "Vælg PR Agenten-skabelonen når du skal udføre et git/github workflow."
     },
     "programmering": {
         "keywords": ["programmer", "opret", "implementer", "byg", "skriv", "kod", "app", "feature", "funktion", "system", "modul", "klasse", "program", "tool", "værktøj", "library", "bibliotek", "ret", "fix", "bug", "fejl", "compile", "ændr", "opdater", "rediger", "tilføj", "slet", "rettelse", "debug"],
@@ -649,7 +649,7 @@ TEMPLATE_GUIDANCE = {
             'Ret compile-fejlene i C:\\Dev\\Trading\\src\\routes\\markets.js',
             'Byg et kommandolinje-værktøj der kan søge efter filer',
         ],
-        "hint": "Vælg programmeringsskabelonen nar du skal designe, implementere eller rette kode i et projekt."
+        "hint": "Vælg programmeringsskabelonen når du skal designe, implementere eller rette kode i et projekt."
     },
     "python-arkitektur": {
         "keywords": ["arkitektur", "planlæg", "design", "struktur", "python", "flask", "komponent", "dokumentér", "systemoversigt", "modulopdeling"],
@@ -658,7 +658,7 @@ TEMPLATE_GUIDANCE = {
             'Design arkitekturen for et nyt system med Flask og SQLAlchemy',
             'Planlæg komponentstruktur og dataflow for en webapp',
         ],
-        "hint": "Vælg Python Arkitektur-skabelonen nar du skal planlægge og dokumentere en systemarkitektur."
+        "hint": "Vælg Python Arkitektur-skabelonen når du skal planlægge og dokumentere en systemarkitektur."
     },
     "billedanalyse": {
         "keywords": ["billede", "billed", "image", "screenshot", "skærmbillede", "foto", "photo", "png", "jpg", "jpeg", "analyser billed", "hvad ser du", "beskriv billedet"],
@@ -667,7 +667,7 @@ TEMPLATE_GUIDANCE = {
             'Hvad ser du på dette billede af en UI?',
             'Beskriv indholdet af dette foto og vurder kvaliteten',
         ],
-        "hint": "Vælg Billedanalyse-skabelonen nar du skal have analyseret et billede eller skærmbillede. Resultatet gemmes automatisk i en .md fil."
+        "hint": "Vælg Billedanalyse-skabelonen når du skal have analyseret et billede eller skærmbillede. Resultatet gemmes automatisk i en .md fil."
     },
 }
 
