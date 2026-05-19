@@ -1087,6 +1087,22 @@ def skillflow_report():
     if not outcomes:
         md += "\n*No outcomes recorded yet. Run some tasks to accumulate data.*\n"
 
+    # Applied changes log
+    log_path = os.path.join(BASE_DIR, ".agent_storage", "evolution_log.json")
+    if os.path.exists(log_path):
+        with open(log_path, encoding="utf-8") as f:
+            log_entries = _json.load(f)
+        if log_entries:
+            md += f"\n## Applied Changes ({len(log_entries)} entries)\n\n"
+            for entry in log_entries[-10:]:
+                md += f"### {entry['timestamp']}\n\n"
+                md += "| Action | Skill | Details |\n|--------|-------|----------|\n"
+                for act in entry.get("actions", []):
+                    md += f"| {act.get('action','?')} | `{act.get('skill','?')}` | {act.get('result','')[:120]} |\n"
+                md += "\n"
+
+    md += "\n\n[Apply pending actions](/api/skillflow/apply)"
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><title>SkillFlow Analysis</title>
@@ -1106,6 +1122,12 @@ def skillflow_report():
 <body><div id="content"></div>
 <script>document.getElementById('content').innerHTML = marked.parse({md!r});</script>
 </body></html>"""
+
+@app.route("/api/skillflow/apply")
+def skillflow_apply():
+    from skill_evolution import evolve_if_needed
+    result = evolve_if_needed(dry_run=False)
+    return jsonify({"success": True, "result": result})
 
 @app.route("/api/skillflow/status")
 def skillflow_status():

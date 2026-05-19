@@ -314,8 +314,30 @@ def evolve_if_needed(dry_run: bool = True) -> dict:
     if analysis.get("status") != "ok":
         return analysis
     results = apply_evolution_actions(analysis["actions"], dry_run=dry_run)
+    if not dry_run and results:
+        _log_applied(results)
     return {
         "status": "evolved",
         "analysis": analysis,
         "results": results,
     }
+
+
+def _log_applied(results: list):
+    import json, os
+    from datetime import datetime
+    log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".agent_storage", "evolution_log.json")
+    try:
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        entries = []
+        if os.path.exists(log_path):
+            with open(log_path, encoding="utf-8") as f:
+                entries = json.load(f)
+        entries.append({
+            "timestamp": datetime.now().isoformat(),
+            "actions": results
+        })
+        with open(log_path, "w", encoding="utf-8") as f:
+            json.dump(entries, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
