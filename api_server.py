@@ -206,7 +206,7 @@ def image_upload():
     filepath = os.path.join(UPLOAD_DIR, safe_filename)
     f.save(filepath)
     with open(filepath, "rb") as bf:
-        raw_b64 = base64.urlsafe_b64encode(bf.read()).decode('utf-8')
+        raw_b64 = base64.b64encode(bf.read()).decode('utf-8')
     agent.images.append({"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath})
     agent._log("TOOL", "🖼️ Billede uploadet", f"{f.filename} → {filepath} ({len(raw_b64)} bytes, {len(agent.images)} billeder i alt)")
     return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(agent.images)})

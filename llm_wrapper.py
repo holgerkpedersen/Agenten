@@ -31,7 +31,7 @@ class LMStudioWrapper:
     @staticmethod
     def encode_image(path):
         with open(path, "rb") as f:
-            return base64.urlsafe_b64encode(f.read()).decode("utf-8")
+            return base64.b64encode(f.read()).decode("utf-8")
 
     IMAGE_FORMATS = {
         # All models use data:image/...;base64,... format
