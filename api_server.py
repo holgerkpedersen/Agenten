@@ -216,7 +216,8 @@ def image_list():
     result = []
     for img in agent.images:
         if isinstance(img, dict):
-            url = f"data:image/{img.get('mime','png')};base64,{img['b64']}"
+            mime = img.get('mime','png')
+            url = f"data:image/{mime};base64,{img['b64']}"
             result.append({"url": url, "filename": img.get("filename","")})
         else:
             result.append({"url": img[:80] + "...", "filename": ""})
