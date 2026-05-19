@@ -545,7 +545,8 @@
                     <button onclick="saveLayoutToLocal()" id="saveLayoutBtn" title="Gem layout permanent">💾 Gem layout</button>
                     <button onclick="resetLayout()" id="resetLayoutBtn" title="Nulstil layout">🔄 Reset layout</button>
                     <hr style="border-color:var(--border);margin:4px 0;">
-                    <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research" style="background:var(--purple-accent);">🔍 Flow Builder</button>
+                    <button onclick="window.open('/skillflow','_blank')" title="SkillFlow Analysis" style="background:var(--purple-accent);">🧬 SkillFlow</button>
+                    <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research">🔍 Flow Builder</button>
                     <button onclick="setGithubToken()" id="githubTokenBtn" title="Opsæt GitHub Token">🔑 GitHub Token</button>
                 </div>
             </div>
@@ -2556,7 +2557,7 @@ async function previewMarkdown() {
                 <h2 style="margin:0;color:var(--text);">📊 ${_('preview_title')}</h2>
                 <div style="display:flex;gap:10px;">
                     <button onclick="downloadFromPreview()" style="background:#10b981;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;">💾 Download MD</button>
-                    <button onclick="closePreview()" style="background:#ef4444;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;">✕ ${_('stop')}</button>
+                    <button onclick="closePreview()" style="background:#ef4444;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;">✕ Luk</button>
                 </div>
             </div>
             <div id="previewContent" style="flex:1;overflow:auto;padding:20px 30px;color:var(--text);background:var(--bg);" class="rendered-markdown">
