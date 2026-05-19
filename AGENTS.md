@@ -81,7 +81,7 @@ Flask serves uploads at `/uploads/<filename>` so gemma can fetch the image local
 2. URL-safe base64 works fine
 3. `_image_url()` now maps `webp` → `png` automatically
 
-**Verified:** Session 70a4713a — 0 HTTP 400 errors after fix (was 48). All 5 billedanalyse tasks completed.
+**Verified:** Session 70a4713a — 0 HTTP 400 errors after fix (was 48). All 5 billedanalyse tasks completed on both gemma-4-26b-a4b AND gemma-4-e4b.
 
 ### 6. Image ordering: Gemma 4 requires images BEFORE text
 
