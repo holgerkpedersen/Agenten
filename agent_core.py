@@ -44,6 +44,7 @@ class Agent:
         self.show_thinking = True
         self.file_context = []
         self.file_chunks = {}
+        self.images = []
         self.stop_requested = False
         self.lang = "da"
         self.active_template = None
@@ -163,9 +164,15 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "read_chunk",
-            "Indlæs en chunk af en stor fil. Kræver: chunk (filnavn eller 'file_filnavn'), index (1..N). Læs ALLE chunks (1,2,3...) før du analyserer — filen er delt i flere chunks.",
+            "Indlæs en chunk af en stor fil. Kræver: chunk (filnavn), index (1..N). Læs ALLE chunks (1,2,3...) før du analyserer — filen er delt i flere chunks. Brug 'list_chunks' først for at se tilgængelige filer.",
             ["chunk", "index"],
             lambda chunk, index=1: self._read_chunk(chunk, int(index))
+        ))
+        self.tool_registry.register(Tool(
+            "list_chunks",
+            "List alle tilgængelige filer (chunks) som kan læses med read_chunk. Brug DENNE først for at se hvad der er tilgængeligt.",
+            [],
+            lambda: self._list_chunks()
         ))
         self.tool_registry.register(Tool(
             "write_file",
@@ -173,6 +180,55 @@ class Agent:
             ["path", "content"],
             lambda path, content: git_ops.write_file(path=path, content=content)
         ))
+        self.tool_registry.register(Tool(
+            "add_image",
+            "Tilføj et billede til konteksten. Kræver: path (sti til billedfil). Returnerer MIME-type og størrelse.",
+            ["path"],
+            lambda path: self._add_image(path)
+        ))
+
+    def _add_image(self, path):
+        # 1. Already loaded in self.images? (match by filename or filepath)
+        basename = os.path.basename(path)
+        for img in self.images:
+            if isinstance(img, dict):
+                if img.get("filename") == basename or img.get("filepath") == path:
+                    return {"success": True, "file": basename, "size": len(img.get("b64","")), "mime": img.get("mime",""), "note": "Allerede indlæst"}
+                if img.get("filepath") and os.path.normpath(img["filepath"]) == os.path.normpath(path):
+                    return {"success": True, "file": basename, "size": len(img.get("b64","")), "mime": img.get("mime",""), "note": "Allerede indlæst"}
+
+        # 2. Exists on disk?
+        if os.path.exists(path):
+            return self._encode_and_store(path)
+
+        # 3. Try UPLOAD_DIR
+        upload_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads", basename)
+        if os.path.exists(upload_path):
+            return self._encode_and_store(upload_path)
+
+        # 4. Not found
+        loaded = [f"{i.get('filename','?')} ({i.get('filepath','?')})" if isinstance(i,dict) else str(i)[:40] for i in self.images]
+        return {"success": False, "error": f"Fil ikke fundet: {path}. Allerede indlæste: {loaded or 'ingen'}"}
+
+    def _encode_and_store(self, path):
+        raw_b64 = LMStudioWrapper.encode_image(path)
+        size = os.path.getsize(path)
+        ext = os.path.splitext(path)[1].lower().lstrip(".")
+        mime = "jpeg" if ext in ("jpg","jpeg") else ext
+        if mime == "webp":
+            mime = "png"  # gemma models reject image/webp MIME
+        self.images.append({"b64": raw_b64, "mime": mime, "filename": os.path.basename(path), "filepath": path})
+        self._log("TOOL", f"Billede tilføjet: {os.path.basename(path)}", f"{size:,} bytes ({ext})")
+        return {"success": True, "file": os.path.basename(path), "size": size, "mime": mime}
+
+    def _list_chunks(self):
+        if not self.file_chunks:
+            return {"success": True, "chunks": [], "message": "Ingen filer indlæst. Brug 'list_chunks' igen efter at have specificeret filer eller en mappe i din prompt."}
+        result = []
+        for key, chunks in self.file_chunks.items():
+            display = key.replace("file_", "", 1)
+            result.append({"file": display, "chunks": len(chunks)})
+        return {"success": True, "chunks": result, "count": len(result)}
 
     def _read_chunk(self, chunk, index):
         original = chunk
@@ -180,18 +236,19 @@ class Agent:
             chunk = "file_" + chunk
         chunks = self.file_chunks.get(chunk)
         if not chunks:
-            available = list(self.file_chunks.keys()) or ["ingen"]
-            return {"success": False, "error": f"Ukendt chunk: '{original}'. Tilgængelige: {available}"}
+            available = [k.replace("file_", "", 1) for k in self.file_chunks.keys()] or ["ingen"]
+            return {"success": False, "error": f"Ukendt chunk: '{original}'. Tilgængelige filer: {available}. Brug 'list_chunks' for at se alle."}
         if index < 1 or index > len(chunks):
             return {"success": False, "error": f"Chunk {index} findes ikke (1..{len(chunks)})"}
         return {"success": True, "chunk": chunk, "index": index, "total": len(chunks), "content": chunks[index-1]}
 
     TEMPLATE_TOOLS = {
-        "resume": ["read_chunk"],
-        "kodeanalyse": ["read_chunk"],
-        "diffanalyse": ["read_chunk", "git_diff", "git_log"],
+        "resume": ["list_chunks", "read_chunk"],
+        "kodeanalyse": ["list_chunks", "read_chunk"],
+        "diffanalyse": ["list_chunks", "read_chunk", "git_diff", "git_log"],
         "fri": None,
         "agenten": [
+            "list_chunks",
             "read_chunk",
             "github_create_pr",
             "git_status", "git_add_all", "git_commit", "git_push",
@@ -199,8 +256,9 @@ class Agent:
             "git_create_branch", "git_current_branch", "git_pull", "git_checkout",
             "git_remote_status"
         ],
-        "programmering": ["read_chunk"],
-        "python-arkitektur": ["read_chunk", "write_file"],
+        "programmering": ["list_chunks", "read_chunk", "write_file", "add_image"],
+        "python-arkitektur": ["list_chunks", "read_chunk", "write_file"],
+        "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk"],
     }
 
     TEMPLATE_TASK_TOOLS = {
@@ -238,10 +296,17 @@ class Agent:
             "Arkitekturdesign": "Design systemarkitekturen: komponenter, moduler, dataflow og afhængigheder. Overvej relevante design patterns og SOLID-principper. Tegn arkitekturen med tekst.",
             "Implementeringsplan": "Planlæg implementeringen: hvilke filer skal oprettes, i hvilken rækkefølge, og hvad skal hver fil indeholde. Overvej teststrategi og edge cases.",
             "Sikkerhedsanalyse": "Analyser sikkerhedsaspekter: inputvalidering, autentifikation, kryptering, håndtering af følsomme data (passwords, keys). Følg OWASP best practices og princip om mindste rettighed.",
-            "Kodeimplementering": "Implementér koden baseret på arkitekturdesign og implementeringsplan. Skriv ren, vedligeholdelsesvenlig kode med korrekt fejlhåndtering og logging.",
+            "Kodeimplementering": "Implementér koden baseret på arkitekturdesign og implementeringsplan. Brug write_file til at oprette/redigere hver fil. Skriv ren, vedligeholdelsesvenlig kode med korrekt fejlhåndtering og logging.",
         },
         "python-arkitektur": {
             "Arkitekturplanlægning": "Analyser projektet og planlæg arkitekturen baseret på Python/Flask/HTML/JS best practices. Brug write_file til at oprette ./docs/arkitektur.md med følgende sektioner:\n\n## Systemoversigt\n- Formål og målsætning\n- Teknologistak (Python, Flask, HTML, JS, database)\n\n## Komponentarkitektur\n- Modulopdeling og ansvar for hvert modul\n- Lagdelt struktur (præsentation, forretningslogik, data)\n- Dataflow mellem komponenter\n\n## Flask-struktur\n- Blueprint-moduler, routes, middleware\n- Request/response-lifecycle\n- Fejlhåndtering og logging\n\n## Database design\n- ORM-modeller (SQLAlchemy) og relationer\n- Migration-strategi (Alembic)\n- Indeksering og query-optimering\n\n## Sikkerhed\n- CSRF, XSS, SQL injection beskyttelse\n- Autentifikation og autorisation (Flask-Login, JWT)\n- Miljøvariabler og secrets-håndtering\n\n## Frontend (HTML/JS)\n- Template-struktur (Jinja2) og statiske filer\n- JS-moduler og event-håndtering\n- API-kommunikation (fetch/AJAX)\n\n## Udviklings-workflow\n- Virtuelt miljø og afhængighedsstyring\n- Testing (pytest, unittest)\n- Kodekvalitet (flake8, black, mypy, type hints)\n\nFølg Python best practices: PEP 8, SOLID, DRY, separation of concerns.",
+        },
+        "billedanalyse": {
+            "Beskrivelse": "Analyser billedet og beskriv hvad der ses. Brug add_image hvis billedet ikke allerede er tilføjet. Beskriv motiv, personer, objekter, farver, layout og overordnet indtryk.",
+            "Kontekst": "Kontekstualiser billedet. Hvor stammer det fra (app, hjemmeside, dokument)? Hvad er formålet? Hvilke brugere er det målrettet? Hvilken situation viser det?",
+            "Detaljer": "Gennemgå specifikke detaljer: tekstindhold, UI-elementer, kodeblokke, tal, datoer, navne, fejlmeddelelser. Fremhæv alt specifikt og målbart.",
+            "Vurdering": "Vurder billedets kvalitet og indhold: Hvad fungerer godt? Hvad kunne forbedres? Er der fejl, inkonsistenser eller mangler? Giv konkrete forbedringsforslag.",
+            "Eksportér": "Skriv den fulde analyse til en .md fil. Brug write_file til at gemme i ./exports/billedanalyse_{timestamp}.md. Filen skal indeholde alle sektioner samlet. Brug formatet:\n\n# Billedanalyse\n\n## Beskrivelse\n...\n\n## Kontekst\n...\n\n## Detaljer\n...\n\n## Vurdering\n...",
         },
     }
 
@@ -340,6 +405,11 @@ class Agent:
                 "prompt": t(K.TP_PYTHON_ARKITEKTUR, self.lang),
                 "fallback": t(K.TF_PYTHON_ARKITEKTUR, self.lang),
             },
+            "billedanalyse": {
+                "name": t(K.T_BILLEDANALYSE, self.lang),
+                "prompt": t(K.TP_BILLEDANALYSE, self.lang),
+                "fallback": t(K.TF_BILLEDANALYSE, self.lang),
+            },
         }
 
     def _log(self, level, message, detail=""):
@@ -416,6 +486,9 @@ class Agent:
         return name
 
     def _read_file_content(self, filepath):
+        ext = os.path.splitext(filepath)[1].lower()
+        if ext in {'.png','.jpg','.jpeg','.gif','.webp','.bmp','.ico','.svg','.pdf','.zip','.exe','.dll'}:
+            return None
         try:
             if not os.path.exists(filepath):
                 return None
@@ -424,8 +497,8 @@ class Agent:
             if len(content) > 50000:
                 content = content[:50000] + "\n" + t(K.FILE_TRUNCATED, self.lang)
             return content
-        except Exception as e:
-            self._log("ERROR", t(K.LOG_READ_ERROR, self.lang), str(e))
+        except (UnicodeDecodeError, Exception) as e:
+            self._log("WARNING", f"Kan ikke læse {os.path.basename(filepath)} som tekst", str(e))
             return None
 
     FOLDER_SCAN_EXCLUDE = {'node_modules', '.git', 'venv', '.venv', '__pycache__', '.opencode', '.agent_storage'}
@@ -465,9 +538,14 @@ class Agent:
         folder_pattern = re.compile(r'(?:[A-Za-z]:[\\/][^\s,;""\']+|/[^\s,;""\']+)')
         folders = set()
         for match in folder_pattern.finditer(prompt):
-            path = os.path.normpath(match.group(0))
+            raw = match.group(0)
+            path = os.path.normpath(raw)
             if os.path.isdir(path):
                 folders.add(path)
+            elif os.path.isfile(path):
+                parent = os.path.dirname(path)
+                if os.path.isdir(parent):
+                    folders.add(parent)
 
         if not folders:
             return None
@@ -921,6 +999,15 @@ class Agent:
         else:
             task_prompt = f"{task_node.name}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
 
+        prev_results = []
+        if task_node.parent:
+            for sibling in task_node.parent.children:
+                if sibling is not task_node and sibling.status == "done" and sibling.result:
+                    shortened = sibling.result[:800] + ("..." if len(sibling.result) > 800 else "")
+                    prev_results.append(f"## Resultat fra '{sibling.name}':\n{shortened}")
+        if prev_results:
+            task_prompt += "\n\n---\n## Foregående resultater (brug disse i din besvarelse):\n" + "\n\n".join(prev_results)
+
         self._refresh_skills()
         self._match_skills(original_prompt)
         skills_block = self._format_skills_for_prompt()
@@ -947,6 +1034,11 @@ class Agent:
         else:
             user_guidance += t(K.DONE_CONTINUATION, self.lang).format(DONE_MARKER=self.tool_registry.DONE_MARKER)
 
+        if not chunk_hint and tools_list:
+            read_only = all(t not in ('write_file',) for t in self.tool_registry.active_tools or [])
+            if read_only and not self.images:
+                user_guidance += f"\n\nOBS: Ingen filer er indlæst. Du KAN svare direkte med <<<DONE>>> uden at kalde værktøjer først. Spørg IKKE efter filnavne — brug din egen viden til at besvare opgaven."
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_guidance}
@@ -965,13 +1057,23 @@ class Agent:
 
         def _truncate_messages():
             nonlocal messages
-            total = sum(len(m["content"]) for m in messages)
+            def _content_len(m):
+                c = m.get("content", "")
+                if isinstance(c, str):
+                    return len(c)
+                if isinstance(c, list):
+                    return sum(p.get("text", "").__len__() if isinstance(p, dict) and p.get("type") == "text" else 0 for p in c)
+                return 0
+            total = sum(_content_len(m) for m in messages)
             if total > self.max_conversation_chars and len(messages) > 3:
                 mid = "\n[... tidligere kontekst afkortet ...]"
-                keep = self.max_conversation_chars - len(messages[0]["content"]) - len(messages[1]["content"]) - len(mid)
+                keep = self.max_conversation_chars - _content_len(messages[0]) - _content_len(messages[1]) - len(mid)
                 if keep > 0:
                     tail_content = messages[-1]["content"]
-                    cropped = tail_content[-keep:] if len(tail_content) > keep else tail_content
+                    if isinstance(tail_content, str):
+                        cropped = tail_content[-keep:] if len(tail_content) > keep else tail_content
+                    else:
+                        cropped = "[...]"
                     messages = messages[:2] + [{"role": "user", "content": mid + cropped}]
 
         for i in range(max_iterations):
@@ -979,7 +1081,7 @@ class Agent:
                 break
 
             response = ""
-            for chunk in self.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=self.max_tokens):
+            for chunk in self.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=self.max_tokens, images=self.images):
                 if self.stop_requested:
                     break
                 response += chunk
@@ -1115,7 +1217,16 @@ class Agent:
             task_node.status = "done"
 
         task_node.result = full_response
-        self.action_history.append(task_node.name.split()[0] if task_node.name else K.UNKNOWN)
+        if task_node.status == "done":
+            bad_patterns = ["angiv venligst", "hvilken fil", "hvilket filnavn", "which file", "what file",
+                          "venligst angiv", "specificer fil", "give me the file", "jeg har brug for filen",
+                          "send mig filen"]
+            is_short = len(full_response) < 100
+            asks_for_files = any(p in full_response.lower() for p in bad_patterns)
+            if is_short or asks_for_files:
+                self._log("WARNING", "Mistænkeligt kort resultat", f"{len(full_response)} tegn, asks_for_files={asks_for_files}")
+                full_response = full_response + "\n\n⚠️  ADVARSEL: Dette resultat ser ufuldstændigt ud. Overvej at køre opgaven igen med en tydeligere prompt."
+        self.action_history.append(task_node.name.split()[0] if task_node.name else "unknown")
         self._record_outcome(task_node)
         if task_node.status == "failed":
             self._log("INFO", t(K.LOG_TASK_FAILED, self.lang), task_node.name)

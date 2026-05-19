@@ -11,6 +11,7 @@ class K(StrEnum):
     T_AGENTEN           = "templates.agenten"
     T_PROGRAMMERING    = "templates.programmering"
     T_PYTHON_ARKITEKTUR = "templates.python-arkitektur"
+    T_BILLEDANALYSE    = "templates.billedanalyse"
 
     # === Template prompts ===
     TP_RESUME          = "template_prompts.resume"
@@ -20,6 +21,7 @@ class K(StrEnum):
     TP_AGENTEN          = "template_prompts.agenten"
     TP_PROGRAMMERING   = "template_prompts.programmering"
     TP_PYTHON_ARKITEKTUR = "template_prompts.python-arkitektur"
+    TP_BILLEDANALYSE    = "template_prompts.billedanalyse"
 
     # === Template fallback sections ===
     TF_RESUME          = "template_fallback.resume"
@@ -28,6 +30,7 @@ class K(StrEnum):
     TF_AGENTEN          = "template_fallback.agenten"
     TF_PROGRAMMERING   = "template_fallback.programmering"
     TF_PYTHON_ARKITEKTUR = "template_fallback.python-arkitektur"
+    TF_BILLEDANALYSE    = "template_fallback.billedanalyse"
 
     # === Fallback tree node names ===
     FT_UNDERSTAND_PURPOSE    = "fallback_tree.understand_purpose"

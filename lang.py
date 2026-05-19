@@ -15,6 +15,7 @@ LANG = {
             "agenten": "🔀 PR Agenten",
             "programmering": "💻 Programmeringsopgave",
             "python-arkitektur": "🏗️ Python Arkitektur",
+            "billedanalyse": "🖼️ Billedanalyse",
         },
         "template_prompts": {
             "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
@@ -38,6 +39,16 @@ Opgave: {prompt}""",
             "python-arkitektur": """Analyser følgende projekt og planlæg Python/Flask-arkitekturen. Returnér KUN træstrukturen med 2 mellemrum per niveau.
 
 Opgave: {prompt}""",
+            "billedanalyse": """Analyser et billede struktureret i fem faser. Returnér KUN træstrukturen med 2 mellemrum per niveau.
+
+Faserne skal være:
+1. Beskrivelse — hvad ses på billedet
+2. Kontekst — hvad repræsenterer billedet
+3. Detaljer — specifikke elementer, tekst, kode, UI, tal
+4. Vurdering — kvalitet, fejl, forbedringsforslag
+5. Eksportér — gem analysen i ./exports/billedanalyse_{timestamp}.md med write_file
+
+Opgave: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"],
@@ -46,6 +57,7 @@ Opgave: {prompt}""",
             "agenten": ["1. Opret branch og verificer", "2. Stage og commit ændringer", "3. Push til remote", "4. Opret Pull Request"],
             "programmering": ["Kravanalyse", "Arkitekturdesign", "Implementeringsplan", "Sikkerhedsanalyse", "Kodeimplementering"],
             "python-arkitektur": ["Arkitekturplanlægning"],
+            "billedanalyse": ["Beskrivelse", "Kontekst", "Detaljer", "Vurdering", "Eksportér"],
         },
         "fallback_tree": {
             "understand_purpose": "Forstå filens formål",
@@ -369,6 +381,7 @@ Opgave: {prompt}""",
             "agenten": "🔀 PR Agenten",
             "programmering": "💻 Programming Task",
             "python-arkitektur": "🏗️ Python Architecture",
+            "billedanalyse": "🖼️ Image Analysis",
         },
         "template_prompts": {
             "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
@@ -392,6 +405,16 @@ Task: {prompt}""",
             "python-arkitektur": """Analyze the following project and plan the Python/Flask architecture. Return ONLY the tree structure with 2 spaces per level.
 
 Task: {prompt}""",
+            "billedanalyse": """Analyze an image structurally in five phases. Return ONLY the tree structure with 2 spaces per level.
+
+The phases are:
+1. Description — what is seen in the image
+2. Context — what the image represents
+3. Details — specific elements, text, code, UI, numbers
+4. Assessment — quality, errors, improvement suggestions
+5. Export — save analysis to ./exports/billedanalyse_{timestamp}.md with write_file
+
+Task: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overview", "Key Points", "Conclusion", "Recommendations"],
@@ -400,6 +423,7 @@ Task: {prompt}""",
             "agenten": ["1. Create branch and verify", "2. Stage and commit changes", "3. Push to remote", "4. Create Pull Request"],
             "programmering": ["Requirements Analysis", "Architecture Design", "Implementation Plan", "Security Analysis", "Code Implementation"],
             "python-arkitektur": ["Architecture Planning"],
+            "billedanalyse": ["Description", "Context", "Details", "Assessment", "Export"],
         },
         "fallback_tree": {
             "understand_purpose": "Understand file purpose",
@@ -722,6 +746,7 @@ Task: {prompt}""",
             "agenten": "🔀 PR Agenten",
             "programmering": "💻 Tarea de Programación",
             "python-arkitektur": "🏗️ Arquitectura Python",
+            "billedanalyse": "🖼️ Análisis de Imagen",
         },
         "template_prompts": {
             "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
@@ -745,6 +770,16 @@ Tarea: {prompt}""",
             "python-arkitektur": """Analiza el siguiente proyecto y planifica la arquitectura Python/Flask. Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
 
 Tarea: {prompt}""",
+            "billedanalyse": """Analiza una imagen estructuralmente en cinco fases. Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
+
+Las fases son:
+1. Descripción — qué se ve en la imagen
+2. Contexto — qué representa la imagen
+3. Detalles — elementos específicos, texto, código, UI, números
+4. Evaluación — calidad, errores, sugerencias de mejora
+5. Exportar — guardar análisis en ./exports/billedanalyse_{timestamp}.md con write_file
+
+Tarea: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Descripción General", "Puntos Clave", "Conclusión", "Recomendaciones"],
@@ -753,6 +788,7 @@ Tarea: {prompt}""",
             "agenten": ["1. Crear rama y verificar", "2. Stage y commit de cambios", "3. Push al remoto", "4. Crear Pull Request"],
             "programmering": ["Análisis de Requisitos", "Diseño de Arquitectura", "Plan de Implementación", "Análisis de Seguridad", "Implementación de Código"],
             "python-arkitektur": ["Planificación de Arquitectura"],
+            "billedanalyse": ["Descripción", "Contexto", "Detalles", "Evaluación", "Exportar"],
         },
         "fallback_tree": {
             "understand_purpose": "Entender el propósito del archivo",
@@ -1075,6 +1111,7 @@ Tarea: {prompt}""",
             "agenten": "🔀 PR Agenten",
             "programmering": "💻 编程任务",
             "python-arkitektur": "🏗️ Python 架构",
+            "billedanalyse": "🖼️ 图像分析",
         },
         "template_prompts": {
             "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
@@ -1098,6 +1135,16 @@ Tarea: {prompt}""",
             "python-arkitektur": """分析以下项目并规划 Python/Flask 架构。只返回树形结构，每级使用2个空格。
 
 任务：{prompt}""",
+            "billedanalyse": """在五个阶段中结构化分析图像。只返回树形结构，每级使用2个空格。
+
+阶段为：
+1. 描述 — 图像中看到什么
+2. 背景 — 图像代表什么
+3. 细节 — 具体元素、文本、代码、UI、数字
+4. 评估 — 质量、错误、改进建议
+5. 导出 — 使用 write_file 将分析保存到 ./exports/billedanalyse_{timestamp}.md
+
+任务：{prompt}""",
         },
         "template_fallback": {
             "resume": ["概述", "要点", "结论", "建议"],
@@ -1106,6 +1153,7 @@ Tarea: {prompt}""",
             "agenten": ["1. 创建分支并验证", "2. Stage并提交更改", "3. 推送到远程", "4. 创建Pull Request"],
             "programmering": ["需求分析", "架构设计", "实施计划", "安全分析", "代码实施"],
             "python-arkitektur": ["架构规划"],
+            "billedanalyse": ["描述", "背景", "细节", "评估", "导出"],
         },
         "fallback_tree": {
             "understand_purpose": "理解文件目的",
@@ -1437,5 +1485,9 @@ def t(key, lang="da"):
 
 def get_ui_translations(lang):
     """Return all UI translations for the frontend as a flat dict."""
-    ui = LANG.get(lang, LANG["da"]).get("ui", {})
+    data = LANG.get(lang, LANG["da"])
+    ui = dict(data.get("ui", {}))
+    T = data.get("templates", {})
+    for k, v in T.items():
+        ui[f"template_name_{k}"] = v
     return ui

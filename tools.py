@@ -1,5 +1,6 @@
 import json
 import re
+import inspect
 import traceback
 from lang import t
 from i18n import K
@@ -122,7 +123,13 @@ class ToolRegistry:
         if self.active_tools is not None and tool_name not in self.active_tools:
                 return {"success": False, "error": t(K.TOOL_BLOCKED, self.lang).format(tool=tool_name, tools=', '.join(self.active_tools))}
         try:
-            result = self.tools[tool_name].function(**args)
+            fn = self.tools[tool_name].function
+            sig = inspect.signature(fn)
+            valid_args = {k: v for k, v in args.items() if k in sig.parameters}
+            missing = [name for name, p in sig.parameters.items() if p.default is p.empty and name not in valid_args]
+            if missing:
+                return {"success": False, "error": f"Manglende argumenter: {', '.join(missing)}. Kræves: {', '.join(self.tools[tool_name].parameters)}"}
+            result = fn(**valid_args)
             return {"success": True, "result": result}
         except Exception as e:
             return {"success": False, "error": str(e), "traceback": traceback.format_exc()}

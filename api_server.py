@@ -27,7 +27,22 @@ current_session_id = None
 execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
 export_folder = None
 
+# ============ VERSION ============
+def _file_mtime(path):
+    try: return datetime.fromtimestamp(os.path.getmtime(os.path.join(BASE_DIR, path))).strftime("%H:%M:%S")
+    except: return "?"
+
+VERSION_FILES = ["api_server.py", "agent_core.py", "llm_wrapper.py", "tools.py", "lang.py", "i18n.py"]
+BUILD_INFO = {f: _file_mtime(f) for f in VERSION_FILES}
+BUILD_INFO["started"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+print(f"📦 Startet: {BUILD_INFO['started']} | api_server={BUILD_INFO['api_server.py']} | llm={BUILD_INFO['llm_wrapper.py']}")
+
 # ============ STATIC ROUTES ============
+@app.route("/uploads/<path:filename>")
+def serve_upload(filename):
+    return send_from_directory(UPLOAD_DIR, filename)
+
 @app.route("/")
 def index():
     index_path = os.path.join(STATIC_DIR, 'index.html')
@@ -170,6 +185,61 @@ def read_file():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+from llm_wrapper import LMStudioWrapper
+
+@app.route("/api/image/upload", methods=["POST"])
+def image_upload():
+    if 'image' not in request.files:
+        return jsonify({"success": False, "error": "Ingen billedfil modtaget"}), 400
+    f = request.files['image']
+    if f.filename == '':
+        return jsonify({"success": False, "error": "Intet filnavn"}), 400
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ('.png','.jpg','.jpeg','.gif','.webp','.bmp'):
+        return jsonify({"success": False, "error": f"Ikke understøttet format: {ext}"}), 400
+    import base64
+    mime = "jpeg" if ext in ('.jpg','.jpeg') else ext.lstrip('.')
+    if mime == "webp":
+        mime = "png"  # gemma models reject image/webp MIME
+    safe_filename = "".join(c for c in f.filename if c.isalnum() or c in '._- ')
+    filepath = os.path.join(UPLOAD_DIR, safe_filename)
+    f.save(filepath)
+    with open(filepath, "rb") as bf:
+        raw_b64 = base64.urlsafe_b64encode(bf.read()).decode('utf-8')
+    agent.images.append({"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath})
+    agent._log("TOOL", "🖼️ Billede uploadet", f"{f.filename} → {filepath} ({len(raw_b64)} bytes, {len(agent.images)} billeder i alt)")
+    return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(agent.images)})
+
+@app.route("/api/image/list", methods=["GET"])
+def image_list():
+    result = []
+    for img in agent.images:
+        if isinstance(img, dict):
+            url = f"data:image/{img.get('mime','png')};base64,{img['b64']}"
+            result.append({"url": url, "filename": img.get("filename","")})
+        else:
+            result.append({"url": img[:80] + "...", "filename": ""})
+    return jsonify({"success": True, "images": result, "count": len(agent.images)})
+
+@app.route("/api/image/clear", methods=["POST"])
+def image_clear():
+    count = len(agent.images)
+    agent.images = []
+    if count:
+        agent._log("TOOL", "🗑️ Billeder ryddet", f"{count} billeder fjernet")
+    return jsonify({"success": True})
+
+@app.route("/api/image/remove/<int:index>", methods=["POST"])
+def image_remove(index):
+    if 0 <= index < len(agent.images):
+        img = agent.images.pop(index)
+        name = img.get("filename", "?") if isinstance(img, dict) else "?"
+        agent._log("TOOL", "✕ Billede fjernet", f"{name} (indeks {index}, {len(agent.images)} tilbage)")
+        return jsonify({"success": True, "count": len(agent.images)})
+    return jsonify({"success": False, "error": "Invalid index"}), 400
+
+
 @app.route("/api/file/list-python", methods=["POST"])
 def list_python_files():
     """List alle Python filer i en mappe"""
@@ -217,6 +287,7 @@ def create_session():
     session_id, session_data = session_manager.create_session(name)
     global current_session_id
     current_session_id = session_id
+    agent.images = []  # clear images from previous session
     return jsonify({"success": True, "session_id": session_id, "session": session_data})
 
 @app.route("/api/sessions/load/<session_id>", methods=["GET"])
@@ -235,6 +306,7 @@ def load_session(session_id):
                 agent.decompose_llm.set_model(session_data["decompose_model"])
             if session_data.get("execute_model"):
                 agent.llm.set_model(session_data["execute_model"])
+        agent.images = session_data.get("images", [])
         return jsonify({"success": True, "session": session_data})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
@@ -264,6 +336,7 @@ def save_current_session():
         "prompt_history": data.get("prompt_history", []),
         "file_context": data.get("file_context", ""),
         "file_chunks": getattr(agent, 'file_chunks', None) or existing.get("file_chunks", {}),
+        "images": getattr(agent, 'images', None) or existing.get("images", []),
         "created": existing.get("created", datetime.now().isoformat()),
         "learned_knowledge": existing.get("learned_knowledge", []),
         "decompose_model": data.get("decompose_model") or existing.get("decompose_model") or getattr(agent.decompose_llm, 'model', ''),
@@ -533,15 +606,24 @@ TEMPLATE_GUIDANCE = {
         ],
         "hint": "Vælg Python Arkitektur-skabelonen nar du skal planlægge og dokumentere en systemarkitektur."
     },
+    "billedanalyse": {
+        "keywords": ["billede", "billed", "image", "screenshot", "skærmbillede", "foto", "photo", "png", "jpg", "jpeg", "analyser billed", "hvad ser du", "beskriv billedet"],
+        "examples": [
+            'Analyser dette skærmbillede af en fejlmeddelelse',
+            'Hvad ser du på dette billede af en UI?',
+            'Beskriv indholdet af dette foto og vurder kvaliteten',
+        ],
+        "hint": "Vælg Billedanalyse-skabelonen nar du skal have analyseret et billede eller skærmbillede. Resultatet gemmes automatisk i en .md fil."
+    },
 }
 
 
 def _validate_template_prompt(prompt: str, template: str) -> dict:
     if not template or template == "fri":
-        return {"warning": "", "suggestion": "", "suggested_template": ""}
+        return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
     guidance = TEMPLATE_GUIDANCE.get(template)
     if not guidance:
-        return {"warning": "", "suggestion": "", "suggested_template": ""}
+        return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
     
     prompt_lower = prompt.lower()
     matches = sum(1 for kw in guidance["keywords"] if kw in prompt_lower)
@@ -568,11 +650,9 @@ def _validate_template_prompt(prompt: str, template: str) -> dict:
             f"Din prompt ligner ikke en opgave til skabelonen '{template}'.{suggested}\n\n"
             f"Eksempler på gode prompts til '{template}':\n{examples}"
         )
-        return {"warning": warning, "suggestion": suggested_template, "suggested_template": suggested_template}
+        return {"warning": warning, "suggestion": suggested_template, "suggested_template": suggested_template, "matches": matches, "total": total}
     
-    return {"warning": "", "suggestion": "", "suggested_template": ""}
-    
-    return {"warning": "", "matches": matches, "total": total}
+    return {"warning": "", "suggestion": "", "suggested_template": "", "matches": matches, "total": total}
 
 
 @app.route("/api/decompose", methods=["POST"])
@@ -598,6 +678,12 @@ def decompose():
     agent.show_thinking = show_thinking
     agent.lang = lang
     session_context = session_manager.get_knowledge_for_context(current_session_id, prompt)
+    
+    # Guard: billedanalyse needs an image
+    image_warning = ""
+    if template == "billedanalyse" and not agent.images and not files:
+        image_warning = "🖼️  Billedanalyse kræver et billede! Upload et billede med 🖼 knappen før du kører Nedbryd."
+        agent._log("WARNING", "Billedanalyse uden billede", image_warning)
     
     # Validate prompt against selected template
     validation = _validate_template_prompt(prompt, template)
@@ -641,6 +727,7 @@ def decompose():
             "log": agent.agent_log[-20:] if agent.agent_log else [],
             "template_warning": validation.get("warning", ""),
             "suggested_template": validation.get("suggested_template", ""),
+            "image_warning": image_warning,
         })
     except Exception as e:
         print(f"❌ Fejl: {e}")
@@ -666,6 +753,7 @@ def execute_stream():
                 agent.tool_registry.lang = agent.lang
             if session_data.get("file_chunks"):
                 agent.file_chunks = session_data["file_chunks"]
+            agent.images = session_data.get("images", [])
             if session_data.get("template"):
                 agent.active_template = session_data["template"]
                 allowed = agent.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent.TEMPLATE_TOOLS else None
@@ -868,15 +956,22 @@ def build_module():
     result = agent.suggest_new_module()
     return jsonify({"success": True, "module_result": result})
 
+@app.route("/api/version", methods=["GET"])
+def version():
+    return jsonify({"success": True, "started": BUILD_INFO.get("started", "?"), "version": {k:v for k,v in BUILD_INFO.items() if k != "started"}})
+
 @app.route("/api/test", methods=["GET"])
 def test():
     return jsonify({"status": "ok", "message": t(K.UI_API_RUNNING, agent.lang), "static_folder": STATIC_DIR, "has_agent": agent is not None})
 
 if __name__ == "__main__":
+    started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print("=" * 50)
     print("🚀 Dansk Agent API starter...")
+    print(f"🕐 Startet: {started}")
     print("📍 http://localhost:5000")
     print(f"📁 Static mappe: {STATIC_DIR}")
+    print(f"📦 api_server={BUILD_INFO['api_server.py']} | agent_core={BUILD_INFO['agent_core.py']} | llm={BUILD_INFO['llm_wrapper.py']}")
     print("💾 Sessions gemmes i ./sessions/")
     print("📁 Filhåndtering via Python (tkinter)")
     print("=" * 50)

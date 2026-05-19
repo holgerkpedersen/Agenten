@@ -545,6 +545,7 @@
                 <option value="agenten">🔀 PR Agenten</option>
                 <option value="programmering">💻 Programmeringsopgave</option>
                 <option value="python-arkitektur">🏗️ Python Arkitektur</option>
+                <option value="billedanalyse">🖼️ Billedanalyse</option>
             </select>
             <label class="thinking-label">
                 <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
@@ -574,24 +575,27 @@
         
         <div class="toolbar-row">
             <span class="toolbar-label" id="filesLabel">Filer</span>
-            <input type="text" id="filePathInput" placeholder="Vælg fil(er) med Gennemse, derefter Læs fil" style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;color:#e2e8f0;" readonly>
+            <input type="text" id="filePathInput" placeholder="Vælg fil(er) med Gennemse, derefter Læs fil" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);" readonly>
             <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
-            <button onclick="document.getElementById('filePicker').click()" id="browseBtn" style="background:#475569;">📂 Gennemse</button>
-            <button onclick="readFiles()" id="readFileBtn" style="background:#8b5cf6;">📖 Læs fil</button>
+            <button onclick="document.getElementById('filePicker').click()" id="browseBtn" style="background:var(--btn-secondary);">📂 Gennemse</button>
+            <button onclick="readFiles()" id="readFileBtn" style="background:var(--purple-accent);">📖 Læs fil</button>
         </div>
-        <div id="fileSectionToggle" style="margin: 2px 0; cursor: pointer; color:#60a5fa; font-size:12px;" onclick="toggleFileSection()">▶ Vis filer</div>
+        <div id="fileSectionToggle" style="margin: 2px 0; cursor: pointer; color:var(--accent); font-size:12px;" onclick="toggleFileSection()">▶ Vis filer</div>
         <div id="fileSection" style="display:none;">
-            <div id="selectedFilesDisplay" style="font-size:11px; color:#64748b; margin: 5px 0;"></div>
+            <div id="selectedFilesDisplay" style="font-size:11px; color:var(--text-muted); margin: 5px 0;"></div>
             <div id="fileContentPreview" class="file-preview"></div>
         </div>
         
         <div class="toolbar-row">
             <span class="toolbar-label" id="promptLabel">Prompt</span>
             <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?" style="flex:1;"></textarea>
+            <input type="file" id="imagePicker" style="display:none" accept="image/*" onchange="onImagePicked(event)">
+            <button onclick="document.getElementById('imagePicker').click()" id="imageBtn" style="background:var(--btn-secondary);" title="Tilføj billede">🖼</button>
             <button onclick="decompose()" id="decomposeBtn">🌳 Nedbryd</button>
             <button onclick="executeWithStream()" id="executeBtn" style="background:#10b981;">⚡ Udfør</button>
             <button onclick="stopStream()" id="stopBtn" style="background:#ef4444;">⏹ Stop</button>
         </div>
+        <div id="imagePreview" style="display:none; gap:4px; flex-wrap:wrap; margin:2px 0;"></div>
         <div id="templateWarning" class="template-warning" style="display:none;"></div>
     </div>
     
@@ -857,6 +861,14 @@ function updateHtmlLabels() {
     if (e('fileSectionToggle')) e('fileSectionToggle').textContent = _('show_files');
     if (e('thinkingLabel'))e('thinkingLabel').textContent= showThinking ? _('show_thinking') : _('hide_thinking');
     if (e('selectSessionOpt')) e('selectSessionOpt').textContent = _('select_session');
+    const tpl = document.getElementById('templateSelect');
+    if (tpl) {
+        for (const opt of tpl.options) {
+            const key = 'template_name_' + opt.value;
+            const label = _(key);
+            if (label && label !== key) opt.textContent = label;
+        }
+    }
 }
 
 function updatePanelTitles() {
@@ -1220,6 +1232,61 @@ function toggleFileSection() {
     }
 }
 
+async function onImagePicked(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+        const resp = await fetch('/api/image/upload', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (data.success) {
+            renderImagePreview();
+            addLogEntry('INFO', 'Billede tilføjet', `${data.filename} (${data.count} billeder i alt)`);
+            if (currentSessionId) saveCurrentSession();
+        } else {
+            addLogEntry('ERROR', 'Billede fejlede', data.error);
+        }
+    } catch (e) {
+        addLogEntry('ERROR', 'Upload fejl', e.message);
+    }
+    event.target.value = '';
+}
+
+async function renderImagePreview() {
+    const el = document.getElementById('imagePreview');
+    try {
+        const resp = await fetch('/api/image/list');
+        const data = await resp.json();
+        if (!data.images.length) {
+            el.style.display = 'none';
+            el.innerHTML = '';
+            return;
+        }
+        el.style.display = 'flex';
+        el.innerHTML = data.images.map((img, i) =>
+            `<div style="position:relative;display:inline-block;">
+                <img src="${img.url || img}" style="height:40px;border-radius:4px;border:1px solid var(--border);" title="${img.filename || ''}">
+                <button onclick="removeImage(${i})" style="position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:14px;cursor:pointer;padding:0;">✕</button>
+            </div>`
+        ).join('');
+        el.innerHTML += `<button onclick="clearImages()" style="background:var(--btn-secondary);font-size:10px;padding:2px 6px;border-radius:4px;">Ryd alle</button>`;
+    } catch (e) {}
+}
+
+async function removeImage(index) {
+    const resp = await fetch(`/api/image/remove/${index}`, { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) { renderImagePreview(); if (currentSessionId) saveCurrentSession(); }
+}
+
+async function clearImages() {
+    await fetch('/api/image/clear', { method: 'POST' });
+    renderImagePreview();
+    addLogEntry('INFO', 'Billeder ryddet', '');
+    if (currentSessionId) saveCurrentSession();
+}
+
 function toggleTools() {
     const dropdown = document.getElementById('toolsDropdown');
     dropdown.classList.toggle('show');
@@ -1280,7 +1347,7 @@ async function readFiles() {
             preview.innerHTML += `<label style="display:flex; align-items:center; gap:8px; margin:8px 0;"><input type="checkbox" ${checked} onchange="toggleFileIncluded(${i}, this.checked)"> <strong>📄 ${fc.filename}</strong></label><pre class="language-${langClass}" style="max-height:150px;overflow-y:auto;margin:8px 0;${fc.included?'':'opacity:0.4'}"><code>${escapeHtml(fc.content.slice(0,3000))}${fc.content.length>3000?'...':''}</code></pre>`;
             try { Prism.highlightElement(preview.querySelectorAll('pre')[i].querySelector('code')); } catch(e) {}
             const status = fc.included ? '✓' : '✗';
-            filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" ${checked} onchange="toggleFileIncluded(${i}, this.checked)"> <span style="${fc.included?'color:#10b981':'color:#ef4444'}">${status}</span> ${fc.filename}</label>`;
+            filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" ${checked} onchange="toggleFileIncluded(${i}, this.checked)"> <span style="${fc.included?'color:var(--success)':'color:var(--danger)'}">${status}</span> ${fc.filename}</label>`;
             addLogEntry('INFO', _('file_shown'), fc.filename);
         }
         filesDisplay += '</div>';
@@ -1297,9 +1364,35 @@ async function readFiles() {
     
     loadedFilesContent = [];
     
-    let filesDisplay = `<div style="color:#10b981; margin-bottom:8px;">📎 <strong>${_('files_included')}</strong><br>`;
+    let filesDisplay = `<div style="color:var(--success); margin-bottom:8px;">📎 <strong>${_('files_included')}</strong><br>`;
+    
+    const IMG_EXT = {png:1,jpg:1,jpeg:1,gif:1,webp:1,bmp:1};
     
     for (const { name, file } of selectedFiles) {
+        const ext = name.split('.').pop().toLowerCase();
+        
+        if (IMG_EXT[ext]) {
+            addLogEntry('INFO', 'Billede uploades', name);
+            const formData = new FormData();
+            formData.append('image', file);
+            try {
+                const resp = await fetch('/api/image/upload', { method: 'POST', body: formData });
+                const data = await resp.json();
+                if (data.success) {
+                    renderImagePreview();
+                    loadedFilesContent.push({ filename: data.filename, filepath: data.filepath, content: '', included: true, isImage: true });
+                    filesDisplay += `<label style="display:flex;align-items:center;gap:4px;"><span style="color:var(--success)">🖼️</span> ${data.filename} <span style="color:var(--text-muted);font-size:10px;font-family:monospace;">${data.filepath}</span></label>`;
+                    addLogEntry('INFO', 'Billede tilføjet', `${data.filepath} (${data.size} bytes)`);
+                    if (currentSessionId) saveCurrentSession();
+                } else {
+                    addLogEntry('ERROR', 'Billede fejlede', data.error);
+                }
+            } catch(e) {
+                addLogEntry('ERROR', 'Upload fejl', e.message);
+            }
+            continue;
+        }
+        
         addLogEntry('INFO', _('reading_file_title'), name);
         
         const formData = new FormData();
@@ -1326,11 +1419,11 @@ async function readFiles() {
                     Prism.highlightElement(preview.lastElementChild.querySelector('code'));
                     
                     loadedFilesContent.push({ filename: readData.filename, filepath: readData.filepath, content: readData.content, included: true });
-                    filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" checked onchange="toggleFileIncluded(${loadedFilesContent.length-1}, this.checked)"> <span style="color:#10b981">✓</span> ${readData.filename}</label>`;
+                    filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" checked onchange="toggleFileIncluded(${loadedFilesContent.length-1}, this.checked)"> <span style="color:var(--success)">✓</span> ${readData.filename}</label>`;
                     
                     addLogEntry('INFO', _('file_read'), `${readData.filename} (${_('N_lines').replace('{n}', readData.lines)})`);
                 } else {
-                    preview.innerHTML += `<div style="color:#ef4444;">${_('could_not_read')} ${name}: ${readData.error}</div><br>`;
+                    preview.innerHTML += `<div style="color:var(--danger);">${_('could_not_read')} ${name}: ${readData.error}</div><br>`;
                 }
             } else {
                 preview.innerHTML += `<div style="color:#ef4444;">${_('could_not_upload')} ${name}: ${data.error}</div><br>`;
@@ -1340,13 +1433,23 @@ async function readFiles() {
         }
     }
     
+    selectedFiles = selectedFiles.filter(sf => !IMG_EXT[sf.name.split('.').pop().toLowerCase()]);
+    
     filesDisplay += '</div>';
     document.getElementById('selectedFilesDisplay').innerHTML = filesDisplay;
     
-    if (selectedFiles.length === 1) {
+    const imgCount = loadedFilesContent.filter(f => f.isImage).length;
+    const textCount = loadedFilesContent.filter(f => !f.isImage).length;
+    if (imgCount > 0 && textCount === 0) {
+        const imgName = loadedFilesContent.find(f => f.isImage)?.filename || 'billedet';
+        document.getElementById('promptInput').value = `Analyser billedet "${imgName}"`;
+        document.getElementById('templateSelect').value = 'billedanalyse';
+    } else if (selectedFiles.length === 1) {
         document.getElementById('promptInput').value = _('prompt_auto_analyze_singular');
-    } else {
+    } else if (selectedFiles.length > 1) {
         document.getElementById('promptInput').value = _('prompt_auto_analyze_plural').replace('{n}', selectedFiles.length);
+    } else if (imgCount > 0 && textCount > 0) {
+        document.getElementById('promptInput').value = `Analyser ${textCount} fil(er) og ${imgCount} billede(r)`;
     }
 }
 
@@ -1724,6 +1827,8 @@ async function createNewSession() {
             refreshSessions();
             loadLayoutFromLocal();
             await updatePromptHistory(currentSessionId);
+            document.getElementById('imagePreview').style.display = 'none';
+            document.getElementById('imagePreview').innerHTML = '';
         }
     }
 }
@@ -1734,6 +1839,9 @@ async function loadSelectedSession() {
     if (!sessionId) {
         alert(_('select_session_to_load'));
         return;
+    }
+    if (currentSessionId && currentSessionId !== sessionId) {
+        await saveCurrentSession();
     }
     const response = await fetch(`/api/sessions/load/${sessionId}`);
     const data = await response.json();
@@ -1826,7 +1934,10 @@ async function loadSelectedSession() {
             console.log('Loading files from session:', data.session.file_context);
             loadedFilesContent = [];
             let missingFiles = [];
+            const IMG_EXT_2 = {png:1,jpg:1,jpeg:1,gif:1,webp:1,bmp:1};
             for (const fc of data.session.file_context) {
+                const ext = (fc.filename || fc.filepath || '').split('.').pop().toLowerCase();
+                if (IMG_EXT_2[ext]) continue; // images are loaded via agent.images, not /api/file/read
                 console.log('Trying to load file:', fc.filepath);
                 try {
                     const resp = await fetch('/api/file/read', { 
@@ -1872,6 +1983,7 @@ async function loadSelectedSession() {
         }
         
         addLogEntry('INFO', _('session_loaded'), data.session.name);
+        renderImagePreview();
     }
 }
 
@@ -1957,14 +2069,22 @@ async function decompose() {
 
         // Show template warning if any
         const warnDiv = document.getElementById('templateWarning');
+        let warnHtml = '';
+        if (data.image_warning) {
+            warnHtml += `<span class="template-warning-close" onclick="this.parentElement.style.display='none'">✕</span>`;
+            warnHtml += `<span style="font-size:16px;">🖼️</span> ${data.image_warning}`;
+        }
         if (data.template_warning) {
-            let html = `<span class="template-warning-close" onclick="this.parentElement.style.display='none'">✕</span>`;
-            html += data.template_warning.replace(/\n/g, '<br>');
+            if (warnHtml) warnHtml += '<br><br>';
+            warnHtml += `<span class="template-warning-close" onclick="this.parentElement.style.display='none'">✕</span>`;
+            warnHtml += data.template_warning.replace(/\n/g, '<br>');
             if (data.suggested_template) {
-                html += `<br><br><button onclick="switchTemplate('${data.suggested_template}')" style="background:#10b981;border:none;padding:6px 14px;border-radius:6px;color:white;cursor:pointer;font-weight:bold;">Skift til '${data.suggested_template}'</button>`;
+                warnHtml += `<br><br><button onclick="switchTemplate('${data.suggested_template}')" style="background:#10b981;border:none;padding:6px 14px;border-radius:6px;color:white;cursor:pointer;font-weight:bold;">Skift til '${data.suggested_template}'</button>`;
             }
+        }
+        if (warnHtml) {
             warnDiv.style.display = 'block';
-            warnDiv.innerHTML = html;
+            warnDiv.innerHTML = warnHtml;
         } else {
             warnDiv.style.display = 'none';
         }
@@ -2140,7 +2260,8 @@ async function executeWithStream() {
             case 'tool_result':
                 const success = data.result?.success;
                 const icon = success ? '✅' : '❌';
-                addLogEntry(success ? 'TOOL' : 'ERROR', `${icon} ${data.tool}`, JSON.stringify(data.result).slice(0, 100));
+                const rtext = JSON.stringify(data.result, null, 2);
+                addLogEntry(success ? 'TOOL' : 'ERROR', `${icon} ${data.tool}`, rtext.length > 500 ? rtext.slice(0, 500) + '…' : rtext);
                 if (llmBox && success) {
                     llmBox.innerHTML += `<div style="color:var(--success); margin:5px 0; padding:5px; background:var(--panel-bg); border-left:3px solid var(--success); font-size:12px;">${icon} <strong>${escapeHtml(data.tool)}</strong>: ${escapeHtml(data.result.result?.url || data.result.result?.output || 'OK').slice(0, 150)}</div>`;
                     llmBox.scrollTop = llmBox.scrollHeight;
