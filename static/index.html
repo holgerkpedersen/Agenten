@@ -2509,7 +2509,7 @@ async function previewMarkdown() {
     const llmContent = document.getElementById('llmContent')?.innerText || '';
     
     let html = `
-    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:9999; display:flex; justify-content:center; align-items:center;">
+    <div id="previewOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;justify-content:center;align-items:center;" onclick="if(event.target===this)closePreview()">
         <div style="background:#1e293b; border-radius:16px; width:90%; max-width:1200px; height:90%; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.5);">
             <div style="background:#334155; padding:15px 20px; display:flex; justify-content:space-between; align-items:center; border-radius:16px 16px 0 0;">
                 <h2 style="margin:0; color:#e2e8f0;">📊 ${_('preview_title')}</h2>
@@ -2552,8 +2552,8 @@ async function previewMarkdown() {
 }
 
 function closePreview() {
-    const preview = document.querySelector('div[style*="position:fixed"]');
-    if (preview) preview.remove();
+    const el = document.getElementById('previewOverlay');
+    if (el) el.remove();
 }
 
 function downloadFromPreview() {
