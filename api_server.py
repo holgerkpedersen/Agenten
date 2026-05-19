@@ -642,13 +642,14 @@ TEMPLATE_GUIDANCE = {
         "hint": "Vælg PR Agenten-skabelonen nar du skal udføre et git/github workflow."
     },
     "programmering": {
-        "keywords": ["programmer", "opret", "implementer", "byg", "skriv", "kod", "app", "feature", "funktion", "system", "modul", "klasse", "program", "tool", "værktøj", "library", "bibliotek"],
+        "keywords": ["programmer", "opret", "implementer", "byg", "skriv", "kod", "app", "feature", "funktion", "system", "modul", "klasse", "program", "tool", "værktøj", "library", "bibliotek", "ret", "fix", "bug", "fejl", "compile", "ændr", "opdater", "rediger", "tilføj", "slet", "rettelse", "debug"],
         "examples": [
             'Opret en Flask-app med en health endpoint',
             'Implementer en funktion der beregner moms i Python',
+            'Ret compile-fejlene i C:\\Dev\\Trading\\src\\routes\\markets.js',
             'Byg et kommandolinje-værktøj der kan søge efter filer',
         ],
-        "hint": "Vælg programmeringsskabelonen nar du skal designe og implementere ny kode."
+        "hint": "Vælg programmeringsskabelonen nar du skal designe, implementere eller rette kode i et projekt."
     },
     "python-arkitektur": {
         "keywords": ["arkitektur", "planlæg", "design", "struktur", "python", "flask", "komponent", "dokumentér", "systemoversigt", "modulopdeling"],
