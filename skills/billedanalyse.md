@@ -1,4 +1,6 @@
 ---
+name: billedanalyse
+template: billedanalyse
 action_types: [analyze, write]
 ---
 

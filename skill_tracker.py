@@ -45,7 +45,7 @@ class SkillTracker:
             os.replace(tmp, path)
 
     def record(self, skill_name: str, task_summary: str, success: bool,
-               duration_ms: int = 0, tokens_used: int = 0, detail: str = ""):
+               duration_ms: int = 0, tokens_used: int = 0, detail: str = "", template: str = ""):
         entry = {
             "skill": skill_name,
             "task": task_summary[:200],
@@ -53,6 +53,7 @@ class SkillTracker:
             "duration_ms": duration_ms,
             "tokens_used": tokens_used,
             "detail": detail[:500],
+            "template": template,
             "session": self._session_id,
             "timestamp": datetime.now().isoformat(),
         }

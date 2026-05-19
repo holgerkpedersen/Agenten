@@ -343,6 +343,7 @@ class Agent:
                 task_summary=task_node.name,
                 success=task_node.status == "done",
                 duration_ms=duration,
+                template=self.active_template or "",
             )
         except ImportError:
             pass
