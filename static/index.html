@@ -1279,7 +1279,6 @@ async function renderImagePreview() {
         el.innerHTML += `<button onclick="clearImages()" style="background:var(--btn-secondary);font-size:11px;padding:4px 10px;border-radius:6px;align-self:center;">Ryd alle</button>`;
     } catch (e) {}
 }
-}
 
 async function removeImage(index) {
     const resp = await fetch(`/api/image/remove/${index}`, { method: 'POST' });
