@@ -509,6 +509,17 @@
                 <button class="tools-toggle" onclick="toggleTools()" id="toolsMenu" title="Flere værktøjer">⚙️</button>
                 <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Skift tema">☀️</button>
                 <div class="tools-dropdown" id="toolsDropdown">
+                    <label style="display:flex;align-items:center;gap:8px;padding:4px 8px;cursor:pointer;white-space:nowrap;">
+                        <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()">
+                        <span id="thinkingLabel">Vis tænkning</span>
+                    </label>
+                    <select id="langSelect" onchange="switchLang(this.value)" style="width:100%;padding:4px;margin:4px 0;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:4px;">
+                        <option value="da">🇩🇰 Dansk</option>
+                        <option value="en">🇬🇧 English</option>
+                        <option value="es">🇪🇸 Español</option>
+                        <option value="zh">🇨🇳 中文</option>
+                    </select>
+                    <hr style="border-color:var(--border);margin:4px 0;">
                     <button onclick="resetExecution()" id="resetTreeBtn" title="Nulstil alle opgavers status">🔄 Nulstil træ</button>
                     <button onclick="deleteTree()" id="deleteTreeBtn" title="Slet hele opgavetræet">🗑 Slet træ</button>
                     <button onclick="previewMarkdown()" id="previewBtn" title="Forhåndsvis session">👁 Preview</button>
@@ -547,16 +558,6 @@
                 <option value="python-arkitektur">🏗️ Python Arkitektur</option>
                 <option value="billedanalyse">🖼️ Billedanalyse</option>
             </select>
-            <label class="thinking-label">
-                <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()" checked>
-                <span id="thinkingLabel" style="color:white;font-size:14px;">Vis tænkning</span>
-            </label>
-            <select id="langSelect" class="toolbar-select" onchange="switchLang(this.value)" style="min-width:80px;">
-                <option value="da">🇩🇰</option>
-                <option value="en">🇬🇧</option>
-                <option value="es">🇪🇸</option>
-                <option value="zh">🇨🇳</option>
-            </select>
         </div>
         
         <div class="toolbar-row">
@@ -574,19 +575,6 @@
         </div>
         
         <div class="toolbar-row">
-            <span class="toolbar-label" id="filesLabel">Filer</span>
-            <input type="text" id="filePathInput" placeholder="Vælg fil(er) med Gennemse, derefter Læs fil" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--text);" readonly>
-            <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
-            <button onclick="document.getElementById('filePicker').click()" id="browseBtn" style="background:var(--btn-secondary);">📂 Gennemse</button>
-            <button onclick="readFiles()" id="readFileBtn" style="background:var(--purple-accent);">📖 Læs fil</button>
-        </div>
-        <div id="fileSectionToggle" style="margin: 2px 0; cursor: pointer; color:var(--accent); font-size:12px;" onclick="toggleFileSection()">▶ Vis filer</div>
-        <div id="fileSection" style="display:none;">
-            <div id="selectedFilesDisplay" style="font-size:11px; color:var(--text-muted); margin: 5px 0;"></div>
-            <div id="fileContentPreview" class="file-preview"></div>
-        </div>
-        
-        <div class="toolbar-row">
             <span class="toolbar-label" id="promptLabel">Prompt</span>
             <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?" style="flex:1;"></textarea>
             <input type="file" id="imagePicker" style="display:none" accept="image/*" onchange="onImagePicked(event)">
@@ -596,6 +584,17 @@
             <button onclick="stopStream()" id="stopBtn" style="background:#ef4444;">⏹ Stop</button>
         </div>
         <div id="imagePreview" style="display:none; gap:4px; flex-wrap:wrap; margin:2px 0;"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin:2px 0;">
+            <input type="text" id="filePathInput" placeholder="Vælg fil(er)" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);font-size:12px;" readonly>
+            <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
+            <button onclick="document.getElementById('filePicker').click()" id="browseBtn" style="background:var(--btn-secondary);font-size:12px;padding:4px 8px;">📂</button>
+            <button onclick="readFiles()" id="readFileBtn" style="background:var(--purple-accent);font-size:12px;padding:4px 8px;">📖</button>
+            <span id="fileSectionToggle" style="cursor:pointer;color:var(--accent);font-size:11px;white-space:nowrap;" onclick="toggleFileSection()">▶ Vis filer</span>
+        </div>
+        <div id="fileSection" style="display:none;">
+            <div id="selectedFilesDisplay" style="font-size:11px; color:var(--text-muted); margin: 5px 0;"></div>
+            <div id="fileContentPreview" class="file-preview"></div>
+        </div>
         <div id="templateWarning" class="template-warning" style="display:none;"></div>
     </div>
     
@@ -938,7 +937,7 @@ let currentSessionId = null;
 let currentTree = null;
 let eventSource = null;
 let panels = {};
-let showThinking = true;
+let showThinking = false;
 let treeEditMode = false;
 let currentTheme = localStorage.getItem('agenten_theme') || 'dark';
 
