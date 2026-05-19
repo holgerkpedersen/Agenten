@@ -188,6 +188,21 @@ def read_file():
 
 from llm_wrapper import LMStudioWrapper
 
+def _normalize_images(images):
+    """Convert url-safe base64 back to standard base64 for browser compatibility."""
+    import base64
+    for img in images:
+        if isinstance(img, dict):
+            b64 = img.get("b64", "")
+            if b64 and "/" not in b64 and "+" not in b64 and ("-" in b64 or "_" in b64):
+                try:
+                    decoded = base64.urlsafe_b64decode(b64)
+                    img["b64"] = base64.b64encode(decoded).decode("utf-8")
+                except Exception:
+                    pass
+    return images
+
+
 @app.route("/api/image/upload", methods=["POST"])
 def image_upload():
     if 'image' not in request.files:
@@ -305,7 +320,7 @@ def load_session(session_id):
                 agent.decompose_llm.set_model(session_data["decompose_model"])
             if session_data.get("execute_model"):
                 agent.llm.set_model(session_data["execute_model"])
-        agent.images = session_data.get("images", [])
+        agent.images = _normalize_images(session_data.get("images", []))
         return jsonify({"success": True, "session": session_data})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
@@ -752,7 +767,7 @@ def execute_stream():
                 agent.tool_registry.lang = agent.lang
             if session_data.get("file_chunks"):
                 agent.file_chunks = session_data["file_chunks"]
-            agent.images = session_data.get("images", [])
+            agent.images = _normalize_images(session_data.get("images", []))
             if session_data.get("template"):
                 agent.active_template = session_data["template"]
                 allowed = agent.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent.TEMPLATE_TOOLS else None
