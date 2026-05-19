@@ -708,6 +708,13 @@ def decompose():
     if files:
         print(f"📄 Med {len(files)} filer")
 
+    decompose_model = data.get("decompose_model")
+    execute_model = data.get("execute_model")
+    if decompose_model:
+        agent.decompose_llm.set_model(decompose_model)
+    if execute_model:
+        agent.llm.set_model(execute_model)
+
     _ensure_model_loaded(agent.decompose_llm.model)
 
     try:
