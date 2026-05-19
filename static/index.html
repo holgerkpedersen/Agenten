@@ -2504,6 +2504,7 @@ async function previewMarkdown() {
     
     addLogEntry('INFO', _('generating_preview'), '');
     
+    const promptText = document.getElementById('promptInput')?.value || '';
     const treeContainer = document.getElementById('treeContainer')?.innerText || '';
     const llmContent = document.getElementById('llmContent')?.innerText || '';
     
