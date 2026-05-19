@@ -200,8 +200,6 @@ def image_upload():
         return jsonify({"success": False, "error": f"Ikke understøttet format: {ext}"}), 400
     import base64
     mime = "jpeg" if ext in ('.jpg','.jpeg') else ext.lstrip('.')
-    if mime == "webp":
-        mime = "png"  # gemma models reject image/webp MIME
     safe_filename = "".join(c for c in f.filename if c.isalnum() or c in '._- ')
     filepath = os.path.join(UPLOAD_DIR, safe_filename)
     f.save(filepath)

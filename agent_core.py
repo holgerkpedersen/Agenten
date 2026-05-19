@@ -215,8 +215,6 @@ class Agent:
         size = os.path.getsize(path)
         ext = os.path.splitext(path)[1].lower().lstrip(".")
         mime = "jpeg" if ext in ("jpg","jpeg") else ext
-        if mime == "webp":
-            mime = "png"  # gemma models reject image/webp MIME
         self.images.append({"b64": raw_b64, "mime": mime, "filename": os.path.basename(path), "filepath": path})
         self._log("TOOL", f"Billede tilføjet: {os.path.basename(path)}", f"{size:,} bytes ({ext})")
         return {"success": True, "file": os.path.basename(path), "size": size, "mime": mime}
