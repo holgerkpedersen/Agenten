@@ -45,6 +45,7 @@ class Agent:
         self.file_context = []
         self.file_chunks = {}
         self.images = []
+        self.pending_reply = None
         self.stop_requested = False
         self.lang = "da"
         self.active_template = None
@@ -1078,6 +1079,12 @@ class Agent:
         for i in range(max_iterations):
             if self.stop_requested:
                 break
+
+            # Check for user reply
+            if self.pending_reply:
+                messages.append({"role": "user", "content": self.pending_reply})
+                self._log("USER", "Bruger svarer", self.pending_reply[:100])
+                self.pending_reply = None
 
             response = ""
             for chunk in self.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=self.max_tokens, images=self.images):

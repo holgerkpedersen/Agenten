@@ -488,6 +488,16 @@ def stop_execution():
     agent.stop_requested = True
     return jsonify({"success": True})
 
+@app.route("/api/reply", methods=["POST"])
+def user_reply():
+    data = request.json
+    msg = data.get("message", "")
+    if not msg:
+        return jsonify({"success": False, "error": "Empty message"}), 400
+    agent.pending_reply = msg
+    agent._log("USER", "Bruger svar", msg[:100])
+    return jsonify({"success": True})
+
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():
     data = request.json

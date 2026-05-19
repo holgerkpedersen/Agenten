@@ -600,6 +600,8 @@
             <button onclick="document.getElementById('imagePicker').click()" id="imageBtn" style="background:var(--btn-secondary);" title="Tilføj billede">🖼</button>
             <button onclick="decompose()" id="decomposeBtn">🌳 Nedbryd</button>
             <button onclick="executeWithStream()" id="executeBtn" style="background:#10b981;">⚡ Udfør</button>
+            <input type="text" id="replyInput" placeholder="Svar til LLM..." style="display:none;width:120px;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')sendReply()">
+            <button onclick="sendReply()" id="replyBtn" style="display:none;background:var(--accent);color:white;">✉</button>
             <button onclick="stopStream()" id="stopBtn" style="background:#ef4444;">⏹ Stop</button>
         </div>
         <div id="imagePreview" style="display:none; gap:4px; flex-wrap:wrap; margin:2px 0;"></div>
@@ -2152,6 +2154,17 @@ function stopStream() {
         eventSource = null;
     }
     addLogEntry('INFO', _('stream_stopped'), _('stopped_by_user'));
+    document.getElementById('replyInput').style.display = 'none';
+    document.getElementById('replyBtn').style.display = 'none';
+}
+
+async function sendReply() {
+    const input = document.getElementById('replyInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    await fetch('/api/reply', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({message: msg}) });
+    addLogEntry('USER', 'Svar sendt til LLM', msg.slice(0, 80));
+    input.value = '';
 }
 
 async function resetExecution() {
@@ -2208,6 +2221,9 @@ async function executeWithStream() {
     }
     
     stopStream();
+    
+    document.getElementById('replyInput').style.display = 'inline-block';
+    document.getElementById('replyBtn').style.display = 'inline-block';
     
     const llmBox = document.getElementById('llmContent');
     if (llmBox) llmBox.innerHTML = '<div class="loading"></div> Forbinder til streaming...';
@@ -2327,12 +2343,16 @@ async function executeWithStream() {
                 saveCurrentSession();
                 updatePromptHistory(currentSessionId);
                 eventSource.close();
+                document.getElementById('replyInput').style.display = 'none';
+                document.getElementById('replyBtn').style.display = 'none';
                 break;
                 
             case 'error':
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
+                document.getElementById('replyInput').style.display = 'none';
+                document.getElementById('replyBtn').style.display = 'none';
                 break;
         }
     };
