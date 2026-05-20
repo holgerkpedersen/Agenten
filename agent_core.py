@@ -9,6 +9,7 @@ from lang import t
 from i18n import K
 import git_ops
 import re
+import sys
 import time
 import os
 import json
@@ -241,7 +242,7 @@ class Agent:
 
     def _run_pytest(self, test_path=""):
         try:
-            cmd = ["pytest", "-v"]
+            cmd = [sys.executable, "-m", "pytest", "-v"]
             if test_path:
                 cmd.append(test_path)
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -249,7 +250,7 @@ class Agent:
         except subprocess.TimeoutExpired:
             return {"success": False, "stdout": "", "stderr": "Timeout (120s)", "exit_code": -1}
         except FileNotFoundError:
-            return {"success": False, "stdout": "", "stderr": "pytest not found", "exit_code": -1}
+            return {"success": False, "stdout": "", "stderr": "python -m pytest not found", "exit_code": -1}
 
     def _read_issue(self, issue_id):
         import json as _json
