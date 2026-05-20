@@ -688,8 +688,26 @@ TEMPLATE_GUIDANCE = {
 
 
 def _validate_template_prompt(prompt: str, template: str) -> dict:
-    if not template or template == "fri":
+    if not template:
         return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
+    
+    if template == "fri":
+        # Even with free template, check if a better template can be suggested
+        try:
+            from skill_loader import SkillLoader
+            skills = SkillLoader.load_all()
+            better = SkillLoader.suggest_template(prompt, skills)
+            if better:
+                better_guidance = TEMPLATE_GUIDANCE.get(better)
+                hint = better_guidance["hint"] if better_guidance else ""
+                warning = (
+                    f"Din prompt matcher skabelonen '🐛 {better}' bedre.\n{hint}"
+                )
+                return {"warning": warning, "suggestion": better, "suggested_template": better, "matches": 0, "total": 0}
+        except Exception:
+            pass
+        return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
+    
     guidance = TEMPLATE_GUIDANCE.get(template)
     if not guidance:
         return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
