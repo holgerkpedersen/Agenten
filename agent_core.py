@@ -569,8 +569,8 @@ class Agent:
                 return None
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
-            if len(content) > 50000:
-                content = content[:50000] + "\n" + t(K.FILE_TRUNCATED, self.lang)
+            if len(content) > CHUNK_SIZE:
+                content = content[:CHUNK_SIZE] + "\n" + t(K.FILE_TRUNCATED, self.lang)
             return content
         except (UnicodeDecodeError, Exception) as e:
             self._log("WARNING", f"Kan ikke læse {os.path.basename(filepath)} som tekst", str(e))
@@ -1082,9 +1082,6 @@ class Agent:
 
         available_keys = list(self.file_chunks.keys())
         is_chunked = any(len(v) > 1 for v in self.file_chunks.values())
-        single_file = len(available_keys) == 1
-        if single_file and not is_chunked and self.tool_registry.active_tools and 'read_chunk' in self.tool_registry.active_tools:
-            self.tool_registry.active_tools = [t for t in self.tool_registry.active_tools if t != 'read_chunk']
         if is_chunked:
             chunk_hint_parts = []
             for key in available_keys:
