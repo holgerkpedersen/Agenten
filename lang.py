@@ -16,6 +16,7 @@ LANG = {
             "programmering": "💻 Programmeringsopgave",
             "python-arkitektur": "🏗️ Python Arkitektur",
             "billedanalyse": "🖼️ Billedanalyse",
+            "bugfix": "🐛 Bugfix (TDD)",
         },
         "template_prompts": {
             "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
@@ -49,6 +50,17 @@ Faserne skal være:
 5. Eksportér — gem analysen i ./exports/billedanalyse_{timestamp}.md med write_file
 
 Opgave: {prompt}""",
+            "bugfix": """Du skal rette en bug ved at følge TDD (Test-Driven Development). Udfør faserne i rækkefølge:
+
+1. Analyse — forstå issue og rodårsag
+2. Test (Red) — skriv en pytest der fanger bug'en, kør den (skal fejle)
+3. Implementering — ret koden med minimal ændring
+4. Verifikation (Green) — kør testen (skal bestå), kør hele testsuiten
+5. Opdatering — opdater issue-status til 'resolved'
+
+Returnér KUN træstrukturen med 2 mellemrum per niveau.
+
+Opgave: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"],
@@ -58,6 +70,7 @@ Opgave: {prompt}""",
             "programmering": ["Kravanalyse", "Arkitekturdesign", "Implementeringsplan", "Sikkerhedsanalyse", "Kodeimplementering"],
             "python-arkitektur": ["Arkitekturplanlægning"],
             "billedanalyse": ["Beskrivelse", "Kontekst", "Detaljer", "Vurdering", "Eksportér"],
+            "bugfix": ["Analyse", "Test (Red)", "Implementering", "Verifikation (Green)", "Opdatering"],
         },
         "fallback_tree": {
             "understand_purpose": "Forstå filens formål",
@@ -382,6 +395,7 @@ Opgave: {prompt}""",
             "programmering": "💻 Programming Task",
             "python-arkitektur": "🏗️ Python Architecture",
             "billedanalyse": "🖼️ Image Analysis",
+            "bugfix": "🐛 Bugfix (TDD)",
         },
         "template_prompts": {
             "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
@@ -415,6 +429,17 @@ The phases are:
 5. Export — save analysis to ./exports/billedanalyse_{timestamp}.md with write_file
 
 Task: {prompt}""",
+            "bugfix": """You must fix a bug following TDD (Test-Driven Development). Execute phases in order:
+
+1. Analysis — understand the issue and root cause
+2. Test (Red) — write a pytest that catches the bug, run it (must fail)
+3. Implementation — fix the code with minimal change
+4. Verification (Green) — run the test (must pass), run the full suite
+5. Update — update issue status to 'resolved'
+
+Return ONLY the tree structure with 2 spaces per level.
+
+Task: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overview", "Key Points", "Conclusion", "Recommendations"],
@@ -424,6 +449,7 @@ Task: {prompt}""",
             "programmering": ["Requirements Analysis", "Architecture Design", "Implementation Plan", "Security Analysis", "Code Implementation"],
             "python-arkitektur": ["Architecture Planning"],
             "billedanalyse": ["Description", "Context", "Details", "Assessment", "Export"],
+            "bugfix": ["Analysis", "Test (Red)", "Implementation", "Verification (Green)", "Update"],
         },
         "fallback_tree": {
             "understand_purpose": "Understand file purpose",
@@ -747,6 +773,7 @@ Task: {prompt}""",
             "programmering": "💻 Tarea de Programación",
             "python-arkitektur": "🏗️ Arquitectura Python",
             "billedanalyse": "🖼️ Análisis de Imagen",
+            "bugfix": "🐛 Bugfix (TDD)",
         },
         "template_prompts": {
             "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
@@ -780,6 +807,17 @@ Las fases son:
 5. Exportar — guardar análisis en ./exports/billedanalyse_{timestamp}.md con write_file
 
 Tarea: {prompt}""",
+            "bugfix": """Debes corregir un bug siguiendo TDD (Desarrollo Guiado por Pruebas). Ejecuta las fases en orden:
+
+1. Análisis — comprender el issue y la causa raíz
+2. Prueba (Red) — escribir un pytest que detecte el bug, ejecutarlo (debe fallar)
+3. Implementación — corregir el código con el cambio mínimo
+4. Verificación (Green) — ejecutar la prueba (debe pasar), ejecutar todo el suite
+5. Actualización — actualizar el estado del issue a 'resolved'
+
+Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
+
+Tarea: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Descripción General", "Puntos Clave", "Conclusión", "Recomendaciones"],
@@ -789,6 +827,7 @@ Tarea: {prompt}""",
             "programmering": ["Análisis de Requisitos", "Diseño de Arquitectura", "Plan de Implementación", "Análisis de Seguridad", "Implementación de Código"],
             "python-arkitektur": ["Planificación de Arquitectura"],
             "billedanalyse": ["Descripción", "Contexto", "Detalles", "Evaluación", "Exportar"],
+            "bugfix": ["Análisis", "Prueba (Red)", "Implementación", "Verificación (Green)", "Actualización"],
         },
         "fallback_tree": {
             "understand_purpose": "Entender el propósito del archivo",
@@ -1112,6 +1151,7 @@ Tarea: {prompt}""",
             "programmering": "💻 编程任务",
             "python-arkitektur": "🏗️ Python 架构",
             "billedanalyse": "🖼️ 图像分析",
+            "bugfix": "🐛 Bugfix (TDD)",
         },
         "template_prompts": {
             "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
@@ -1145,6 +1185,17 @@ Tarea: {prompt}""",
 5. 导出 — 使用 write_file 将分析保存到 ./exports/billedanalyse_{timestamp}.md
 
 任务：{prompt}""",
+            "bugfix": """你必须按照TDD（测试驱动开发）修复一个bug。按顺序执行阶段：
+
+1. 分析 — 理解issue和根本原因
+2. 测试（Red） — 编写能捕获bug的pytest，运行它（必须失败）
+3. 实施 — 用最小修改修复代码
+4. 验证（Green） — 运行测试（必须通过），运行完整测试套件
+5. 更新 — 将issue状态更新为'resolved'
+
+只返回树形结构，每级使用2个空格。
+
+任务：{prompt}""",
         },
         "template_fallback": {
             "resume": ["概述", "要点", "结论", "建议"],
@@ -1154,6 +1205,7 @@ Tarea: {prompt}""",
             "programmering": ["需求分析", "架构设计", "实施计划", "安全分析", "代码实施"],
             "python-arkitektur": ["架构规划"],
             "billedanalyse": ["描述", "背景", "细节", "评估", "导出"],
+            "bugfix": ["分析", "测试 (Red)", "实施", "验证 (Green)", "更新"],
         },
         "fallback_tree": {
             "understand_purpose": "理解文件目的",

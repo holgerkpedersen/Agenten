@@ -45,11 +45,15 @@ def serve_upload(filename):
 
 @app.route("/preview-exports/<path:filename>")
 def preview_export(filename):
+    import re
     filepath = os.path.join(export_folder or os.path.join(BASE_DIR, "exports"), filename)
     if not os.path.exists(filepath):
         return "<h2>File not found</h2>", 404
     with open(filepath, encoding="utf-8") as f:
         md_content = f.read()
+    md_content = md_content.replace('<<<', '&lt;&lt;&lt;').replace('>>>', '&gt;&gt;&gt;')
+    md_content = re.sub(r'&lt;&lt;&lt;TOOL&gt;&gt;&gt;(\{.*?\})&lt;&lt;&lt;END&gt;&gt;&gt;', r'<pre class="tool-call">&lt;&lt;&lt;TOOL&gt;&gt;&gt;\1&lt;&lt;&lt;END&gt;&gt;&gt;</pre>', md_content)
+    md_content = re.sub(r'&lt;&lt;&lt;DONE&gt;&gt;&gt;(\{.*?\})&lt;&lt;&lt;END&gt;&gt;&gt;', r'<pre class="tool-result">&lt;&lt;&lt;DONE&gt;&gt;&gt;\1&lt;&lt;&lt;END&gt;&gt;&gt;</pre>', md_content)
     return f"""<!DOCTYPE html>
 <html lang="da">
 <head><meta charset="UTF-8"><title>{filename}</title>
@@ -61,6 +65,8 @@ def preview_export(filename):
     code {{ background: #1e293b; padding: 2px 6px; border-radius: 4px; }}
     pre {{ background: #1e293b; padding: 14px; border-radius: 8px; overflow-x: auto; }}
     pre code {{ background: none; padding: 0; }}
+    .tool-call {{ border-left: 3px solid #f59e0b; background: #451a03; }}
+    .tool-result {{ border-left: 3px solid #10b981; background: #064e3b; }}
     blockquote {{ border-left: 3px solid #3b82f6; padding-left: 14px; color: #94a3b8; }}
     table {{ border-collapse: collapse; width: 100%; }}
     th, td {{ border: 1px solid #334155; padding: 8px 12px; text-align: left; }}
@@ -668,6 +674,15 @@ TEMPLATE_GUIDANCE = {
             'Beskriv indholdet af dette foto og vurder kvaliteten',
         ],
         "hint": "Vælg Billedanalyse-skabelonen når du skal have analyseret et billede eller skærmbillede. Resultatet gemmes automatisk i en .md fil."
+    },
+    "bugfix": {
+        "keywords": ["bug", "fix", "fejl", "issue", "defekt", "test", "tdd", "red", "green", "refactor", "ret", "rettelse", "patch"],
+        "examples": [
+            'Fix BUG-003: None crash i solve_task_stream',
+            'Ret fejlen i [fil] og skriv test først',
+            'Anvend TDD: skriv test, implementer fix, verificér',
+        ],
+        "hint": "Vælg Bugfix-skabelonen når du skal rette en kendt bug med TDD-workflow: test først → implementer → verificér."
     },
 }
 
