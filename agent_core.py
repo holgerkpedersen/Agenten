@@ -753,6 +753,33 @@ class Agent:
         self.file_context = files or []
         self.file_chunks = {}
 
+        if template == "bugfix" and not files:
+            issue_match = re.search(r'(BUG-\d+)', prompt)
+            if issue_match:
+                issue_id = issue_match.group(1)
+                try:
+                    issues_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
+                    if os.path.exists(issues_path):
+                        with open(issues_path, encoding="utf-8") as f:
+                            issues_data = json.load(f)
+                        for issue in issues_data.get("issues", []):
+                            if issue.get("id", "").lower() == issue_id.lower():
+                                location = issue.get("location", "")
+                                if ":" in location:
+                                    filename = location.split(":")[0].strip()
+                                    base_dir = os.path.dirname(os.path.abspath(__file__))
+                                    for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
+                                        if os.path.exists(path):
+                                            content = self._read_file_content(path)
+                                            if content:
+                                                files = [{"filename": filename, "content": content, "path": path}]
+                                                self.file_context = files
+                                                self._log("INFO", f"Auto-loaded fil fra {issue_id}", path)
+                                            break
+                                break
+                except Exception as e:
+                    self._log("WARNING", "Kunne ikke auto-loade issue-fil", str(e))
+
         file_context = ""
         if files and len(files) > 0:
             file_context = t(K.FILE_CONTEXT_HEADER, self.lang)
