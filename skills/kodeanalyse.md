@@ -9,7 +9,7 @@ description: Struktureret kodeanalyse med gennemgang af formal, imports, arkitek
 
 Nar du analyserer kode:
 
-1. **Formal**: Hvad gor filen/klassen/funktionen?
+1. **Formal**: Hvad gør filen/klassen/funktionen?
 2. **Imports**: Hvilke biblioteker og afhængigheder bruges?
 3. **Arkitektur**: Hvordan er koden struktureret? Monster, klasser, funktioner.
 4. **Kodekvalitet**: Lasbarhed, navngivning, DRY, test coverage.
@@ -17,11 +17,11 @@ Nar du analyserer kode:
 
 ## Verificering for rapportering (OBLIGATORISK)
 
-For du pasta at noget er et problem, **verificer det i koden**:
+Før du påstår at noget er et problem, **verificer det i koden**:
 
 1. **Læs den eksakte linje** du henviser til — gæt ALDRIG linjenumre.
 2. **Tæl til den eksakte linje** — linje 1 er forste linje.
-3. **Kopier det faktiske indhold** og bekræft at det matcher dit claim.
+3. **Kopier det faktiske indhold** og bekræft at det matcher din påstand.
 4. **Hvis du IKKE kan verificere linjen findes**: rapporter den IKKE.
 5. **Falske positiver er VÆRRE end manglende issues** — hellere færre korrekte end mange forkerte.
 
@@ -29,7 +29,7 @@ For du pasta at noget er et problem, **verificer det i koden**:
 - Manglende fejlhandtering (try/except, if exists checks)
 - Hardcodede stier eller credentials
 - Race conditions / concurrency problemer
-- Edge cases der ikke handteres
+- Edge cases der ikke håndteres
 - Død kode eller ubrugte imports
 
-**Vigtigt:** Var konkret — henvis til specifikke linjer og funktioner. Eftervis ALTID med faktisk kodeindhold.
+**Vigtigt:** Vær konkret — henvis til specifikke linjer og funktioner. Eftervis ALTID med faktisk kodeindhold.

@@ -9,9 +9,11 @@ from lang import t
 from i18n import K
 import git_ops
 import re
+import sys
 import time
 import os
 import json
+import subprocess
 
 CHUNK_SIZE = 150000
 
@@ -45,6 +47,7 @@ class Agent:
         self.file_context = []
         self.file_chunks = {}
         self.images = []
+        self.pending_reply = None
         self.stop_requested = False
         self.lang = "da"
         self.active_template = None
@@ -186,6 +189,24 @@ class Agent:
             ["path"],
             lambda path: self._add_image(path)
         ))
+        self.tool_registry.register(Tool(
+            "run_tests",
+            "Kør pytest og returner resultat. Args: test_path (valgfri). Eksempel: run_tests(test_path='tests/test_tools.py::TestToolExecution')",
+            ["test_path"],
+            lambda test_path="": self._run_pytest(test_path)
+        ))
+        self.tool_registry.register(Tool(
+            "read_issue",
+            "Læs et issue fra docs/issues/observed/issues.json. Args: issue_id (f.eks. 'BUG-003'). Returnerer issue-detaljer.",
+            ["issue_id"],
+            lambda issue_id: self._read_issue(issue_id)
+        ))
+        self.tool_registry.register(Tool(
+            "update_issue_status",
+            "Opdater status på et issue i docs/issues/observed/issues.json. Args: issue_id, status ('open'/'in_progress'/'resolved'), resolution_note (valgfri).",
+            ["issue_id", "status"],
+            lambda issue_id, status="resolved", resolution_note="": self._update_issue_status(issue_id, status, resolution_note)
+        ))
 
     def _add_image(self, path):
         # 1. Already loaded in self.images? (match by filename or filepath)
@@ -218,6 +239,48 @@ class Agent:
         self.images.append({"b64": raw_b64, "mime": mime, "filename": os.path.basename(path), "filepath": path})
         self._log("TOOL", f"Billede tilføjet: {os.path.basename(path)}", f"{size:,} bytes ({ext})")
         return {"success": True, "file": os.path.basename(path), "size": size, "mime": mime}
+
+    def _run_pytest(self, test_path=""):
+        try:
+            cmd = [sys.executable, "-m", "pytest", "-v"]
+            if test_path:
+                cmd.append(test_path)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            return {"success": result.returncode == 0, "stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode}
+        except subprocess.TimeoutExpired:
+            return {"success": False, "stdout": "", "stderr": "Timeout (120s)", "exit_code": -1}
+        except FileNotFoundError:
+            return {"success": False, "stdout": "", "stderr": "python -m pytest not found", "exit_code": -1}
+
+    def _read_issue(self, issue_id):
+        import json as _json
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
+        if not os.path.exists(path):
+            return {"success": False, "error": f"Issue file not found at {path}"}
+        with open(path, encoding="utf-8") as f:
+            data = _json.load(f)
+        for issue in data.get("issues", []):
+            if issue.get("id", "").lower() == issue_id.lower():
+                return {"success": True, "issue": issue}
+        return {"success": False, "error": f"Issue '{issue_id}' not found. Available: {[i['id'] for i in data.get('issues', [])]}"}
+
+    def _update_issue_status(self, issue_id, status, resolution_note=""):
+        import json as _json
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
+        if not os.path.exists(path):
+            return {"success": False, "error": f"Issue file not found at {path}"}
+        with open(path, encoding="utf-8") as f:
+            data = _json.load(f)
+        for issue in data.get("issues", []):
+            if issue.get("id", "").lower() == issue_id.lower():
+                issue["status"] = status
+                if resolution_note:
+                    issue["resolution_note"] = resolution_note
+                with open(path, "w", encoding="utf-8") as f:
+                    _json.dump(data, f, ensure_ascii=False, indent=2)
+                self._log("INFO", f"Issue {issue_id} → {status}", resolution_note[:200])
+                return {"success": True, "issue": issue, "status": status}
+        return {"success": False, "error": f"Issue '{issue_id}' not found."}
 
     def _list_chunks(self):
         if not self.file_chunks:
@@ -257,6 +320,7 @@ class Agent:
         "programmering": ["list_chunks", "read_chunk", "write_file", "add_image"],
         "python-arkitektur": ["list_chunks", "read_chunk", "write_file"],
         "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk"],
+        "bugfix": ["read_issue", "update_issue_status", "run_tests", "list_chunks", "read_chunk", "write_file"],
     }
 
     TEMPLATE_TASK_TOOLS = {
@@ -305,6 +369,13 @@ class Agent:
             "Detaljer": "Gennemgå specifikke detaljer: tekstindhold, UI-elementer, kodeblokke, tal, datoer, navne, fejlmeddelelser. Fremhæv alt specifikt og målbart.",
             "Vurdering": "Vurder billedets kvalitet og indhold: Hvad fungerer godt? Hvad kunne forbedres? Er der fejl, inkonsistenser eller mangler? Giv konkrete forbedringsforslag.",
             "Eksportér": "Skriv den fulde analyse til en .md fil. Brug write_file til at gemme i ./exports/billedanalyse_{timestamp}.md. Filen skal indeholde alle sektioner samlet. Brug formatet:\n\n# Billedanalyse\n\n## Beskrivelse\n...\n\n## Kontekst\n...\n\n## Detaljer\n...\n\n## Vurdering\n...",
+        },
+        "bugfix": {
+            "Analyse": "Læs issue med read_issue(). Forstå hvad bug'en er og hvilken kode der skal ændres. Læs den relevante kildekode med read_chunk(). Forstå rodårsagen.",
+            "Test (Red)": "Skriv en pytest der fanger bug'en. Gå til den relevante testfil og tilføj en test. Kør testen med run_tests() — den SKAL fejle (rød fase). Hvis testen ikke fejler, fanger den ikke bug'en.",
+            "Implementering": "Ret kildekoden med den mindst mulige ændring. Brug write_file til at opdatere filen.",
+            "Verifikation (Green)": "Kør testen igen med run_tests() — den SKAL bestå (grøn fase). Kør HELE testsuiten med run_tests() for at verificere ingen regressions.",
+            "Opdatering": "Opdater issue-status til 'resolved' med update_issue_status(). Tilføj en kort resolution_note om hvad der blev fikset.",
         },
     }
 
@@ -409,6 +480,11 @@ class Agent:
                 "prompt": t(K.TP_BILLEDANALYSE, self.lang),
                 "fallback": t(K.TF_BILLEDANALYSE, self.lang),
             },
+            "bugfix": {
+                "name": t(K.T_BUGFIX, self.lang),
+                "prompt": t(K.TP_BUGFIX, self.lang),
+                "fallback": t(K.TF_BUGFIX, self.lang),
+            },
         }
 
     def _log(self, level, message, detail=""):
@@ -493,8 +569,8 @@ class Agent:
                 return None
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
-            if len(content) > 50000:
-                content = content[:50000] + "\n" + t(K.FILE_TRUNCATED, self.lang)
+            if len(content) > CHUNK_SIZE:
+                content = content[:CHUNK_SIZE] + "\n" + t(K.FILE_TRUNCATED, self.lang)
             return content
         except (UnicodeDecodeError, Exception) as e:
             self._log("WARNING", f"Kan ikke læse {os.path.basename(filepath)} som tekst", str(e))
@@ -676,6 +752,33 @@ class Agent:
 
         self.file_context = files or []
         self.file_chunks = {}
+
+        if template == "bugfix" and not files:
+            issue_match = re.search(r'(BUG-\d+)', prompt)
+            if issue_match:
+                issue_id = issue_match.group(1)
+                try:
+                    issues_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
+                    if os.path.exists(issues_path):
+                        with open(issues_path, encoding="utf-8") as f:
+                            issues_data = json.load(f)
+                        for issue in issues_data.get("issues", []):
+                            if issue.get("id", "").lower() == issue_id.lower():
+                                location = issue.get("location", "")
+                                if ":" in location:
+                                    filename = location.split(":")[0].strip()
+                                    base_dir = os.path.dirname(os.path.abspath(__file__))
+                                    for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
+                                        if os.path.exists(path):
+                                            content = self._read_file_content(path)
+                                            if content:
+                                                files = [{"filename": filename, "content": content, "path": path}]
+                                                self.file_context = files
+                                                self._log("INFO", f"Auto-loaded fil fra {issue_id}", path)
+                                            break
+                                break
+                except Exception as e:
+                    self._log("WARNING", "Kunne ikke auto-loade issue-fil", str(e))
 
         file_context = ""
         if files and len(files) > 0:
@@ -979,9 +1082,6 @@ class Agent:
 
         available_keys = list(self.file_chunks.keys())
         is_chunked = any(len(v) > 1 for v in self.file_chunks.values())
-        single_file = len(available_keys) == 1
-        if single_file and not is_chunked and self.tool_registry.active_tools and 'read_chunk' in self.tool_registry.active_tools:
-            self.tool_registry.active_tools = [t for t in self.tool_registry.active_tools if t != 'read_chunk']
         if is_chunked:
             chunk_hint_parts = []
             for key in available_keys:
@@ -1078,6 +1178,12 @@ class Agent:
         for i in range(max_iterations):
             if self.stop_requested:
                 break
+
+            # Check for user reply
+            if self.pending_reply:
+                messages.append({"role": "user", "content": self.pending_reply})
+                self._log("USER", "Bruger svarer", self.pending_reply[:100])
+                self.pending_reply = None
 
             response = ""
             for chunk in self.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=self.max_tokens, images=self.images):

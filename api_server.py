@@ -43,6 +43,41 @@ print(f"📦 Startet: {BUILD_INFO['started']} | api_server={BUILD_INFO['api_serv
 def serve_upload(filename):
     return send_from_directory(UPLOAD_DIR, filename)
 
+@app.route("/preview-exports/<path:filename>")
+def preview_export(filename):
+    import re
+    filepath = os.path.join(export_folder or os.path.join(BASE_DIR, "exports"), filename)
+    if not os.path.exists(filepath):
+        return "<h2>File not found</h2>", 404
+    with open(filepath, encoding="utf-8") as f:
+        md_content = f.read()
+    md_content = md_content.replace('<<<', '&lt;&lt;&lt;').replace('>>>', '&gt;&gt;&gt;')
+    md_content = re.sub(r'&lt;&lt;&lt;TOOL&gt;&gt;&gt;(\{.*?\})&lt;&lt;&lt;END&gt;&gt;&gt;', r'<pre class="tool-call">&lt;&lt;&lt;TOOL&gt;&gt;&gt;\1&lt;&lt;&lt;END&gt;&gt;&gt;</pre>', md_content)
+    md_content = re.sub(r'&lt;&lt;&lt;DONE&gt;&gt;&gt;(\{.*?\})&lt;&lt;&lt;END&gt;&gt;&gt;', r'<pre class="tool-result">&lt;&lt;&lt;DONE&gt;&gt;&gt;\1&lt;&lt;&lt;END&gt;&gt;&gt;</pre>', md_content)
+    return f"""<!DOCTYPE html>
+<html lang="da">
+<head><meta charset="UTF-8"><title>{filename}</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+    body {{ font-family: 'Segoe UI', system-ui; max-width: 960px; margin: 40px auto; padding: 20px; background: #0f172a; color: #e2e8f0; }}
+    h1 {{ border-bottom: 2px solid #334155; padding-bottom: 10px; }}
+    h2 {{ border-bottom: 1px solid #334155; padding-bottom: 6px; margin-top: 28px; }}
+    code {{ background: #1e293b; padding: 2px 6px; border-radius: 4px; }}
+    pre {{ background: #1e293b; padding: 14px; border-radius: 8px; overflow-x: auto; }}
+    pre code {{ background: none; padding: 0; }}
+    .tool-call {{ border-left: 3px solid #f59e0b; background: #451a03; }}
+    .tool-result {{ border-left: 3px solid #10b981; background: #064e3b; }}
+    blockquote {{ border-left: 3px solid #3b82f6; padding-left: 14px; color: #94a3b8; }}
+    table {{ border-collapse: collapse; width: 100%; }}
+    th, td {{ border: 1px solid #334155; padding: 8px 12px; text-align: left; }}
+    th {{ background: #1e293b; }}
+    a {{ color: #60a5fa; }}
+    img {{ max-width: 100%; border-radius: 8px; }}
+</style></head>
+<body><div id="content"></div>
+<script>document.getElementById('content').innerHTML = marked.parse({md_content!r});</script>
+</body></html>"""
+
 @app.route("/")
 def index():
     index_path = os.path.join(STATIC_DIR, 'index.html')
@@ -459,6 +494,16 @@ def stop_execution():
     agent.stop_requested = True
     return jsonify({"success": True})
 
+@app.route("/api/reply", methods=["POST"])
+def user_reply():
+    data = request.json
+    msg = data.get("message", "")
+    if not msg:
+        return jsonify({"success": False, "error": "Empty message"}), 400
+    agent.pending_reply = msg
+    agent._log("USER", "Bruger svar", msg[:100])
+    return jsonify({"success": True})
+
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():
     data = request.json
@@ -573,7 +618,7 @@ TEMPLATE_GUIDANCE = {
             'Opsummer [filnavn] i et kort referat',
             'Analyser [fil] og lav en struktureret gennemgang',
         ],
-        "hint": "Vælg resume-skabelonen nar du vil have en struktureret gennemgang af en bestemt fil."
+        "hint": "Vælg resume-skabelonen når du vil have en struktureret gennemgang af en bestemt fil."
     },
     "kodeanalyse": {
         "keywords": ["analyser", "kode", "gennemgå", "review", "debug", "sikkerhed", "struktur", "arkitektur", "kodekvalitet", "fejl", "sårbarhed"],
@@ -582,7 +627,7 @@ TEMPLATE_GUIDANCE = {
             'Gennemgå [fil] for fejl og sikkerhedsproblemer',
             'Review koden i [fil] og vurder kodekvaliteten',
         ],
-        "hint": "Vælg kodeanalyse-skabelonen nar du skal have analyseret en konkret fil eller kodebase."
+        "hint": "Vælg kodeanalyse-skabelonen når du skal have analyseret en konkret fil eller kodebase."
     },
     "diffanalyse": {
         "keywords": ["diff", "forskel", "ændring", "change", "commit", "pull", "merge", "version", "gren", "branch"],
@@ -591,7 +636,7 @@ TEMPLATE_GUIDANCE = {
             'Gennemgå de seneste commits og vurder risiko',
             'Sammenlign to versioner af [fil]',
         ],
-        "hint": "Vælg diffanalyse-skabelonen nar du sammenligner to versioner eller brances."
+        "hint": "Vælg diffanalyse-skabelonen når du sammenligner to versioner eller branches."
     },
     "agenten": {
         "keywords": ["git", "github", "commit", "push", "branch", "pull request", "pr", "workflow", "repository", "repo"],
@@ -600,16 +645,17 @@ TEMPLATE_GUIDANCE = {
             'Git workflow: opret branch commit push PR',
             'Commit og push mine ændringer, og opret en pull request',
         ],
-        "hint": "Vælg PR Agenten-skabelonen nar du skal udføre et git/github workflow."
+        "hint": "Vælg PR Agenten-skabelonen når du skal udføre et git/github workflow."
     },
     "programmering": {
-        "keywords": ["programmer", "opret", "implementer", "byg", "skriv", "kod", "app", "feature", "funktion", "system", "modul", "klasse", "program", "tool", "værktøj", "library", "bibliotek"],
+        "keywords": ["programmer", "opret", "implementer", "byg", "skriv", "kod", "app", "feature", "funktion", "system", "modul", "klasse", "program", "tool", "værktøj", "library", "bibliotek", "ret", "fix", "bug", "fejl", "compile", "ændr", "opdater", "rediger", "tilføj", "slet", "rettelse", "debug"],
         "examples": [
             'Opret en Flask-app med en health endpoint',
             'Implementer en funktion der beregner moms i Python',
+            'Ret compile-fejlene i C:\\Dev\\Trading\\src\\routes\\markets.js',
             'Byg et kommandolinje-værktøj der kan søge efter filer',
         ],
-        "hint": "Vælg programmeringsskabelonen nar du skal designe og implementere ny kode."
+        "hint": "Vælg programmeringsskabelonen når du skal designe, implementere eller rette kode i et projekt."
     },
     "python-arkitektur": {
         "keywords": ["arkitektur", "planlæg", "design", "struktur", "python", "flask", "komponent", "dokumentér", "systemoversigt", "modulopdeling"],
@@ -618,7 +664,7 @@ TEMPLATE_GUIDANCE = {
             'Design arkitekturen for et nyt system med Flask og SQLAlchemy',
             'Planlæg komponentstruktur og dataflow for en webapp',
         ],
-        "hint": "Vælg Python Arkitektur-skabelonen nar du skal planlægge og dokumentere en systemarkitektur."
+        "hint": "Vælg Python Arkitektur-skabelonen når du skal planlægge og dokumentere en systemarkitektur."
     },
     "billedanalyse": {
         "keywords": ["billede", "billed", "image", "screenshot", "skærmbillede", "foto", "photo", "png", "jpg", "jpeg", "analyser billed", "hvad ser du", "beskriv billedet"],
@@ -627,14 +673,41 @@ TEMPLATE_GUIDANCE = {
             'Hvad ser du på dette billede af en UI?',
             'Beskriv indholdet af dette foto og vurder kvaliteten',
         ],
-        "hint": "Vælg Billedanalyse-skabelonen nar du skal have analyseret et billede eller skærmbillede. Resultatet gemmes automatisk i en .md fil."
+        "hint": "Vælg Billedanalyse-skabelonen når du skal have analyseret et billede eller skærmbillede. Resultatet gemmes automatisk i en .md fil."
+    },
+    "bugfix": {
+        "keywords": ["bug", "fix", "fejl", "issue", "defekt", "test", "tdd", "red", "green", "refactor", "ret", "rettelse", "patch"],
+        "examples": [
+            'Fix BUG-003: None crash i solve_task_stream',
+            'Ret fejlen i [fil] og skriv test først',
+            'Anvend TDD: skriv test, implementer fix, verificér',
+        ],
+        "hint": "Vælg Bugfix-skabelonen når du skal rette en kendt bug med TDD-workflow: test først → implementer → verificér."
     },
 }
 
 
 def _validate_template_prompt(prompt: str, template: str) -> dict:
-    if not template or template == "fri":
+    if not template:
         return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
+    
+    if template == "fri":
+        # Even with free template, check if a better template can be suggested
+        try:
+            from skill_loader import SkillLoader
+            skills = SkillLoader.load_all()
+            better = SkillLoader.suggest_template(prompt, skills)
+            if better:
+                better_guidance = TEMPLATE_GUIDANCE.get(better)
+                hint = better_guidance["hint"] if better_guidance else ""
+                warning = (
+                    f"Din prompt matcher skabelonen '🐛 {better}' bedre.\n{hint}"
+                )
+                return {"warning": warning, "suggestion": better, "suggested_template": better, "matches": 0, "total": 0}
+        except Exception:
+            pass
+        return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
+    
     guidance = TEMPLATE_GUIDANCE.get(template)
     if not guidance:
         return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
@@ -707,6 +780,13 @@ def decompose():
     print(f"🌳 Nedbryder: {prompt[:50]}..." + (f" skabelon: {template}" if template else ""))
     if files:
         print(f"📄 Med {len(files)} filer")
+
+    decompose_model = data.get("decompose_model")
+    execute_model = data.get("execute_model")
+    if decompose_model:
+        agent.decompose_llm.set_model(decompose_model)
+    if execute_model:
+        agent.llm.set_model(execute_model)
 
     _ensure_model_loaded(agent.decompose_llm.model)
 
@@ -977,6 +1057,140 @@ def version():
 @app.route("/api/test", methods=["GET"])
 def test():
     return jsonify({"status": "ok", "message": t(K.UI_API_RUNNING, agent.lang), "static_folder": STATIC_DIR, "has_agent": agent is not None})
+
+@app.route("/skillflow")
+def skillflow_report():
+    import json as _json
+    outcomes_path = os.path.join(BASE_DIR, ".agent_storage", "skill_outcomes.json")
+    evolution_path = os.path.join(BASE_DIR, ".agent_storage", "evolution_actions.json")
+
+    outcomes = []
+    if os.path.exists(outcomes_path):
+        with open(outcomes_path, encoding="utf-8") as f:
+            outcomes = _json.load(f)
+
+    evolution = {}
+    if os.path.exists(evolution_path):
+        with open(evolution_path, encoding="utf-8") as f:
+            evolution = _json.load(f)
+
+    # Build stats
+    from collections import Counter
+    skills_c = Counter()
+    success_c = Counter()
+    templates_c = Counter()
+    for o in outcomes:
+        s = o.get("skill", "?")
+        skills_c[s] += 1
+        if o.get("success"):
+            success_c[s] += 1
+        t = o.get("template", "")
+        if t:
+            templates_c[t] += 1
+
+    md = f"""# 🧬 SkillFlow Analysis
+
+**Total outcomes:** {len(outcomes)}
+**Last analysis:** {evolution.get('analyzed_at', 'never')}
+
+## Per-Skill Statistics
+
+| Skill | Success | Total | Rate |
+|-------|---------|-------|------|
+"""
+    for skill, count in skills_c.most_common():
+        s = success_c.get(skill, 0)
+        rate = 100 * s / count if count else 0
+        md += f"| {skill} | {s} | {count} | {rate:.0f}% |\n"
+
+    if templates_c:
+        md += "\n## Template Usage\n\n| Template | Outcomes |\n|----------|----------|\n"
+        for t, c in templates_c.most_common():
+            md += f"| {t} | {c} |\n"
+
+    actions = evolution.get("actions", [])
+    if actions:
+        md += f"\n## Evolution Actions ({len(actions)})\n\n"
+        for a in actions:
+            act = a.get("action", "?")
+            skill = a.get("skill", "?")
+            reason = a.get("reason", "")
+            emoji = {"retain": "✅", "refine": "🔧", "prune": "🗑️", "generate": "🆕"}.get(act, "❓")
+            md += f"### {emoji} {act.upper()}: `{skill}`\n\n"
+            md += f"**Reason:** {reason}\n\n"
+            if a.get("success_rate") is not None:
+                md += f"- Success rate: {a['success_rate']:.0%}\n"
+            if a.get("frequency"):
+                md += f"- Frequency: {a['frequency']}× repeated\n"
+            if a.get("example_task"):
+                md += f"- Example task: *{a['example_task']}*\n"
+            if a.get("suggested_action_types"):
+                md += f"- Suggested types: {', '.join(a['suggested_action_types'])}\n"
+            md += "\n"
+
+    if not outcomes:
+        md += "\n*No outcomes recorded yet. Run some tasks to accumulate data.*\n"
+
+    # Applied changes log
+    log_path = os.path.join(BASE_DIR, ".agent_storage", "evolution_log.json")
+    if os.path.exists(log_path):
+        with open(log_path, encoding="utf-8") as f:
+            log_entries = _json.load(f)
+        if log_entries:
+            md += f"\n## Applied Changes ({len(log_entries)} entries)\n\n"
+            for entry in log_entries[-10:]:
+                md += f"### {entry['timestamp']}\n\n"
+                md += "| Action | Skill | Details |\n|--------|-------|----------|\n"
+                for act in entry.get("actions", []):
+                    md += f"| {act.get('action','?')} | `{act.get('skill','?')}` | {act.get('result','')[:120]} |\n"
+                md += "\n"
+
+    md += "\n\n[Apply pending actions](/api/skillflow/apply)"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>SkillFlow Analysis</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+    body {{ font-family: 'Segoe UI', system-ui; max-width: 1000px; margin: 40px auto; padding: 20px; background: #0f172a; color: #e2e8f0; }}
+    h1 {{ border-bottom: 2px solid #334155; padding-bottom: 10px; }}
+    h2 {{ border-bottom: 1px solid #334155; padding-bottom: 6px; margin-top: 28px; }}
+    h3 {{ color: #93c5fd; margin-top: 20px; }}
+    code {{ background: #1e293b; padding: 2px 6px; border-radius: 4px; }}
+    pre {{ background: #1e293b; padding: 14px; border-radius: 8px; overflow-x: auto; }}
+    table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
+    th, td {{ border: 1px solid #334155; padding: 8px 12px; text-align: left; }}
+    th {{ background: #1e293b; }}
+    a {{ color: #60a5fa; }}
+</style></head>
+<body><div id="content"></div>
+<script>document.getElementById('content').innerHTML = marked.parse({md!r});</script>
+</body></html>"""
+
+@app.route("/api/skillflow/apply")
+def skillflow_apply():
+    from skill_evolution import analyze, apply_evolution_actions, _log_applied
+    analysis = analyze()
+    if analysis.get("status") != "ok":
+        return jsonify({"success": False, "error": analysis})
+    results = apply_evolution_actions(analysis["actions"], dry_run=False)
+    if results:
+        _log_applied(results)
+    return jsonify({"success": True, "status": "applied", "actions": len(results), "results": results})
+
+@app.route("/api/skillflow/status")
+def skillflow_status():
+    import json as _json
+    outcomes_path = os.path.join(BASE_DIR, ".agent_storage", "skill_outcomes.json")
+    evolution_path = os.path.join(BASE_DIR, ".agent_storage", "evolution_actions.json")
+    data = {"outcomes": [], "evolution": {}}
+    if os.path.exists(outcomes_path):
+        with open(outcomes_path, encoding="utf-8") as f:
+            data["outcomes"] = _json.load(f)
+    if os.path.exists(evolution_path):
+        with open(evolution_path, encoding="utf-8") as f:
+            data["evolution"] = _json.load(f)
+    return jsonify({"success": True, "data": data})
 
 if __name__ == "__main__":
     started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

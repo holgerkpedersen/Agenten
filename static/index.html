@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Agenten</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --bg: #0f172a;
@@ -74,6 +75,23 @@
             --resize-hover: #6366f1;
             --purple-accent: #7c3aed;
         }
+
+        /* Rendered Markdown in preview */
+        .rendered-markdown h1 { font-size: 24px; border-bottom: 2px solid var(--border); padding-bottom: 8px; margin-top: 0; }
+        .rendered-markdown h2 { font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-top: 24px; }
+        .rendered-markdown h3 { font-size: 15px; margin-top: 18px; }
+        .rendered-markdown code { background: var(--input-bg); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+        .rendered-markdown pre { background: var(--input-bg); padding: 14px; border-radius: 8px; overflow-x: auto; }
+        .rendered-markdown pre code { background: none; padding: 0; }
+        .rendered-markdown ul, .rendered-markdown ol { padding-left: 24px; }
+        .rendered-markdown li { margin: 4px 0; }
+        .rendered-markdown table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+        .rendered-markdown th, .rendered-markdown td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+        .rendered-markdown th { background: var(--panel-header); }
+        .rendered-markdown blockquote { border-left: 3px solid var(--accent); padding-left: 14px; color: var(--text-muted); margin: 12px 0; }
+        .rendered-markdown a { color: var(--accent); }
+        .rendered-markdown hr { border-color: var(--border); }
+        .rendered-markdown img { max-width: 100%; border-radius: 8px; }
 
         * { box-sizing: border-box; }
         button, input, select, label, .reuse-btn, .tools-toggle, .panel-controls { user-select: none; }
@@ -527,7 +545,8 @@
                     <button onclick="saveLayoutToLocal()" id="saveLayoutBtn" title="Gem layout permanent">💾 Gem layout</button>
                     <button onclick="resetLayout()" id="resetLayoutBtn" title="Nulstil layout">🔄 Reset layout</button>
                     <hr style="border-color:var(--border);margin:4px 0;">
-                    <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research" style="background:var(--purple-accent);">🔍 Flow Builder</button>
+                    <button onclick="window.open('/skillflow','_blank')" title="SkillFlow Analysis" style="background:var(--purple-accent);">🧬 SkillFlow</button>
+                    <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research">🔍 Flow Builder</button>
                     <button onclick="setGithubToken()" id="githubTokenBtn" title="Opsæt GitHub Token">🔑 GitHub Token</button>
                 </div>
             </div>
@@ -557,9 +576,16 @@
                 <option value="programmering">💻 Programmeringsopgave</option>
                 <option value="python-arkitektur">🏗️ Python Arkitektur</option>
                 <option value="billedanalyse">🖼️ Billedanalyse</option>
+                <option value="bugfix">🐛 Bugfix (TDD)</option>
             </select>
         </div>
         
+        <div class="toolbar-row" id="issueRow" style="display:none;">
+            <span class="toolbar-label" id="issuesLabel">🐛 Issues</span>
+            <select id="issueSelect" class="toolbar-select" style="flex:1;" onchange="onIssueSelected(this.value)"></select>
+            <button onclick="loadIssue()" id="loadIssueBtn" style="background:var(--btn-secondary);font-size:12px;padding:4px 8px;">📋 Indlæs</button>
+            <button onclick="toggleIssueRow()" style="background:var(--danger);font-size:12px;padding:4px 8px;">✕</button>
+        </div>
         <div class="toolbar-row">
             <span class="toolbar-label" id="llmLangLabel">🤖 LLM Sprog</span>
             <select id="llmLangSelect" class="toolbar-select" onchange="switchLLMLang(this.value)" style="min-width:80px;">
@@ -581,6 +607,8 @@
             <button onclick="document.getElementById('imagePicker').click()" id="imageBtn" style="background:var(--btn-secondary);" title="Tilføj billede">🖼</button>
             <button onclick="decompose()" id="decomposeBtn">🌳 Nedbryd</button>
             <button onclick="executeWithStream()" id="executeBtn" style="background:#10b981;">⚡ Udfør</button>
+            <input type="text" id="replyInput" placeholder="Svar til LLM..." style="display:none;width:120px;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')sendReply()">
+            <button onclick="sendReply()" id="replyBtn" style="display:none;background:var(--accent);color:white;">✉</button>
             <button onclick="stopStream()" id="stopBtn" style="background:#ef4444;">⏹ Stop</button>
         </div>
         <div id="imagePreview" style="display:none; gap:4px; flex-wrap:wrap; margin:2px 0;"></div>
@@ -2133,6 +2161,17 @@ function stopStream() {
         eventSource = null;
     }
     addLogEntry('INFO', _('stream_stopped'), _('stopped_by_user'));
+    document.getElementById('replyInput').style.display = 'none';
+    document.getElementById('replyBtn').style.display = 'none';
+}
+
+async function sendReply() {
+    const input = document.getElementById('replyInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    await fetch('/api/reply', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({message: msg}) });
+    addLogEntry('USER', 'Svar sendt til LLM', msg.slice(0, 80));
+    input.value = '';
 }
 
 async function resetExecution() {
@@ -2189,6 +2228,9 @@ async function executeWithStream() {
     }
     
     stopStream();
+    
+    document.getElementById('replyInput').style.display = 'inline-block';
+    document.getElementById('replyBtn').style.display = 'inline-block';
     
     const llmBox = document.getElementById('llmContent');
     if (llmBox) llmBox.innerHTML = '<div class="loading"></div> Forbinder til streaming...';
@@ -2308,12 +2350,16 @@ async function executeWithStream() {
                 saveCurrentSession();
                 updatePromptHistory(currentSessionId);
                 eventSource.close();
+                document.getElementById('replyInput').style.display = 'none';
+                document.getElementById('replyBtn').style.display = 'none';
                 break;
                 
             case 'error':
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
+                document.getElementById('replyInput').style.display = 'none';
+                document.getElementById('replyBtn').style.display = 'none';
                 break;
         }
     };
@@ -2508,47 +2554,47 @@ async function previewMarkdown() {
     const treeContainer = document.getElementById('treeContainer')?.innerText || '';
     const llmContent = document.getElementById('llmContent')?.innerText || '';
     
-    let html = `
+    // Build Markdown
+    let md = `# ${_('preview_title')}\n\n`;
+    if (promptText) {
+        md += `## ${_('prompt')}\n\n\`\`\`\n${promptText}\n\`\`\`\n\n`;
+    }
+    if (treeContainer && treeContainer !== _('click_tree_hint')) {
+        md += `## ${_('tree_panel')}\n\n\`\`\`\n${treeContainer}\n\`\`\`\n\n`;
+    }
+    if (llmContent && llmContent !== _('click_stream_hint')) {
+        const trimmed = llmContent.length > 8000 ? llmContent.slice(0, 8000) + '\n\n[... truncated ...]' : llmContent;
+        md += `## ${_('llm_panel')}\n\n\`\`\`\n${trimmed}\n\`\`\`\n\n`;
+    }
+    if (loadedFilesContent.length > 0) {
+        md += `## ${_('files_included')}\n\n`;
+        for (const fc of loadedFilesContent.filter(f => f.included)) {
+            md += `- **${fc.filename}**\n`;
+        }
+        md += '\n';
+    }
+
+    // Render Markdown to HTML
+    const rendered = typeof marked !== 'undefined' ? marked.parse(md) : `<pre>${escapeHtml(md)}</pre>`;
+
+    const html = `
     <div id="previewOverlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:99999;display:flex;justify-content:center;align-items:center;" onclick="if(event.target===this)closePreview()">
-        <div style="background:#1e293b; border-radius:16px; width:90%; max-width:1200px; height:90%; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 8px 32px rgba(0,0,0,0.5);">
-            <div style="background:#334155; padding:15px 20px; display:flex; justify-content:space-between; align-items:center; border-radius:16px 16px 0 0;">
-                <h2 style="margin:0; color:#e2e8f0;">📊 ${_('preview_title')}</h2>
-                <div style="display:flex; gap:10px;">
-                    <button onclick="downloadFromPreview()" style="background:#10b981; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">💾 Download MD</button>
-                    <button onclick="closePreview()" style="background:#ef4444; border:none; padding:8px 16px; border-radius:8px; color:white; cursor:pointer;">✕ ${_('stop')}</button>
+        <div style="background:var(--panel-bg);border-radius:16px;width:90%;max-width:1200px;height:90%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+            <div style="background:var(--panel-header);padding:15px 20px;display:flex;justify-content:space-between;align-items:center;border-radius:16px 16px 0 0;">
+                <h2 style="margin:0;color:var(--text);">📊 ${_('preview_title')}</h2>
+                <div style="display:flex;gap:10px;">
+                    <button onclick="downloadFromPreview()" style="background:#10b981;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;">💾 Download MD</button>
+                    <button onclick="closePreview()" style="background:#ef4444;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;">✕ Luk</button>
                 </div>
             </div>
-            <div id="previewContent" style="flex:1; overflow:auto; padding:20px; font-family:monospace; font-size:14px; line-height:1.6; color:#e2e8f0; background:#0f172a;">
-    `;
-    
-    if (promptText) {
-        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px;">📝 ${_('prompt')}</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(promptText)}</pre>`;
-    }
-    
-    if (treeContainer && treeContainer !== _('click_tree_hint')) {
-        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">🌲 ${_('tree_panel')}</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap;">${escapeHtml(treeContainer)}</pre>`;
-    }
-    
-    if (llmContent && llmContent !== _('click_stream_hint')) {
-        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📡 ${_('llm_panel')}</h3><pre style="background:#1e293b; padding:15px; border-radius:8px; white-space:pre-wrap; max-height:400px; overflow:auto;">${escapeHtml(llmContent)}</pre>`;
-    }
-    
-    if (loadedFilesContent.length > 0) {
-        html += `<h3 style="color:#60a5fa; border-bottom:1px solid #334155; padding-bottom:10px; margin-top:20px;">📎 ${_('files_included')}</h3>`;
-        for (const fc of loadedFilesContent.filter(f => f.included)) {
-            html += `<div style="margin:10px 0; padding:10px; background:#1e293b; border-radius:8px;"><strong style="color:#10b981;">📄 ${fc.filename}</strong><div style="color:#64748b; font-size:11px; margin-top:4px;">${_('file_included_path')}: ${fc.filepath}</div></div>`;
-        }
-    }
-    
-    html += `
+            <div id="previewContent" style="flex:1;overflow:auto;padding:20px 30px;color:var(--text);background:var(--bg);" class="rendered-markdown">
+                ${rendered}
             </div>
         </div>
-    </div>
-    `;
-    
+    </div>`;
+
     document.body.insertAdjacentHTML('beforeend', html);
-    
-    window._previewContent = html;
+    window._previewContent = md;
 }
 
 function closePreview() {

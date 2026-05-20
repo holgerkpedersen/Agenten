@@ -16,10 +16,10 @@ Nar du skal lave et resume af en fil:
 5. **Anbefalinger**: Foresla konkrete forbedringer.
 
 ## Begrænsninger (OBLIGATORISK)
-- **Opfind ALDRIG** detaljer der ikke star i kilden — hold dig til fakta.
+- **Opfind ALDRIG** detaljer der ikke står i kilden — hold dig til fakta.
 - **Undga fyldord** — hver sætning skal bidrage med ny information.
 - **Foresla IKKE** follow-up opgaver eller kodeændringer medmindre du bliver bedt om det.
 - **Overblik: 3-5 sætninger** — ikke et helt afsnit.
 - **Brug punktopstilling** til lister af distincte pointer fremfor lange afsnit.
 
-**Vigtigt:** Analysen skal vare baseret pa HELE filens indhold — ikke kun forste chunk.
+**Vigtigt:** Analysen skal være baseret på HELE filens indhold — ikke kun første chunk.

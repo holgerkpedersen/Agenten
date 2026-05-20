@@ -44,12 +44,14 @@ class TestAgentInit:
 
     def test_template_tools_mapping(self):
         agent = Agent()
-        assert agent.TEMPLATE_TOOLS["resume"] == ["read_chunk"]
-        assert agent.TEMPLATE_TOOLS["kodeanalyse"] == ["read_chunk"]
-        assert agent.TEMPLATE_TOOLS["diffanalyse"] == ["read_chunk", "git_diff", "git_log"]
+        assert agent.TEMPLATE_TOOLS["resume"] == ["list_chunks", "read_chunk"]
+        assert agent.TEMPLATE_TOOLS["kodeanalyse"] == ["list_chunks", "read_chunk"]
+        assert agent.TEMPLATE_TOOLS["diffanalyse"] == ["list_chunks", "read_chunk", "git_diff", "git_log"]
         assert agent.TEMPLATE_TOOLS["fri"] is None
-        assert agent.TEMPLATE_TOOLS["programmering"] == ["read_chunk"]
-        assert agent.TEMPLATE_TOOLS["python-arkitektur"] == ["read_chunk", "write_file"]
+        assert agent.TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image"]
+        assert agent.TEMPLATE_TOOLS["python-arkitektur"] == ["list_chunks", "read_chunk", "write_file"]
+        assert agent.TEMPLATE_TOOLS["billedanalyse"] == ["add_image", "write_file", "list_chunks", "read_chunk"]
+        assert agent.TEMPLATE_TOOLS["bugfix"] == ["read_issue", "update_issue_status", "run_tests", "list_chunks", "read_chunk", "write_file"]
 
 
 class TestFallbackTree:
