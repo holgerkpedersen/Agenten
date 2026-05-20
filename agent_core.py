@@ -8,6 +8,7 @@ from skill_loader import SkillLoader
 from lang import t
 from i18n import K
 import git_ops
+import agent_issues
 import re
 import sys
 import time
@@ -49,6 +50,7 @@ class Agent:
         self.images = []
         self.pending_reply = None
         self.stop_requested = False
+        self._pending_refactor = None
         self.lang = "da"
         self.active_template = None
         self.max_tokens = 4096
@@ -193,19 +195,25 @@ class Agent:
             "run_tests",
             "Kør pytest og returner resultat. Args: test_path (valgfri). Eksempel: run_tests(test_path='tests/test_tools.py::TestToolExecution')",
             ["test_path"],
-            lambda test_path="": self._run_pytest(test_path)
+            lambda test_path="": agent_issues.run_pytest(test_path)
         ))
         self.tool_registry.register(Tool(
             "read_issue",
             "Læs et issue fra docs/issues/observed/issues.json. Args: issue_id (f.eks. 'BUG-003'). Returnerer issue-detaljer.",
             ["issue_id"],
-            lambda issue_id: self._read_issue(issue_id)
+            lambda issue_id: agent_issues.read_issue(issue_id)
         ))
         self.tool_registry.register(Tool(
             "update_issue_status",
             "Opdater status på et issue i docs/issues/observed/issues.json. Args: issue_id, status ('open'/'in_progress'/'resolved'), resolution_note (valgfri).",
             ["issue_id", "status"],
-            lambda issue_id, status="resolved", resolution_note="": self._update_issue_status(issue_id, status, resolution_note)
+            lambda issue_id, status="resolved", resolution_note="": agent_issues.update_issue_status(self, issue_id, status, resolution_note)
+        ))
+        self.tool_registry.register(Tool(
+            "create_refactor_issue",
+            "Opret et REFAC-issue i issues.json for en fil der er for stor. Kræver: filepath (filsti), line_count (antal linjer). Valgfri: related_issues (liste af issue-IDs).",
+            ["filepath", "line_count"],
+            lambda filepath, line_count, related_issues="": agent_issues.create_refactor_issue(self, filepath, int(line_count), related_issues.split(",") if related_issues else None)
         ))
 
     def _add_image(self, path):
@@ -320,7 +328,7 @@ class Agent:
         "programmering": ["list_chunks", "read_chunk", "write_file", "add_image"],
         "python-arkitektur": ["list_chunks", "read_chunk", "write_file"],
         "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk"],
-        "bugfix": ["read_issue", "update_issue_status", "run_tests", "list_chunks", "read_chunk", "write_file"],
+        "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "list_chunks", "read_chunk", "write_file"],
     }
 
     TEMPLATE_TASK_TOOLS = {
@@ -789,6 +797,7 @@ class Agent:
                 chunk_key = f"file_{filename}"
                 chunks = chunk_text(content)
                 self.file_chunks[chunk_key] = chunks
+                oversize = agent_issues.detect_oversize_file(self, filename, content)
                 if len(chunks) <= 1:
                     file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
                 else:
@@ -806,6 +815,7 @@ class Agent:
                     chunk_key = f"file_{filename}"
                     chunks = chunk_text(content)
                     self.file_chunks[chunk_key] = chunks
+                    agent_issues.detect_oversize_file(self, filename, content)
                     if len(chunks) <= 1:
                         file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
                     else:
@@ -816,6 +826,15 @@ class Agent:
                 file_path, file_content = self._get_single_file_context(prompt)
                 if file_content:
                     file_context = t(K.FILE_CONTEXT_HEADER, self.lang) + os.path.basename(file_path) + t(K.FILE_CONTEXT_PYTHON, self.lang).replace("{content}", file_content)
+
+        if self._pending_refactor:
+            oversize_note = (
+                f"\n\n## \u26A0\uFE0F BEM\u00C6RKNING: Filen '{self._pending_refactor['file']}' er "
+                f"{self._pending_refactor['lines']} linjer (gr\u00E6nse: {agent_issues.OVERSIZE_LINE_LIMIT}).\n"
+                f"Sp\u00F8rg venligst brugeren om de \u00F8nsker et REFAC-issue oprettet "
+                f"(brug `create_refactor_issue` v\u00E6rkt\u00F8jet).\n"
+            )
+            file_context += oversize_note
 
         self.full_prompt_with_context = prompt + file_context
 

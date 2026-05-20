@@ -51,7 +51,7 @@ class TestAgentInit:
         assert agent.TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image"]
         assert agent.TEMPLATE_TOOLS["python-arkitektur"] == ["list_chunks", "read_chunk", "write_file"]
         assert agent.TEMPLATE_TOOLS["billedanalyse"] == ["add_image", "write_file", "list_chunks", "read_chunk"]
-        assert agent.TEMPLATE_TOOLS["bugfix"] == ["read_issue", "update_issue_status", "run_tests", "list_chunks", "read_chunk", "write_file"]
+        assert agent.TEMPLATE_TOOLS["bugfix"] == ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "list_chunks", "read_chunk", "write_file"]
 
 
 class TestFallbackTree:
