@@ -10,6 +10,7 @@ from i18n import K
 import git_ops
 import agent_issues
 import agent_files
+import agent_tree
 import re
 import sys
 import time
@@ -385,34 +386,10 @@ class Agent:
         return not self.active_template or intent == self.active_template or skill.get("base")
 
     def _record_outcome(self, task_node):
-        try:
-            from skill_tracker import tracker
-            skill_name = "__none__"
-            for s in self._active_skills:
-                if not s.get("base"):
-                    skill_name = s["name"]
-                    break
-            duration = int((time.time() - self._task_start_time) * 1000) if self._task_start_time else 0
-            tracker.record(
-                skill_name=skill_name,
-                task_summary=task_node.name,
-                success=task_node.status == "done",
-                duration_ms=duration,
-                template=self.active_template or "",
-            )
-        except ImportError:
-            pass
+        agent_tree.record_outcome(self, task_node)
 
     def _evolve_if_needed(self):
-        try:
-            from skill_evolution import evolve_if_needed
-            result = evolve_if_needed(dry_run=True)
-            if result.get("status") == "evolved":
-                self._log("SKILLFLOW", "Evolution triggered", f"{len(result.get('analysis', {}).get('actions', []))} actions")
-            elif result.get("status") == "ok":
-                self._log("SKILLFLOW", "Analysis ready", f"{len(result.get('actions', []))} actions available")
-        except ImportError:
-            pass
+        agent_tree.evolve_if_needed(self)
 
     def _format_skills_for_prompt(self):
         if not self._active_skills:
@@ -484,67 +461,7 @@ class Agent:
         print(f"[{level}] {message}: {detail[:200]}")
 
     def _clean_task_name(self, name):
-        name = re.sub(r'^[\*\-+]\s+', '', name.strip())
-        name = re.sub(r'^\d+\.\s+', '', name)
-        patterns = [
-            r'<think>.*?</think>',
-            r'Here\'s a thinking process:.*$',
-            r'^\*\*.*\*\*$',
-            r'^[•\-]\s*$',
-            r'^Let\'s.*$',
-            r'^Check.*$',
-            r'^Draft:.*$',
-            r'^No repetition.*$',
-            r'^Drop politeness.*$',
-            r'^Indentation:.*$',
-            r'^Structure:.*$',
-            r'^Task to break down:.*$',
-            r'^Brainstorming.*$',
-            r'^Main task:.*$',
-            r'^Level \d+ steps.*$',
-            r'^Let\'s break each down.*$',
-            r'^Let\'s ensure.*$',
-            r'^Udfør opgave.*$',
-            r'^Analyze User Input:.*$',
-            r'^Deconstruct Constraints.*$',
-            r'^-\s*Task:.*$',
-            r'^-\s*Input Task:.*$',
-            r'^-\s*Example Provided:.*$',
-            r'^-\s*Language:.*$',
-            r'^-\s*Must be a tree structure.*$',
-            r'^-\s*Output:.*$',
-            r'^What does it mean to analyze.*$',
-            r'^Wait, the example shows.*$',
-            r'^This is a bit linear.*$',
-            r'^Final check of the prompt.*$',
-            r'^I will output exactly.*$',
-            r'^Ready. Output matches exactly.*$',
-            r'^✅$',
-            r'^Nedbryd nu opgaven.*$',
-            r'^KUN træstruktur.*$',
-            r'^Returnér KUN træstruktur.*$',
-            r'^Returner KUN træstruktur.*$',
-            r'^Now break down the task.*$',
-            r'^ONLY tree structure.*$',
-            r'^Return ONLY the tree structure.*$',
-            r'^Ahora descompón la tarea.*$',
-            r'^SOLO estructura de árbol.*$',
-            r'^Devuelve SOLO la estructura.*$',
-            r'^\u73b0\u5728\u5206\u89e3\u4efb\u52a1.*$',
-            r'^\u4ec5\u6811\u7ed3\u6784.*$',
-            r'^<\|?channel\|?>.*$',
-            r'^thought$',
-            r'^namesearch$',
-            r'^namesekundar.*$',
-        ]
-        for pattern in patterns:
-            name = re.sub(pattern, '', name, flags=re.IGNORECASE | re.DOTALL)
-        name = re.sub(r'\*\*', '', name)
-        name = re.sub(r'`.*?`', '', name)
-        name = re.sub(r'\s+', ' ', name).strip()
-        if len(name) < 3 or name in ['', '-', '•', '*']:
-            return None
-        return name
+        return agent_tree._clean_task_name(name)
 
     def _read_file_content(self, filepath):
         return agent_files.read_file_content(self, filepath)
@@ -556,74 +473,11 @@ class Agent:
         return agent_files.get_folder_context(self, prompt)
 
     def _create_fallback_tree(self, prompt):
-        tree = TaskTree(prompt)
         self.original_prompt = prompt
-        prompt_lower = prompt.lower()
-
-        if "analyser" in prompt_lower and (".py" in prompt_lower or "api_server" in prompt_lower):
-            tree.root.add_child(TaskNode(t(K.FT_UNDERSTAND_PURPOSE, self.lang)))
-            tree.root.children[0].add_child(TaskNode(t(K.FT_READ_IMPORTS, self.lang)))
-            tree.root.children[0].add_child(TaskNode(t(K.FT_IDENTIFY_FRAMEWORKS, self.lang)))
-            tree.root.add_child(TaskNode(t(K.FT_ANALYZE_STRUCTURE, self.lang)))
-            tree.root.children[1].add_child(TaskNode(t(K.FT_REVIEW_ENDPOINTS, self.lang)))
-            tree.root.children[1].add_child(TaskNode(t(K.FT_CHECK_CONFIG, self.lang)))
-            tree.root.add_child(TaskNode(t(K.FT_ASSESS_QUALITY, self.lang)))
-            tree.root.children[2].add_child(TaskNode(t(K.FT_SECURITY_ANALYSIS, self.lang)))
-            tree.root.children[2].add_child(TaskNode(t(K.FT_ERROR_HANDLING, self.lang)))
-            tree.root.add_child(TaskNode(t(K.FT_DOCUMENT_FINDINGS, self.lang)))
-        elif "2 + 2" in prompt_lower or "2 plus 2" in prompt_lower:
-            tree.root.add_child(TaskNode(t(K.FT_UNDERSTAND_NUMBERS, self.lang)))
-            tree.root.add_child(TaskNode(t(K.FT_PERFORM_ADDITION, self.lang)))
-            tree.root.add_child(TaskNode(t(K.FT_CONCLUDE, self.lang)))
-        else:
-            tree.root.add_child(TaskNode(t(K.FT_ANALYZE_PROBLEM, self.lang)))
-            tree.root.add_child(TaskNode(t(K.FT_FIND_STRATEGY, self.lang)))
-            tree.root.add_child(TaskNode(t(K.FT_IMPLEMENT_SOLUTION, self.lang)))
-            tree.root.add_child(TaskNode(t(K.FT_TEST_VALIDATE, self.lang)))
-        return tree
+        return agent_tree.create_fallback_tree(self, prompt)
 
     def _parse_tree_from_llm(self, prompt, llm_response):
-        tree = TaskTree(prompt)
-        if llm_response.startswith("ERROR") or not llm_response.strip():
-            self._log("ERROR", t(K.LOG_LLM_ERROR_FALLBACK, self.lang), llm_response[:100] if llm_response else t(K.LOG_EMPTY_RESPONSE, self.lang))
-            return self._create_fallback_tree(prompt)
-
-        lines = llm_response.strip().split('\n')
-        stack = [(tree.root, 0)]
-        added_count = 0
-
-        for line in lines:
-            if not line.strip():
-                continue
-            stripped = line.lstrip(' ')
-            indent = len(line) - len(stripped)
-            task_name = self._clean_task_name(stripped)
-            if task_name is None:
-                continue
-            skip_words = ['think', 'thinking', 'brainstorm', 'draft', 'constraint',
-                         'repetition', 'politeness', 'indentation', 'compliance',
-                         'thought', 'channel', 'namesekundar', 'namesearch',
-                         'analyze user input', 'deconstruct', 'example provided',
-                         'must be a tree', 'output:', 'language:']
-            if any(word in task_name.lower() for word in skip_words):
-                continue
-            if not task_name or len(task_name) < 3:
-                continue
-            level = indent // 2
-            while len(stack) > level + 1:
-                stack.pop()
-            parent = stack[-1][0]
-            new_node = TaskNode(task_name[:80])
-            parent.add_child(new_node)
-            stack.append((new_node, level))
-            added_count += 1
-
-        if added_count == 0:
-            self._log("WARNING", t(K.LOG_NO_VALID_TASKS, self.lang), "")
-            return self._create_fallback_tree(prompt)
-
-        self._log("INFO", t(K.LOG_PARSED_TASKS, self.lang).format(n=added_count), "")
-        return tree
+        return agent_tree.parse_tree_from_llm(self, prompt, llm_response)
 
     def decompose_prompt(self, prompt, files=None, template=None):
         self.agent_log = []
@@ -775,34 +629,13 @@ class Agent:
         self._log("INFO", t(K.LOG_EXECUTION_RESET, self.lang), "")
 
     def _count_tasks(self, node):
-        count = 1
-        for child in node.children:
-            count += self._count_tasks(child)
-        return count
+        return agent_tree.count_tasks(node)
 
     def task_tree_to_dict(self):
-        if not self.task_tree or not self.task_tree.root:
-            return None
-        
-        def node_to_dict(node):
-            return {
-                "name": node.name,
-                "status": node.status,
-                "children": [node_to_dict(child) for child in node.children] if node.children else []
-            }
-        
-        return node_to_dict(self.task_tree.root)
+        return agent_tree.task_tree_to_dict(self)
 
     def task_tree_from_dict(self, d):
-        from task_tree import TaskTree, TaskNode
-        def dict_to_node(item):
-            node = TaskNode(item["name"])
-            node.status = item.get("status", "pending")
-            for child_data in item.get("children", []):
-                node.add_child(dict_to_node(child_data))
-            return node
-        self.task_tree = TaskTree("temp")
-        self.task_tree.root = dict_to_node(d)
+        agent_tree.task_tree_from_dict(self, d)
 
     # Helper functions (makes main function more readable)
     def _truncate_conversation(self, conversation, system_prompt):
