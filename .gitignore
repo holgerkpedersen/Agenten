@@ -25,3 +25,17 @@ exports/
 
 # Brainstorms folder
 .brainstorms/
+
+# logs
+flask_output.log
+
+# docs
+docs/
+docs/issues/
+docs/issues/observed/
+docs/**/*.*
+
+
+# agent storage and tmp files
+.agent_storage/
+.agent_tmp/
