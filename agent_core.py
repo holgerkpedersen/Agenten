@@ -170,9 +170,21 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "write_file",
-            "Skriv indhold til en fil. Opretter mappen hvis den ikke findes. Returnerer stien og antal tegn.",
+            "Opret en NY fil med indhold. Virker KUN til nye filer — findes filen i forvejen, brug edit_file i stedet. Opretter mappen hvis den ikke findes. Syntestjekker .py filer.",
             ["path", "content"],
             lambda path, content: git_ops.write_file(path=path, content=content)
+        ))
+        self.tool_registry.register(Tool(
+            "edit_file",
+            "Rediger en eksisterende fil med search-and-replace. Kræver: path (filsti), old_text (præcis tekst der skal erstattes), new_text (den nye tekst). Søgeteksten skal findes præcis én gang. Syntestjekkes for .py filer. Opretter IKKE nye filer — brug write_file til det.",
+            ["path", "old_text", "new_text"],
+            lambda path, old_text, new_text: git_ops.edit_file(path=path, old_text=old_text, new_text=new_text)
+        ))
+        self.tool_registry.register(Tool(
+            "list_files",
+            "List filer i en mappe. Kræver: path (mappesti, default '.'). Valgfri: pattern (filtype f.eks. '.py'). Valgfri: max_depth (max dybde, default 2). Returnerer filnavne og størrelser.",
+            ["path"],
+            lambda path=".", pattern="", max_depth=2: git_ops.list_files(path=path, pattern=pattern or None, max_depth=int(max_depth))
         ))
         self.tool_registry.register(Tool(
             "add_image",
@@ -203,6 +215,12 @@ class Agent:
             "Opret et REFAC-issue i issues.json for en fil der er for stor. Kræver: filepath (filsti), line_count (antal linjer). Valgfri: related_issues (liste af issue-IDs).",
             ["filepath", "line_count"],
             lambda filepath, line_count, related_issues="": agent_issues.create_refactor_issue(self, filepath, int(line_count), related_issues.split(",") if related_issues else None)
+        ))
+        self.tool_registry.register(Tool(
+            "create_issue",
+            "Opret et nyt issue i issues.json når agenten opdager en fejl i kode eller data. Kræver: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location, impact, proposed_fix. Valgfri felter kan sendes som tomme strenge.",
+            ["title", "type", "severity", "description", "location", "impact", "proposed_fix"],
+            lambda title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="": agent_issues.create_issue(self, title=title, type=type, severity=severity, description=description, location=location, impact=impact, proposed_fix=proposed_fix)
         ))
 
     def _add_image(self, path):
