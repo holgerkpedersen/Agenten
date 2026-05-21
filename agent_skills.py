@@ -5,24 +5,25 @@ from skill_loader import SkillLoader
 
 
 TEMPLATE_TOOLS = {
-    "resume": ["list_chunks", "read_chunk"],
-    "kodeanalyse": ["list_chunks", "read_chunk"],
-    "diffanalyse": ["list_chunks", "read_chunk", "git_diff", "git_log"],
+    "resume": ["list_chunks", "read_chunk", "list_files"],
+    "kodeanalyse": ["list_chunks", "read_chunk", "list_files", "create_issue"],
+    "diffanalyse": ["list_chunks", "read_chunk", "git_diff", "git_log", "list_files", "create_issue"],
     "fri": None,
     "agenten": [
         "list_chunks",
         "read_chunk",
+        "list_files",
         "github_create_pr",
         "git_status", "git_add_all", "git_commit", "git_push",
         "git_diff", "git_log",
         "git_create_branch", "git_current_branch", "git_pull", "git_checkout",
         "git_remote_status"
     ],
-    "programmering": ["list_chunks", "read_chunk", "write_file", "add_image"],
-    "python-arkitektur": ["list_chunks", "read_chunk", "write_file"],
-    "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk"],
-    "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "list_chunks", "read_chunk", "write_file"],
-    "refactor": ["list_chunks", "read_chunk", "write_file", "run_tests"],
+    "programmering": ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue"],
+    "python-arkitektur": ["list_chunks", "read_chunk", "write_file", "list_files", "create_issue"],
+    "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk", "list_files", "create_issue"],
+    "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_chunk", "write_file", "edit_file", "list_files"],
+    "refactor": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue"],
 }
 
 TEMPLATE_TASK_TOOLS = {
@@ -31,7 +32,21 @@ TEMPLATE_TASK_TOOLS = {
         "commit": ["git_add_all", "git_commit", "git_status", "git_diff", "git_log"],
         "push": ["git_push", "git_remote_status"],
         "pull request": ["github_create_pr", "git_remote_status", "git_diff", "git_log"],
-    }
+    },
+    "bugfix": {
+        "analyse": ["read_issue", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
+        "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_chunk", "create_issue"],
+        "implementering": ["edit_file", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
+        "verifikation": ["run_tests", "edit_file", "list_files", "list_chunks", "read_chunk", "create_issue"],
+        "opdatering": ["update_issue_status", "list_files", "list_chunks", "read_chunk", "create_issue"],
+    },
+    "refactor": {
+        "analyse": ["list_files", "list_chunks", "read_chunk"],
+        "plan": ["list_files", "list_chunks", "read_chunk"],
+        "ekstraher": ["write_file", "list_files", "list_chunks", "read_chunk"],
+        "opdatér": ["edit_file", "list_files", "list_chunks", "read_chunk"],
+        "test": ["run_tests", "list_files", "list_chunks", "read_chunk"],
+    },
 }
 
 SECTION_INSTRUCTIONS = {
@@ -73,17 +88,17 @@ SECTION_INSTRUCTIONS = {
         "Eksport\u00e9r": "Skriv den fulde analyse til en .md fil. Brug write_file til at gemme i ./exports/billedanalyse_{timestamp}.md. Filen skal indeholde alle sektioner samlet. Brug formatet:\n\n# Billedanalyse\n\n## Beskrivelse\n...\n\n## Kontekst\n...\n\n## Detaljer\n...\n\n## Vurdering\n...",
     },
     "bugfix": {
-        "Analyse": "Læs issue med read_issue(). Forstå hvad bug'en er og hvilken kode der skal ændres. Læs den relevante kildekode med read_chunk(). Forstå rodårsagen.",
-        "Test (Red)": "Skriv en pytest der fanger bug'en. Gå til den relevante testfil og tilføj en test. Kør testen med run_tests() — den SKAL fejle (rød fase). Hvis testen ikke fejler, fanger den ikke bug'en.",
-        "Implementering": "Ret kildekoden med den mindst mulige ændring. Brug write_file til at opdatere filen.",
+        "Analyse": "Læs issue med read_issue(). Forstå hvad bug'en er og hvilken kode der skal ændres. Læs den relevante kildekode med read_chunk(). Forstå rodårsagen. SKRIV IKKE til filer — kun analyse. Opret et issue med create_issue() hvis du opdager en ny fejl i koden eller data der skal rettes.",
+        "Test (Red)": "Skriv en pytest der fanger bug'en. Opret en ny testfil med write_file (testfilen findes ikke i forvejen). Kør testen med run_tests() — den SKAL fejle (rød fase). Hvis testen består (i stedet for at fejle), er bug'en allerede fikset — opdater issue-status til 'resolved' og afslut med <<<DONE>>>.",
+        "Implementering": "Ret kildekoden med den mindst mulige ændring. Brug edit_file til at lave præcise search-and-replace ændringer i den eksisterende kode. Brug IKKE write_file — filen findes allerede.",
         "Verifikation (Green)": "Kør testen igen med run_tests() — den SKAL bestå (grøn fase). Kør HELE testsuiten med run_tests() for at verificere ingen regressions.",
         "Opdatering": "Opdater issue-status til 'resolved' med update_issue_status(). Tilføj en kort resolution_note om hvad der blev fikset.",
     },
     "refactor": {
-        "Analyse": "Læs filen med read_chunk(). Forstå alle funktioner, klasser, imports og deres ansvar. Identificér grænseflader og afhængigheder mellem komponenter.",
+        "Analyse": "Læs filen med read_chunk(). Forstå alle funktioner, klasser, imports og deres ansvar. Identificér grænseflader og afhængigheder mellem komponenter. SKRIV IKKE til filer — kun analyse.",
         "Plan": "Beslut hvordan filen opdeles i moduler. F.eks.: ét modul per klasse, ét modul per ansvarsområde, fælles imports i en base-modul. Overvej SOLID-principperne.",
-        "Ekstraher": "Opret nye modulfiler med write_file(). Flyt relevant kode til hvert modul. Bevar samme funktionalitet — bare omorganiseret.",
-        "Opdatér": "Opdater den originale fil: tilføj import af nye moduler, fjern den kode der blev flyttet. Sørg for at alle referencer stadig virker.",
+        "Ekstraher": "Opret nye modulfiler med write_file() — disse er NYE filer. Flyt relevant kode til hvert modul. Bevar samme funktionalitet — bare omorganiseret.",
+        "Opdatér": "Opdater den originale fil med edit_file(): fjern den kode der blev flyttet, tilføj import af nye moduler. Brug IKKE write_file — den originale fil findes allerede.",
         "Test": "Kør testsuiten med run_tests() for at verificere at intet er gået i stykker. Hvis tests fejler, ret import-stier og genkør.",
     },
 }

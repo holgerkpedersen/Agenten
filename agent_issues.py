@@ -45,6 +45,24 @@ def _next_refac_id(data):
     return f"REFAC-{max(nums) + 1:03d}" if nums else "REFAC-001"
 
 
+ISSUE_TYPE_PREFIXES = {
+    "bug": "BUG",
+    "security": "SEC",
+    "architecture": "ARC",
+    "testing": "TST",
+    "performance": "PRF",
+    "maintainability": "MNT",
+    "refactor": "REFAC",
+}
+
+
+def _next_issue_id(data, issue_type):
+    prefix = ISSUE_TYPE_PREFIXES.get(issue_type, "BUG")
+    existing = [i["id"] for i in data.get("issues", []) if i["id"].startswith(f"{prefix}-")]
+    nums = [int(i.split("-")[1]) for i in existing if i.split("-")[1].isdigit()]
+    return f"{prefix}-{max(nums) + 1:03d}" if nums else f"{prefix}-001"
+
+
 def run_pytest(test_path=""):
     try:
         cmd = [sys.executable, "-m", "pytest", "-v"]
@@ -87,7 +105,7 @@ def create_refactor_issue(agent, filepath, line_count, related_issues=None):
         agent._log("INFO", f"REFAC-issue findes allerede for {filepath}", existing[0]["id"])
         return {"success": True, "issue": existing[0], "existing": True}
 
-    issue_id = _next_refac_id(data)
+    issue_id = _next_issue_id(data, "refactor")
     issue = dict(REFAC_TEMPLATE)
     issue["id"] = issue_id
     issue["title"] = f"{filepath} er {line_count} linjer — bryder Single Responsibility Principle"
@@ -104,6 +122,32 @@ def create_refactor_issue(agent, filepath, line_count, related_issues=None):
     data["meta"]["total"] = len(data["issues"])
     _save_issues(data)
     agent._log("WARNING", f"REFAC-issue oprettet: {issue_id}", f"{filepath} ({line_count} linjer)")
+    return {"success": True, "issue": issue, "existing": False}
+
+
+def create_issue(agent, title, type="bug", severity="medium", description="", location="", impact="", proposed_fix=""):
+    data = _load_issues()
+    for i in data.get("issues", []):
+        if i.get("title") == title or (location and i.get("location", "").startswith(location)):
+            agent._log("INFO", f"Issue findes allerede", i["id"])
+            return {"success": True, "issue": i, "existing": True}
+
+    issue_id = _next_issue_id(data, type)
+    issue = {
+        "id": issue_id,
+        "title": title,
+        "type": type,
+        "severity": severity,
+        "description": description,
+        "location": location,
+        "impact": impact,
+        "proposed_fix": proposed_fix,
+        "status": "open",
+    }
+    data["issues"].append(issue)
+    data["meta"]["total"] = len(data["issues"])
+    _save_issues(data)
+    agent._log("INFO", f"Issue oprettet: {issue_id}", title[:100])
     return {"success": True, "issue": issue, "existing": False}
 
 
