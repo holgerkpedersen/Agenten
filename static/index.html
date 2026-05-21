@@ -2716,7 +2716,7 @@ function showIssuesPanel() {
                 const statusClass = `issue-status-${issue.status || 'open'}`;
                 const typeClass = `issue-type-${issue.type || 'bug'}`;
                 const desc = (issue.description || '').substring(0, 120);
-                const issueEnc = encodeURIComponent(JSON.stringify(issue));
+                const issueEnc = encodeURIComponent(JSON.stringify(issue)).replace(/'/g, '%27');
                 html += `<tr onclick="toggleIssueDetail(this)" style="cursor:pointer;">
                     <td><strong>${issue.id}</strong></td>
                     <td>${issue.title}
