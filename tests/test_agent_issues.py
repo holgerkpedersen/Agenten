@@ -128,3 +128,63 @@ class TestRunPytest:
             mock_run.return_value.stderr = "error"
             result = run_pytest()
             assert result["success"] is False
+
+
+class TestCreateIssue:
+    def test_create_new_issue(self, tmp_path):
+        from agent_issues import create_issue, _get_issues_path, _save_issues
+        data = {"meta": {"total": 0}, "issues": []}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            agent = MagicMock()
+            result = create_issue(agent, "Test bug found", "bug", "high",
+                                  "A test description", "file.py:10", "High impact", "Fix it")
+            assert result["success"] is True
+            assert result["existing"] is False
+            assert result["issue"]["title"] == "Test bug found"
+            assert result["issue"]["type"] == "bug"
+            assert result["issue"]["severity"] == "high"
+            assert result["issue"]["status"] == "open"
+
+    def test_create_issue_duplicate_title(self, tmp_path):
+        from agent_issues import create_issue, _get_issues_path, _save_issues
+        data = {"meta": {"total": 1}, "issues": [
+            {"id": "BUG-001", "title": "Duplicate title", "type": "bug"}
+        ]}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            agent = MagicMock()
+            result = create_issue(agent, "Duplicate title", "bug", "medium", "desc")
+            assert result["success"] is True
+            assert result["existing"] is True
+
+    def test_create_issue_generates_correct_id(self, tmp_path):
+        from agent_issues import create_issue, _get_issues_path, _save_issues
+        data = {"meta": {"total": 5}, "issues": [
+            {"id": "BUG-001"}, {"id": "BUG-003"}, {"id": "SEC-001"},
+            {"id": "ARC-001"}, {"id": "TST-001"}
+        ]}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            agent = MagicMock()
+            r1 = create_issue(agent, "Bug A", "bug", "low", "")
+            assert r1["issue"]["id"] == "BUG-004"
+            r2 = create_issue(agent, "Sec A", "security", "high", "")
+            assert r2["issue"]["id"] == "SEC-002"
+            r3 = create_issue(agent, "Arc A", "architecture", "medium", "")
+            assert r3["issue"]["id"] == "ARC-002"
+            r4 = create_issue(agent, "Tst A", "testing", "low", "")
+            assert r4["issue"]["id"] == "TST-002"
+
+    def test_create_issue_first_id(self, tmp_path):
+        from agent_issues import create_issue, _get_issues_path, _save_issues
+        data = {"meta": {"total": 0}, "issues": []}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            agent = MagicMock()
+            result = create_issue(agent, "First bug", "bug", "low", "")
+            assert result["issue"]["id"] == "BUG-001"
+            result = create_issue(agent, "First perf", "performance", "low", "")
+            assert result["issue"]["id"] == "PRF-001"
+            result = create_issue(agent, "First mnt", "maintainability", "low", "")
+            assert result["issue"]["id"] == "MNT-001"
