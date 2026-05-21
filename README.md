@@ -17,7 +17,13 @@ python api_server.py   # Åbn http://localhost:5000
 ## 📁 Projektstruktur
 
 ```
-agent_core.py         # Agent-kerne: LLM-interaktion, opgavetræ, værktøjer, folder scanning
+agent_core.py         # Agent-facade (504 linjer): init, tool-registrering, decompose, execute, tynde delegat-metoder
+agent_tasks.py        # Opgaveudførelse: solve_task_stream, solve_task, handle_tool_call
+agent_tree.py         # Træoperationer: parse_tree_from_llm, create_fallback_tree, record_outcome, evolve_if_needed
+agent_files.py        # Fil/chunk operationer: read/write/chunk, folder-scanning
+agent_skills.py       # Skills-matching, skabelon-konstanter (TEMPLATE_TOOLS, get_templates)
+agent_issues.py       # Issue-værktøjer: read_issue, update_issue_status, oversize-detektion
+agent_git.py          # Git/PR workflow: is_pr_workflow, extract_branch_name, verify_pr_step
 api_server.py         # Flask API: SSE streaming, sessions, billed-upload, version endpoint
 llm_wrapper.py        # LM Studio HTTP wrapper (chat + streaming + vision/image encoding)
 tools.py              # Tool/ToolRegistry — værktøjs-ramme (parse_response, build_system_prompt)
@@ -35,6 +41,7 @@ lang.py               # Oversættelser (da/en/es/zh)
 i18n.py               # Internacionaliserings-nøgler (K enum)
 AGENTS.md             # Knowledge base — bugs, fixes, debugging workflow
 static/index.html     # Browser-UI med drag/resize paneler, template dropdown, billed-preview
+sessions/             # Sessioner i JSON-format (gem/indlæs/slet)
 skills/               # Skills i markdown med frontmatter
 ```
 
@@ -135,8 +142,19 @@ Browser (index.html)
     ▼
 Flask API (api_server.py)
     │
-    ├── decompose() → agent_core.decompose_prompt() → LLM
-    ├── execute_stream() → agent_core.solve_task_stream() → LLM + Tools
+    ├── decompose() → agent_core.decompose_prompt()
+    │       ├── agent_skills.get_templates() / match_skills()
+    │       ├── agent_files.get_folder_context() / get_single_file_context()
+    │       ├── agent_tree.parse_tree_from_llm() / create_fallback_tree()
+    │       └── LLM (decomposition)
+    │
+    ├── execute_stream() → agent_core.solve_task_stream()
+    │       ├── agent_tasks.solve_task_stream() → LLM + Tools loop
+    │       ├── agent_tasks.handle_tool_call()
+    │       ├── agent_git.verify_pr_step()
+    │       ├── agent_tree.record_outcome()
+    │       └── LLM (iteration)
+    │
     ├── /api/image/* — upload/list/clear/remove
     ├── /api/version — server version + file timestamps
     └── sessions/ (JSON persistence)
@@ -144,11 +162,11 @@ Flask API (api_server.py)
 
 **Tool-loop**: `solve_task_stream` → LLM → parse response → TOOL: executér → feed resultat → LLM → ... → `<<<DONE>>>`
 
-**PR Workflow**: Checkpoint-validering tvinger branch → commit → push → PR i korrekt rækkefølge.
+**PR Workflow**: `agent_git.verify_pr_step()` tvinger branch → commit → push → PR i korrekt rækkefølge.
 
-**Skills**: `skill_loader.py` indlæser `skills/*.md` med frontmatter. `_match_skills()` scorer prompt og aktiverer relevante skills. `skill_evolution.py` analyserer outcomes og foreslår Retain/Refine/Prune/Generate.
+**Skills**: `skill_loader.py` indlæser `skills/*.md` med frontmatter. `agent_skills.match_skills()` scorer prompt og aktiverer relevante skills. `skill_evolution.py` analyserer outcomes og foreslår Retain/Refine/Prune/Generate.
 
-**SkillFlow**: `skill_tracker.py` registrerer per-skill outcomes. Efter 15+ outcomes trigger `_evolve_if_needed()` automatisk evolution-analyse.
+**SkillFlow**: `skill_tracker.py` registrerer per-skill outcomes. Efter 15+ outcomes trigger `agent_tree.evolve_if_needed()` automatisk evolution-analyse.
 
 **Version tracking**: Server startup viser `🕐 Startet:` + `📦 llm=HH:MM:SS`. `/api/version` returnerer alle fil-timestamps.
 
