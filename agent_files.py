@@ -14,6 +14,9 @@ def chunk_text(text, size=CHUNK_SIZE):
 
 
 def read_file_content(agent, filepath):
+    basename = os.path.basename(filepath)
+    if basename in {'.env'}:
+        return None
     ext = os.path.splitext(filepath)[1].lower()
     if ext in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.svg', '.pdf', '.zip', '.exe', '.dll'}:
         return None
@@ -30,8 +33,9 @@ def read_file_content(agent, filepath):
         return None
 
 
-FOLDER_SCAN_EXCLUDE = {'node_modules', '.git', 'venv', '.venv', '__pycache__', '.opencode', '.agent_storage'}
-FOLDER_SCAN_EXTENSIONS = {'.py', '.js', '.json', '.html', '.css', '.yml', '.yaml', '.toml', '.env', '.md', '.txt', '.bat', '.cfg', '.ini', '.sh', '.jsx', '.ts', '.tsx', '.vue', '.svelte'}
+FOLDER_SCAN_EXCLUDE_DIRS = {'node_modules', '.git', 'venv', '.venv', '__pycache__', '.opencode', '.agent_storage'}
+FOLDER_SCAN_EXCLUDE_FILES = {'.env'}
+FOLDER_SCAN_EXTENSIONS = {'.py', '.js', '.json', '.html', '.css', '.yml', '.yaml', '.toml', '.md', '.txt', '.bat', '.cfg', '.ini', '.sh', '.jsx', '.ts', '.tsx', '.vue', '.svelte'}
 FOLDER_SCAN_MAX_FILES = 20
 FOLDER_SCAN_MAX_DEPTH = 2
 
@@ -91,10 +95,12 @@ def get_folder_context(agent, prompt):
             if depth > FOLDER_SCAN_MAX_DEPTH:
                 dirnames.clear()
                 continue
-            dirnames[:] = [d for d in dirnames if d not in FOLDER_SCAN_EXCLUDE]
+            dirnames[:] = [d for d in dirnames if d not in FOLDER_SCAN_EXCLUDE_DIRS]
             for f in sorted(filenames):
+                if f in FOLDER_SCAN_EXCLUDE_FILES:
+                    continue
                 ext = os.path.splitext(f)[1].lower()
-                if ext not in FOLDER_SCAN_EXTENSIONS and not f.startswith('.env'):
+                if ext not in FOLDER_SCAN_EXTENSIONS:
                     continue
                 if len(found_files) >= FOLDER_SCAN_MAX_FILES:
                     break

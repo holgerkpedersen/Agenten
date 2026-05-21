@@ -11,20 +11,15 @@ import git_ops
 import agent_issues
 import agent_files
 import agent_tree
+import agent_skills
+import agent_git
+import agent_tasks
 import re
 import sys
 import time
 import os
 import json
 import subprocess
-
-
-PR_REQUIRED_BEFORE_PR = {"git_add_all", "git_commit", "git_push"}
-PR_COMMIT_TOOLS = {"git_add_all", "git_commit"}
-PR_PUSH_TOOLS = {"git_push"}
-PR_BRANCH_TOOLS = {"git_create_branch"}
-PR_REMOTE_TOOLS = {"git_remote_status"}
-PR_GIT_TOOLS = {"git_diff", "git_log", "git_status", "git_current_branch", "git_branch_list", "git_pull", "git_checkout"}
 
 
 class Agent:
@@ -211,36 +206,7 @@ class Agent:
         ))
 
     def _add_image(self, path):
-        # 1. Already loaded in self.images? (match by filename or filepath)
-        basename = os.path.basename(path)
-        for img in self.images:
-            if isinstance(img, dict):
-                if img.get("filename") == basename or img.get("filepath") == path:
-                    return {"success": True, "file": basename, "size": len(img.get("b64","")), "mime": img.get("mime",""), "note": "Allerede indlæst"}
-                if img.get("filepath") and os.path.normpath(img["filepath"]) == os.path.normpath(path):
-                    return {"success": True, "file": basename, "size": len(img.get("b64","")), "mime": img.get("mime",""), "note": "Allerede indlæst"}
-
-        # 2. Exists on disk?
-        if os.path.exists(path):
-            return self._encode_and_store(path)
-
-        # 3. Try UPLOAD_DIR
-        upload_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads", basename)
-        if os.path.exists(upload_path):
-            return self._encode_and_store(upload_path)
-
-        # 4. Not found
-        loaded = [f"{i.get('filename','?')} ({i.get('filepath','?')})" if isinstance(i,dict) else str(i)[:40] for i in self.images]
-        return {"success": False, "error": f"Fil ikke fundet: {path}. Allerede indlæste: {loaded or 'ingen'}"}
-
-    def _encode_and_store(self, path):
-        raw_b64 = LMStudioWrapper.encode_image(path)
-        size = os.path.getsize(path)
-        ext = os.path.splitext(path)[1].lower().lstrip(".")
-        mime = "jpeg" if ext in ("jpg","jpeg") else ext
-        self.images.append({"b64": raw_b64, "mime": mime, "filename": os.path.basename(path), "filepath": path})
-        self._log("TOOL", f"Billede tilføjet: {os.path.basename(path)}", f"{size:,} bytes ({ext})")
-        return {"success": True, "file": os.path.basename(path), "size": size, "mime": mime}
+        return agent_tasks.add_image(self, path)
 
     def _run_pytest(self, test_path=""):
         try:
@@ -290,165 +256,23 @@ class Agent:
     def _read_chunk(self, chunk, index):
         return agent_files.read_chunk(self, chunk, int(index))
 
-    TEMPLATE_TOOLS = {
-        "resume": ["list_chunks", "read_chunk"],
-        "kodeanalyse": ["list_chunks", "read_chunk"],
-        "diffanalyse": ["list_chunks", "read_chunk", "git_diff", "git_log"],
-        "fri": None,
-        "agenten": [
-            "list_chunks",
-            "read_chunk",
-            "github_create_pr",
-            "git_status", "git_add_all", "git_commit", "git_push",
-            "git_diff", "git_log",
-            "git_create_branch", "git_current_branch", "git_pull", "git_checkout",
-            "git_remote_status"
-        ],
-        "programmering": ["list_chunks", "read_chunk", "write_file", "add_image"],
-        "python-arkitektur": ["list_chunks", "read_chunk", "write_file"],
-        "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk"],
-        "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "list_chunks", "read_chunk", "write_file"],
-    }
-
-    TEMPLATE_TASK_TOOLS = {
-        "agenten": {
-            "branch": ["git_current_branch", "git_create_branch", "git_branch_list", "git_checkout", "git_remote_status", "git_pull"],
-            "commit": ["git_add_all", "git_commit", "git_status", "git_diff", "git_log"],
-            "push": ["git_push", "git_remote_status"],
-            "pull request": ["github_create_pr", "git_remote_status", "git_diff", "git_log"],
-        }
-    }
-
-    SECTION_INSTRUCTIONS = {
-        "resume": {
-            "Overblik": "Skriv afsnittet 'Overblik': beskriv filens formål, struktur og hovedindhold.",
-            "Nøglepunkter": "Skriv afsnittet 'Nøglepunkter': fremhæv de vigtigste tekniske detaljer, features og arkitektur.",
-            "Konklusion": "Skriv afsnittet 'Konklusion': vurder filens kvalitet, styrker og svagheder.",
-            "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå konkrete forbedringer og næste skridt.",
-        },
-        "kodeanalyse": {
-            "Formål": "Skriv afsnittet 'Formål': forklar hvad filen gør og dens rolle i projektet.",
-            "Imports og afhængigheder": "Skriv afsnittet 'Imports og afhængigheder': gennemgå filens imports og eksterne afhængigheder.",
-            "Arkitektur": "Skriv afsnittet 'Arkitektur': analysér filens struktur, klasser og funktioner.",
-            "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder kodens læsbarhed, vedligeholdbarhed og test coverage.",
-            "Sikkerhed": "Skriv afsnittet 'Sikkerhed': identificér potentielle sikkerhedsproblemer og sårbarheder.",
-        },
-        "diffanalyse": {
-            "Oversigt": "Skriv afsnittet 'Oversigt': beskriv hvad diff'en indeholder af ændringer.",
-            "Risikovurdering": "Skriv afsnittet 'Risikovurdering': vurder risikoen (høj/middel/lav) for hver ændret fil.",
-            "Brydende ændringer": "Skriv afsnittet 'Brydende ændringer': identificér breaking changes og bagudkompatibilitet.",
-            "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder ændringernes kvalitet og konsistens.",
-            "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå forbedringer til diff'en.",
-        },
-        "programmering": {
-            "Kravanalyse": "Analyser kravene grundigt. Identificér funktionelle og ikke-funktionelle krav, input/output, og eventuelle begrænsninger. Beskriv hvad systemet skal kunne.",
-            "Arkitekturdesign": "Design systemarkitekturen: komponenter, moduler, dataflow og afhængigheder. Overvej relevante design patterns og SOLID-principper. Tegn arkitekturen med tekst.",
-            "Implementeringsplan": "Planlæg implementeringen: hvilke filer skal oprettes, i hvilken rækkefølge, og hvad skal hver fil indeholde. Overvej teststrategi og edge cases.",
-            "Sikkerhedsanalyse": "Analyser sikkerhedsaspekter: inputvalidering, autentifikation, kryptering, håndtering af følsomme data (passwords, keys). Følg OWASP best practices og princip om mindste rettighed.",
-            "Kodeimplementering": "Implementér koden baseret på arkitekturdesign og implementeringsplan. Brug write_file til at oprette/redigere hver fil. Skriv ren, vedligeholdelsesvenlig kode med korrekt fejlhåndtering og logging.",
-        },
-        "python-arkitektur": {
-            "Arkitekturplanlægning": "Analyser projektet og planlæg arkitekturen baseret på Python/Flask/HTML/JS best practices. Brug write_file til at oprette ./docs/arkitektur.md med følgende sektioner:\n\n## Systemoversigt\n- Formål og målsætning\n- Teknologistak (Python, Flask, HTML, JS, database)\n\n## Komponentarkitektur\n- Modulopdeling og ansvar for hvert modul\n- Lagdelt struktur (præsentation, forretningslogik, data)\n- Dataflow mellem komponenter\n\n## Flask-struktur\n- Blueprint-moduler, routes, middleware\n- Request/response-lifecycle\n- Fejlhåndtering og logging\n\n## Database design\n- ORM-modeller (SQLAlchemy) og relationer\n- Migration-strategi (Alembic)\n- Indeksering og query-optimering\n\n## Sikkerhed\n- CSRF, XSS, SQL injection beskyttelse\n- Autentifikation og autorisation (Flask-Login, JWT)\n- Miljøvariabler og secrets-håndtering\n\n## Frontend (HTML/JS)\n- Template-struktur (Jinja2) og statiske filer\n- JS-moduler og event-håndtering\n- API-kommunikation (fetch/AJAX)\n\n## Udviklings-workflow\n- Virtuelt miljø og afhængighedsstyring\n- Testing (pytest, unittest)\n- Kodekvalitet (flake8, black, mypy, type hints)\n\nFølg Python best practices: PEP 8, SOLID, DRY, separation of concerns.",
-        },
-        "billedanalyse": {
-            "Beskrivelse": "Analyser billedet og beskriv hvad der ses. Brug add_image hvis billedet ikke allerede er tilføjet. Beskriv motiv, personer, objekter, farver, layout og overordnet indtryk.",
-            "Kontekst": "Kontekstualiser billedet. Hvor stammer det fra (app, hjemmeside, dokument)? Hvad er formålet? Hvilke brugere er det målrettet? Hvilken situation viser det?",
-            "Detaljer": "Gennemgå specifikke detaljer: tekstindhold, UI-elementer, kodeblokke, tal, datoer, navne, fejlmeddelelser. Fremhæv alt specifikt og målbart.",
-            "Vurdering": "Vurder billedets kvalitet og indhold: Hvad fungerer godt? Hvad kunne forbedres? Er der fejl, inkonsistenser eller mangler? Giv konkrete forbedringsforslag.",
-            "Eksportér": "Skriv den fulde analyse til en .md fil. Brug write_file til at gemme i ./exports/billedanalyse_{timestamp}.md. Filen skal indeholde alle sektioner samlet. Brug formatet:\n\n# Billedanalyse\n\n## Beskrivelse\n...\n\n## Kontekst\n...\n\n## Detaljer\n...\n\n## Vurdering\n...",
-        },
-        "bugfix": {
-            "Analyse": "Læs issue med read_issue(). Forstå hvad bug'en er og hvilken kode der skal ændres. Læs den relevante kildekode med read_chunk(). Forstå rodårsagen.",
-            "Test (Red)": "Skriv en pytest der fanger bug'en. Gå til den relevante testfil og tilføj en test. Kør testen med run_tests() — den SKAL fejle (rød fase). Hvis testen ikke fejler, fanger den ikke bug'en.",
-            "Implementering": "Ret kildekoden med den mindst mulige ændring. Brug write_file til at opdatere filen.",
-            "Verifikation (Green)": "Kør testen igen med run_tests() — den SKAL bestå (grøn fase). Kør HELE testsuiten med run_tests() for at verificere ingen regressions.",
-            "Opdatering": "Opdater issue-status til 'resolved' med update_issue_status(). Tilføj en kort resolution_note om hvad der blev fikset.",
-        },
-    }
-
     def _refresh_skills(self):
-        self._skills = SkillLoader.load_all(lang=self.lang)
+        agent_skills.refresh_skills(self)
 
     def _match_skills(self, prompt):
-        scored = SkillLoader.find_all_for_task(prompt, self._skills, top=3)
-        self._active_skills = [s for s in scored if s.get("base") or self._has_matching_intent(s)]
-        template_match = [s for s in self._skills if s.get("template") and s["template"] == self.active_template and s not in self._active_skills]
-        self._active_skills.extend(template_match)
-        if self._active_skills:
-            names = [f"{s['name']}[{'BASE' if s.get('base') else 'MATCH'}]" for s in self._active_skills]
-            self._log("SKILL", f"Aktive skills ({len(self._active_skills)})", ", ".join(names))
-        else:
-            self._log("SKILL", "Ingen skills matchede", "")
-        return self._active_skills
+        return agent_skills.match_skills(self, prompt)
 
-    def _has_matching_intent(self, skill):
-        intent = skill.get("template") or skill.get("intent")
-        return not self.active_template or intent == self.active_template or skill.get("base")
+    def _format_skills_for_prompt(self):
+        return agent_skills.format_skills_for_prompt(self)
+
+    def _get_templates(self):
+        return agent_skills.get_templates(self)
 
     def _record_outcome(self, task_node):
         agent_tree.record_outcome(self, task_node)
 
     def _evolve_if_needed(self):
         agent_tree.evolve_if_needed(self)
-
-    def _format_skills_for_prompt(self):
-        if not self._active_skills:
-            return ""
-        lines = ["\n## 📋 Retningslinjer (ikke værktøjer)\n"]
-        for s in self._active_skills:
-            tag = "BASE" if s.get("base") else "MATCH"
-            lines.append(f"- **{s['name']}** [{tag}]: {s.get('description', '')[:120]}")
-        return "\n".join(lines)
-
-    def _get_templates(self):
-        lang_instr = t(K.ANSWER_IN, self.lang)
-        return {
-            "resume": {
-                "name": t(K.T_RESUME, self.lang),
-                "prompt": t(K.TP_RESUME, self.lang).replace("{lang_instruction}", lang_instr),
-                "fallback": t(K.TF_RESUME, self.lang),
-            },
-            "kodeanalyse": {
-                "name": t(K.T_KODEANALYSE, self.lang),
-                "prompt": t(K.TP_KODEANALYSE, self.lang).replace("{lang_instruction}", lang_instr),
-                "fallback": t(K.TF_KODEANALYSE, self.lang),
-            },
-            "diffanalyse": {
-                "name": t(K.T_DIFFANALYSE, self.lang),
-                "prompt": t(K.TP_DIFFANALYSE, self.lang).replace("{lang_instruction}", lang_instr),
-                "fallback": t(K.TF_DIFFANALYSE, self.lang),
-            },
-            "fri": {
-                "name": t(K.T_FRI, self.lang),
-                "prompt": t(K.TP_FRI, self.lang),
-                "fallback": None
-            },
-            "agenten": {
-                "name": t(K.T_AGENTEN, self.lang),
-                "prompt": t(K.TP_AGENTEN, self.lang).replace("{lang_instruction}", lang_instr),
-                "fallback": t(K.TF_AGENTEN, self.lang),
-            },
-            "programmering": {
-                "name": t(K.T_PROGRAMMERING, self.lang),
-                "prompt": t(K.TP_PROGRAMMERING, self.lang),
-                "fallback": t(K.TF_PROGRAMMERING, self.lang),
-            },
-            "python-arkitektur": {
-                "name": t(K.T_PYTHON_ARKITEKTUR, self.lang),
-                "prompt": t(K.TP_PYTHON_ARKITEKTUR, self.lang),
-                "fallback": t(K.TF_PYTHON_ARKITEKTUR, self.lang),
-            },
-            "billedanalyse": {
-                "name": t(K.T_BILLEDANALYSE, self.lang),
-                "prompt": t(K.TP_BILLEDANALYSE, self.lang),
-                "fallback": t(K.TF_BILLEDANALYSE, self.lang),
-            },
-            "bugfix": {
-                "name": t(K.T_BUGFIX, self.lang),
-                "prompt": t(K.TP_BUGFIX, self.lang),
-                "fallback": t(K.TF_BUGFIX, self.lang),
-            },
-        }
 
     def _log(self, level, message, detail=""):
         log_entry = {
@@ -493,7 +317,7 @@ class Agent:
 
         template_config = templates.get(template, templates["fri"]) if template else templates["fri"]
         self.active_template = template
-        allowed = self.TEMPLATE_TOOLS.get(template) if template else None
+        allowed = agent_skills.TEMPLATE_TOOLS.get(template) if template else None
         self.tool_registry.set_active_tools(allowed)
         self._log("INFO", t(K.LOG_DECOMPOSE_START, self.lang), f"{prompt[:100]} ({t('ui.using_template', self.lang).format(name=template_config['name'])})")
 
@@ -637,447 +461,26 @@ class Agent:
     def task_tree_from_dict(self, d):
         agent_tree.task_tree_from_dict(self, d)
 
-    # Helper functions (makes main function more readable)
     def _truncate_conversation(self, conversation, system_prompt):
-        if len(conversation) > self.max_conversation_chars and len(system_prompt) < self.max_conversation_chars:
-            mid = "\n\n[... tidligere kontekst afkortet / previous context truncated...]"
-            keep = self.max_conversation_chars - len(system_prompt) - len(mid)
-            if keep > 0:
-                return system_prompt + mid + conversation[-keep:]
-        return conversation
+        return agent_tasks.truncate_conversation(self, conversation, system_prompt)
 
     def _build_tool_guidance(self, attempt):
-        """Builds guidance for the AI about which tools it can use"""
-        if attempt > 0:
-            return ""
-        
-        tool_list = ', '.join(self.tool_registry.tools.keys())
-        if self.tool_registry.active_tools is not None:
-            tool_list = ', '.join(self.tool_registry.active_tools)
-        return f"\n\n" + t(K.TOOL_CONTINUATION, self.lang).format(
-            tools_list=tool_list,
-            TOOL_MARKER=self.tool_registry.TOOL_MARKER,
-            DONE_MARKER=self.tool_registry.DONE_MARKER
-        )
+        return agent_tasks.build_tool_guidance(self, attempt)
 
     def _ask_ai(self, prompt):
-        """Ask the AI model and return the response"""
-        response = ""
-        for chunk in self.llm.generate_stream(prompt, temperature=0.3, max_tokens=self.max_tokens):
-            response += chunk
-        return response
+        return agent_tasks.ask_ai(self, prompt)
 
     def _handle_tool_call(self, action, conversation, already_called, attempt):
-        """Executes a tool call from the AI"""
-        tool_name = action["tool"]
-        arguments = action.get("args", {})
-        
-        # Check if tool was recently called (avoid loops)
-        key = f"{tool_name}_{arguments}"
-        times_called = already_called.get(key, 0)
-        already_called[key] = times_called + 1
-        
-        if times_called >= 2:
-            conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.TOOL_DUPLICATE_MSG, self.lang).format(tool=tool_name)}"
-            return conversation
-        
-        # Execute the tool
-        result = self.tool_registry.execute(tool_name, arguments)
-        result_text = json.dumps(result, ensure_ascii=False)
-        
-        # Tell the AI the result
-        conversation += f"\n\n{t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=tool_name)}\n{result_text}"
-        return conversation
+        return agent_tasks.handle_tool_call(self, action, conversation, already_called, attempt)
 
     def _set_task_tools(self, task_name):
-        if not self.active_template or self.active_template not in self.TEMPLATE_TASK_TOOLS:
-            return
-        template_tools = self.TEMPLATE_TASK_TOOLS[self.active_template]
-        for keyword, tools in template_tools.items():
-            if keyword in task_name.lower():
-                self.tool_registry.set_active_tools(tools)
-                self._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
-                return
-        allowed = self.TEMPLATE_TOOLS.get(self.active_template)
-        if allowed is not None:
-            self.tool_registry.set_active_tools(allowed)
-
-    def _is_pr_workflow(self, task_name):
-        if re.search(r'\bpr\b', task_name, re.IGNORECASE):
-            return True
-        keywords = ["pull request", "github", "push og opret", "push and create"]
-        return any(k in task_name.lower() for k in keywords)
-
-    def _extract_branch_name(self, task_name, original_prompt):
-        m = re.search(r"branch\s*['\"]?([\w\-\/]+)['\"]?", original_prompt, re.IGNORECASE)
-        if m:
-            return m.group(1)
-        m = re.search(r"branch\s*['\"]?([\w\-\/]+)['\"]?", task_name, re.IGNORECASE)
-        if m:
-            return m.group(1)
-        return ""
-
-    def _verify_pr_step(self, tool_name, result, task_name, original_prompt):
-        if not self._is_pr_workflow(task_name):
-            return None
-
-        if tool_name == "github_create_pr":
-            called_set = {t.split("{")[0] for t in self._checkpoint_tools}
-            missing = PR_REQUIRED_BEFORE_PR - called_set
-            if missing:
-                return t(K.CP_NO_COMMIT, self.lang)
-
-        result_ok = result.get("success", False) and result.get("result", {}).get("success", True) is not False
-        if not result_ok:
-            err = result.get("error") or result.get("result", {}).get("error", "ukendt fejl")
-            err_str = str(err)
-            if tool_name in PR_BRANCH_TOOLS and "already exists" in err_str:
-                expected = self._extract_branch_name(task_name, original_prompt)
-                return f"Branch '{expected}' findes allerede. Brug git_checkout(branch='{expected}') i stedet for at oprette den igen."
-            if tool_name == "github_create_pr":
-                return t(K.CP_PR_FAILED, self.lang)
-            return t(K.CP_TOOL_FAILED, self.lang).format(tool=tool_name, error=err_str[:100])
-
-        if tool_name in PR_BRANCH_TOOLS:
-            expected = self._extract_branch_name(task_name, original_prompt)
-            actual = result.get("result", {}).get("error", "")
-            m = re.search(r"Switched to a new branch '([^']+)'", actual)
-            if m:
-                actual_branch = m.group(1)
-            else:
-                actual_branch = result.get("args", {}).get("name", "")
-            if expected and actual_branch and actual_branch != expected:
-                return t(K.CP_BRANCH_NAME, self.lang).format(actual=actual_branch, expected=expected)
-            self._checkpoint_branch = actual_branch or expected
-
-        if tool_name == "github_create_pr":
-            url = result.get("result", {}).get("url", "")
-            if not url:
-                return t(K.CP_PR_FAILED, self.lang)
-
-        return None
+        agent_tasks.set_task_tools(self, task_name)
 
     def solve_task(self, task_node, original_prompt):
-        # 1. Start the task
-        task_node.status = "running"
-        self._log("INFO", f"Starting task: {task_node.name}")
-        
-        # 2. Prepare system prompt (instructions for the AI)
-        system_prompt = self.tool_registry.build_system_prompt(task_node.name)
-        conversation = system_prompt
-        
-        # 3. AI can call tools (e.g., read file, search the web)
-        max_attempts = 5
-        already_called_tools = {}
-        answer = ""
-        
-        for attempt in range(max_attempts):
-            # 3a. Ask the AI
-            prompt = conversation + self._build_tool_guidance(attempt)
-            ai_response = self._ask_ai(prompt)
-            
-            # 3b. Understand what the AI wants to do
-            action = self.tool_registry.parse_response(ai_response)
-            
-            # 3c. Handle different action types
-            if action["type"] == "tool":
-                # AI wants to use a tool
-                conversation = self._handle_tool_call(action, conversation, already_called_tools, attempt)
-                
-            elif action["type"] == "done":
-                # AI is finished with the task
-                answer = action["result"]
-                break
-                
-            elif action["type"] == "error":
-                conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {action['message']}"
-            
-            elif action["type"] == "text":
-                conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.TOOL_NO_RESULT, self.lang)}"
-            
-            tool_for_msg = self.tool_registry.active_tools[0] if self.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, self.lang)
-            if attempt == 0 and not already_called_tools and action["type"] != "done":
-                conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.FIRST_TOOL_REQUIRED, self.lang).format(tool=tool_for_msg)}"
-            
-            conversation = self._truncate_conversation(conversation, system_prompt)
-        
-        # 4. Finish the task
-        if not answer:
-            answer = "Task failed"
-            task_node.status = "failed"
-        else:
-            task_node.status = "done"
-        
-        task_node.result = answer
-        return answer
+        return agent_tasks.solve_task(self, task_node, original_prompt)
 
     def solve_task_stream(self, task_node, original_prompt):
-        task_node.status = "running"
-        self._task_start_time = time.time()
-        self._log("INFO", t(K.LOG_TASK_START, self.lang), f"{task_node.name} (model: {self.llm.model})")
-        self._set_task_tools(task_node.name)
-        self._checkpoint_tools = set()
-        self._checkpoint_branch = ""
-
-        available_keys = list(self.file_chunks.keys())
-        is_chunked = any(len(v) > 1 for v in self.file_chunks.values())
-        if is_chunked:
-            chunk_hint_parts = []
-            for key in available_keys:
-                total = len(self.file_chunks[key])
-                display = key.replace("file_", "", 1)
-                chunk_hint_parts.append(f"\n  read_chunk(chunk='{display}', index=2..{total}) eller chunk='{key}', index=2..{total}")
-            chunk_hint = f"\n\n## TILGÆNGELIGE FILER (brug read_chunk for at læse alle chunks):{''.join(chunk_hint_parts)}\n"
-        else:
-            chunk_hint = ""
-
-        section_instr = self.SECTION_INSTRUCTIONS.get(self.active_template, {}).get(task_node.name, "")
-        if section_instr:
-            task_prompt = f"{section_instr}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
-        else:
-            task_prompt = f"{task_node.name}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
-
-        prev_results = []
-        if task_node.parent:
-            for sibling in task_node.parent.children:
-                if sibling is not task_node and sibling.status == "done" and sibling.result:
-                    shortened = sibling.result[:800] + ("..." if len(sibling.result) > 800 else "")
-                    prev_results.append(f"## Resultat fra '{sibling.name}':\n{shortened}")
-        if prev_results:
-            task_prompt += "\n\n---\n## Foregående resultater (brug disse i din besvarelse):\n" + "\n\n".join(prev_results)
-
-        self._refresh_skills()
-        self._match_skills(original_prompt)
-        skills_block = self._format_skills_for_prompt()
-        if skills_block:
-            task_prompt = skills_block + task_prompt
-            self._log("SKILL", "Skills injectet i prompt", skills_block[:200])
-
-        system_prompt = self.tool_registry.build_system_prompt(task_prompt)
-        self._log("DEBUG", f"file_chunks keys: {list(self.file_chunks.keys())}", "")
-        self._log("DEBUG", f"original_prompt length: {len(original_prompt)}", f"starts with: {original_prompt[:100]}")
-        self._log("DEBUG", f"system_prompt length: {len(system_prompt)}", f"contains file content: {'###' in system_prompt}")
-
-        tools_list = ', '.join([k for k in self.tool_registry.tools if self.tool_registry.active_tools is None or k in self.tool_registry.active_tools])
-        lang_instr = t(K.ANSWER_IN, self.lang)
-        user_guidance = f"{lang_instr}. "
-        if chunk_hint:
-            user_guidance += chunk_hint.replace("## TILGÆNGELIGE FILER (brug read_chunk for at læse alle chunks):", "FILER:").strip() + " "
-        if tools_list:
-            user_guidance += t(K.TOOL_CONTINUATION, self.lang).format(
-                tools_list=tools_list,
-                TOOL_MARKER=self.tool_registry.TOOL_MARKER,
-                DONE_MARKER=self.tool_registry.DONE_MARKER
-            )
-        else:
-            user_guidance += t(K.DONE_CONTINUATION, self.lang).format(DONE_MARKER=self.tool_registry.DONE_MARKER)
-
-        if not chunk_hint and tools_list:
-            read_only = all(t not in ('write_file',) for t in self.tool_registry.active_tools or [])
-            if read_only and not self.images:
-                user_guidance += f"\n\nOBS: Ingen filer er indlæst. Du KAN svare direkte med <<<DONE>>> uden at kalde værktøjer først. Spørg IKKE efter filnavne — brug din egen viden til at besvare opgaven."
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_guidance}
-        ]
-        self._log("LLM", "System prompt", f"{len(system_prompt)} chars — {system_prompt[:300]}...")
-        self._log("LLM", "User guidance", user_guidance)
-
-        full_response = ""
-        text_fallback = ""
-        max_iterations = 15 if self._is_pr_workflow(task_node.name) else 10
-        called_tools = {}
-
-        def _add_user_msg(content):
-            nonlocal messages
-            messages.append({"role": "user", "content": content})
-
-        def _truncate_messages():
-            nonlocal messages
-            def _content_len(m):
-                c = m.get("content", "")
-                if isinstance(c, str):
-                    return len(c)
-                if isinstance(c, list):
-                    return sum(p.get("text", "").__len__() if isinstance(p, dict) and p.get("type") == "text" else 0 for p in c)
-                return 0
-            total = sum(_content_len(m) for m in messages)
-            if total > self.max_conversation_chars and len(messages) > 3:
-                mid = "\n[... tidligere kontekst afkortet ...]"
-                keep = self.max_conversation_chars - _content_len(messages[0]) - _content_len(messages[1]) - len(mid)
-                if keep > 0:
-                    tail_content = messages[-1]["content"]
-                    if isinstance(tail_content, str):
-                        cropped = tail_content[-keep:] if len(tail_content) > keep else tail_content
-                    else:
-                        cropped = "[...]"
-                    messages = messages[:2] + [{"role": "user", "content": mid + cropped}]
-
-        for i in range(max_iterations):
-            if self.stop_requested:
-                break
-
-            # Check for user reply
-            if self.pending_reply:
-                messages.append({"role": "user", "content": self.pending_reply})
-                self._log("USER", "Bruger svarer", self.pending_reply[:100])
-                self.pending_reply = None
-
-            response = ""
-            for chunk in self.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=self.max_tokens, images=self.images):
-                if self.stop_requested:
-                    break
-                response += chunk
-                yield {"type": "chunk", "chunk": chunk}
-
-            if self.stop_requested:
-                break
-
-            messages.append({"role": "assistant", "content": response})
-
-            parsed = self.tool_registry.parse_response(response)
-            self._log("LLM", t(K.LOG_ITERATION, self.lang).format(n=i+1), t(K.LOG_TYPE, self.lang).format(type=parsed.get('type')))
-            self._log("LLM", "LLM response (raw)", response)
-
-            if parsed["type"] == "tool":
-                tool_key = parsed['tool'] + str(parsed.get('args', {}))
-                dup_count = called_tools.get(tool_key, 0)
-                called_tools[tool_key] = dup_count + 1
-
-                if dup_count >= 2:
-                    _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: Du har allerede dette resultat. Gå videre eller brug <<<DONE>>>.")
-                    _truncate_messages()
-                    continue
-
-                if dup_count == 1:
-                    self._log("TOOL", t(K.TOOL_DUPLICATE, self.lang), parsed['tool'])
-
-                self._log("TOOL", t(K.LOG_TOOL_CALLING, self.lang).format(tool=parsed['tool']), str(parsed.get("args", {})))
-                result = self.tool_registry.execute(parsed["tool"], parsed["args"])
-                result_str = json.dumps(result, ensure_ascii=False)
-                self._log("TOOL", t(K.LOG_TOOL_RESULT, self.lang).format(tool=parsed['tool']), result_str)
-                yield {"type": "tool_call", "tool": parsed["tool"], "args": parsed.get("args", {})}
-                yield {"type": "tool_result", "tool": parsed["tool"], "result": result}
-
-                checkpoint_msg = self._verify_pr_step(parsed["tool"], result, task_node.name, original_prompt)
-                if checkpoint_msg:
-                    _add_user_msg(f"!!! CHECKPOINT - {checkpoint_msg}")
-                    self._log("INFO", "CHECKPOINT", checkpoint_msg)
-                    yield {"type": "checkpoint", "message": checkpoint_msg, "tool": parsed["tool"]}
-                else:
-                    self._checkpoint_tools.add(parsed["tool"] + str(parsed.get("args", {})))
-                    cont_hint = t(K.TOOL_CONTINUATION, self.lang).format(
-                        tools_list=tools_list,
-                        TOOL_MARKER=self.tool_registry.TOOL_MARKER,
-                        DONE_MARKER=self.tool_registry.DONE_MARKER
-                    )
-                    _add_user_msg(f"{t(K.TOOL_RESULT_PREFIX, self.lang).format(tool=parsed['tool'])}\n{result_str}\n\n{cont_hint}")
-
-                _truncate_messages()
-                total_calls = sum(called_tools.values())
-                if total_calls >= 8:
-                    full_response = t(K.LOG_AUTO_DONE, self.lang).format(count=total_calls)
-                    break
-                continue
-
-            if parsed["type"] == "done":
-                if self._is_pr_workflow(task_node.name) and not called_tools:
-                    _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: Du kaldte <<<DONE>>> uden at bruge nogen værktøjer. Brug værktøjerne først.")
-                    _truncate_messages()
-                    continue
-
-                if self._is_pr_workflow(task_node.name):
-                    called_names = {t.split("{")[0] for t in self._checkpoint_tools}
-                    if "github_create_pr" not in called_names:
-                        msg = f"!!! CHECKPOINT - {t(K.CP_PR_FAILED, self.lang)}"
-                        _add_user_msg(msg)
-                        self._log("INFO", "CHECKPOINT", t(K.CP_PR_FAILED, self.lang))
-                        yield {"type": "checkpoint", "message": t(K.CP_PR_FAILED, self.lang), "tool": "done"}
-                        _truncate_messages()
-                        continue
-                    missing_commit = PR_COMMIT_TOOLS - called_names
-                    if missing_commit:
-                        msg = f"!!! CHECKPOINT - {t(K.CP_NO_COMMIT, self.lang)}"
-                        _add_user_msg(msg)
-                        self._log("INFO", "CHECKPOINT", t(K.CP_NO_COMMIT, self.lang))
-                        yield {"type": "checkpoint", "message": t(K.CP_NO_COMMIT, self.lang), "tool": "done"}
-                        _truncate_messages()
-                        continue
-                    if "git_push" not in called_names:
-                        msg = f"!!! CHECKPOINT - {t(K.CP_NO_PUSH, self.lang)}"
-                        _add_user_msg(msg)
-                        self._log("INFO", "CHECKPOINT", t(K.CP_NO_PUSH, self.lang))
-                        yield {"type": "checkpoint", "message": t(K.CP_NO_PUSH, self.lang), "tool": "done"}
-                        _truncate_messages()
-                        continue
-
-                full_response = parsed["result"]
-                done_idx = response.find(self.tool_registry.DONE_MARKER)
-                if done_idx > 0:
-                    pre_done = response[:done_idx].strip()
-                    if len(pre_done.strip()) > max(50, len(full_response) * 2):
-                        full_response = pre_done
-                break
-
-            if parsed["type"] == "error":
-                _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: {parsed['message']}")
-                _truncate_messages()
-                continue
-
-            if i == 0 and not called_tools:
-                all_files_loaded = all(len(v) <= 1 for v in self.file_chunks.values()) if self.file_chunks else True
-                if all_files_loaded and parsed["type"] in ("text", "done"):
-                    text_fallback = response.strip() if parsed["type"] == "text" else parsed.get("result", response.strip())
-                    if text_fallback and "ERROR" not in text_fallback and not text_fallback.startswith("<<<"):
-                        full_response = text_fallback
-                        break
-                if parsed["type"] == "text":
-                    tool_for_msg = self.tool_registry.active_tools[0] if self.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, self.lang)
-                    _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, self.lang)}: {t(K.FIRST_TOOL_REQUIRED, self.lang).format(tool=tool_for_msg)}")
-                    _truncate_messages()
-                    continue
-
-            clean = response.strip() if "ERROR" not in response else ""
-            if clean:
-                text_fallback = clean
-            _add_user_msg(t(K.TOOL_NO_RESULT, self.lang))
-            _truncate_messages()
-            full_response = response
-            if i >= 3:
-                break
-
-        if not full_response or "ERROR" in full_response:
-            if called_tools:
-                full_response = t(K.LOG_AUTO_DONE, self.lang).format(count=len(called_tools))
-                task_node.status = "done"
-            elif text_fallback and "ERROR" not in text_fallback:
-                full_response = text_fallback
-                task_node.status = "done"
-            else:
-                full_response = t(K.LOG_TASK_FAILED, self.lang)
-                task_node.status = "failed"
-        else:
-            task_node.status = "done"
-
-        task_node.result = full_response
-        if task_node.status == "done":
-            bad_patterns = ["angiv venligst", "hvilken fil", "hvilket filnavn", "which file", "what file",
-                          "venligst angiv", "specificer fil", "give me the file", "jeg har brug for filen",
-                          "send mig filen"]
-            is_short = len(full_response) < 100
-            asks_for_files = any(p in full_response.lower() for p in bad_patterns)
-            if is_short or asks_for_files:
-                self._log("WARNING", "Mistænkeligt kort resultat", f"{len(full_response)} tegn, asks_for_files={asks_for_files}")
-                full_response = full_response + "\n\n⚠️  ADVARSEL: Dette resultat ser ufuldstændigt ud. Overvej at køre opgaven igen med en tydeligere prompt."
-        self.action_history.append(task_node.name.split()[0] if task_node.name else "unknown")
-        self._record_outcome(task_node)
-        if task_node.status == "failed":
-            self._log("INFO", t(K.LOG_TASK_FAILED, self.lang), task_node.name)
-        else:
-            self._log("INFO", t(K.LOG_TASK_DONE, self.lang), task_node.name)
-        self._evolve_if_needed()
-        yield {"type": "done", "result": full_response}
+        yield from agent_tasks.solve_task_stream(self, task_node, original_prompt)
 
     def execute_tree(self, node=None):
         if node is None:
