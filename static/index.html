@@ -516,6 +516,56 @@
         ::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+        /* Issues modal */
+        .issues-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 10000;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .issues-modal {
+            background: var(--panel-bg); border-radius: 12px;
+            width: 90%; max-width: 900px; max-height: 80vh;
+            display: flex; flex-direction: column;
+            box-shadow: 0 20px 60px var(--shadow);
+        }
+        .issues-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+        }
+        .issues-header h2 { margin: 0; font-size: 18px; }
+        .issues-close {
+            background: var(--btn-secondary); border: none;
+            padding: 6px 12px; border-radius: 6px; color: var(--text);
+            cursor: pointer; font-size: 14px;
+        }
+        .issues-table {
+            width: 100%; border-collapse: collapse; font-size: 12px;
+        }
+        .issues-table th {
+            text-align: left; padding: 8px 12px;
+            border-bottom: 2px solid var(--border);
+            background: var(--panel-header); position: sticky; top: 0;
+        }
+        .issues-table td {
+            padding: 6px 12px; border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        .issues-table tr:hover { background: var(--input-bg); }
+        .issues-scroll { overflow-y: auto; flex: 1; padding: 8px; }
+        .issue-severity-critical { color: var(--danger); font-weight: bold; }
+        .issue-severity-high { color: var(--warning); font-weight: bold; }
+        .issue-severity-medium { color: var(--accent); }
+        .issue-severity-low { color: var(--text-muted); }
+        .issue-status-open { color: var(--danger); }
+        .issue-status-resolved { color: var(--success); }
+        .issue-type { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; }
+        .issue-type-bug { background: var(--danger); color: white; }
+        .issue-type-security { background: var(--warning); color: #0f172a; }
+        .issue-type-architecture { background: var(--purple-accent); color: white; }
+        .issue-type-testing { background: var(--accent); color: white; }
+        .issue-type-performance { background: #06b6d4; color: white; }
+        .issue-type-maintainability { background: var(--text-muted); color: white; }
     </style>
 </head>
 <body>
@@ -548,6 +598,7 @@
                     <button onclick="window.open('/skillflow','_blank')" title="SkillFlow Analysis" style="background:var(--purple-accent);">🧬 SkillFlow</button>
                     <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research">🔍 Flow Builder</button>
                     <button onclick="setGithubToken()" id="githubTokenBtn" title="Opsæt GitHub Token">🔑 GitHub Token</button>
+                    <button onclick="showIssuesPanel()" id="issuesBtn" title="Vis alle issues">🐛 Issues</button>
                 </div>
             </div>
         </div>
@@ -577,6 +628,7 @@
                 <option value="python-arkitektur">🏗️ Python Arkitektur</option>
                 <option value="billedanalyse">🖼️ Billedanalyse</option>
                 <option value="bugfix">🐛 Bugfix (TDD)</option>
+                <option value="refactor">🔧 Refaktorering</option>
             </select>
         </div>
         
@@ -627,6 +679,18 @@
     </div>
     
     <div class="canvas-container" id="canvasContainer"></div>
+</div>
+
+<div id="issuesModal" class="issues-overlay" style="display:none;" onclick="if(event.target===this)closeIssuesPanel()">
+    <div class="issues-modal">
+        <div class="issues-header">
+            <h2>🐛 Issues</h2>
+            <button class="issues-close" onclick="closeIssuesPanel()">✕</button>
+        </div>
+        <div class="issues-scroll" id="issuesContent">
+            <div style="text-align:center;padding:40px;color:var(--text-muted);">Indlæser...</div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -689,6 +753,7 @@ const LANG_FALLBACK = {
     all_executed: 'Alle opgaver udført',
     stream_error: 'Streaming fejl',
     error_prefix: 'Fejl: ',
+    prompt_filled_from: 'Prompt udfyldt fra',
     export_md_report_header: '# 📊 Agenten - Session Rapport',
     export_md_prompt: '## 📝 Original Prompt',
     export_md_tree: '## 🌲 Opgavetræ',
@@ -2629,6 +2694,82 @@ function downloadFromPreview() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     addLogEntry('INFO', _('preview_downloaded'), a.download);
+}
+
+function showIssuesPanel() {
+    const modal = document.getElementById('issuesModal');
+    const content = document.getElementById('issuesContent');
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Indlæser...</div>';
+    modal.style.display = 'flex';
+    fetch('/api/issues')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.issues || !data.issues.length) {
+                content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Ingen issues fundet.</div>';
+                return;
+            }
+            let html = `<table class="issues-table"><thead><tr>
+                <th>ID</th><th>Titel</th><th>Type</th><th>Status</th><th>Prioritet</th><th></th>
+            </tr></thead><tbody>`;
+            for (const issue of data.issues) {
+                const sevClass = `issue-severity-${issue.severity || 'low'}`;
+                const statusClass = `issue-status-${issue.status || 'open'}`;
+                const typeClass = `issue-type-${issue.type || 'bug'}`;
+                const desc = (issue.description || '').substring(0, 120);
+                const issueEnc = encodeURIComponent(JSON.stringify(issue));
+                html += `<tr onclick="toggleIssueDetail(this)" style="cursor:pointer;">
+                    <td><strong>${issue.id}</strong></td>
+                    <td>${issue.title}
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${desc}...</div>
+                        <div class="issue-detail" style="display:none;margin-top:6px;padding:8px;background:var(--input-bg);border-radius:6px;font-size:11px;line-height:1.5;">
+                            <div><strong>Sted:</strong> ${issue.location || '—'}</div>
+                            <div><strong>Impact:</strong> ${issue.impact || '—'}</div>
+                            <div style="margin-top:4px;"><strong>Forslag:</strong> ${issue.proposed_fix || '—'}</div>
+                            ${issue.resolution_note ? `<div style="margin-top:4px;color:var(--success);"><strong>Løsning:</strong> ${issue.resolution_note}</div>` : ''}
+                            <button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="margin-top:8px;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
+                                🚀 Brug som opgave
+                            </button>
+                        </div>
+                    </td>
+                    <td><span class="issue-type ${typeClass}">${issue.type}</span></td>
+                    <td><span class="${statusClass}">${issue.status}</span></td>
+                    <td><span class="${sevClass}">${issue.severity}</span></td>
+                    <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">🚀 Kør</button></td>
+                </tr>`;
+            }
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        })
+        .catch(e => {
+            content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);">Fejl: ${e.message}</div>`;
+        });
+}
+
+function closeIssuesPanel() {
+    document.getElementById('issuesModal').style.display = 'none';
+}
+
+function toggleIssueDetail(row) {
+    const detail = row.querySelector('.issue-detail');
+    if (detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+}
+
+function useIssueAsTask(encoded) {
+    const issue = JSON.parse(decodeURIComponent(encoded));
+    closeIssuesPanel();
+    const prompt = document.getElementById('promptInput');
+    const template = document.getElementById('templateSelect');
+    const templateLabel = document.getElementById('templateLabel');
+    const promptText = `${issue.id}: ${issue.title}\n\n${issue.description || ''}\n\nLocation: ${issue.location || '—'}\nImpact: ${issue.impact || '—'}\n\nForeslået fix: ${issue.proposed_fix || '—'}`;
+    prompt.value = promptText;
+    if (issue.type === 'bug' || issue.type === 'security') {
+        template.value = 'bugfix';
+    } else if (issue.type === 'architecture') {
+        template.value = 'refactor';
+    } else {
+        template.value = 'fri';
+    }
+    addLogEntry('INFO', `${_('prompt_filled_from')} ${issue.id}`, issue.title);
 }
 
 // Initialize
