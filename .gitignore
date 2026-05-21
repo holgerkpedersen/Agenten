@@ -31,5 +31,11 @@ flask_output.log
 
 # docs
 docs/
-docs/*.*
+docs/issues/
+docs/issues/observed/
 docs/**/*.*
+
+
+# agent storage and tmp files
+.agent_storage/
+.agent_tmp/
