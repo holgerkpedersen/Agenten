@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory, Response, stream
 from flask_cors import CORS
 from agent_core import Agent
 from session_manager import SessionManager
+import agent_skills
 import model_manager
 import json
 import time
@@ -850,7 +851,7 @@ def execute_stream():
             agent.images = _normalize_images(session_data.get("images", []))
             if session_data.get("template"):
                 agent.active_template = session_data["template"]
-                allowed = agent.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent.TEMPLATE_TOOLS else None
+                allowed = agent_skills.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent_skills.TEMPLATE_TOOLS else None
                 agent.tool_registry.set_active_tools(allowed)
             if session_data.get("decompose_model"):
                 agent.decompose_llm.set_model(session_data["decompose_model"])
@@ -1053,6 +1054,15 @@ def build_module():
 @app.route("/api/version", methods=["GET"])
 def version():
     return jsonify({"success": True, "started": BUILD_INFO.get("started", "?"), "version": {k:v for k,v in BUILD_INFO.items() if k != "started"}})
+
+@app.route("/api/issues", methods=["GET"])
+def list_issues():
+    issues_path = os.path.join(BASE_DIR, "docs", "issues", "observed", "issues.json")
+    if not os.path.exists(issues_path):
+        return jsonify({"success": True, "meta": {"total": 0}, "issues": []})
+    with open(issues_path, encoding="utf-8") as f:
+        data = json.load(f)
+    return jsonify({"success": True, **data})
 
 @app.route("/api/test", methods=["GET"])
 def test():
