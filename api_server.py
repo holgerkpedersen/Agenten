@@ -414,8 +414,9 @@ def manage_token():
         if os.path.exists(env_path):
             with open(env_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            return jsonify({"success": True, "exists": True, "content": content})
-        return jsonify({"success": True, "exists": False, "content": "GITHUB_TOKEN=dit_token_her"})
+            has_token = "GITHUB_TOKEN" in content
+            return jsonify({"success": True, "exists": True, "has_token": has_token})
+        return jsonify({"success": True, "exists": False, "has_token": False})
     
     data = request.json
     content = data.get("content", "")
@@ -927,6 +928,15 @@ def execute_stream():
                 if child.result:
                     child_results.append(f"- {child.name}: {child.result}")
             
+            if child_results:
+                node.status = "done"
+                node.result = "\n".join(child_results)
+                completed += 1
+                progress = int((completed / total_tasks) * 100)
+                yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+                yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': node.result[:500]})}\n\n"
+                return
+            
             node.status = "running"
             full_response = ""
             for event in agent.solve_task_stream(node, task_context_prompt):
@@ -1213,4 +1223,4 @@ if __name__ == "__main__":
     print("💾 Sessions gemmes i ./sessions/")
     print("📁 Filhåndtering via Python (tkinter)")
     print("=" * 50)
-    app.run(debug=True, port=5000, threaded=True)
+    app.run(debug=True, use_reloader=False, port=5000, threaded=True)
