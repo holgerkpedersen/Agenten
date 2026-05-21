@@ -25,3 +25,9 @@ exports/
 
 # Brainstorms folder
 .brainstorms/
+
+# logs
+flask_output.log
+
+# docs
+docs/
