@@ -17,13 +17,13 @@ LANG = {
             "python-arkitektur": "🏗️ Python Arkitektur",
             "billedanalyse": "🖼️ Billedanalyse",
             "bugfix": "🐛 Bugfix (TDD)",
+            "refactor": "🔧 Refaktorering",
         },
         "template_prompts": {
             "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
             "kodeanalyse": "Analyser følgende kode struktureret. Returnér KUN følgende sektioner:\n## Formål\n## Imports og afhængigheder\n## Arkitektur\n## Kodekvalitet\n## Sikkerhed\n\n{lang_instruction}. Brug ikke <think> tags.",
             "diffanalyse": "DU SKAL starte med at kalde git_log(5) og git_diff(HEAD~1,HEAD). Brug IKKE andre værktøjer. Analyser dernæst diff'en struktureret. Returnér KUN følgende sektioner:\n## Oversigt\n## Risikovurdering (høj/middel/lav per fil)\n## Brydende ændringer\n## Kodekvalitet\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
-            "fri": """Nedbryd følgende opgave i delopgaver. Brug 2 mellemrum per niveau.
-Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.
+            "fri": """Nedbryd følgende opgave i 3-6 hovedopgaver. Hver opgave skal være en selvstændig analyse eller handling — undgå mikroskopiske trin. Brug maks 2 niveauer. Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.
 
 Opgave: {prompt}""",
             "agenten": """Du er en PR workflow-specialist. Brug værktøjerne til at gennemføre en Pull Request. Følg disse trin i rækkefølge:\n1. Opret branch\n2. Stage og commit\n3. Push til remote\n4. Opret Pull Request\n\nOpgave: {prompt}\n\n{lang_instruction}""",
@@ -61,6 +61,17 @@ Opgave: {prompt}""",
 Returnér KUN træstrukturen med 2 mellemrum per niveau.
 
 Opgave: {prompt}""",
+            "refactor": """Du skal refaktorere en Python-fil struktureret. Følg disse faser i rækkefølge:
+
+1. Analyse — læs filen med read_chunk, forstå funktioner, klasser, imports og deres ansvar
+2. Plan — beslut hvordan filen opdeles i moduler (f.eks. ét modul per klasse/ansvar)
+3. Ekstraher — opret nye modulfiler med write_file, flyt relevant kode
+4. Opdatér — opdater den originale fil til at importere fra nye moduler
+5. Test — kør testsuiten med run_tests for at verificere intet er gået i stykker
+
+Returnér KUN træstrukturen med 2 mellemrum per niveau.
+
+Opgave: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"],
@@ -71,6 +82,7 @@ Opgave: {prompt}""",
             "python-arkitektur": ["Arkitekturplanlægning"],
             "billedanalyse": ["Beskrivelse", "Kontekst", "Detaljer", "Vurdering", "Eksportér"],
             "bugfix": ["Analyse", "Test (Red)", "Implementering", "Verifikation (Green)", "Opdatering"],
+            "refactor": ["Analyse", "Plan", "Ekstraher", "Opdatér", "Test"],
         },
         "fallback_tree": {
             "understand_purpose": "Forstå filens formål",
@@ -396,13 +408,13 @@ Opgave: {prompt}""",
             "python-arkitektur": "🏗️ Python Architecture",
             "billedanalyse": "🖼️ Image Analysis",
             "bugfix": "🐛 Bugfix (TDD)",
+            "refactor": "🔧 Refactoring",
         },
         "template_prompts": {
             "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
             "kodeanalyse": "Analyze the following code structurally. Return ONLY the following sections:\n## Purpose\n## Imports and Dependencies\n## Architecture\n## Code Quality\n## Security\n\n{lang_instruction}. Do not use <think> tags.",
             "diffanalyse": "YOU MUST start by calling git_log(5) and git_diff(HEAD~1,HEAD). Do NOT use any other tools. Then analyze the diff structurally. Return ONLY the following sections:\n## Change Overview\n## Risk Assessment (high/medium/low per file)\n## Breaking Changes\n## Code Quality\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
-            "fri": """Break down the following task into subtasks. Use 2 spaces per level.
-Return ONLY the tree structure. No explanations, no thought process.
+            "fri": """Break down the following task into 3-6 main tasks. Each must be a self-contained analysis or action — avoid micro-steps. Use max 2 levels. Return ONLY the tree structure. No explanations, no thought process.
 
 Task: {prompt}""",
             "agenten": """You are a PR workflow specialist. Use the tools to complete a Pull Request. Follow these steps in order:\n1. Create branch\n2. Stage and commit\n3. Push to remote\n4. Create Pull Request\n\nTask: {prompt}\n\n{lang_instruction}""",
@@ -440,6 +452,17 @@ Task: {prompt}""",
 Return ONLY the tree structure with 2 spaces per level.
 
 Task: {prompt}""",
+            "refactor": """You must refactor a Python file structurally. Execute phases in order:
+
+1. Analysis — read the file with read_chunk, understand functions, classes, imports and their responsibilities
+2. Plan — decide how to split the file into modules (e.g. one module per class/responsibility)
+3. Extract — create new module files with write_file, move relevant code
+4. Update — update the original file to import from new modules
+5. Test — run the test suite with run_tests to verify nothing broke
+
+Return ONLY the tree structure with 2 spaces per level.
+
+Task: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overview", "Key Points", "Conclusion", "Recommendations"],
@@ -450,6 +473,7 @@ Task: {prompt}""",
             "python-arkitektur": ["Architecture Planning"],
             "billedanalyse": ["Description", "Context", "Details", "Assessment", "Export"],
             "bugfix": ["Analysis", "Test (Red)", "Implementation", "Verification (Green)", "Update"],
+            "refactor": ["Analysis", "Plan", "Extract", "Update", "Test"],
         },
         "fallback_tree": {
             "understand_purpose": "Understand file purpose",
@@ -774,13 +798,13 @@ Task: {prompt}""",
             "python-arkitektur": "🏗️ Arquitectura Python",
             "billedanalyse": "🖼️ Análisis de Imagen",
             "bugfix": "🐛 Bugfix (TDD)",
+            "refactor": "🔧 Refactorización",
         },
         "template_prompts": {
             "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
             "kodeanalyse": "Analiza el siguiente código de forma estructurada. Devuelve SOLO estas secciones:\n## Propósito\n## Imports y Dependencias\n## Arquitectura\n## Calidad del Código\n## Seguridad\n\n{lang_instruction}. No uses etiquetas <think>.",
             "diffanalyse": "DEBES comenzar llamando a git_log(5) y git_diff(HEAD~1,HEAD). NO uses otras herramientas. Luego analiza el diff. Devuelve SOLO estas secciones:\n## Resumen de Cambios\n## Evaluación de Riesgos (alto/medio/bajo por archivo)\n## Cambios Rupturistas\n## Calidad del Código\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
-            "fri": """Descompón la siguiente tarea en subtareas. Usa 2 espacios por nivel.
-Devuelve SOLO la estructura de árbol. Sin explicaciones, sin proceso de pensamiento.
+            "fri": """Descompón la siguiente tarea en 3-6 tareas principales. Cada una debe ser un análisis o acción autónomo — evita pasos microscópicos. Usa máx 2 niveles. Devuelve SOLO la estructura de árbol. Sin explicaciones, sin proceso de pensamiento.
 
 Tarea: {prompt}""",
             "agenten": """Eres un especialista en flujos de trabajo PR. Usa las herramientas para completar un Pull Request. Sigue estos pasos en orden:\n1. Crear rama\n2. Stage y commit\n3. Push al remoto\n4. Crear Pull Request\n\nTarea: {prompt}\n\n{lang_instruction}""",
@@ -818,6 +842,17 @@ Tarea: {prompt}""",
 Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
 
 Tarea: {prompt}""",
+            "refactor": """Debes refactorizar un archivo Python estructuralmente. Ejecuta las fases en orden:
+
+1. Análisis — lee el archivo con read_chunk, entiende funciones, clases, imports y sus responsabilidades
+2. Plan — decide cómo dividir el archivo en módulos (ej. un módulo por clase/responsabilidad)
+3. Extraer — crea nuevos archivos de módulo con write_file, mueve el código relevante
+4. Actualizar — actualiza el archivo original para importar desde los nuevos módulos
+5. Probar — ejecuta el suite de pruebas con run_tests para verificar que nada se rompió
+
+Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
+
+Tarea: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Descripción General", "Puntos Clave", "Conclusión", "Recomendaciones"],
@@ -828,6 +863,7 @@ Tarea: {prompt}""",
             "python-arkitektur": ["Planificación de Arquitectura"],
             "billedanalyse": ["Descripción", "Contexto", "Detalles", "Evaluación", "Exportar"],
             "bugfix": ["Análisis", "Prueba (Red)", "Implementación", "Verificación (Green)", "Actualización"],
+            "refactor": ["Análisis", "Plan", "Extraer", "Actualizar", "Probar"],
         },
         "fallback_tree": {
             "understand_purpose": "Entender el propósito del archivo",
@@ -1152,13 +1188,13 @@ Tarea: {prompt}""",
             "python-arkitektur": "🏗️ Python 架构",
             "billedanalyse": "🖼️ 图像分析",
             "bugfix": "🐛 Bugfix (TDD)",
+            "refactor": "🔧 重构",
         },
         "template_prompts": {
             "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
             "kodeanalyse": "分析以下代码结构。只返回以下部分：\n## 目的\n## 导入和依赖\n## 架构\n## 代码质量\n## 安全性\n\n{lang_instruction}。不要使用 <think> 标签。",
             "diffanalyse": "你必须先调用 git_log(5) 和 git_diff(HEAD~1,HEAD)。不要使用其他工具。然后分析差异。只返回以下部分：\n## 更改概述\n## 风险评估（高/中/低 按文件）\n## 破坏性更改\n## 代码质量\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
-            "fri": """将以下任务分解为子任务。每级使用2个空格。
-只返回树形结构。不解释，不需要思考过程。
+            "fri": """将以下任务分解为3-6个主要任务。每个必须是自包含的分析或操作——避免微观步骤。最多2层。只返回树形结构。不解释，不需要思考过程。
 
 任务：{prompt}""",
             "agenten": """你是PR工作流专家。使用工具完成Pull Request。按顺序执行以下步骤：\n1. 创建分支\n2. Stage和提交\n3. 推送到远程\n4. 创建Pull Request\n\n任务：{prompt}\n\n{lang_instruction}""",
@@ -1196,6 +1232,17 @@ Tarea: {prompt}""",
 只返回树形结构，每级使用2个空格。
 
 任务：{prompt}""",
+            "refactor": """你必须结构化地重构一个Python文件。按顺序执行阶段：
+
+1. 分析 — 使用read_chunk读取文件，理解函数、类、导入及其职责
+2. 计划 — 决定如何将文件拆分为模块（例如每个类/职责一个模块）
+3. 提取 — 使用write_file创建新模块文件，移动相关代码
+4. 更新 — 更新原始文件以从新模块导入
+5. 测试 — 使用run_tests运行测试套件以验证没有损坏
+
+只返回树形结构，每级使用2个空格。
+
+任务：{prompt}""",
         },
         "template_fallback": {
             "resume": ["概述", "要点", "结论", "建议"],
@@ -1206,6 +1253,7 @@ Tarea: {prompt}""",
             "python-arkitektur": ["架构规划"],
             "billedanalyse": ["描述", "背景", "细节", "评估", "导出"],
             "bugfix": ["分析", "测试 (Red)", "实施", "验证 (Green)", "更新"],
+            "refactor": ["分析", "计划", "提取", "更新", "测试"],
         },
         "fallback_tree": {
             "understand_purpose": "理解文件目的",
