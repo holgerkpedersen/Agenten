@@ -235,14 +235,20 @@ def write_file(path, content):
         os.makedirs(dirname, exist_ok=True)
     try:
         content = content.replace('\\r\\n', '\r\n').replace('\\n', '\n')
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
-        result = {"success": True, "path": os.path.abspath(path), "chars": len(content)}
         if path.endswith('.py'):
             try:
                 ast.parse(content)
             except SyntaxError as e:
-                result["syntax_error"] = f"Linje {e.lineno}: {e.msg}"
+                return {
+                    "success": False,
+                    "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
+                    "line": e.lineno,
+                    "msg": e.msg
+                }
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        result = {"success": True, "path": os.path.abspath(path), "chars": len(content)}
+        if path.endswith('.py'):
             req_path = os.path.join(dirname or os.getcwd(), 'requirements.txt')
             missing = _check_missing_deps(content, req_path)
             if missing:
