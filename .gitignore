@@ -32,3 +32,4 @@ flask_output.log
 # docs
 docs/
 docs/*.*
+docs/**/*.*
