@@ -1,0 +1,130 @@
+"""Test agent_issues.py — issue CRUD, oversize detection."""
+import json
+import os
+from unittest.mock import MagicMock, patch
+
+
+class TestNextRefacId:
+    def test_first_id_when_none_exist(self):
+        from agent_issues import _next_refac_id
+        data = {"issues": []}
+        assert _next_refac_id(data) == "REFAC-001"
+
+    def test_increments_from_existing(self):
+        from agent_issues import _next_refac_id
+        data = {"issues": [
+            {"id": "REFAC-001"}, {"id": "REFAC-005"}, {"id": "SEC-001"}
+        ]}
+        assert _next_refac_id(data) == "REFAC-006"
+
+    def test_ignores_non_refac_ids(self):
+        from agent_issues import _next_refac_id
+        data = {"issues": [
+            {"id": "BUG-001"}, {"id": "SEC-001"}
+        ]}
+        assert _next_refac_id(data) == "REFAC-001"
+
+
+class TestDetectOversizeFile:
+    def test_under_limit_returns_none(self):
+        from agent_issues import detect_oversize_file
+        agent = MagicMock()
+        result = detect_oversize_file(agent, "small.py", "x = 1\n")
+        assert result is None
+
+    def test_over_limit_sets_pending_refactor(self):
+        from agent_issues import detect_oversize_file, OVERSIZE_LINE_LIMIT
+        agent = MagicMock()
+        content = "\n".join(f"line {i}" for i in range(OVERSIZE_LINE_LIMIT + 10))
+        result = detect_oversize_file(agent, "big.py", content)
+        assert result is not None
+        assert result["file"] == "big.py"
+        assert result["lines"] >= OVERSIZE_LINE_LIMIT
+        assert agent._pending_refactor is not None
+
+    def test_exact_limit_returns_none(self):
+        from agent_issues import detect_oversize_file, OVERSIZE_LINE_LIMIT
+        agent = MagicMock()
+        content = "\n".join(f"line {i}" for i in range(OVERSIZE_LINE_LIMIT - 1))
+        result = detect_oversize_file(agent, "ok.py", content)
+        assert result is None
+
+
+class TestReadIssue:
+    def test_read_existing_issue(self, tmp_path):
+        from agent_issues import read_issue, _get_issues_path, _save_issues
+        data = {"meta": {"total": 1}, "issues": [
+            {"id": "BUG-001", "title": "Test bug", "status": "open"}
+        ]}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            result = read_issue("BUG-001")
+            assert result["success"] is True
+            assert result["issue"]["title"] == "Test bug"
+
+    def test_read_nonexistent_issue(self, tmp_path):
+        from agent_issues import read_issue, _get_issues_path, _save_issues
+        data = {"meta": {"total": 0}, "issues": []}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            result = read_issue("BUG-999")
+            assert result["success"] is False
+
+
+class TestUpdateIssueStatus:
+    def test_update_status(self, tmp_path):
+        from agent_issues import update_issue_status, _get_issues_path, _save_issues
+        data = {"meta": {"total": 1}, "issues": [
+            {"id": "BUG-001", "title": "Test bug", "status": "open"}
+        ]}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            agent = MagicMock()
+            result = update_issue_status(agent, "BUG-001", "resolved", "fix: tested")
+            assert result["success"] is True
+            assert result["status"] == "resolved"
+
+
+class TestCreateRefactorIssue:
+    def test_creates_new_issue(self, tmp_path):
+        from agent_issues import create_refactor_issue, _get_issues_path, _save_issues
+        data = {"meta": {"total": 0}, "issues": []}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            agent = MagicMock()
+            result = create_refactor_issue(agent, "src/big.py", 1500)
+            assert result["success"] is True
+            assert result["existing"] is False
+            assert result["issue"]["id"].startswith("REFAC-")
+
+    def test_returns_existing_if_duplicate(self, tmp_path):
+        from agent_issues import create_refactor_issue, _get_issues_path, _save_issues
+        data = {"meta": {"total": 1}, "issues": [
+            {"id": "REFAC-001", "type": "refactor", "location": "src/big.py"}
+        ]}
+        with patch("agent_issues._get_issues_path", return_value=str(tmp_path / "issues.json")):
+            _save_issues(data)
+            agent = MagicMock()
+            result = create_refactor_issue(agent, "src/big.py", 1500)
+            assert result["success"] is True
+            assert result["existing"] is True
+
+
+class TestRunPytest:
+    def test_run_pytest_success(self):
+        from agent_issues import run_pytest
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = "OK"
+            mock_run.return_value.stderr = ""
+            result = run_pytest()
+            assert result["success"] is True
+
+    def test_run_pytest_failure(self):
+        from agent_issues import run_pytest
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 1
+            mock_run.return_value.stdout = "FAIL"
+            mock_run.return_value.stderr = "error"
+            result = run_pytest()
+            assert result["success"] is False
