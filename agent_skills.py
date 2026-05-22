@@ -35,7 +35,7 @@ TEMPLATE_TASK_TOOLS = {
         "pull request": ["github_create_pr", "git_remote_status", "git_diff", "git_log"],
     },
     "bugfix": {
-        "analyse": ["read_issue", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
+        "analyse": ["read_issue", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue", "update_issue_status"],
         "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_chunk", "create_issue"],
         "implementering": ["edit_file", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
         "verifikation": ["run_tests", "edit_file", "list_files", "list_chunks", "read_chunk", "create_issue"],
@@ -95,9 +95,9 @@ SECTION_INSTRUCTIONS = {
         "Eksport\u00e9r": "Skriv den fulde analyse til en .md fil. Brug write_file til at gemme i ./exports/billedanalyse_{timestamp}.md. Filen skal indeholde alle sektioner samlet. Brug formatet:\n\n# Billedanalyse\n\n## Beskrivelse\n...\n\n## Kontekst\n...\n\n## Detaljer\n...\n\n## Vurdering\n...",
     },
     "bugfix": {
-        "Analyse": "Læs issue med read_issue(). Forstå hvad bug'en er og hvilken kode der skal ændres. Læs den relevante kildekode med read_chunk(). Forstå rodårsagen. SKRIV IKKE til filer — kun analyse. Opret et issue med create_issue() hvis du opdager en ny fejl i koden eller data der skal rettes.",
+        "Analyse": "Læs issue med read_issue(). Forstå hvad bug'en er og hvilken kode der skal ændres. Læs den relevante kildekode med read_chunk(). Forstå rodårsagen. Verificér at fejlen stadig findes — hvis koden allerede er rettet, opdater issue-status til 'resolved' med update_issue_status() og afslut med <<<DONE>>>. SKRIV IKKE til filer — kun analyse. Opret et issue med create_issue() hvis du opdager en ny fejl i koden eller data der skal rettes.",
         "Test (Red)": "Skriv en pytest der fanger bug'en. Opret en ny testfil med write_file (testfilen findes ikke i forvejen). Kør testen med run_tests() — den SKAL fejle (rød fase). Hvis testen består (i stedet for at fejle), er bug'en allerede fikset — opdater issue-status til 'resolved' og afslut med <<<DONE>>>.",
-        "Implementering": "Ret kildekoden med den mindst mulige ændring. Brug edit_file til at lave præcise search-and-replace ændringer i den eksisterende kode. Brug IKKE write_file — filen findes allerede.",
+        "Implementering": "Ret kildekoden med den mindst mulige ændring. Brug read_chunk til at læse filen og find den PRÆCISE tekst der skal ændres — kopiér teksten direkte ind i edit_file's old_text med samme indentering, samme quotes, samme linjeafslutninger. Brug IKKE write_file — filen findes allerede.",
         "Verifikation (Green)": "Kør testen igen med run_tests() — den SKAL bestå (grøn fase). Kør HELE testsuiten med run_tests() for at verificere ingen regressions.",
         "Opdatering": "Opdater issue-status til 'resolved' med update_issue_status(). Tilføj en kort resolution_note om hvad der blev fikset.",
     },

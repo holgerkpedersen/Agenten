@@ -1,5 +1,6 @@
 import json as _json
 import os
+import re
 import sys
 import subprocess
 from lang import t
@@ -85,6 +86,25 @@ def read_issue(issue_id):
     return {"success": False, "error": f"Issue '{issue_id}' not found. Available: {available}"}
 
 
+def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
+    if status != "resolved":
+        return
+    ref_pattern = re.compile(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)')
+    fields = [issue.get("title", ""), issue.get("description", ""),
+              issue.get("location", ""), issue.get("impact", ""), issue.get("proposed_fix", ""),
+              resolution_note]
+    refs = set()
+    for field in fields:
+        refs.update(ref_pattern.findall(field))
+    refs.discard(issue.get("id", ""))
+    for ref in refs:
+        for ref_issue in data.get("issues", []):
+            if ref_issue.get("id", "").upper() == ref.upper() and ref_issue.get("status") in ("open", "in_progress"):
+                ref_issue["status"] = "resolved"
+                ref_issue["resolution_note"] = f"Lukket automatisk da {issue['id']} blev resolved: {resolution_note[:100]}"
+                agent._log("INFO", f"Med-reference {ref} \u2192 resolved via {issue['id']}", "")
+
+
 def update_issue_status(agent, issue_id, status, resolution_note=""):
     data = _load_issues()
     for issue in data.get("issues", []):
@@ -92,6 +112,7 @@ def update_issue_status(agent, issue_id, status, resolution_note=""):
             issue["status"] = status
             if resolution_note:
                 issue["resolution_note"] = resolution_note
+            _resolve_referenced_issues(agent, data, issue, status, resolution_note)
             _save_issues(data)
             agent._log("INFO", f"Issue {issue_id} \u2192 {status}", resolution_note[:200])
             return {"success": True, "issue": issue, "status": status}
@@ -127,9 +148,20 @@ def create_refactor_issue(agent, filepath, line_count, related_issues=None):
 
 def create_issue(agent, title, type="bug", severity="medium", description="", location="", impact="", proposed_fix=""):
     data = _load_issues()
+    title_lower = title.lower()
+    title_keywords = {w for w in title_lower.split() if len(w) > 3}
     for i in data.get("issues", []):
-        if i.get("title") == title or (location and i.get("location", "").startswith(location)):
+        if i.get("title") == title:
             agent._log("INFO", f"Issue findes allerede", i["id"])
+            return {"success": True, "issue": i, "existing": True}
+        loc = i.get("location", "")
+        if location and loc and (location in loc or loc in location):
+            agent._log("INFO", f"Issue med samme lokation allerede oprettet", i["id"])
+            return {"success": True, "issue": i, "existing": True}
+        existing_keywords = {w for w in i.get("title", "").lower().split() if len(w) > 3}
+        overlap = title_keywords & existing_keywords
+        if len(overlap) >= 3:
+            agent._log("INFO", f"Issue med samme emne allerede oprettet", i["id"])
             return {"success": True, "issue": i, "existing": True}
 
     issue_id = _next_issue_id(data, type)
