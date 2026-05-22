@@ -1,99 +1,42 @@
 import os
+import re
 import time
 import json
-from lang import t
 from i18n import K
-from tools import ToolRegistry
-from llm_wrapper import LMStudioWrapper
+from lang import t
 import agent_skills
 import agent_git
 
 
-def add_image(agent, path):
-    basename = os.path.basename(path)
-    for img in agent.images:
-        if isinstance(img, dict):
-            if img.get("filename") == basename or img.get("filepath") == path:
-                return {"success": True, "file": basename, "size": len(img.get("b64","")), "mime": img.get("mime",""), "note": "Allerede indl\u00e6st"}
-            if img.get("filepath") and os.path.normpath(img["filepath"]) == os.path.normpath(path):
-                return {"success": True, "file": basename, "size": len(img.get("b64","")), "mime": img.get("mime",""), "note": "Allerede indl\u00e6st"}
-
-    if os.path.exists(path):
-        return encode_and_store(agent, path)
-
-    upload_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads", basename)
-    if os.path.exists(upload_path):
-        return encode_and_store(agent, upload_path)
-
-    loaded = [f"{i.get('filename','?')} ({i.get('filepath','?')})" if isinstance(i,dict) else str(i)[:40] for i in agent.images]
-    return {"success": False, "error": f"Fil ikke fundet: {path}. Allerede indl\u00e6ste: {loaded or 'ingen'}"}
+PHASE_ALIASES = {
+    "analyse": "analyse", "analysis": "analyse",
+    "test": "test",
+    "implementering": "implementering", "implementation": "implementering",
+    "verifikation": "verifikation", "verification": "verifikation", "green": "verifikation",
+    "opdatering": "opdatering", "update": "opdatering",
+    "ekstraher": "ekstraher", "extract": "ekstraher",
+    "plan": "plan",
+    "opdatér": "opdatér",
+}
 
 
-def encode_and_store(agent, path):
-    raw_b64 = LMStudioWrapper.encode_image(path)
-    size = os.path.getsize(path)
-    ext = os.path.splitext(path)[1].lower().lstrip(".")
-    mime = "jpeg" if ext in ("jpg","jpeg") else ext
-    agent.images.append({"b64": raw_b64, "mime": mime, "filename": os.path.basename(path), "filepath": path})
-    agent._log("TOOL", f"Billede tilf\u00f8jet: {os.path.basename(path)}", f"{size:,} bytes ({ext})")
-    return {"success": True, "file": os.path.basename(path), "size": size, "mime": mime}
-
-
-def truncate_conversation(agent, conversation, system_prompt):
-    if len(conversation) > agent.max_conversation_chars and len(system_prompt) < agent.max_conversation_chars:
-        mid = "\n\n[... tidligere kontekst afkortet / previous context truncated...]"
-        keep = agent.max_conversation_chars - len(system_prompt) - len(mid)
-        if keep > 0:
-            return system_prompt + mid + conversation[-keep:]
-    return conversation
-
-
-def build_tool_guidance(agent, attempt):
-    if attempt > 0:
-        return ""
-
-    tool_list = ', '.join(agent.tool_registry.tools.keys())
-    if agent.tool_registry.active_tools is not None:
-        tool_list = ', '.join(agent.tool_registry.active_tools)
-    return f"\n\n" + t(K.TOOL_CONTINUATION, agent.lang).format(
-        tools_list=tool_list,
-        TOOL_MARKER=agent.tool_registry.TOOL_MARKER,
-        DONE_MARKER=agent.tool_registry.DONE_MARKER
-    )
-
-
-def ask_ai(agent, prompt):
-    response = ""
-    for chunk in agent.llm.generate_stream(prompt, temperature=0.3, max_tokens=agent.max_tokens):
-        response += chunk
-    return response
-
-
-def handle_tool_call(agent, action, conversation, already_called, attempt):
-    tool_name = action["tool"]
-    arguments = action.get("args", {})
-
-    key = f"{tool_name}_{arguments}"
-    times_called = already_called.get(key, 0)
-    already_called[key] = times_called + 1
-
-    if times_called >= 2:
-        conversation += f"\n\n{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.TOOL_DUPLICATE_MSG, agent.lang).format(tool=tool_name)}"
-        return conversation
-
-    result = agent.tool_registry.execute(tool_name, arguments)
-    result_text = json.dumps(result, ensure_ascii=False)
-
-    conversation += f"\n\n{t(K.TOOL_RESULT_PREFIX, agent.lang).format(tool=tool_name)}\n{result_text}"
-    return conversation
+def _normalize_phase(name):
+    lower = name.lower().split("(")[0].strip()
+    lower = re.sub(r'^[\d.]+[\)\s]*', '', lower).strip()
+    return PHASE_ALIASES.get(lower, lower)
 
 
 def set_task_tools(agent, task_name):
     if not agent.active_template or agent.active_template not in agent_skills.TEMPLATE_TASK_TOOLS:
         return
     template_tools = agent_skills.TEMPLATE_TASK_TOOLS[agent.active_template]
+    phase = _normalize_phase(task_name)
+    if phase in template_tools:
+        agent.tool_registry.set_active_tools(template_tools[phase])
+        agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(template_tools[phase]))
+        return
     for keyword, tools in template_tools.items():
-        if keyword in task_name.lower():
+        if keyword in phase.lower():
             agent.tool_registry.set_active_tools(tools)
             agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
             return
