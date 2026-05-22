@@ -629,6 +629,7 @@
                 <option value="billedanalyse">🖼️ Billedanalyse</option>
                 <option value="bugfix">🐛 Bugfix (TDD)</option>
                 <option value="refactor">🔧 Refaktorering</option>
+                <option value="testgenerering">🧪 Testgenerering</option>
             </select>
         </div>
         
@@ -2766,6 +2767,8 @@ function useIssueAsTask(encoded) {
         template.value = 'bugfix';
     } else if (issue.type === 'architecture') {
         template.value = 'refactor';
+    } else if (issue.type === 'testing') {
+        template.value = 'testgenerering';
     } else {
         template.value = 'fri';
     }
