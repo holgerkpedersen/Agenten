@@ -342,9 +342,11 @@ def create_session():
 
 @app.route("/api/sessions/load/<session_id>", methods=["GET"])
 def load_session(session_id):
+    global current_session_id
+    agent.agent_log = []
+    agent.execution_log = []
     session_data = session_manager.load_session(session_id)
     if session_data:
-        global current_session_id
         current_session_id = session_id
         if session_data.get("tree"):
             from task_tree import TaskTree, TaskNode
@@ -896,6 +898,9 @@ def execute_stream():
 
         def _check_client():
             return agent.stop_requested
+
+        agent.agent_log = []
+        agent.execution_log = []
 
         # Truncate context for subtask prompts
         MAX_CTX = 150000
