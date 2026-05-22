@@ -288,13 +288,27 @@ def edit_file(path, old_text, new_text):
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        count = content.count(old_text)
+        search = old_text.replace('\r\n', '\n')
+        norm = content.replace('\r\n', '\n')
+        count = norm.count(search)
         if count == 0:
             return {"success": False, "error": f"Teksten blev ikke fundet i {path}"}
         if count > 1:
             return {"success": False, "error": f"Teksten fundet {count} gange — brug en mere specifik søgestreng"}
 
-        new_content = content.replace(old_text, new_text)
+        idx = norm.index(search)
+        search_len = len(search)
+        exact_old = content[idx:idx + search_len]
+        if exact_old.count('\n') != search.count('\n'):
+            lines = search.split('\n')
+            pos = idx
+            parts = []
+            for line in lines:
+                end = content.index('\n', pos) + 1
+                parts.append(content[pos:end])
+                pos = end
+            exact_old = ''.join(parts)
+        new_content = content.replace(exact_old, new_text, 1)
         if path.endswith('.py'):
             try:
                 ast.parse(new_content)
