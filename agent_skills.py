@@ -24,6 +24,7 @@ TEMPLATE_TOOLS = {
     "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk", "list_files", "create_issue"],
     "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_chunk", "write_file", "edit_file", "list_files"],
     "refactor": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue"],
+    "testgenerering": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue", "update_issue_status"],
 }
 
 TEMPLATE_TASK_TOOLS = {
@@ -46,6 +47,12 @@ TEMPLATE_TASK_TOOLS = {
         "ekstraher": ["write_file", "list_files", "list_chunks", "read_chunk"],
         "opdatér": ["edit_file", "list_files", "list_chunks", "read_chunk"],
         "test": ["run_tests", "list_files", "list_chunks", "read_chunk"],
+    },
+    "testgenerering": {
+        "analyse": ["list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
+        "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_chunk", "create_issue"],
+        "implementering": ["edit_file", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
+        "verifikation": ["run_tests", "edit_file", "list_files", "list_chunks", "read_chunk", "create_issue"],
     },
 }
 
@@ -100,6 +107,12 @@ SECTION_INSTRUCTIONS = {
         "Ekstraher": "Opret nye modulfiler med write_file() — disse er NYE filer. Flyt relevant kode til hvert modul. Bevar samme funktionalitet — bare omorganiseret.",
         "Opdatér": "Opdater den originale fil med edit_file(): fjern den kode der blev flyttet, tilføj import af nye moduler. Brug IKKE write_file — den originale fil findes allerede.",
         "Test": "Kør testsuiten med run_tests() for at verificere at intet er gået i stykker. Hvis tests fejler, ret import-stier og genkør.",
+    },
+    "testgenerering": {
+        "Analyse": "Læs filen med read_chunk(). Forstå alle klasser, funktioner, metoder og imports. Identificér hvilke der allerede har tests og hvilke der mangler. Opret et issue med create_issue() hvis du finder kode der mangler tests.",
+        "Test (Red)": "Skriv pytest-tests for den manglende dækning. Opret en NY testfil med write_file (testfilen må ikke findes i forvejen). Kør testen med run_tests() — den SKAL bestå (grøn fase). Hvis testen fejler, ret koden med edit_file og genkør.",
+        "Implementering": "Hvis produktionskoden skal ændres for at gøres testbar, brug edit_file til målrettede ændringer. Brug IKKE write_file — produktionsfilen findes allerede.",
+        "Verifikation (Green)": "Kør HELE testsuiten med run_tests() for at verificere ingen regressions. Opdater issue-status til 'resolved' med update_issue_status() hvis et TST-issue blev løst.",
     },
 }
 
@@ -188,5 +201,10 @@ def get_templates(agent):
             "name": t(K.T_REFACTOR, agent.lang),
             "prompt": t(K.TP_REFACTOR, agent.lang),
             "fallback": t(K.TF_REFACTOR, agent.lang),
+        },
+        "testgenerering": {
+            "name": t(K.T_TESTGENERERING, agent.lang),
+            "prompt": t(K.TP_TESTGENERERING, agent.lang),
+            "fallback": t(K.TF_TESTGENERERING, agent.lang),
         },
     }
