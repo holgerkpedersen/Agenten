@@ -57,8 +57,9 @@ Vælg skabelon i dropdown før nedbrydning — LLM får fastlagte sektioner:
 | 📊 **Diff-analyse** | Git log + diff → Risikovurdering → Anbefalinger |
 | 🔀 **PR Agenten** | Branch → Commit → Push → Pull Request (automatiseret PR workflow) |
 | 💻 **Programmeringsopgave** | Kravanalyse → Arkitekturdesign → Implementeringsplan → Sikkerhedsanalyse → Kodeimplementering |
-| 🏗️ **Python Arkitektur** | Arkitekturplanlægning med `write_file` output til `./docs/arkitektur.md` |
-| 🖼️ **Billedanalyse** | Beskrivelse → Kontekst → Detaljer → Vurdering → Eksportér (.md) |
+| 🔧 **Refaktorering** | Analyse → Plan → Ekstraher → Opdatér → Test (SOLID refactoring) |
+| 🧪 **Testgenerering** | Analyse → Test (Red) → Implementering → Verifikation (Green) |
+| 🐛 **Bugfix (TDD)** | Analyse → Test (Red) → Implementering → Verifikation (Green) → Opdatering |
 
 **Billedanalyse forudsætter:** Upload et billede via 🖼 knappen **før** du klikker Nedbryd. WebP billeder konverteres automatisk til `image/png` MIME for gemma-kompatibilitet.
 
@@ -70,7 +71,12 @@ Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører:
 |---------|----------|
 | `list_chunks` | List alle indlæste filer |
 | `read_chunk` | Læs en chunk af en stor fil |
-| `write_file` | Skriv fil til disk (validerer syntax, dependencies og routes) |
+| `write_file` | Opret NY fil (afviser eksisterende .py filer — brug edit_file) |
+| `edit_file` | Search-and-replace i eksisterende filer (med syntax-tjek) |
+| `list_files` | List filer i en mappe (med filter på filtype og max dybde) |
+| `create_issue` | Opret nyt issue i issues.json |
+| `read_issue` | Læs issue fra issues.json |
+| `update_issue_status` | Opdater status på issue |
 | `add_image` | Tilføj billede til kontekst (base64-encodes) |
 | `github_create_repo` | Opret GitHub repository |
 | `github_list_repos` | List dine repos |
@@ -120,8 +126,11 @@ Se `skills/vision_models.md` for fuld kompatibilitetsmatrix og `AGENTS.md` for d
 ## 🔐 Sikkerhed
 
 - **Token i `.env`**: GitHub token KUN i `.env` (ikke i kode, ikke i git)
-- **Prompt injection**: `<<<TOOL>>>` og `<<<DONE>>>` markører strips fra bruger-input
+- **`.env` aldrig scannet**: `.env` filer ekskluderes fra folder-scanning og `read_file_content`
+- **Prompt injection**: `<<<TOOL>>>` og `<<<DONE>>>` markører strips fra bruger-input. Yderligere sanitization via `_sanitize_prompt()`
+- **Syntax check før skrivning**: `write_file` og `edit_file` validerer Python syntaks FØR filen skrives
 - **Kun registrerede værktøjer**: `ToolRegistry.execute()` nægter ukendte værktøjsnavne
+- **Per-fase tool-restriktioner**: Hver fase i en skabelon har kun adgang til relevante værktøjer
 - **Subprocess safety**: Git-kommandoer bruger liste-args (ingen shell)
 - **LM Studio**: Kører lokalt — ingen data sendes eksternt (undtagen GitHub API)
 
@@ -153,7 +162,7 @@ Flask API (api_server.py)
     │       ├── agent_tasks.handle_tool_call()
     │       ├── agent_git.verify_pr_step()
     │       ├── agent_tree.record_outcome()
-    │       └── LLM (iteration)
+    │       └── Skip root node when children exist (no redundant re-execution)
     │
     ├── /api/image/* — upload/list/clear/remove
     ├── /api/version — server version + file timestamps
@@ -175,7 +184,12 @@ Flask API (api_server.py)
 - **Billedanalyse**: Upload → Decompose → 5-trins struktureret analyse → .md eksport
 - **Vision support**: Automatisk model-detektion (VISION_KEYWORDS), format-tilpasning (raw_b64/data_url)
 - **Sessions**: Gem/indlæs/omdøb — persistent JSON storage med atomic write
-- **Filanalyse**: Upload filer, folder-scanning, automatisk chunk-deling af store filer
+- **Filanalyse**: Upload filer, folder-scanning (med .env exkludering), automatisk chunk-deling af store filer
+- **Autonom refactoring**: 🔧 Refactor-skabelon → Analyse → Plan → Ekstraher → Opdatér → Test
+- **Autonom bugfix**: 🐛 Bugfix (TDD) skabelon → Analyse → Test → Implementering → Verifikation → Opdatering
+- **Testgenerering**: 🧪 Generer tests for utestede klasser/funktioner/metoder
+- **Præcise filændringer**: `edit_file` search-and-replace i stedet for full-file rewrites
+- **Auto-opdagelse**: `create_issue` værktøj rapporterer nye fejl/issues under analyse
 - **Streaming**: Real-time SSE output med thinking-toggle
 - **Resultatkaskade**: Foregående task-resultater fødes ind i næste opgave
 - **Drag/resize paneler**: Frit layout med maximize/minimize
