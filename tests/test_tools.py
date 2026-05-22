@@ -434,6 +434,14 @@ class TestEditFile:
         result = edit_file(str(html), "/api/missing", "/api/data")
         assert result["success"] is True
 
+    def test_edit_file_newline_normalization(self, tmp_path):
+        from git_ops import edit_file
+        f = tmp_path / "test.py"
+        f.write_bytes("x = 1\r\ny = 2\r\nz = 3\r\n".encode('utf-8'))
+        result = edit_file(str(f), "y = 2\nz = 3", "y = 99\nz = 99")
+        assert result["success"] is True
+        assert f.read_bytes().decode('utf-8') == "x = 1\r\ny = 99\r\nz = 99\r\n"
+
 
 class TestListFiles:
     def test_list_files_basic(self, tmp_path):

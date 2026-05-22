@@ -138,3 +138,7 @@ class TestAPIRoot:
         assert "issues" in data
         assert "meta" in data
         assert data["success"] is True
+
+    def test_delete_nonexistent_issue(self, client):
+        resp = client.delete("/api/issues/DOESNOTEXIST")
+        assert resp.status_code == 404
