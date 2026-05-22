@@ -1079,6 +1079,22 @@ def list_issues():
         data = json.load(f)
     return jsonify({"success": True, **data})
 
+@app.route("/api/issues/<issue_id>", methods=["DELETE"])
+def delete_issue(issue_id):
+    issues_path = os.path.join(BASE_DIR, "docs", "issues", "observed", "issues.json")
+    if not os.path.exists(issues_path):
+        return jsonify({"success": False, "error": "Issues-fil findes ikke"}), 404
+    with open(issues_path, encoding="utf-8") as f:
+        data = json.load(f)
+    before = len(data.get("issues", []))
+    data["issues"] = [i for i in data.get("issues", []) if i.get("id", "").lower() != issue_id.lower()]
+    if len(data["issues"]) == before:
+        return jsonify({"success": False, "error": f"Issue '{issue_id}' findes ikke"}), 404
+    data["meta"]["total"] = len(data["issues"])
+    with open(issues_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return jsonify({"success": True, "deleted": issue_id})
+
 @app.route("/api/test", methods=["GET"])
 def test():
     return jsonify({"status": "ok", "message": t(K.UI_API_RUNNING, agent.lang), "static_folder": STATIC_DIR, "has_agent": agent is not None})
