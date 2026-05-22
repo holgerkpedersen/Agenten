@@ -2710,7 +2710,7 @@ function showIssuesPanel() {
                 return;
             }
             let html = `<table class="issues-table"><thead><tr>
-                <th>ID</th><th>Titel</th><th>Type</th><th>Status</th><th>Prioritet</th><th></th>
+                <th>ID</th><th>Titel</th><th>Type</th><th>Status</th><th>Prioritet</th><th></th><th></th>
             </tr></thead><tbody>`;
             for (const issue of data.issues) {
                 const sevClass = `issue-severity-${issue.severity || 'low'}`;
@@ -2736,6 +2736,7 @@ function showIssuesPanel() {
                     <td><span class="${statusClass}">${issue.status}</span></td>
                     <td><span class="${sevClass}">${issue.severity}</span></td>
                     <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">🚀 Kør</button></td>
+                    <td><button onclick="event.stopPropagation();deleteIssue('${issue.id}')" style="background:var(--danger);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;" title="Slet issue">✕</button></td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -2773,6 +2774,22 @@ function useIssueAsTask(encoded) {
         template.value = 'fri';
     }
     addLogEntry('INFO', `${_('prompt_filled_from')} ${issue.id}`, issue.title);
+}
+
+async function deleteIssue(issueId) {
+    if (!confirm(`Slet issue ${issueId}?`)) return;
+    try {
+        const resp = await fetch(`/api/issues/${issueId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) {
+            addLogEntry('INFO', `Issue ${issueId} slettet`, '');
+            showIssuesPanel();
+        } else {
+            addLogEntry('ERROR', `Kunne ikke slette ${issueId}`, data.error);
+        }
+    } catch (e) {
+        addLogEntry('ERROR', `Fejl ved sletning`, e.message);
+    }
 }
 
 // Initialize
