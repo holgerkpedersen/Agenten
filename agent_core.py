@@ -321,6 +321,12 @@ class Agent:
     def _parse_tree_from_llm(self, prompt, llm_response):
         return agent_tree.parse_tree_from_llm(self, prompt, llm_response)
 
+    def _sanitize_prompt(self, prompt):
+        """Sanitize user input to prevent prompt injection attacks."""
+        # Escape potential closing tags that might break the wrapper structure
+        safe_input = prompt.replace("</user_input>", "<SECURITY_TAG>")
+        return f"<user_input>\n{safe_input}\n<END_USER_INPUT>"
+
     def decompose_prompt(self, prompt, files=None, template=None):
         self.agent_log = []
         self.original_prompt = prompt
@@ -345,7 +351,7 @@ class Agent:
         self.file_chunks = {}
 
         if template == "bugfix" and not files:
-            issue_match = re.search(r'(BUG-\d+)', prompt)
+            issue_match = re.search(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)', prompt)
             if issue_match:
                 issue_id = issue_match.group(1)
                 try:
@@ -408,7 +414,11 @@ class Agent:
             else:
                 file_path, file_content = self._get_single_file_context(prompt)
                 if file_content:
-                    file_context = t(K.FILE_CONTEXT_HEADER, self.lang) + os.path.basename(file_path) + t(K.FILE_CONTEXT_PYTHON, self.lang).replace("{content}", file_content)
+                    filename = os.path.basename(file_path)
+                    chunk_key = f"file_{filename}"
+                    chunks = agent_files.chunk_text(file_content)
+                    self.file_chunks[chunk_key] = chunks
+                    file_context = t(K.FILE_CONTEXT_HEADER, self.lang) + filename + t(K.FILE_CONTEXT_PYTHON, self.lang).replace("{content}", file_content)
 
         if self._pending_refactor:
             oversize_note = (
@@ -431,7 +441,7 @@ class Agent:
                 self._log("INFO", t(K.LOG_USING_TEMPLATE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
                 return self.task_tree_to_dict()
 
-        decomposition_prompt = template_config["prompt"].replace("{prompt}", prompt)
+        decomposition_prompt = template_config["prompt"].replace("{prompt}", self._sanitize_prompt(prompt))
         file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
         decomposition_prompt += file_context_entry
 
