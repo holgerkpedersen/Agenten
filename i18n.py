@@ -14,6 +14,7 @@ class K(StrEnum):
     T_BILLEDANALYSE    = "templates.billedanalyse"
     T_BUGFIX           = "templates.bugfix"
     T_REFACTOR         = "templates.refactor"
+    T_TESTGENERERING   = "templates.testgenerering"
 
     # === Template prompts ===
     TP_RESUME          = "template_prompts.resume"
@@ -26,6 +27,7 @@ class K(StrEnum):
     TP_BILLEDANALYSE    = "template_prompts.billedanalyse"
     TP_BUGFIX           = "template_prompts.bugfix"
     TP_REFACTOR         = "template_prompts.refactor"
+    TP_TESTGENERERING   = "template_prompts.testgenerering"
 
     # === Template fallback sections ===
     TF_RESUME          = "template_fallback.resume"
@@ -37,6 +39,7 @@ class K(StrEnum):
     TF_BILLEDANALYSE    = "template_fallback.billedanalyse"
     TF_BUGFIX           = "template_fallback.bugfix"
     TF_REFACTOR         = "template_fallback.refactor"
+    TF_TESTGENERERING   = "template_fallback.testgenerering"
 
     # === Fallback tree node names ===
     FT_UNDERSTAND_PURPOSE    = "fallback_tree.understand_purpose"

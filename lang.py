@@ -18,6 +18,7 @@ LANG = {
             "billedanalyse": "🖼️ Billedanalyse",
             "bugfix": "🐛 Bugfix (TDD)",
             "refactor": "🔧 Refaktorering",
+            "testgenerering": "🧪 Testgenerering",
         },
         "template_prompts": {
             "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
@@ -72,6 +73,16 @@ Opgave: {prompt}""",
 Returnér KUN træstrukturen med 2 mellemrum per niveau.
 
 Opgave: {prompt}""",
+            "testgenerering": """Du skal generere tests for en Python-fil. Følg disse faser i rækkefølge:
+
+1. Analyse — læs filen med read_chunk, identificér klasser, funktioner og metoder der mangler tests
+2. Test (Red) — skriv pytest-tests for den manglende dækning med write_file (opret ny testfil). Kør med run_tests — tests SKAL bestå (grøn fase)
+3. Implementering — hvis koden skal ændres for at gøres testbar, brug edit_file
+4. Verifikation (Green) — kør HELE testsuiten med run_tests for at verificere ingen regressions
+
+Returnér KUN træstrukturen med 2 mellemrum per niveau.
+
+Opgave: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"],
@@ -83,6 +94,7 @@ Opgave: {prompt}""",
             "billedanalyse": ["Beskrivelse", "Kontekst", "Detaljer", "Vurdering", "Eksportér"],
             "bugfix": ["Analyse", "Test (Red)", "Implementering", "Verifikation (Green)", "Opdatering"],
             "refactor": ["Analyse", "Plan", "Ekstraher", "Opdatér", "Test"],
+            "testgenerering": ["Analyse", "Test (Red)", "Implementering", "Verifikation (Green)"],
         },
         "fallback_tree": {
             "understand_purpose": "Forstå filens formål",
@@ -409,6 +421,7 @@ Opgave: {prompt}""",
             "billedanalyse": "🖼️ Image Analysis",
             "bugfix": "🐛 Bugfix (TDD)",
             "refactor": "🔧 Refactoring",
+            "testgenerering": "🧪 Test Generation",
         },
         "template_prompts": {
             "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
@@ -463,6 +476,16 @@ Task: {prompt}""",
 Return ONLY the tree structure with 2 spaces per level.
 
 Task: {prompt}""",
+            "testgenerering": """You must generate tests for a Python file. Execute phases in order:
+
+1. Analysis — read the file with read_chunk, identify classes, functions and methods missing tests
+2. Test (Red) — write pytest tests for missing coverage with write_file (create new test file). Run with run_tests — tests MUST pass (green phase)
+3. Implementation — if code needs changes to be testable, use edit_file
+4. Verification (Green) — run the FULL test suite with run_tests to verify no regressions
+
+Return ONLY the tree structure with 2 spaces per level.
+
+Task: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overview", "Key Points", "Conclusion", "Recommendations"],
@@ -474,6 +497,7 @@ Task: {prompt}""",
             "billedanalyse": ["Description", "Context", "Details", "Assessment", "Export"],
             "bugfix": ["Analysis", "Test (Red)", "Implementation", "Verification (Green)", "Update"],
             "refactor": ["Analysis", "Plan", "Extract", "Update", "Test"],
+            "testgenerering": ["Analysis", "Test (Red)", "Implementation", "Verification (Green)"],
         },
         "fallback_tree": {
             "understand_purpose": "Understand file purpose",
@@ -799,6 +823,7 @@ Task: {prompt}""",
             "billedanalyse": "🖼️ Análisis de Imagen",
             "bugfix": "🐛 Bugfix (TDD)",
             "refactor": "🔧 Refactorización",
+            "testgenerering": "🧪 Generación de Pruebas",
         },
         "template_prompts": {
             "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
@@ -853,6 +878,16 @@ Tarea: {prompt}""",
 Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
 
 Tarea: {prompt}""",
+            "testgenerering": """Debes generar pruebas para un archivo Python. Ejecuta las fases en orden:
+
+1. Análisis — lee el archivo con read_chunk, identifica clases, funciones y métodos sin pruebas
+2. Prueba (Red) — escribe pruebas pytest con write_file (crea nuevo archivo de prueba). Ejecuta con run_tests — las pruebas DEBEN pasar (fase verde)
+3. Implementación — si el código necesita cambios para ser comprobable, usa edit_file
+4. Verificación (Green) — ejecuta TODO el suite de pruebas con run_tests para verificar que no hay regresiones
+
+Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
+
+Tarea: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Descripción General", "Puntos Clave", "Conclusión", "Recomendaciones"],
@@ -864,6 +899,7 @@ Tarea: {prompt}""",
             "billedanalyse": ["Descripción", "Contexto", "Detalles", "Evaluación", "Exportar"],
             "bugfix": ["Análisis", "Prueba (Red)", "Implementación", "Verificación (Green)", "Actualización"],
             "refactor": ["Análisis", "Plan", "Extraer", "Actualizar", "Probar"],
+            "testgenerering": ["Análisis", "Prueba (Red)", "Implementación", "Verificación (Green)"],
         },
         "fallback_tree": {
             "understand_purpose": "Entender el propósito del archivo",
@@ -1189,6 +1225,7 @@ Tarea: {prompt}""",
             "billedanalyse": "🖼️ 图像分析",
             "bugfix": "🐛 Bugfix (TDD)",
             "refactor": "🔧 重构",
+            "testgenerering": "🧪 测试生成",
         },
         "template_prompts": {
             "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
@@ -1243,6 +1280,16 @@ Tarea: {prompt}""",
 只返回树形结构，每级使用2个空格。
 
 任务：{prompt}""",
+            "testgenerering": """你必须为Python文件生成测试。按顺序执行阶段：
+
+1. 分析 — 使用read_chunk读取文件，识别缺少测试的类、函数和方法
+2. 测试 (Red) — 使用write_file编写pytest测试（创建新测试文件）。使用run_tests运行 —— 测试必须通过（绿阶段）
+3. 实施 — 如果代码需要修改以使其可测试，使用edit_file
+4. 验证 (Green) — 使用run_tests运行完整的测试套件以验证没有回归
+
+只返回树形结构，每级使用2个空格。
+
+任务：{prompt}""",
         },
         "template_fallback": {
             "resume": ["概述", "要点", "结论", "建议"],
@@ -1254,6 +1301,7 @@ Tarea: {prompt}""",
             "billedanalyse": ["描述", "背景", "细节", "评估", "导出"],
             "bugfix": ["分析", "测试 (Red)", "实施", "验证 (Green)", "更新"],
             "refactor": ["分析", "计划", "提取", "更新", "测试"],
+            "testgenerering": ["分析", "测试 (Red)", "实施", "验证 (Green)"],
         },
         "fallback_tree": {
             "understand_purpose": "理解文件目的",
