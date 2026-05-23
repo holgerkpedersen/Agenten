@@ -630,6 +630,7 @@
                 <option value="bugfix">🐛 Bugfix (TDD)</option>
                 <option value="refactor">🔧 Refaktorering</option>
                 <option value="testgenerering">🧪 Testgenerering</option>
+                <option value="issue_handler">🔷 Issue Håndtering</option>
             </select>
         </div>
         
@@ -685,7 +686,7 @@
 <div id="issuesModal" class="issues-overlay" style="display:none;" onclick="if(event.target===this)closeIssuesPanel()">
     <div class="issues-modal">
         <div class="issues-header">
-            <h2>🐛 Issues</h2>
+            <h2 id="issuesModalTitle">${_('issues_title')}</h2>
             <button class="issues-close" onclick="closeIssuesPanel()">✕</button>
         </div>
         <div class="issues-scroll" id="issuesContent">
@@ -886,6 +887,27 @@ btn_edit: 'Rediger',
     task_done_label: 'Opgave færdig',
     files_included: 'Filer inkluderet i LLM kontekst:',
     reading_file_title: 'Læser fil',
+    loading: 'Indlæser...',
+    issues_table_title: 'Titel',
+    issues_table_type: 'Type',
+    issues_table_status: 'Status',
+    issues_table_priority: 'Prioritet',
+    issues_error: 'Fejl',
+    issues_title: '🐛 Issues',
+    issues_none: 'Ingen issues fundet.',
+    issues_location: 'Sted:',
+    issues_impact: 'Impact:',
+    issues_proposed_fix: 'Forslag:',
+    issues_resolution: 'Løsning:',
+    issues_acceptance: 'Acceptance criteria:',
+    issues_run: '🚀 Kør',
+    issues_delete: '✕',
+    issues_delete_title: 'Slet issue',
+    issues_delete_confirm: 'Slet issue {id}?',
+    issues_use_as_task: 'Brug som opgave',
+    issues_detail_location: 'Location:',
+    issues_detail_impact: 'Impact:',
+    issues_detail_fix: 'Foreslået fix:',
 };
 
 async function loadLang(lang) {
@@ -953,6 +975,7 @@ function updateHtmlLabels() {
     if (e('stopBtn'))      e('stopBtn').textContent         = '⏹ ' + _('stop');
     if (e('fileSectionToggle')) e('fileSectionToggle').textContent = _('show_files');
     if (e('thinkingLabel'))e('thinkingLabel').textContent= showThinking ? _('show_thinking') : _('hide_thinking');
+    if (e('issuesBtn'))   e('issuesBtn').textContent       = '🐛 ' + _('issues_title');
     if (e('selectSessionOpt')) e('selectSessionOpt').textContent = _('select_session');
     const tpl = document.getElementById('templateSelect');
     if (tpl) {
@@ -2700,17 +2723,18 @@ function downloadFromPreview() {
 function showIssuesPanel() {
     const modal = document.getElementById('issuesModal');
     const content = document.getElementById('issuesContent');
-    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Indlæser...</div>';
+    document.getElementById('issuesModalTitle').textContent = _('issues_title');
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">' + _('loading') + '</div>';
     modal.style.display = 'flex';
     fetch('/api/issues')
         .then(r => r.json())
         .then(data => {
             if (!data.issues || !data.issues.length) {
-                content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Ingen issues fundet.</div>';
+                content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">' + _('issues_none') + '</div>';
                 return;
             }
             let html = `<table class="issues-table"><thead><tr>
-                <th>ID</th><th>Titel</th><th>Type</th><th>Status</th><th>Prioritet</th><th></th><th></th>
+                <th>ID</th><th>${_('issues_table_title')}</th><th>${_('issues_table_type')}</th><th>${_('issues_table_status')}</th><th>${_('issues_table_priority')}</th><th></th><th></th>
             </tr></thead><tbody>`;
             for (const issue of data.issues) {
                 const sevClass = `issue-severity-${issue.severity || 'low'}`;
@@ -2723,27 +2747,28 @@ function showIssuesPanel() {
                     <td>${issue.title}
                         <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${desc}...</div>
                         <div class="issue-detail" style="display:none;margin-top:6px;padding:8px;background:var(--input-bg);border-radius:6px;font-size:11px;line-height:1.5;">
-                            <div><strong>Sted:</strong> ${issue.location || '—'}</div>
-                            <div><strong>Impact:</strong> ${issue.impact || '—'}</div>
-                            <div style="margin-top:4px;"><strong>Forslag:</strong> ${issue.proposed_fix || '—'}</div>
-                            ${issue.resolution_note ? `<div style="margin-top:4px;color:var(--success);"><strong>Løsning:</strong> ${issue.resolution_note}</div>` : ''}
+                            <div><strong>${_('issues_location')}</strong> ${issue.location || '—'}</div>
+                            <div><strong>${_('issues_impact')}</strong> ${issue.impact || '—'}</div>
+                            <div style="margin-top:4px;"><strong>${_('issues_proposed_fix')}</strong> ${issue.proposed_fix || '—'}</div>
+                            ${issue.acceptance_criteria ? `<div style="margin-top:4px;"><strong>${_('issues_acceptance')}</strong> ${issue.acceptance_criteria}</div>` : ''}
+                            ${issue.resolution_note ? `<div style="margin-top:4px;color:var(--success);"><strong>${_('issues_resolution')}</strong> ${issue.resolution_note}</div>` : ''}
                             <button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="margin-top:8px;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
-                                🚀 Brug som opgave
+                                ${_('issues_use_as_task')}
                             </button>
                         </div>
                     </td>
                     <td><span class="issue-type ${typeClass}">${issue.type}</span></td>
                     <td><span class="${statusClass}">${issue.status}</span></td>
                     <td><span class="${sevClass}">${issue.severity}</span></td>
-                    <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">🚀 Kør</button></td>
-                    <td><button onclick="event.stopPropagation();deleteIssue('${issue.id}')" style="background:var(--danger);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;" title="Slet issue">✕</button></td>
+                    <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">${_('issues_run')}</button></td>
+                    <td><button onclick="event.stopPropagation();deleteIssue('${issue.id}')" style="background:var(--danger);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;" title="${_('issues_delete_title')}">${_('issues_delete')}</button></td>
                 </tr>`;
             }
             html += '</tbody></table>';
             content.innerHTML = html;
         })
         .catch(e => {
-            content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);">Fejl: ${e.message}</div>`;
+            content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);">${_('issues_error')}: ${e.message}</div>`;
         });
 }
 
@@ -2762,22 +2787,14 @@ function useIssueAsTask(encoded) {
     const prompt = document.getElementById('promptInput');
     const template = document.getElementById('templateSelect');
     const templateLabel = document.getElementById('templateLabel');
-    const promptText = `${issue.id}: ${issue.title}\n\n${issue.description || ''}\n\nLocation: ${issue.location || '—'}\nImpact: ${issue.impact || '—'}\n\nForeslået fix: ${issue.proposed_fix || '—'}`;
+    const promptText = `${issue.id}: ${issue.title}\n\n${issue.description || ''}\n\n${_('issues_detail_location')} ${issue.location || '—'}\n${_('issues_detail_impact')} ${issue.impact || '—'}\n\n${_('issues_detail_fix')} ${issue.proposed_fix || '—'}`;
     prompt.value = promptText;
-    if (issue.type === 'bug' || issue.type === 'security') {
-        template.value = 'bugfix';
-    } else if (issue.type === 'architecture') {
-        template.value = 'refactor';
-    } else if (issue.type === 'testing') {
-        template.value = 'testgenerering';
-    } else {
-        template.value = 'fri';
-    }
+    template.value = 'issue_handler';
     addLogEntry('INFO', `${_('prompt_filled_from')} ${issue.id}`, issue.title);
 }
 
 async function deleteIssue(issueId) {
-    if (!confirm(`Slet issue ${issueId}?`)) return;
+    if (!confirm(_('issues_delete_confirm').replace('{id}', issueId))) return;
     try {
         const resp = await fetch(`/api/issues/${issueId}`, { method: 'DELETE' });
         const data = await resp.json();

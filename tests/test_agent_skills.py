@@ -7,7 +7,8 @@ class TestTemplateTools:
         from agent_skills import TEMPLATE_TOOLS
         expected = {"resume", "kodeanalyse", "diffanalyse", "fri",
                     "agenten", "programmering", "python-arkitektur",
-                    "billedanalyse", "bugfix", "refactor", "testgenerering"}
+                    "billedanalyse", "bugfix", "refactor", "testgenerering",
+                    "issue_handler"}
         assert set(TEMPLATE_TOOLS.keys()) == expected
 
     def test_fri_is_none(self):

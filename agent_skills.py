@@ -25,6 +25,12 @@ TEMPLATE_TOOLS = {
     "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_chunk", "write_file", "edit_file", "list_files"],
     "refactor": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue"],
     "testgenerering": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue", "update_issue_status"],
+    "issue_handler": [
+        "read_issue", "update_issue_status", "run_tests",
+        "read_chunk", "list_chunks", "list_files",
+        "edit_file", "write_file",
+        "create_issue",
+    ],
 }
 
 TEMPLATE_TASK_TOOLS = {
@@ -53,6 +59,13 @@ TEMPLATE_TASK_TOOLS = {
         "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_chunk", "create_issue"],
         "implementering": ["edit_file", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
         "verifikation": ["run_tests", "edit_file", "list_files", "list_chunks", "read_chunk", "create_issue"],
+    },
+    "issue_handler": {
+        "læs": ["read_issue", "list_files"],
+        "afklar": ["read_issue", "update_issue_status"],
+        "verificer": ["read_issue", "run_tests", "list_files", "list_chunks", "read_chunk"],
+        "luk": ["update_issue_status"],
+        "fix": ["read_issue", "read_chunk", "list_chunks", "edit_file", "run_tests", "list_files"],
     },
 }
 
@@ -95,9 +108,9 @@ SECTION_INSTRUCTIONS = {
         "Eksport\u00e9r": "Skriv den fulde analyse til en .md fil. Brug write_file til at gemme i ./exports/billedanalyse_{timestamp}.md. Filen skal indeholde alle sektioner samlet. Brug formatet:\n\n# Billedanalyse\n\n## Beskrivelse\n...\n\n## Kontekst\n...\n\n## Detaljer\n...\n\n## Vurdering\n...",
     },
     "bugfix": {
-        "Analyse": "Læs issue med read_issue(). Forstå hvad bug'en er og hvilken kode der skal ændres. Læs den relevante kildekode med read_chunk(). Forstå rodårsagen. Verificér at fejlen stadig findes — hvis koden allerede er rettet, opdater issue-status til 'resolved' med update_issue_status() og afslut med <<<DONE>>>. SKRIV IKKE til filer — kun analyse. Opret et issue med create_issue() hvis du opdager en ny fejl i koden eller data der skal rettes.",
+        "Analyse": "Læs issue med read_issue(). Hvis issue'et dækker FLERE selvstændige fejl (f.eks. '5 endpoints'), opret da separate issues med create_issue() — ét issue per endpoint/fejl. Forstå koden med read_chunk(). Verificér at fejlen stadig findes. Hvis koden allerede er rettet, opdater issue-status til 'resolved' og afslut. SKRIV IKKE til filer — kun analyse.",
         "Test (Red)": "Skriv en pytest der fanger bug'en. Opret en ny testfil med write_file (testfilen findes ikke i forvejen). Kør testen med run_tests() — den SKAL fejle (rød fase). Hvis testen består (i stedet for at fejle), er bug'en allerede fikset — opdater issue-status til 'resolved' og afslut med <<<DONE>>>.",
-        "Implementering": "Ret kildekoden med den mindst mulige ændring. Brug read_chunk til at læse filen og find den PRÆCISE tekst der skal ændres — kopiér teksten direkte ind i edit_file's old_text med samme indentering, samme quotes, samme linjeafslutninger. Brug IKKE write_file — filen findes allerede.",
+        "Implementering": "Ret kildekoden med den mindst mulige ændring. Brug read_chunk til at læse filen og kopiér tekst direkte ind i edit_file's old_text — brug PRÆCIS de tegn filen indeholder. Brug IKKE write_file — filen findes allerede.",
         "Verifikation (Green)": "Kør testen igen med run_tests() — den SKAL bestå (grøn fase). Kør HELE testsuiten med run_tests() for at verificere ingen regressions.",
         "Opdatering": "Opdater issue-status til 'resolved' med update_issue_status(). Tilføj en kort resolution_note om hvad der blev fikset.",
     },
@@ -113,6 +126,13 @@ SECTION_INSTRUCTIONS = {
         "Test (Red)": "Skriv pytest-tests for den manglende dækning. Opret en NY testfil med write_file (testfilen må ikke findes i forvejen). Kør testen med run_tests() — den SKAL bestå (grøn fase). Hvis testen fejler, ret koden med edit_file og genkør.",
         "Implementering": "Hvis produktionskoden skal ændres for at gøres testbar, brug edit_file til målrettede ændringer. Brug IKKE write_file — produktionsfilen findes allerede.",
         "Verifikation (Green)": "Kør HELE testsuiten med run_tests() for at verificere ingen regressions. Opdater issue-status til 'resolved' med update_issue_status() hvis et TST-issue blev løst.",
+    },
+    "issue_handler": {
+        "Læs": "Læs den tildelte issue med read_issue(). Forstå beskrivelse, location, impact og proposed_fix. Du må IKKE læse kildekode eller redigere filer i dette trin. Brug KUN read_issue(). Afslut med <<<DONE>>>.",
+        "Afklar & Opdater": "Analyser issue-teksten. Hvis der mangler detaljer (præcis location, acceptance criteria, repro steps), opdater da issue med update_issue_status() og tilføj en resolution_note med de nye detaljer. Afslut med <<<DONE>>>.",
+        "Verificer": "Kør run_tests() for at bekræfte at testsuiten kører. Læs den relevante kildekode med read_chunk(). Verificér om fejlen stadig eksisterer. Hvis fejlen ALLEREDE er løst: opdater issue-status til 'resolved' med update_issue_status() og afslut med <<<DONE>>>. Hvis fejlen stadig findes: afslut med <<<DONE>>> og fortsæt til Fix.",
+        "Luk Issue": "Fejlen blev ikke reproduceret. Opdater issue-status til 'resolved' med update_issue_status() og tilføj en resolution_note om at fejlen ikke kunne reproduceres. Afslut med <<<DONE>>>.",
+        "Fix": "Læs kildekoden med read_chunk(). Ret fejlen med edit_file(). Kør run_tests() for at bekræfte rettelsen. Opdater issue-status til 'resolved' med update_issue_status() og tilføj en resolution_note. Afslut med <<<DONE>>>.",
     },
 }
 
@@ -206,5 +226,10 @@ def get_templates(agent):
             "name": t(K.T_TESTGENERERING, agent.lang),
             "prompt": t(K.TP_TESTGENERERING, agent.lang),
             "fallback": t(K.TF_TESTGENERERING, agent.lang),
+        },
+        "issue_handler": {
+            "name": t(K.T_ISSUE_HANDLER, agent.lang),
+            "prompt": t(K.TP_ISSUE_HANDLER, agent.lang),
+            "fallback": t(K.TF_ISSUE_HANDLER, agent.lang),
         },
     }

@@ -81,7 +81,10 @@ def read_issue(issue_id):
     data = _load_issues()
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
-            return {"success": True, "issue": issue}
+            result = {"success": True, "issue": dict(issue)}
+            # Ensure acceptance_criteria is shown even if empty
+            result["issue"].setdefault("acceptance_criteria", "")
+            return result
     available = [i["id"] for i in data.get("issues", [])]
     return {"success": False, "error": f"Issue '{issue_id}' not found. Available: {available}"}
 
@@ -146,8 +149,14 @@ def create_refactor_issue(agent, filepath, line_count, related_issues=None):
     return {"success": True, "issue": issue, "existing": False}
 
 
-def create_issue(agent, title, type="bug", severity="medium", description="", location="", impact="", proposed_fix=""):
+def create_issue(agent, title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="", acceptance_criteria=""):
     data = _load_issues()
+    # Normalize location to filename format
+    if location:
+        if ":" in location:
+            location = location.split(":")[0].strip()
+        else:
+            location = location.split()[0].strip("`")
     title_lower = title.lower()
     title_keywords = {w for w in title_lower.split() if len(w) > 3}
     for i in data.get("issues", []):
@@ -174,6 +183,7 @@ def create_issue(agent, title, type="bug", severity="medium", description="", lo
         "location": location,
         "impact": impact,
         "proposed_fix": proposed_fix,
+        "acceptance_criteria": acceptance_criteria,
         "status": "open",
     }
     data["issues"].append(issue)

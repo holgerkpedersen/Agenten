@@ -22,6 +22,20 @@ import json
 import subprocess
 
 
+def _extract_filenames(location):
+    filenames = []
+    if not location:
+        return filenames
+    if ":" in location:
+        filenames.append(location.split(":")[0].strip())
+    else:
+        for part in location.split(","):
+            part = part.strip().split()[0].strip("`'\"")
+            if part.endswith(".py"):
+                filenames.append(part)
+    return filenames
+
+
 class Agent:
     def __init__(self):
         self.llm = LMStudioWrapper(timeout=600, model="qwen/qwen3.5-9b")
@@ -218,9 +232,9 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "create_issue",
-            "Opret et nyt issue i issues.json når agenten opdager en fejl i kode eller data. Kræver: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location, impact, proposed_fix. Valgfri felter kan sendes som tomme strenge.",
-            ["title", "type", "severity", "description", "location", "impact", "proposed_fix"],
-            lambda title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="": agent_issues.create_issue(self, title=title, type=type, severity=severity, description=description, location=location, impact=impact, proposed_fix=proposed_fix)
+            "Opret et nyt issue i issues.json. ÉT issue = ÉN specifik fejl (ikke flere endpoints samlet). Kræver: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location (format: filnavn:funktionsnavn), impact, proposed_fix. acceptance_criteria: beskriv præcist hvordan fixet verificeres (f.eks. 'Endpoint returnerer 403 ved ../ i stien').",
+            ["title", "type", "severity", "description", "location", "impact", "proposed_fix", "acceptance_criteria"],
+            lambda title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="", acceptance_criteria="": agent_issues.create_issue(self, title=title, type=type, severity=severity, description=description, location=location, impact=impact, proposed_fix=proposed_fix, acceptance_criteria=acceptance_criteria)
         ))
 
     def _add_image(self, path):
@@ -350,7 +364,7 @@ class Agent:
         self.file_context = files or []
         self.file_chunks = {}
 
-        if template == "bugfix" and not files:
+        if template in ("bugfix", "issue_handler") and not files:
             issue_match = re.search(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)', prompt)
             if issue_match:
                 issue_id = issue_match.group(1)
@@ -362,18 +376,17 @@ class Agent:
                         for issue in issues_data.get("issues", []):
                             if issue.get("id", "").lower() == issue_id.lower():
                                 location = issue.get("location", "")
-                                if ":" in location:
-                                    filename = location.split(":")[0].strip()
-                                    base_dir = os.path.dirname(os.path.abspath(__file__))
-                                    for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
-                                        if os.path.exists(path):
-                                            content = self._read_file_content(path)
-                                            if content:
-                                                files = [{"filename": filename, "content": content, "path": path}]
-                                                self.file_context = files
-                                                self._log("INFO", f"Auto-loaded fil fra {issue_id}", path)
-                                            break
-                                break
+                                filenames = _extract_filenames(location)
+                                for filename in filenames:
+                                    if filename.endswith('.py'):
+                                        base_dir = os.path.dirname(os.path.abspath(__file__))
+                                        for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
+                                            if os.path.exists(path):
+                                                content = self._read_file_content(path)
+                                                if content:
+                                                    files.append({"filename": filename, "content": content, "path": path})
+                                                    self._log("INFO", f"Auto-loaded fil fra {issue_id}", path)
+                                                break
                 except Exception as e:
                     self._log("WARNING", "Kunne ikke auto-loade issue-fil", str(e))
 

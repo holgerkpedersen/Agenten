@@ -47,7 +47,13 @@ def serve_upload(filename):
 @app.route("/preview-exports/<path:filename>")
 def preview_export(filename):
     import re
-    filepath = os.path.join(export_folder or os.path.join(BASE_DIR, "exports"), filename)
+    base = export_folder or os.path.join(BASE_DIR, "exports")
+    filepath = os.path.join(base, filename)
+    
+    # Security check: Path Traversal Prevention (SEC-013)
+    if not _is_safe_path(base, filepath):
+        return "<h2>Access denied</h2>", 403
+        
     if not os.path.exists(filepath):
         return "<h2>File not found</h2>", 404
     with open(filepath, encoding="utf-8") as f:
@@ -146,6 +152,8 @@ def save_to_folder():
         os.makedirs(path, exist_ok=True)
         safe_filename = "".join(c for c in filename if c.isalnum() or c in '._- ')
         filepath = os.path.join(path, safe_filename)
+        if not _is_safe_path(BASE_DIR, filepath):
+            return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(content)
         return jsonify({"success": True, "filepath": filepath})
@@ -158,6 +166,8 @@ def list_folder_contents():
     folder_path = data.get("path", export_folder)
     if not folder_path or not os.path.exists(folder_path):
         return jsonify({"success": False, "error": t(K.ERR_FOLDER_NOT_FOUND, agent.lang)}), 400
+    if not _is_safe_path(BASE_DIR, folder_path):
+        return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
     try:
         items = []
         for item in os.listdir(folder_path):
@@ -177,6 +187,16 @@ import tempfile
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def _is_safe_path(base_dir, target_path):
+    """Ensures that target_path resolves within base_dir to prevent path traversal."""
+    try:
+        real_base = os.path.realpath(base_dir)
+        # For non-existent paths (e.g., saving), resolve what we can.
+        real_target = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
+        return real_target.startswith(real_base + os.sep) or real_target == real_base
+    except Exception:
+        return False
 
 @app.route("/api/file/upload", methods=["POST"])
 def upload_file():
@@ -202,6 +222,9 @@ def read_file():
     
     if not filepath:
         return jsonify({"success": False, "error": t(K.ERR_NO_PATH, agent.lang)}), 400
+    
+    if not _is_safe_path(BASE_DIR, filepath):
+        return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
     
     try:
         if not os.path.exists(filepath):
@@ -298,6 +321,9 @@ def list_python_files():
     
     if not os.path.exists(folder_path):
         return jsonify({"success": False, "error": t(K.ERR_FOLDER_NOT_FOUND, agent.lang)}), 404
+    
+    if not _is_safe_path(BASE_DIR, folder_path):
+        return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
     
     try:
         python_files = []

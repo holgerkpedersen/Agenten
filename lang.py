@@ -19,6 +19,7 @@ LANG = {
             "bugfix": "🐛 Bugfix (TDD)",
             "refactor": "🔧 Refaktorering",
             "testgenerering": "🧪 Testgenerering",
+            "issue_handler": "🔷 Issue Håndtering",
         },
         "template_prompts": {
             "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
@@ -83,6 +84,17 @@ Opgave: {prompt}""",
 Returnér KUN træstrukturen med 2 mellemrum per niveau.
 
 Opgave: {prompt}""",
+            "issue_handler": """Du skal håndtere en issue. Følg disse faser slavisk i rækkefølge:
+
+1. Læs — læs issue med read_issue. Forstå problemet. Du må IKKE læse kildekode.
+2. Afklar & Opdater — analysér issue. Opdater med update_issue_status hvis detaljer mangler.
+3. Verificer — kør tests og læs kildekode for at bekræfte om fejlen stadig findes.
+4. Hvis fejlen IKKE findes → Luk Issue med update_issue_status('resolved')
+5. Hvis fejlen findes → Fix med edit_file og kør tests igen
+
+Returnér KUN træstrukturen med 2 mellemrum per niveau.
+
+Opgave: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overblik", "Nøglepunkter", "Konklusion", "Anbefalinger"],
@@ -95,6 +107,7 @@ Opgave: {prompt}""",
             "bugfix": ["Analyse", "Test (Red)", "Implementering", "Verifikation (Green)", "Opdatering"],
             "refactor": ["Analyse", "Plan", "Ekstraher", "Opdatér", "Test"],
             "testgenerering": ["Analyse", "Test (Red)", "Implementering", "Verifikation (Green)"],
+            "issue_handler": ["Læs", "Afklar & Opdater", "Verificer", "Luk Issue", "Fix"],
         },
         "fallback_tree": {
             "understand_purpose": "Forstå filens formål",
@@ -401,6 +414,27 @@ Opgave: {prompt}""",
             "session.demo_math_fact": "2 + 2 = 4 er sandt per definition af addition",
             "session.demo_optimization": "Token-forbrug kan reduceres med caching, komprimering og mindre modeller",
             "session.demo_knowledge_header": "## 🧠 Tidligere erfaringer fra denne session:\n",
+            "issues_title": "🐛 Issues",
+            "issues_none": "Ingen issues fundet.",
+            "issues_location": "Sted:",
+            "issues_impact": "Impact:",
+            "issues_proposed_fix": "Forslag:",
+            "issues_resolution": "Løsning:",
+            "issues_acceptance": "Acceptance criteria:",
+            "issues_run": "🚀 Kør",
+            "issues_delete": "✕",
+            "issues_delete_title": "Slet issue",
+            "issues_delete_confirm": "Slet issue {id}?",
+            "issues_use_as_task": "Brug som opgave",
+            "issues_detail_location": "Location:",
+            "issues_detail_impact": "Impact:",
+            "issues_detail_fix": "Foreslået fix:",
+            "issues_table_title": "Titel",
+            "issues_table_type": "Type",
+            "issues_table_status": "Status",
+            "issues_table_priority": "Prioritet",
+            "loading": "Indlæser...",
+            "issues_error": "Fejl",
         },
     },
 
@@ -422,6 +456,7 @@ Opgave: {prompt}""",
             "bugfix": "🐛 Bugfix (TDD)",
             "refactor": "🔧 Refactoring",
             "testgenerering": "🧪 Test Generation",
+            "issue_handler": "🔷 Issue Handler",
         },
         "template_prompts": {
             "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
@@ -486,6 +521,17 @@ Task: {prompt}""",
 Return ONLY the tree structure with 2 spaces per level.
 
 Task: {prompt}""",
+            "issue_handler": """You must handle an issue. Follow these phases strictly in order:
+
+1. Read — read the issue with read_issue. Understand the problem. You MUST NOT read source code.
+2. Clarify & Update — analyze the issue. Update with update_issue_status if details are missing.
+3. Verify — run tests and read source code to confirm if the bug still exists.
+4. If bug does NOT exist → Close Issue with update_issue_status('resolved')
+5. If bug exists → Fix with edit_file and run tests again
+
+Return ONLY the tree structure with 2 spaces per level.
+
+Task: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Overview", "Key Points", "Conclusion", "Recommendations"],
@@ -498,6 +544,7 @@ Task: {prompt}""",
             "bugfix": ["Analysis", "Test (Red)", "Implementation", "Verification (Green)", "Update"],
             "refactor": ["Analysis", "Plan", "Extract", "Update", "Test"],
             "testgenerering": ["Analysis", "Test (Red)", "Implementation", "Verification (Green)"],
+            "issue_handler": ["Read", "Clarify & Update", "Verify", "Close Issue", "Fix"],
         },
         "fallback_tree": {
             "understand_purpose": "Understand file purpose",
@@ -803,6 +850,27 @@ Task: {prompt}""",
             "session.demo_math_fact": "2 + 2 = 4 is true by definition of addition",
             "session.demo_optimization": "Token usage can be reduced with caching, compression, and smaller models",
             "session.demo_knowledge_header": "## 🧠 Previous experiences from this session:\n",
+            "issues_title": "🐛 Issues",
+            "issues_none": "No issues found.",
+            "issues_location": "Location:",
+            "issues_impact": "Impact:",
+            "issues_proposed_fix": "Proposed fix:",
+            "issues_resolution": "Resolution:",
+            "issues_acceptance": "Acceptance criteria:",
+            "issues_run": "🚀 Run",
+            "issues_delete": "✕",
+            "issues_delete_title": "Delete issue",
+            "issues_delete_confirm": "Delete issue {id}?",
+            "issues_use_as_task": "Use as task",
+            "issues_detail_location": "Location:",
+            "issues_detail_impact": "Impact:",
+            "issues_detail_fix": "Proposed fix:",
+            "issues_table_title": "Title",
+            "issues_table_type": "Type",
+            "issues_table_status": "Status",
+            "issues_table_priority": "Priority",
+            "loading": "Loading...",
+            "issues_error": "Error",
         },
     },
 
@@ -824,6 +892,7 @@ Task: {prompt}""",
             "bugfix": "🐛 Bugfix (TDD)",
             "refactor": "🔧 Refactorización",
             "testgenerering": "🧪 Generación de Pruebas",
+            "issue_handler": "🔷 Manejador de Issues",
         },
         "template_prompts": {
             "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
@@ -888,6 +957,17 @@ Tarea: {prompt}""",
 Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
 
 Tarea: {prompt}""",
+            "issue_handler": """Debes manejar un issue. Sigue estas fases estrictamente en orden:
+
+1. Leer — lee el issue con read_issue. Entiende el problema. NO debes leer código fuente.
+2. Clarificar y Actualizar — analiza el issue. Actualiza con update_issue_status si faltan detalles.
+3. Verificar — ejecuta pruebas y lee código fuente para confirmar si el bug aún existe.
+4. Si el bug NO existe → Cierra Issue con update_issue_status('resolved')
+5. Si el bug existe → Arregla con edit_file y ejecuta pruebas de nuevo
+
+Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
+
+Tarea: {prompt}""",
         },
         "template_fallback": {
             "resume": ["Descripción General", "Puntos Clave", "Conclusión", "Recomendaciones"],
@@ -900,6 +980,7 @@ Tarea: {prompt}""",
             "bugfix": ["Análisis", "Prueba (Red)", "Implementación", "Verificación (Green)", "Actualización"],
             "refactor": ["Análisis", "Plan", "Extraer", "Actualizar", "Probar"],
             "testgenerering": ["Análisis", "Prueba (Red)", "Implementación", "Verificación (Green)"],
+            "issue_handler": ["Leer", "Clarificar y Actualizar", "Verificar", "Cerrar Issue", "Arreglar"],
         },
         "fallback_tree": {
             "understand_purpose": "Entender el propósito del archivo",
@@ -1205,6 +1286,27 @@ Tarea: {prompt}""",
             "session.demo_math_fact": "2 + 2 = 4 es verdadero por definición de la suma",
             "session.demo_optimization": "El uso de tokens se puede reducir con caché, compresión y modelos más pequeños",
             "session.demo_knowledge_header": "## 🧠 Experiencias previas de esta sesión:\n",
+            "issues_title": "🐛 Issues",
+            "issues_none": "No se encontraron issues.",
+            "issues_location": "Ubicación:",
+            "issues_impact": "Impacto:",
+            "issues_proposed_fix": "Solución propuesta:",
+            "issues_resolution": "Resolución:",
+            "issues_acceptance": "Criterios de aceptación:",
+            "issues_run": "🚀 Ejecutar",
+            "issues_delete": "✕",
+            "issues_delete_title": "Eliminar issue",
+            "issues_delete_confirm": "¿Eliminar issue {id}?",
+            "issues_use_as_task": "Usar como tarea",
+            "issues_detail_location": "Location:",
+            "issues_detail_impact": "Impact:",
+            "issues_detail_fix": "Solución propuesta:",
+            "issues_table_title": "Título",
+            "issues_table_type": "Tipo",
+            "issues_table_status": "Estado",
+            "issues_table_priority": "Prioridad",
+            "loading": "Cargando...",
+            "issues_error": "Error",
         },
     },
 
@@ -1226,6 +1328,7 @@ Tarea: {prompt}""",
             "bugfix": "🐛 Bugfix (TDD)",
             "refactor": "🔧 重构",
             "testgenerering": "🧪 测试生成",
+            "issue_handler": "🔷 Issue 处理",
         },
         "template_prompts": {
             "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
@@ -1290,6 +1393,17 @@ Tarea: {prompt}""",
 只返回树形结构，每级使用2个空格。
 
 任务：{prompt}""",
+            "issue_handler": """你必须处理一个Issue。严格遵守以下阶段顺序：
+
+1. 读取 — 使用read_issue读取issue。理解问题。不得阅读源代码。
+2. 澄清和更新 — 分析issue。如果缺少详细信息，使用update_issue_status更新。
+3. 验证 — 运行测试并阅读源代码以确认bug是否仍然存在。
+4. 如果bug不存在 → 使用update_issue_status('resolved')关闭Issue
+5. 如果bug存在 → 使用edit_file修复并重新运行测试
+
+只返回树形结构，每级使用2个空格。
+
+任务：{prompt}""",
         },
         "template_fallback": {
             "resume": ["概述", "要点", "结论", "建议"],
@@ -1302,6 +1416,7 @@ Tarea: {prompt}""",
             "bugfix": ["分析", "测试 (Red)", "实施", "验证 (Green)", "更新"],
             "refactor": ["分析", "计划", "提取", "更新", "测试"],
             "testgenerering": ["分析", "测试 (Red)", "实施", "验证 (Green)"],
+            "issue_handler": ["读取", "澄清和更新", "验证", "关闭 Issue", "修复"],
         },
         "fallback_tree": {
             "understand_purpose": "理解文件目的",
@@ -1607,6 +1722,27 @@ Tarea: {prompt}""",
             "session.demo_math_fact": "2 + 2 = 4 根据加法定义成立",
             "session.demo_optimization": "令牌使用可通过缓存、压缩和更小的模型减少",
             "session.demo_knowledge_header": "## 🧠 此会话的先前经验：\n",
+            "issues_title": "🐛 Issues",
+            "issues_none": "未找到问题。",
+            "issues_location": "位置：",
+            "issues_impact": "影响：",
+            "issues_proposed_fix": "建议修复：",
+            "issues_resolution": "解决方案：",
+            "issues_acceptance": "验收标准：",
+            "issues_run": "🚀 运行",
+            "issues_delete": "✕",
+            "issues_delete_title": "删除问题",
+            "issues_delete_confirm": "删除问题 {id}？",
+            "issues_use_as_task": "用作任务",
+            "issues_detail_location": "Location:",
+            "issues_detail_impact": "Impact:",
+            "issues_detail_fix": "建议修复：",
+            "issues_table_title": "标题",
+            "issues_table_type": "类型",
+            "issues_table_status": "状态",
+            "issues_table_priority": "优先级",
+            "loading": "加载中...",
+            "issues_error": "错误",
         },
     },
 }

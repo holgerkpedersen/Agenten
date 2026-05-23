@@ -281,6 +281,18 @@ def write_file(path, content):
         return {"success": False, "error": str(e)}
 
 
+def _build_flexible_pattern(text):
+    lines = text.split('\n')
+    parts = []
+    for line in lines:
+        stripped = line.lstrip()
+        if stripped:
+            parts.append(r'[ \t]*' + re.escape(stripped))
+        else:
+            parts.append(r'[ \t]*')
+    return r'\n'.join(parts), len(lines)
+
+
 def edit_file(path, old_text, new_text):
     try:
         if not os.path.exists(path):
@@ -292,12 +304,21 @@ def edit_file(path, old_text, new_text):
         norm = content.replace('\r\n', '\n')
         count = norm.count(search)
         if count == 0:
-            return {"success": False, "error": f"Teksten blev ikke fundet i {path}"}
-        if count > 1:
-            return {"success": False, "error": f"Teksten fundet {count} gange — brug en mere specifik søgestreng"}
+            pattern, nlines = _build_flexible_pattern(search)
+            m = re.search(pattern, norm)
+            if not m:
+                return {"success": False, "error": f"Teksten blev ikke fundet i {path}"}
+            matches = list(re.finditer(pattern, norm))
+            if len(matches) > 1:
+                return {"success": False, "error": f"Teksten fundet {len(matches)} gange — brug en mere specifik søgestreng"}
+            idx = m.start()
+            search_len = len(m.group())
+        else:
+            if count > 1:
+                return {"success": False, "error": f"Teksten fundet {count} gange — brug en mere specifik søgestreng"}
+            idx = norm.index(search)
+            search_len = len(search)
 
-        idx = norm.index(search)
-        search_len = len(search)
         exact_old = content[idx:idx + search_len]
         if exact_old.count('\n') != search.count('\n'):
             lines = search.split('\n')
