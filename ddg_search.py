@@ -75,3 +75,10 @@ def search_ddg(query: str, max_results: int = 5) -> List[Dict]:
 
 def websearch(query: str, max_results: Optional[int] = None) -> List[Dict]:
     return search_ddg(query, max_results or MAX_RESULTS)
+
+
+def evaluate_techstack(tech_name):
+    robust = ["React", "Flask", "FastAPI", "PostgreSQL", "Redis", "Docker"]
+    if tech_name in robust:
+        return "robust"
+    return "ukendt"
