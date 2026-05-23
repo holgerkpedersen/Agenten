@@ -122,6 +122,12 @@ def load_model(model_key, parallel=4, identifier=None, callback=None):
         return False, f'lms not found at {LMS_PATH}'
 
     resolved = resolve_model_key(model_key)
+
+    # SEC-004 Fix: Validate model key against available models to prevent command injection
+    available_models = get_available_models()
+    if not available_models or resolved not in available_models:
+        return False, f'Invalid model key: {resolved}'
+
     if callback:
         callback(f'Loading {resolved}...')
 
