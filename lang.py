@@ -87,10 +87,9 @@ Opgave: {prompt}""",
             "issue_handler": """Du skal håndtere en issue. Følg disse faser slavisk i rækkefølge:
 
 1. Læs — læs issue med read_issue. Forstå problemet. Du må IKKE læse kildekode.
-2. Afklar & Opdater — analysér issue. Opdater med update_issue_status hvis detaljer mangler.
-3. Verificer — kør tests og læs kildekode for at bekræfte om fejlen stadig findes.
-4. Hvis fejlen IKKE findes → Luk Issue med update_issue_status('resolved')
-5. Hvis fejlen findes → Fix med edit_file og kør tests igen
+2. Afklar — analysér issue, læs kildekode med read_chunk, kør tests. Opdater med update_issue_status hvis detaljer mangler. Hvis fejlen ALLEREDE er løst: markér resolved og stop.
+3. Fix — ret fejlen med edit_file, kør tests. Må IKKE markere resolved — det gøres i næste fase.
+4. Luk Issue — bekræft at fix og tests er OK, opdater status til 'resolved' med præcis resolution_note.
 
 Returnér KUN træstrukturen med 2 mellemrum per niveau.
 
@@ -107,7 +106,7 @@ Opgave: {prompt}""",
             "bugfix": ["Analyse", "Test (Red)", "Implementering", "Verifikation (Green)", "Opdatering"],
             "refactor": ["Analyse", "Plan", "Ekstraher", "Opdatér", "Test"],
             "testgenerering": ["Analyse", "Test (Red)", "Implementering", "Verifikation (Green)"],
-            "issue_handler": ["Læs", "Afklar & Opdater", "Verificer", "Luk Issue", "Fix"],
+            "issue_handler": ["Læs", "Afklar", "Fix", "Luk Issue"],
         },
         "fallback_tree": {
             "understand_purpose": "Forstå filens formål",
@@ -524,10 +523,9 @@ Task: {prompt}""",
             "issue_handler": """You must handle an issue. Follow these phases strictly in order:
 
 1. Read — read the issue with read_issue. Understand the problem. You MUST NOT read source code.
-2. Clarify & Update — analyze the issue. Update with update_issue_status if details are missing.
-3. Verify — run tests and read source code to confirm if the bug still exists.
-4. If bug does NOT exist → Close Issue with update_issue_status('resolved')
-5. If bug exists → Fix with edit_file and run tests again
+2. Clarify — analyze the issue, read source with read_chunk, run tests. Update with update_issue_status if details missing. If bug is ALREADY fixed: mark resolved and stop.
+3. Fix — fix with edit_file, run tests. Do NOT mark resolved — the next phase handles that.
+4. Close Issue — confirm fix and tests pass, update status to 'resolved' with precise resolution_note.
 
 Return ONLY the tree structure with 2 spaces per level.
 
@@ -544,7 +542,7 @@ Task: {prompt}""",
             "bugfix": ["Analysis", "Test (Red)", "Implementation", "Verification (Green)", "Update"],
             "refactor": ["Analysis", "Plan", "Extract", "Update", "Test"],
             "testgenerering": ["Analysis", "Test (Red)", "Implementation", "Verification (Green)"],
-            "issue_handler": ["Read", "Clarify & Update", "Verify", "Close Issue", "Fix"],
+            "issue_handler": ["Read", "Clarify", "Fix", "Close Issue"],
         },
         "fallback_tree": {
             "understand_purpose": "Understand file purpose",
@@ -960,10 +958,9 @@ Tarea: {prompt}""",
             "issue_handler": """Debes manejar un issue. Sigue estas fases estrictamente en orden:
 
 1. Leer — lee el issue con read_issue. Entiende el problema. NO debes leer código fuente.
-2. Clarificar y Actualizar — analiza el issue. Actualiza con update_issue_status si faltan detalles.
-3. Verificar — ejecuta pruebas y lee código fuente para confirmar si el bug aún existe.
-4. Si el bug NO existe → Cierra Issue con update_issue_status('resolved')
-5. Si el bug existe → Arregla con edit_file y ejecuta pruebas de nuevo
+2. Clarificar — analiza el issue, lee código con read_chunk, ejecuta pruebas. Actualiza con update_issue_status si faltan detalles. Si el bug YA está arreglado: marca resolved y detente.
+3. Arreglar — arregla con edit_file, ejecuta pruebas. NO marques resolved — la siguiente fase lo hace.
+4. Cerrar Issue — confirma que el arreglo y pruebas están OK, actualiza estado a 'resolved' con nota precisa.
 
 Devuelve SOLO la estructura de árbol con 2 espacios por nivel.
 
@@ -980,7 +977,7 @@ Tarea: {prompt}""",
             "bugfix": ["Análisis", "Prueba (Red)", "Implementación", "Verificación (Green)", "Actualización"],
             "refactor": ["Análisis", "Plan", "Extraer", "Actualizar", "Probar"],
             "testgenerering": ["Análisis", "Prueba (Red)", "Implementación", "Verificación (Green)"],
-            "issue_handler": ["Leer", "Clarificar y Actualizar", "Verificar", "Cerrar Issue", "Arreglar"],
+            "issue_handler": ["Leer", "Clarificar", "Arreglar", "Cerrar Issue"],
         },
         "fallback_tree": {
             "understand_purpose": "Entender el propósito del archivo",
@@ -1396,10 +1393,9 @@ Tarea: {prompt}""",
             "issue_handler": """你必须处理一个Issue。严格遵守以下阶段顺序：
 
 1. 读取 — 使用read_issue读取issue。理解问题。不得阅读源代码。
-2. 澄清和更新 — 分析issue。如果缺少详细信息，使用update_issue_status更新。
-3. 验证 — 运行测试并阅读源代码以确认bug是否仍然存在。
-4. 如果bug不存在 → 使用update_issue_status('resolved')关闭Issue
-5. 如果bug存在 → 使用edit_file修复并重新运行测试
+2. 澄清 — 分析issue，使用read_chunk阅读源代码，运行测试。如果缺少详细信息，使用update_issue_status更新。如果bug已修复：标记resolved并停止。
+3. 修复 — 使用edit_file修复，运行测试。不要标记resolved — 下一阶段处理。
+4. 关闭 Issue — 确认修复和测试通过，使用精确的resolution_note将状态更新为'resolved'。
 
 只返回树形结构，每级使用2个空格。
 
@@ -1416,7 +1412,7 @@ Tarea: {prompt}""",
             "bugfix": ["分析", "测试 (Red)", "实施", "验证 (Green)", "更新"],
             "refactor": ["分析", "计划", "提取", "更新", "测试"],
             "testgenerering": ["分析", "测试 (Red)", "实施", "验证 (Green)"],
-            "issue_handler": ["读取", "澄清和更新", "验证", "关闭 Issue", "修复"],
+            "issue_handler": ["读取", "澄清", "修复", "关闭 Issue"],
         },
         "fallback_tree": {
             "understand_purpose": "理解文件目的",

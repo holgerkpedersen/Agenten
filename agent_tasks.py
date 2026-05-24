@@ -20,10 +20,10 @@ PHASE_ALIASES = {
     "læs": "læs", "read": "læs",
     "afklar": "afklar", "clarify": "afklar",
     "afklar & opdater": "afklar", "clarify & update": "afklar",
-    "verificer": "verificer", "verify": "verificer",
+    "verificer": "afklar", "verify": "afklar",
+    "fix": "fix",
     "luk": "luk", "close": "luk",
     "luk issue": "luk", "close issue": "luk",
-    "fix": "fix",
 }
 
 

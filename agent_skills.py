@@ -62,10 +62,9 @@ TEMPLATE_TASK_TOOLS = {
     },
     "issue_handler": {
         "læs": ["read_issue", "list_files"],
-        "afklar": ["read_issue", "update_issue_status"],
-        "verificer": ["read_issue", "run_tests", "list_files", "list_chunks", "read_chunk"],
-        "luk": ["update_issue_status"],
-        "fix": ["read_issue", "read_chunk", "list_chunks", "edit_file", "run_tests", "list_files"],
+        "afklar": ["read_issue", "update_issue_status", "run_tests", "read_chunk", "list_chunks", "list_files"],
+        "fix": ["read_chunk", "edit_file", "run_tests", "list_files"],
+        "luk": ["update_issue_status", "read_issue"],
     },
 }
 
@@ -129,10 +128,9 @@ SECTION_INSTRUCTIONS = {
     },
     "issue_handler": {
         "Læs": "Læs den tildelte issue med read_issue(). Forstå beskrivelse, location, impact og proposed_fix. Du må IKKE læse kildekode eller redigere filer i dette trin. Brug KUN read_issue(). Afslut med <<<DONE>>>.",
-        "Afklar & Opdater": "Analyser issue-teksten. Hvis der mangler detaljer (præcis location, acceptance criteria, repro steps), opdater da issue med update_issue_status() og tilføj en resolution_note med de nye detaljer. Du må IKKE ændre status til 'resolved' i denne fase — kun Verificer- eller Fix-fasen må afslutte et issue. Afslut med <<<DONE>>>.",
-        "Verificer": "Kør run_tests() for at bekræfte at testsuiten kører. Læs den relevante kildekode med read_chunk(). Verificér om fejlen stadig eksisterer. Hvis fejlen ALLEREDE er løst: opdater issue-status til 'resolved' med update_issue_status() og afslut med <<<DONE>>>. Hvis fejlen stadig findes: afslut med <<<DONE>>> og fortsæt til Fix.",
-        "Luk Issue": "Fejlen blev ikke reproduceret. Opdater issue-status til 'resolved' med update_issue_status() og tilføj en resolution_note om at fejlen ikke kunne reproduceres. Afslut med <<<DONE>>>.",
-        "Fix": "Læs kildekoden med read_chunk(). Ret fejlen med edit_file(). Kør run_tests() for at bekræfte rettelsen. Opdater issue-status til 'resolved' med update_issue_status() og tilføj en resolution_note. Afslut med <<<DONE>>>.",
+        "Afklar": "Læs issue med read_issue(). Analyser om der mangler detaljer (præcis location, acceptance criteria, repro steps) — opdater i så fald med update_issue_status() (men må IKKE sætte status='resolved'). Læs den relevante kildekode med read_chunk() og kør run_tests() for at verificere om fejlen stadig eksisterer. Hvis fejlen ALLEREDE er løst: opdater status til 'resolved' med update_issue_status() og afslut med <<<DONE>>>. Hvis fejlen stadig findes: afslut med <<<DONE>>> og fortsæt til Fix.",
+        "Fix": "Læs kildekoden med read_chunk(). Ret fejlen med edit_file() — brug PRÆCIS tekst fra filen. Kør run_tests() for at bekræfte rettelsen OG at ingen tests er gået i stykker. Du må IKKE selv markere issue som resolved — det gøres i Luk Issue. Afslut med <<<DONE>>>.",
+        "Luk Issue": "Bekræft at fix'et er implementeret og tests består. Opdater issue-status til 'resolved' med update_issue_status() og tilføj en PRÆCIS resolution_note: beskriv HVAD der blev ændret, HVORFOR, og bekræft at ALLE tests består. Afslut med <<<DONE>>>.",
     },
 }
 
