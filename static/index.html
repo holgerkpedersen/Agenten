@@ -689,6 +689,9 @@
             <h2 id="issuesModalTitle">${_('issues_title')}</h2>
             <button class="issues-close" onclick="closeIssuesPanel()">✕</button>
         </div>
+        <div id="issuesFilterBar" style="padding:8px 16px 0 16px;display:none;">
+            <input type="text" id="issuesFilterInput" placeholder="Filter..." style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:13px;box-sizing:border-box;">
+        </div>
         <div class="issues-scroll" id="issuesContent">
             <div style="text-align:center;padding:40px;color:var(--text-muted);">Indlæser...</div>
         </div>
@@ -2759,8 +2762,7 @@ function renderIssuesTable() {
         return;
     }
     const arrow = c => issuesSort.column === c ? (issuesSort.dir === 'asc' ? ' &#9650;' : ' &#9660;') : '';
-    let html = `<div style="margin-bottom:8px;"><input type="text" id="issuesFilterInput" placeholder="Filter..." value="${issuesFilter}" oninput="issuesFilter=this.value;renderIssuesTable()" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:13px;box-sizing:border-box;"></div>`;
-    html += `<table class="issues-table"><thead><tr>
+    let html = `<table class="issues-table"><thead><tr>
         <th onclick="sortIssues('id')" style="cursor:pointer;user-select:none;">ID${arrow('id')}</th>
         <th onclick="sortIssues('title')" style="cursor:pointer;user-select:none;">${_('issues_table_title')}${arrow('title')}</th>
         <th onclick="sortIssues('type')" style="cursor:pointer;user-select:none;">${_('issues_table_type')}${arrow('type')}</th>
@@ -2798,14 +2800,17 @@ function renderIssuesTable() {
     }
     html += '</tbody></table>';
     content.innerHTML = html;
-    document.getElementById('issuesFilterInput').focus();
 }
 
 function showIssuesPanel() {
     const modal = document.getElementById('issuesModal');
     const content = document.getElementById('issuesContent');
+    const filterBar = document.getElementById('issuesFilterBar');
+    const filterInput = document.getElementById('issuesFilterInput');
     document.getElementById('issuesModalTitle').textContent = _('issues_title');
     content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">' + _('loading') + '</div>';
+    filterBar.style.display = 'block';
+    filterInput.value = '';
     modal.style.display = 'flex';
     fetch('/api/issues')
         .then(r => r.json())
@@ -2814,14 +2819,24 @@ function showIssuesPanel() {
             issuesSort = { column: null, dir: 'asc' };
             issuesFilter = '';
             renderIssuesTable();
+            filterInput.focus();
         })
         .catch(e => {
+            filterBar.style.display = 'none';
             content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);">${_('issues_error')}: ${e.message}</div>`;
         });
 }
 
+document.addEventListener('input', function(e) {
+    if (e.target.id === 'issuesFilterInput') {
+        issuesFilter = e.target.value;
+        renderIssuesTable();
+    }
+});
+
 function closeIssuesPanel() {
     document.getElementById('issuesModal').style.display = 'none';
+    document.getElementById('issuesFilterBar').style.display = 'none';
 }
 
 function toggleIssueDetail(row) {
