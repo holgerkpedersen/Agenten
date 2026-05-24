@@ -454,7 +454,9 @@ def manage_token():
 
 @app.route("/api/lang/<lang>")
 def get_lang(lang):
-    return jsonify(get_ui_translations(lang))
+    resp = jsonify(get_ui_translations(lang))
+    resp.headers['Cache-Control'] = 'public, max-age=3600'
+    return resp
 
 @app.route("/api/models")
 def get_models():
