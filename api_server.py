@@ -22,6 +22,22 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='/static')
 CORS(app)
 
+# ============ SECURITY CONFIGURATION ============
+def _is_development_mode():
+    """Check if server is running in development mode."""
+    return os.environ.get('DEV_MODE', 'true').lower() == 'true'
+
+@app.before_request
+def check_api_key():
+    """Require API key for all /api/* endpoints unless in dev mode."""
+    if request.path.startswith('/api/') and not _is_development_mode():
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        expected_key = os.environ.get('AGENT_API_KEY', '')
+        
+        # Enforce key only if configured in environment
+        if expected_key and api_key != expected_key:
+            return jsonify({"error": "Unauthorized: Invalid or missing API key"}), 401
+
 agent = Agent()
 session_manager = SessionManager()
 current_session_id = None
