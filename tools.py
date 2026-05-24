@@ -57,7 +57,8 @@ class ToolRegistry:
             task=task,
         )
         example_prefix = t(K.SYS_EXAMPLE_PREFIX, self.lang)
-        prompt += f"\n\n{example_prefix}: {self.TOOL_MARKER}{{\"tool\":\"{example_tool}\",\"args\":{{}}}}{self.END_MARKER}"
+        param_hint = "\"param1\":\"value1\"" if active_names else ""
+        prompt += f"\n\n{example_prefix}: {self.TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{{param_hint}}}}}{self.END_MARKER}"
         return prompt
 
     @staticmethod
