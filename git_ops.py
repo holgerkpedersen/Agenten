@@ -377,6 +377,8 @@ def edit_file(path, old_text, new_text):
         return {"success": False, "error": str(e)}
 
 
+EXCLUDE_LIST_FILES = {'.env', '.env.example', 'credentials.json', 'secrets.json', '.gitconfig', 'id_rsa', 'id_rsa.pub', 'known_hosts', 'config.json'}
+
 def list_files(path=".", pattern=None, max_depth=2):
     try:
         if not os.path.isdir(path):
@@ -389,6 +391,8 @@ def list_files(path=".", pattern=None, max_depth=2):
                 dirs.clear()
                 continue
             for f in sorted(files):
+                if f in EXCLUDE_LIST_FILES:
+                    continue
                 if pattern and not f.endswith(pattern):
                     continue
                 fp = os.path.join(root, f)

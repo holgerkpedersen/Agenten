@@ -174,9 +174,9 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "read_chunk",
-            "Indlæs en chunk af en stor fil. Kræver: chunk (filnavn), index (1..N). Læs ALLE chunks (1,2,3...) før du analyserer — filen er delt i flere chunks. Brug 'list_chunks' først for at se tilgængelige filer.",
-            ["chunk", "index"],
-            lambda chunk, index=1: self._read_chunk(chunk, int(index))
+            "Indlæs en chunk af en stor fil. Kræver: file_key (filnavn fra list_chunks), index (1..N). Brug 'list_chunks' først for at se tilgængelige filer og deres chunk-indekser.",
+            ["file_key", "index"],
+            lambda file_key, index=1: self._read_chunk(file_key, int(index))
         ))
         self.tool_registry.register(Tool(
             "list_chunks",
@@ -406,7 +406,7 @@ class Agent:
                     file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
                 else:
                     file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
-                    file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(chunk='{chunk_key}', index=2..{len(chunks)})*\n"
+                    file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
             self._log("INFO", t(K.LOG_ADDING_FILES, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(files)))
         else:
             scanned_files = self._get_folder_context(prompt)
@@ -424,7 +424,7 @@ class Agent:
                         file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
                     else:
                         file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
-                        file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(chunk='{chunk_key}', index=2..{len(chunks)})*\n"
+                        file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
                 self._log("INFO", t(K.LOG_ADDING_FILES, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(scanned_files)))
             else:
                 file_path, file_content = self._get_single_file_context(prompt)

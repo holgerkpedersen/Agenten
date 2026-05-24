@@ -114,7 +114,7 @@ def solve_task_stream(agent, task_node, original_prompt):
         for key in available_keys:
             total = len(agent.file_chunks[key])
             display = key.replace("file_", "", 1)
-            chunk_hint_parts.append(f"\n  read_chunk(chunk='{display}', index=2..{total}) eller chunk='{key}', index=2..{total}")
+            chunk_hint_parts.append(f"\n  read_chunk(file_key='{display}', index=2..{total}) eller file_key='{key}', index=2..{total}")
         chunk_hint = f"\n\n## TILG\u00c6NGELIGE FILER (brug read_chunk for at l\u00e6se alle chunks):{''.join(chunk_hint_parts)}\n"
     else:
         chunk_hint = ""
