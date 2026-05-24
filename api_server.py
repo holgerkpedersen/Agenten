@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory, Response, stream
 from flask_cors import CORS
 from agent_core import Agent
 from session_manager import SessionManager
+import agent_skills
 import model_manager
 import json
 import time
@@ -20,6 +21,22 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='/static')
 CORS(app)
+
+# ============ SECURITY CONFIGURATION ============
+def _is_development_mode():
+    """Check if server is running in development mode."""
+    return os.environ.get('DEV_MODE', 'true').lower() == 'true'
+
+@app.before_request
+def check_api_key():
+    """Require API key for all /api/* endpoints unless in dev mode."""
+    if request.path.startswith('/api/') and not _is_development_mode():
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        expected_key = os.environ.get('AGENT_API_KEY', '')
+        
+        # Enforce key only if configured in environment
+        if expected_key and api_key != expected_key:
+            return jsonify({"error": "Unauthorized: Invalid or missing API key"}), 401
 
 agent = Agent()
 session_manager = SessionManager()
@@ -46,7 +63,13 @@ def serve_upload(filename):
 @app.route("/preview-exports/<path:filename>")
 def preview_export(filename):
     import re
-    filepath = os.path.join(export_folder or os.path.join(BASE_DIR, "exports"), filename)
+    base = export_folder or os.path.join(BASE_DIR, "exports")
+    filepath = os.path.join(base, filename)
+    
+    # Security check: Path Traversal Prevention (SEC-013)
+    if not _is_safe_path(base, filepath):
+        return "<h2>Access denied</h2>", 403
+        
     if not os.path.exists(filepath):
         return "<h2>File not found</h2>", 404
     with open(filepath, encoding="utf-8") as f:
@@ -75,7 +98,7 @@ def preview_export(filename):
     img {{ max-width: 100%; border-radius: 8px; }}
 </style></head>
 <body><div id="content"></div>
-<script>document.getElementById('content').innerHTML = marked.parse({md_content!r});</script>
+<script>document.getElementById('content').innerHTML = marked.parse({json.dumps(md_content)});</script>
 </body></html>"""
 
 @app.route("/")
@@ -143,8 +166,10 @@ def save_to_folder():
     
     try:
         os.makedirs(path, exist_ok=True)
-        safe_filename = "".join(c for c in filename if c.isalnum() or c in '._- ')
+        safe_filename = sanitize_filename(filename)
         filepath = os.path.join(path, safe_filename)
+        if not _is_safe_path(BASE_DIR, filepath):
+            return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(content)
         return jsonify({"success": True, "filepath": filepath})
@@ -157,6 +182,8 @@ def list_folder_contents():
     folder_path = data.get("path", export_folder)
     if not folder_path or not os.path.exists(folder_path):
         return jsonify({"success": False, "error": t(K.ERR_FOLDER_NOT_FOUND, agent.lang)}), 400
+    if not _is_safe_path(BASE_DIR, folder_path):
+        return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
     try:
         items = []
         for item in os.listdir(folder_path):
@@ -177,6 +204,46 @@ import tempfile
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+def sanitize_filename(filename):
+    """Sanitize a filename by removing potentially dangerous characters."""
+    if not filename:
+        return ""
+    # Keep alphanumeric and safe punctuation (., -, _)
+    return "".join(c for c in filename if c.isalnum() or c in '._- ')
+
+
+def _is_safe_path(base_dir, target_path):
+    """Ensures that target_path resolves within base_dir to prevent path traversal."""
+    try:
+        real_base = os.path.realpath(base_dir)
+        real_target = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
+        return real_target.startswith(real_base + os.sep) or real_target == real_base
+    except Exception:
+        return False
+
+
+_IMAGE_MAGIC_BYTES = {
+    b'\x89PNG\r\n\x1a\n': 'png',
+    b'\xff\xd8\xff': 'jpg',
+    b'GIF8': 'gif',
+    b'RIFF': 'webp',
+    b'BM': 'bmp',
+}
+
+
+def _validate_image_content(file_bytes, ext):
+    """Validate that file_bytes contains actual image content matching ext."""
+    for magic, fmt in _IMAGE_MAGIC_BYTES.items():
+        if file_bytes.startswith(magic):
+            if fmt == 'webp':
+                return len(file_bytes) > 12 and file_bytes[8:12] == b'WEBP'
+            if fmt == 'jpg':
+                return ext in ('.jpg', '.jpeg')
+            return True
+    return False
+
+
 @app.route("/api/file/upload", methods=["POST"])
 def upload_file():
     """Upload en fil fra browseren og gem den med original navn"""
@@ -186,7 +253,7 @@ def upload_file():
     if file.filename == '':
         return jsonify({"success": False, "error": t(K.ERR_EMPTY_FILENAME, agent.lang)}), 400
     try:
-        safe_filename = "".join(c for c in file.filename if c.isalnum() or c in '._- ')
+        safe_filename = sanitize_filename(file.filename)
         filepath = os.path.join(UPLOAD_DIR, safe_filename)
         file.save(filepath)
         return jsonify({"success": True, "filepath": filepath, "filename": file.filename})
@@ -201,6 +268,9 @@ def read_file():
     
     if not filepath:
         return jsonify({"success": False, "error": t(K.ERR_NO_PATH, agent.lang)}), 400
+    
+    if not _is_safe_path(BASE_DIR, filepath):
+        return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
     
     try:
         if not os.path.exists(filepath):
@@ -248,13 +318,16 @@ def image_upload():
     ext = os.path.splitext(f.filename)[1].lower()
     if ext not in ('.png','.jpg','.jpeg','.gif','.webp','.bmp'):
         return jsonify({"success": False, "error": f"Ikke understøttet format: {ext}"}), 400
+    raw_bytes = f.read()
+    if not _validate_image_content(raw_bytes, ext):
+        return jsonify({"success": False, "error": "Filens indhold matcher ikke et gyldigt billedformat"}), 400
+    f.stream.seek(0)
     import base64
     mime = "jpeg" if ext in ('.jpg','.jpeg') else ext.lstrip('.')
-    safe_filename = "".join(c for c in f.filename if c.isalnum() or c in '._- ')
+    safe_filename = sanitize_filename(f.filename)
     filepath = os.path.join(UPLOAD_DIR, safe_filename)
     f.save(filepath)
-    with open(filepath, "rb") as bf:
-        raw_b64 = base64.b64encode(bf.read()).decode('utf-8')
+    raw_b64 = base64.b64encode(raw_bytes).decode('utf-8')
     agent.images.append({"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath})
     agent._log("TOOL", "🖼️ Billede uploadet", f"{f.filename} → {filepath} ({len(raw_b64)} bytes, {len(agent.images)} billeder i alt)")
     return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(agent.images)})
@@ -297,6 +370,9 @@ def list_python_files():
     
     if not os.path.exists(folder_path):
         return jsonify({"success": False, "error": t(K.ERR_FOLDER_NOT_FOUND, agent.lang)}), 404
+    
+    if not _is_safe_path(BASE_DIR, folder_path):
+        return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
     
     try:
         python_files = []
@@ -341,9 +417,11 @@ def create_session():
 
 @app.route("/api/sessions/load/<session_id>", methods=["GET"])
 def load_session(session_id):
+    global current_session_id
+    agent.agent_log = []
+    agent.execution_log = []
     session_data = session_manager.load_session(session_id)
     if session_data:
-        global current_session_id
         current_session_id = session_id
         if session_data.get("tree"):
             from task_tree import TaskTree, TaskNode
@@ -406,6 +484,17 @@ def rename_session():
         return jsonify({"success": True})
     return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
+@app.route("/api/sessions/<session_id>", methods=["DELETE"])
+def delete_session(session_id):
+    global current_session_id
+    if not session_id:
+        return jsonify({"error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
+    if session_manager.delete_session(session_id):
+        if current_session_id == session_id:
+            current_session_id = None
+        return jsonify({"success": True, "deleted": session_id})
+    return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
+
 @app.route("/api/tools/token", methods=["GET", "POST"])
 def manage_token():
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
@@ -413,8 +502,9 @@ def manage_token():
         if os.path.exists(env_path):
             with open(env_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            return jsonify({"success": True, "exists": True, "content": content})
-        return jsonify({"success": True, "exists": False, "content": "GITHUB_TOKEN=dit_token_her"})
+            has_token = "GITHUB_TOKEN" in content
+            return jsonify({"success": True, "exists": True, "has_token": has_token})
+        return jsonify({"success": True, "exists": False, "has_token": False})
     
     data = request.json
     content = data.get("content", "")
@@ -424,7 +514,9 @@ def manage_token():
 
 @app.route("/api/lang/<lang>")
 def get_lang(lang):
-    return jsonify(get_ui_translations(lang))
+    resp = jsonify(get_ui_translations(lang))
+    resp.headers['Cache-Control'] = 'public, max-age=3600'
+    return resp
 
 @app.route("/api/models")
 def get_models():
@@ -831,6 +923,13 @@ def decompose():
 def execute_stream():
     global current_session_id
     ui_lang = "da"
+    
+    # Create a session-scoped agent to avoid race conditions with concurrent SSE requests (ARC-007)
+    stream_agent = Agent()
+    stream_agent.llm = agent.llm
+    stream_agent.decompose_llm = agent.decompose_llm
+    stream_agent.searcher = agent.searcher
+    
     print(f"Execute stream - current_session_id: {current_session_id}")
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
@@ -839,44 +938,44 @@ def execute_stream():
             ui_lang = session_data.get("ui_lang", session_data.get("lang", "da"))
             print(f"Session show_thinking: {st}")
             if session_data.get("original_prompt"):
-                agent.original_prompt = session_data["original_prompt"]
+                stream_agent.original_prompt = session_data["original_prompt"]
             if session_data.get("tree"):
-                agent.task_tree_from_dict(session_data["tree"])
+                stream_agent.task_tree_from_dict(session_data["tree"])
             if session_data.get("lang"):
-                agent.lang = session_data["lang"]
-                agent.tool_registry.lang = agent.lang
+                stream_agent.lang = session_data["lang"]
+                stream_agent.tool_registry.lang = stream_agent.lang
             if session_data.get("file_chunks"):
-                agent.file_chunks = session_data["file_chunks"]
-            agent.images = _normalize_images(session_data.get("images", []))
+                stream_agent.file_chunks = session_data["file_chunks"]
+            stream_agent.images = _normalize_images(session_data.get("images", []))
             if session_data.get("template"):
-                agent.active_template = session_data["template"]
-                allowed = agent.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent.TEMPLATE_TOOLS else None
-                agent.tool_registry.set_active_tools(allowed)
+                stream_agent.active_template = session_data["template"]
+                allowed = agent_skills.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent_skills.TEMPLATE_TOOLS else None
+                stream_agent.tool_registry.set_active_tools(allowed)
             if session_data.get("decompose_model"):
-                agent.decompose_llm.set_model(session_data["decompose_model"])
+                stream_agent.decompose_llm.set_model(session_data["decompose_model"])
             if session_data.get("execute_model"):
-                agent.llm.set_model(session_data["execute_model"])
+                stream_agent.llm.set_model(session_data["execute_model"])
             
             fpc = session_data.get("full_prompt_with_context", "")
             if not fpc:
                 fc = session_data.get("file_context", "")
                 if fc and isinstance(fc, list):
-                    file_context_content = "\n\n" + t(K.FILE_CONTEXT_HEADER, agent.lang)
+                    file_context_content = "\n\n" + t(K.FILE_CONTEXT_HEADER, stream_agent.lang)
                     for f in fc:
-                        filename = f.get('filename', t(K.UNKNOWN, agent.lang))
+                        filename = f.get('filename', t(K.UNKNOWN, stream_agent.lang))
                         content = f.get('content', '')
                         file_context_content += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
-                    fpc = agent.original_prompt + file_context_content
+                    fpc = stream_agent.original_prompt + file_context_content
                 else:
-                    fpc = agent.original_prompt
-            agent.full_prompt_with_context = fpc
-            agent.show_thinking = st
-            print(f"Agent show_thinking set to: {agent.show_thinking}")
-            agent.stop_requested = False
+                    fpc = stream_agent.original_prompt
+            stream_agent.full_prompt_with_context = fpc
+            stream_agent.show_thinking = st
+            print(f"Agent show_thinking set to: {stream_agent.show_thinking}")
+            stream_agent.stop_requested = False
 
-    _ensure_model_loaded(agent.llm.model)
+    _ensure_model_loaded(stream_agent.llm.model)
 
-    def generate():
+    def generate(agent):
         _ui = ui_lang  # capture in closure
         if agent.task_tree is None:
             if current_session_id:
@@ -894,6 +993,11 @@ def execute_stream():
 
         def _check_client():
             return agent.stop_requested
+
+        agent.agent_log = []
+        agent.execution_log = []
+        agent.issue_resolved = False
+        agent.current_phase = None
 
         # Truncate context for subtask prompts
         MAX_CTX = 150000
@@ -922,9 +1026,23 @@ def execute_stream():
             for child in node.children:
                 if _check_client():
                     return
+                if getattr(agent, 'issue_resolved', False):
+                    child.status = "skipped"
+                    child.result = "Skipped — issue was already resolved in an earlier phase"
+                    child_results.append(f"- {child.name}: {child.result}")
+                    continue
                 yield from execute_with_stream(child)
                 if child.result:
                     child_results.append(f"- {child.name}: {child.result}")
+            
+            if child_results:
+                node.status = "done"
+                node.result = "\n".join(child_results)
+                completed += 1
+                progress = int((completed / total_tasks) * 100)
+                yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+                yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': node.result[:500]})}\n\n"
+                return
             
             node.status = "running"
             full_response = ""
@@ -956,37 +1074,41 @@ def execute_stream():
             if current_session_id:
                 session_manager.add_prompt_result(current_session_id, node.name, full_response, None)
         
-        try:
-            if _check_client():
-                yield f"data: {json.dumps({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui)})}\n\n"
+        saved = False
+        def _save_session():
+            nonlocal saved
+            if saved or not current_session_id:
                 return
-            yield from execute_with_stream(agent.task_tree.root)
             existing = session_manager.load_session(current_session_id) or {}
             existing.update({
-                "tree": agent.task_tree_to_dict(),
+                "tree": agent.task_tree_to_dict() if agent.task_tree else existing.get("tree"),
                 "execution_log": agent.execution_log,
                 "agent_log": agent.agent_log,
                 "original_prompt": agent.original_prompt or (agent.task_tree.root.name if agent.task_tree else ""),
                 "prompt_history": existing.get("prompt_history", []),
                 "lang": agent.lang,
                 "ui_lang": ui_lang,
-                "template": agent.active_template
+                "template": agent.active_template,
+                "file_chunks": agent.file_chunks,
+                "images": agent.images,
             })
-            if current_session_id:
-                session_manager.save_session(current_session_id, existing)
+            session_manager.save_session(current_session_id, existing)
+            saved = True
+
+        try:
+            if _check_client():
+                yield f"data: {json.dumps({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui)})}\n\n"
+                return
+            yield from execute_with_stream(agent.task_tree.root)
+            _save_session()
             yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, _ui)})}\n\n"
         except Exception as e:
-            existing = session_manager.load_session(current_session_id) or {}
-            existing["tree"] = agent.task_tree_to_dict() if agent.task_tree else existing.get("tree")
-            existing["execution_log"] = agent.execution_log
-            existing["agent_log"] = agent.agent_log
-            existing["lang"] = agent.lang
-            existing["template"] = agent.active_template
-            if current_session_id:
-                session_manager.save_session(current_session_id, existing)
+            _save_session()
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            _save_session()
     
-    return Response(stream_with_context(generate()), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
+    return Response(stream_with_context(generate(stream_agent)), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
 
 @app.route("/api/log", methods=["GET"])
 def get_log():
@@ -1053,6 +1175,31 @@ def build_module():
 @app.route("/api/version", methods=["GET"])
 def version():
     return jsonify({"success": True, "started": BUILD_INFO.get("started", "?"), "version": {k:v for k,v in BUILD_INFO.items() if k != "started"}})
+
+@app.route("/api/issues", methods=["GET"])
+def list_issues():
+    issues_path = os.path.join(BASE_DIR, "docs", "issues", "observed", "issues.json")
+    if not os.path.exists(issues_path):
+        return jsonify({"success": True, "meta": {"total": 0}, "issues": []})
+    with open(issues_path, encoding="utf-8") as f:
+        data = json.load(f)
+    return jsonify({"success": True, **data})
+
+@app.route("/api/issues/<issue_id>", methods=["DELETE"])
+def delete_issue(issue_id):
+    issues_path = os.path.join(BASE_DIR, "docs", "issues", "observed", "issues.json")
+    if not os.path.exists(issues_path):
+        return jsonify({"success": False, "error": "Issues-fil findes ikke"}), 404
+    with open(issues_path, encoding="utf-8") as f:
+        data = json.load(f)
+    before = len(data.get("issues", []))
+    data["issues"] = [i for i in data.get("issues", []) if i.get("id", "").lower() != issue_id.lower()]
+    if len(data["issues"]) == before:
+        return jsonify({"success": False, "error": f"Issue '{issue_id}' findes ikke"}), 404
+    data["meta"]["total"] = len(data["issues"])
+    with open(issues_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return jsonify({"success": True, "deleted": issue_id})
 
 @app.route("/api/test", methods=["GET"])
 def test():
@@ -1164,7 +1311,7 @@ def skillflow_report():
     a {{ color: #60a5fa; }}
 </style></head>
 <body><div id="content"></div>
-<script>document.getElementById('content').innerHTML = marked.parse({md!r});</script>
+<script>document.getElementById('content').innerHTML = marked.parse({json.dumps(md)});</script>
 </body></html>"""
 
 @app.route("/api/skillflow/apply")
@@ -1203,4 +1350,5 @@ if __name__ == "__main__":
     print("💾 Sessions gemmes i ./sessions/")
     print("📁 Filhåndtering via Python (tkinter)")
     print("=" * 50)
-    app.run(debug=True, port=5000, threaded=True)
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug, use_reloader=False, port=5000, threaded=True)

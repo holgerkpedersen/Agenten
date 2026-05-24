@@ -516,6 +516,56 @@
         ::-webkit-scrollbar-track { background: var(--scrollbar-track); border-radius: 4px; }
         ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+        /* Issues modal */
+        .issues-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 10000;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .issues-modal {
+            background: var(--panel-bg); border-radius: 12px;
+            width: 90%; max-width: 900px; max-height: 80vh;
+            display: flex; flex-direction: column;
+            box-shadow: 0 20px 60px var(--shadow);
+        }
+        .issues-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+        }
+        .issues-header h2 { margin: 0; font-size: 18px; }
+        .issues-close {
+            background: var(--btn-secondary); border: none;
+            padding: 6px 12px; border-radius: 6px; color: var(--text);
+            cursor: pointer; font-size: 14px;
+        }
+        .issues-table {
+            width: 100%; border-collapse: collapse; font-size: 12px;
+        }
+        .issues-table th {
+            text-align: left; padding: 8px 12px;
+            border-bottom: 2px solid var(--border);
+            background: var(--panel-header); position: sticky; top: 0;
+        }
+        .issues-table td {
+            padding: 6px 12px; border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+        .issues-table tr:hover { background: var(--input-bg); }
+        .issues-scroll { overflow-y: auto; flex: 1; padding: 8px; }
+        .issue-severity-critical { color: var(--danger); font-weight: bold; }
+        .issue-severity-high { color: var(--warning); font-weight: bold; }
+        .issue-severity-medium { color: var(--accent); }
+        .issue-severity-low { color: var(--text-muted); }
+        .issue-status-open { color: var(--danger); }
+        .issue-status-resolved { color: var(--success); }
+        .issue-type { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; }
+        .issue-type-bug { background: var(--danger); color: white; }
+        .issue-type-security { background: var(--warning); color: #0f172a; }
+        .issue-type-architecture { background: var(--purple-accent); color: white; }
+        .issue-type-testing { background: var(--accent); color: white; }
+        .issue-type-performance { background: #06b6d4; color: white; }
+        .issue-type-maintainability { background: var(--text-muted); color: white; }
     </style>
 </head>
 <body>
@@ -548,6 +598,7 @@
                     <button onclick="window.open('/skillflow','_blank')" title="SkillFlow Analysis" style="background:var(--purple-accent);">🧬 SkillFlow</button>
                     <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research">🔍 Flow Builder</button>
                     <button onclick="setGithubToken()" id="githubTokenBtn" title="Opsæt GitHub Token">🔑 GitHub Token</button>
+                    <button onclick="showIssuesPanel()" id="issuesBtn" title="Vis alle issues">🐛 Issues</button>
                 </div>
             </div>
         </div>
@@ -577,6 +628,9 @@
                 <option value="python-arkitektur">🏗️ Python Arkitektur</option>
                 <option value="billedanalyse">🖼️ Billedanalyse</option>
                 <option value="bugfix">🐛 Bugfix (TDD)</option>
+                <option value="refactor">🔧 Refaktorering</option>
+                <option value="testgenerering">🧪 Testgenerering</option>
+                <option value="issue_handler">🔷 Issue Håndtering</option>
             </select>
         </div>
         
@@ -627,6 +681,21 @@
     </div>
     
     <div class="canvas-container" id="canvasContainer"></div>
+</div>
+
+<div id="issuesModal" class="issues-overlay" style="display:none;" onclick="if(event.target===this)closeIssuesPanel()">
+    <div class="issues-modal">
+        <div class="issues-header">
+            <h2 id="issuesModalTitle">${_('issues_title')}</h2>
+            <button class="issues-close" onclick="closeIssuesPanel()">✕</button>
+        </div>
+        <div id="issuesFilterBar" style="padding:8px 16px 0 16px;display:none;">
+            <input type="text" id="issuesFilterInput" placeholder="Filter..." style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:13px;box-sizing:border-box;">
+        </div>
+        <div class="issues-scroll" id="issuesContent">
+            <div style="text-align:center;padding:40px;color:var(--text-muted);">Indlæser...</div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -689,6 +758,7 @@ const LANG_FALLBACK = {
     all_executed: 'Alle opgaver udført',
     stream_error: 'Streaming fejl',
     error_prefix: 'Fejl: ',
+    prompt_filled_from: 'Prompt udfyldt fra',
     export_md_report_header: '# 📊 Agenten - Session Rapport',
     export_md_prompt: '## 📝 Original Prompt',
     export_md_tree: '## 🌲 Opgavetræ',
@@ -820,6 +890,27 @@ btn_edit: 'Rediger',
     task_done_label: 'Opgave færdig',
     files_included: 'Filer inkluderet i LLM kontekst:',
     reading_file_title: 'Læser fil',
+    loading: 'Indlæser...',
+    issues_table_title: 'Titel',
+    issues_table_type: 'Type',
+    issues_table_status: 'Status',
+    issues_table_priority: 'Prioritet',
+    issues_error: 'Fejl',
+    issues_title: '🐛 Issues',
+    issues_none: 'Ingen issues fundet.',
+    issues_location: 'Sted:',
+    issues_impact: 'Impact:',
+    issues_proposed_fix: 'Forslag:',
+    issues_resolution: 'Løsning:',
+    issues_acceptance: 'Acceptance criteria:',
+    issues_run: '🚀 Kør',
+    issues_delete: '✕',
+    issues_delete_title: 'Slet issue',
+    issues_delete_confirm: 'Slet issue {id}?',
+    issues_use_as_task: 'Brug som opgave',
+    issues_detail_location: 'Location:',
+    issues_detail_impact: 'Impact:',
+    issues_detail_fix: 'Foreslået fix:',
 };
 
 async function loadLang(lang) {
@@ -839,6 +930,11 @@ async function loadLang(lang) {
 
 function _(key) {
     return window.AGENTEN_LANG[key] || LANG_FALLBACK[key] || key;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function switchLang(lang) {
@@ -887,6 +983,7 @@ function updateHtmlLabels() {
     if (e('stopBtn'))      e('stopBtn').textContent         = '⏹ ' + _('stop');
     if (e('fileSectionToggle')) e('fileSectionToggle').textContent = _('show_files');
     if (e('thinkingLabel'))e('thinkingLabel').textContent= showThinking ? _('show_thinking') : _('hide_thinking');
+    if (e('issuesBtn'))   e('issuesBtn').textContent       = '🐛 ' + _('issues_title');
     if (e('selectSessionOpt')) e('selectSessionOpt').textContent = _('select_session');
     const tpl = document.getElementById('templateSelect');
     if (tpl) {
@@ -2629,6 +2726,190 @@ function downloadFromPreview() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     addLogEntry('INFO', _('preview_downloaded'), a.download);
+}
+
+let issuesData = [];
+let issuesSort = { column: null, dir: 'asc' };
+let issuesFilter = '';
+
+function sortIssues(col) {
+    if (issuesSort.column === col) {
+        issuesSort.dir = issuesSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        issuesSort.column = col;
+        issuesSort.dir = 'asc';
+    }
+    renderIssuesTable();
+}
+
+function renderIssuesTable() {
+    const content = document.getElementById('issuesContent');
+    let filtered = issuesData;
+    if (issuesFilter) {
+        const f = issuesFilter.toLowerCase();
+        filtered = issuesData.filter(issue =>
+            ['id','title','type','status','severity','description','location'].some(k =>
+                (issue[k] || '').toLowerCase().includes(f)
+            )
+        );
+    }
+    const col = issuesSort.column;
+    if (col) {
+        const d = issuesSort.dir === 'asc' ? 1 : -1;
+        filtered.sort((a, b) => {
+            const va = (a[col] || '').toString().toLowerCase();
+            const vb = (b[col] || '').toString().toLowerCase();
+            return va < vb ? -d : va > vb ? d : 0;
+        });
+    }
+    if (!filtered.length) {
+        content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">' + _('issues_none') + '</div>';
+        return;
+    }
+    const arrow = c => issuesSort.column === c ? (issuesSort.dir === 'asc' ? ' &#9650;' : ' &#9660;') : '';
+    let html = `<table class="issues-table"><thead><tr>
+        <th onclick="sortIssues('id')" style="cursor:pointer;user-select:none;">ID${arrow('id')}</th>
+        <th onclick="sortIssues('title')" style="cursor:pointer;user-select:none;">${_('issues_table_title')}${arrow('title')}</th>
+        <th onclick="sortIssues('type')" style="cursor:pointer;user-select:none;">${_('issues_table_type')}${arrow('type')}</th>
+        <th onclick="sortIssues('status')" style="cursor:pointer;user-select:none;">${_('issues_table_status')}${arrow('status')}</th>
+        <th onclick="sortIssues('severity')" style="cursor:pointer;user-select:none;">${_('issues_table_priority')}${arrow('severity')}</th>
+        <th></th><th></th>
+    </tr></thead><tbody>`;
+    for (const issue of filtered) {
+        const eid = escapeHtml(issue.id);
+        const etitle = escapeHtml(issue.title);
+        const etype = escapeHtml(issue.type);
+        const estatus = escapeHtml(issue.status);
+        const eseverity = escapeHtml(issue.severity);
+        const edesc = escapeHtml((issue.description || '').substring(0, 120));
+        const elocation = escapeHtml(issue.location);
+        const eimpact = escapeHtml(issue.impact);
+        const efix = escapeHtml(issue.proposed_fix);
+        const eaccept = escapeHtml(issue.acceptance_criteria);
+        const eresolution = escapeHtml(issue.resolution_note);
+        const sevClass = `issue-severity-${issue.severity || 'low'}`;
+        const statusClass = `issue-status-${issue.status || 'open'}`;
+        const typeClass = `issue-type-${issue.type || 'bug'}`;
+        const issueEnc = encodeURIComponent(JSON.stringify(issue)).replace(/'/g, '%27');
+        html += `<tr onclick="toggleIssueDetail(this)" style="cursor:pointer;">
+            <td><strong>${eid}</strong></td>
+            <td>${etitle}
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${edesc}...</div>
+                <div class="issue-detail" style="display:none;margin-top:6px;padding:8px;background:var(--input-bg);border-radius:6px;font-size:11px;line-height:1.5;">
+                    <div><strong>${_('issues_location')}</strong> ${elocation || '—'}</div>
+                    <div><strong>${_('issues_impact')}</strong> ${eimpact || '—'}</div>
+                    <div style="margin-top:4px;"><strong>${_('issues_proposed_fix')}</strong> ${efix || '—'}</div>
+                    ${eaccept ? `<div style="margin-top:4px;"><strong>${_('issues_acceptance')}</strong> ${eaccept}</div>` : ''}
+                    ${eresolution ? `<div style="margin-top:4px;color:var(--success);"><strong>${_('issues_resolution')}</strong> ${eresolution}</div>` : ''}
+                    <button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="margin-top:8px;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
+                        ${_('issues_use_as_task')}
+                    </button>
+                </div>
+            </td>
+            <td><span class="issue-type ${typeClass}">${etype}</span></td>
+            <td><span class="${statusClass}">${estatus}</span></td>
+            <td><span class="${sevClass}">${eseverity}</span></td>
+            <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">${_('issues_run')}</button></td>
+            <td><button onclick="event.stopPropagation();deleteIssue('${eid}')" style="background:var(--danger);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;" title="${_('issues_delete_title')}">${_('issues_delete')}</button></td>
+        </tr>`;
+    }
+    html += '</tbody></table>';
+    content.innerHTML = html;
+}
+
+function showIssuesPanel() {
+    const modal = document.getElementById('issuesModal');
+    const content = document.getElementById('issuesContent');
+    const filterBar = document.getElementById('issuesFilterBar');
+    const filterInput = document.getElementById('issuesFilterInput');
+    document.getElementById('issuesModalTitle').textContent = _('issues_title');
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">' + _('loading') + '</div>';
+    filterBar.style.display = 'block';
+    filterInput.value = '';
+    modal.style.display = 'flex';
+    fetch('/api/issues')
+        .then(r => r.json())
+        .then(data => {
+            issuesData = data.issues || [];
+            issuesSort = { column: null, dir: 'asc' };
+            issuesFilter = '';
+            renderIssuesTable();
+            filterInput.focus();
+        })
+        .catch(e => {
+            filterBar.style.display = 'none';
+            content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);">${_('issues_error')}: ${e.message}</div>`;
+        });
+}
+
+document.addEventListener('input', function(e) {
+    if (e.target.id === 'issuesFilterInput') {
+        issuesFilter = e.target.value;
+        renderIssuesTable();
+    }
+});
+
+function closeIssuesPanel() {
+    document.getElementById('issuesModal').style.display = 'none';
+    document.getElementById('issuesFilterBar').style.display = 'none';
+}
+
+function toggleIssueDetail(row) {
+    const detail = row.querySelector('.issue-detail');
+    if (detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+}
+
+async function useIssueAsTask(encoded) {
+    const issue = JSON.parse(decodeURIComponent(encoded));
+    closeIssuesPanel();
+    const prompt = document.getElementById('promptInput');
+    const template = document.getElementById('templateSelect');
+    const templateLabel = document.getElementById('templateLabel');
+    const promptText = `${issue.id}: ${issue.title}\n\n${issue.description || ''}\n\n${_('issues_detail_location')} ${issue.location || '—'}\n${_('issues_detail_impact')} ${issue.impact || '—'}\n\n${_('issues_detail_fix')} ${issue.proposed_fix || '—'}`;
+    prompt.value = promptText;
+    const tplMap = { 'architecture': 'refactor', 'bug': 'bugfix' };
+    template.value = tplMap[issue.type] || 'issue_handler';
+    addLogEntry('INFO', `${_('prompt_filled_from')} ${issue.id}`, issue.title);
+
+    const fileMatch = issue.location ? issue.location.match(/([\w./-]+\.\w+)/) : null;
+    if (fileMatch) {
+        try {
+            const resp = await fetch('/api/file/read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filepath: fileMatch[1] })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                loadedFilesContent.push({
+                    filename: data.filename,
+                    filepath: data.filepath,
+                    content: data.content,
+                    included: true
+                });
+                document.getElementById('filePathInput').value = data.filename;
+                addLogEntry('INFO', `Fil indlæst: ${data.filename}`, `${data.lines} linjer`);
+            }
+        } catch(e) {
+            addLogEntry('WARNING', 'Kunne ikke auto-indlæse fil', fileMatch[1]);
+        }
+    }
+}
+
+async function deleteIssue(issueId) {
+    if (!confirm(_('issues_delete_confirm').replace('{id}', issueId))) return;
+    try {
+        const resp = await fetch(`/api/issues/${issueId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) {
+            addLogEntry('INFO', `Issue ${issueId} slettet`, '');
+            showIssuesPanel();
+        } else {
+            addLogEntry('ERROR', `Kunne ikke slette ${issueId}`, data.error);
+        }
+    } catch (e) {
+        addLogEntry('ERROR', `Fejl ved sletning`, e.message);
+    }
 }
 
 // Initialize

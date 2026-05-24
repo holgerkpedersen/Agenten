@@ -1,6 +1,8 @@
 """Test agent_core.py — agent decomposition and execution."""
 import pytest
 from agent_core import Agent
+import agent_skills
+import agent_git
 
 
 class TestAgentInit:
@@ -43,15 +45,14 @@ class TestAgentInit:
         assert "Resumé" in templates["resume"]["name"]
 
     def test_template_tools_mapping(self):
-        agent = Agent()
-        assert agent.TEMPLATE_TOOLS["resume"] == ["list_chunks", "read_chunk"]
-        assert agent.TEMPLATE_TOOLS["kodeanalyse"] == ["list_chunks", "read_chunk"]
-        assert agent.TEMPLATE_TOOLS["diffanalyse"] == ["list_chunks", "read_chunk", "git_diff", "git_log"]
-        assert agent.TEMPLATE_TOOLS["fri"] is None
-        assert agent.TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image"]
-        assert agent.TEMPLATE_TOOLS["python-arkitektur"] == ["list_chunks", "read_chunk", "write_file"]
-        assert agent.TEMPLATE_TOOLS["billedanalyse"] == ["add_image", "write_file", "list_chunks", "read_chunk"]
-        assert agent.TEMPLATE_TOOLS["bugfix"] == ["read_issue", "update_issue_status", "run_tests", "list_chunks", "read_chunk", "write_file"]
+        assert agent_skills.TEMPLATE_TOOLS["resume"] == ["list_chunks", "read_chunk", "list_files"]
+        assert agent_skills.TEMPLATE_TOOLS["kodeanalyse"] == ["list_chunks", "read_chunk", "list_files", "create_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["diffanalyse"] == ["list_chunks", "read_chunk", "git_diff", "git_log", "list_files", "create_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["fri"] is None
+        assert agent_skills.TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["python-arkitektur"] == ["list_chunks", "read_chunk", "write_file", "list_files", "create_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["billedanalyse"] == ["add_image", "write_file", "list_chunks", "read_chunk", "list_files", "create_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["bugfix"] == ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_chunk", "write_file", "edit_file", "list_files"]
 
 
 class TestFallbackTree:
@@ -154,29 +155,25 @@ class TestAgentStatus:
 
 class TestExtractBranchName:
     def test_prefers_original_prompt_over_task_name(self):
-        agent = Agent()
-        result = agent._extract_branch_name(
+        result = agent_git.extract_branch_name(
             "1. Opret branch og verificer",
             "Opret en ny branch 'test-ny-branch8', commit ændringerne, og opret PR til master"
         )
         assert result == "test-ny-branch8", f"Expected test-ny-branch8, got '{result}'"
 
     def test_falls_back_to_task_name(self):
-        agent = Agent()
-        result = agent._extract_branch_name(
+        result = agent_git.extract_branch_name(
             "Opret branch main-feature og verificer",
             "Nothing to decompose here"
         )
         assert result == "main-feature"
 
     def test_returns_empty_if_no_branch_found(self):
-        agent = Agent()
-        result = agent._extract_branch_name("Just a task name", "Decompose this without referencing any git")
+        result = agent_git.extract_branch_name("Just a task name", "Decompose this without referencing any git")
         assert result == ""
 
     def test_ignores_opret_substring_in_task_name(self):
-        agent = Agent()
-        result = agent._extract_branch_name(
+        result = agent_git.extract_branch_name(
             "1. Opret branch og verificer",
             "Create branch 'test-feature', commit and push"
         )
@@ -185,54 +182,45 @@ class TestExtractBranchName:
 
 class TestIsPrWorkflow:
     def test_matches_real_pr_in_text(self):
-        agent = Agent()
-        assert agent._is_pr_workflow("Opret en ny branch og opret PR til master") is True
-        assert agent._is_pr_workflow("Create PR for feature") is True
-        assert agent._is_pr_workflow("Opret Pull Request") is True
+        assert agent_git.is_pr_workflow("Opret en ny branch og opret PR til master") is True
+        assert agent_git.is_pr_workflow("Create PR for feature") is True
+        assert agent_git.is_pr_workflow("Opret Pull Request") is True
 
     def test_does_not_match_opret_substring(self):
-        agent = Agent()
-        assert agent._is_pr_workflow("1. Opret branch og verificer") is False
-        assert agent._is_pr_workflow("2. Stage og commit ændringer") is False
-        assert agent._is_pr_workflow("3. Push til remote") is False
+        assert agent_git.is_pr_workflow("1. Opret branch og verificer") is False
+        assert agent_git.is_pr_workflow("2. Stage og commit ændringer") is False
+        assert agent_git.is_pr_workflow("3. Push til remote") is False
 
     def test_does_not_match_unrelated_tasks(self):
-        agent = Agent()
-        assert agent._is_pr_workflow("Analyse kode") is False
-        assert agent._is_pr_workflow("Lav et resume") is False
+        assert agent_git.is_pr_workflow("Analyse kode") is False
+        assert agent_git.is_pr_workflow("Lav et resume") is False
 
     def test_matches_pull_request_subtask(self):
-        agent = Agent()
-        assert agent._is_pr_workflow("4. Opret Pull Request") is True
+        assert agent_git.is_pr_workflow("4. Opret Pull Request") is True
 
     def test_matches_github_keyword(self):
-        agent = Agent()
-        assert agent._is_pr_workflow("GitHub PR setup") is True
+        assert agent_git.is_pr_workflow("GitHub PR setup") is True
 
 
 class TestTemplateTaskTools:
     def test_has_agenten_entry(self):
-        agent = Agent()
-        assert "agenten" in agent.TEMPLATE_TASK_TOOLS
+        assert "agenten" in agent_skills.TEMPLATE_TASK_TOOLS
 
     def test_agenten_has_four_task_groups(self):
-        agent = Agent()
-        groups = agent.TEMPLATE_TASK_TOOLS["agenten"]
+        groups = agent_skills.TEMPLATE_TASK_TOOLS["agenten"]
         assert "branch" in groups
         assert "commit" in groups
         assert "push" in groups
         assert "pull request" in groups
 
     def test_push_group_excludes_git_status(self):
-        agent = Agent()
-        push_tools = agent.TEMPLATE_TASK_TOOLS["agenten"]["push"]
+        push_tools = agent_skills.TEMPLATE_TASK_TOOLS["agenten"]["push"]
         assert "git_push" in push_tools
         assert "git_remote_status" in push_tools
         assert "git_status" not in push_tools, "git_status should not be in push tools"
 
     def test_commit_group_includes_core_tools(self):
-        agent = Agent()
-        commit_tools = agent.TEMPLATE_TASK_TOOLS["agenten"]["commit"]
+        commit_tools = agent_skills.TEMPLATE_TASK_TOOLS["agenten"]["commit"]
         assert "git_add_all" in commit_tools
         assert "git_commit" in commit_tools
 

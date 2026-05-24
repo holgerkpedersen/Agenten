@@ -129,3 +129,16 @@ class TestAPIRoot:
     def test_root(self, client):
         resp = client.get("/")
         assert resp.status_code == 200
+
+    def test_list_issues(self, client):
+        resp = client.get("/api/issues")
+        assert resp.status_code == 200
+        import json
+        data = json.loads(resp.data)
+        assert "issues" in data
+        assert "meta" in data
+        assert data["success"] is True
+
+    def test_delete_nonexistent_issue(self, client):
+        resp = client.delete("/api/issues/DOESNOTEXIST")
+        assert resp.status_code == 404

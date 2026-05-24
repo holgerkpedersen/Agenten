@@ -374,3 +374,115 @@ class TestRouteMismatch:
         assert "cryptography" in result.get("req_updated", [])
         updated = req.read_text(encoding='utf-8')
         assert "cryptography" in updated
+
+
+class TestEditFile:
+    def test_edit_file_basic(self, tmp_path):
+        from git_ops import edit_file
+        f = tmp_path / "test.py"
+        f.write_text("x = 1\ny = 2\nz = 3\n", encoding='utf-8')
+        result = edit_file(str(f), "y = 2", "y = 99")
+        assert result["success"] is True
+        assert f.read_text(encoding='utf-8') == "x = 1\ny = 99\nz = 3\n"
+
+    def test_edit_file_not_found(self, tmp_path):
+        from git_ops import edit_file
+        f = tmp_path / "test.py"
+        f.write_text("x = 1\n", encoding='utf-8')
+        result = edit_file(str(f), "nonexistent", "new")
+        assert result["success"] is False
+        assert "ikke fundet" in result["error"]
+
+    def test_edit_file_multiple_matches(self, tmp_path):
+        from git_ops import edit_file
+        f = tmp_path / "test.py"
+        f.write_text("a = 1\na = 2\na = 3\n", encoding='utf-8')
+        result = edit_file(str(f), "a =", "b =")
+        assert result["success"] is False
+        assert "fundet 3 gange" in result["error"]
+
+    def test_edit_file_syntax_check_fails(self, tmp_path):
+        from git_ops import edit_file
+        f = tmp_path / "test.py"
+        f.write_text("x = 1\n", encoding='utf-8')
+        result = edit_file(str(f), "x = 1", "x = 1 broken syntax {{{")
+        assert result["success"] is False
+        assert "Syntaksfejl" in result["error"]
+        # File should NOT be modified
+        assert f.read_text(encoding='utf-8') == "x = 1\n"
+
+    def test_edit_file_nonexistent_path(self, tmp_path):
+        from git_ops import edit_file
+        result = edit_file(str(tmp_path / "nonexistent.py"), "old", "new")
+        assert result["success"] is False
+        assert "findes ikke" in result["error"]
+
+    def test_edit_file_non_py(self, tmp_path):
+        from git_ops import edit_file
+        f = tmp_path / "test.txt"
+        f.write_text("hello world\n", encoding='utf-8')
+        result = edit_file(str(f), "hello", "goodbye")
+        assert result["success"] is True
+        assert f.read_text(encoding='utf-8') == "goodbye world\n"
+
+    def test_edit_file_route_warning(self, tmp_path):
+        from git_ops import edit_file
+        py = tmp_path / "app.py"
+        py.write_text('@app.route("/api/data")\ndef data(): pass\n', encoding='utf-8')
+        html = tmp_path / "index.html"
+        html.write_text('<script>fetch("/api/data"); fetch("/api/missing")</script>', encoding='utf-8')
+        result = edit_file(str(html), "/api/missing", "/api/data")
+        assert result["success"] is True
+
+    def test_edit_file_newline_normalization(self, tmp_path):
+        from git_ops import edit_file
+        f = tmp_path / "test.py"
+        f.write_bytes("x = 1\r\ny = 2\r\nz = 3\r\n".encode('utf-8'))
+        result = edit_file(str(f), "y = 2\nz = 3", "y = 99\nz = 99")
+        assert result["success"] is True
+        assert f.read_bytes().decode('utf-8') == "x = 1\r\ny = 99\r\nz = 99\r\n"
+
+
+class TestListFiles:
+    def test_list_files_basic(self, tmp_path):
+        from git_ops import list_files
+        (tmp_path / "a.py").write_text("x=1", encoding='utf-8')
+        (tmp_path / "b.py").write_text("y=2", encoding='utf-8')
+        (tmp_path / "c.txt").write_text("hello", encoding='utf-8')
+        result = list_files(str(tmp_path))
+        assert result["success"] is True
+        assert result["count"] == 3
+        names = [f["file"] for f in result["files"]]
+        assert "a.py" in names
+        assert "c.txt" in names
+
+    def test_list_files_pattern(self, tmp_path):
+        from git_ops import list_files
+        (tmp_path / "a.py").write_text("x=1", encoding='utf-8')
+        (tmp_path / "b.txt").write_text("hello", encoding='utf-8')
+        result = list_files(str(tmp_path), pattern=".py")
+        assert result["success"] is True
+        assert result["count"] == 1
+        assert result["files"][0]["file"] == "a.py"
+
+    def test_list_files_max_depth(self, tmp_path):
+        from git_ops import list_files
+        import os
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        deep = sub / "deep"
+        deep.mkdir()
+        (tmp_path / "root.py").write_text("x=1", encoding='utf-8')
+        (sub / "mid.py").write_text("y=2", encoding='utf-8')
+        (deep / "deep.py").write_text("z=3", encoding='utf-8')
+        result = list_files(str(tmp_path), max_depth=1)
+        assert result["success"] is True
+        names = [f["file"] for f in result["files"]]
+        assert "root.py" in names
+        assert os.path.join("sub", "mid.py") in names
+        assert os.path.join("sub", "deep", "deep.py") not in names
+
+    def test_list_files_nonexistent(self):
+        from git_ops import list_files
+        result = list_files("/nonexistent/path")
+        assert result["success"] is False

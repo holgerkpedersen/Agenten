@@ -48,9 +48,6 @@ class LMStudioWrapper:
         if mime == "webp":
             mime = "png"
         return f"data:image/{mime};base64,{b64}"
-        if fmt == "data_url":
-            return f"data:image/{mime};base64,{b64}"
-        return b64
 
     @classmethod
     def _image_part(cls, img, model):

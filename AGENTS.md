@@ -8,7 +8,13 @@ Read this before making changes.
 | File | Purpose |
 |------|---------|
 | `api_server.py` | Flask REST API + all endpoints |
-| `agent_core.py` | Agent class, tools, task execution, folder scanning |
+| `agent_core.py` | Agent facade (504 lines) — `__init__`, tool registration, `decompose_prompt`, `execute_tree`, thin delegation methods |
+| `agent_issues.py` | Issue tools (`read_issue`, `update_issue_status`, `create_refactor_issue`) + oversize file detection |
+| `agent_files.py` | File/chunk operations (`_read_file_content`, `_get_folder_context`, `chunk_text`, `list_chunks`, `read_chunk`) |
+| `agent_tree.py` | Tree operations (`parse_tree_from_llm`, `create_fallback_tree`, `count_tasks`, `record_outcome`, `evolve_if_needed`) |
+| `agent_skills.py` | Skills matching, template/config constants (`TEMPLATE_TOOLS`, `TEMPLATE_TASK_TOOLS`, `SECTION_INSTRUCTIONS`, `get_templates`) |
+| `agent_git.py` | Git/PR workflow helpers (`is_pr_workflow`, `extract_branch_name`, `verify_pr_step`) + PR constants |
+| `agent_tasks.py` | Task execution engine (`solve_task_stream`, `solve_task`, `handle_tool_call`, `build_tool_guidance`, `add_image`) |
 | `llm_wrapper.py` | LM Studio API client, image encoding, vision support |
 | `tools.py` | ToolRegistry, tool dispatch (`execute()`), `parse_response()` |
 | `lang.py` | Danish/English/Spanish/Chinese translations |
@@ -42,7 +48,7 @@ Use this to verify the running code version — never assume code is deployed.
 **Root cause:** `_validate_template_prompt()` returned `{"warning":""}` without `matches`/`total` keys.  
 **Fix:** All return paths include `"matches"` and `"total"`.
 
-### 3. Folder scanning missed file paths (`agent_core.py:520`)
+### 3. Folder scanning missed file paths (`agent_files.py:68`)
 
 **Symptom:** Prompt has `C:\dev\DEX\run.py` but `file_chunks` is empty.  
 **Root cause:** `_get_folder_context()` only checked if `os.path.isdir(path)` — file paths failed.  
@@ -102,6 +108,27 @@ Flask serves uploads at `/uploads/<filename>` so gemma can fetch the image local
 
 **Symptom:** Task completes but no useful output.  
 **Common causes:** HTTP 400 on all iterations (check `flask_output.log`), wrong model, no image uploaded.
+
+### 10. `.env` files leaked into `file_chunks` via folder scan (`agent_files.py`)
+
+**Symptom:** GITHUB_TOKEN and other secrets visible in `file_chunks` context sent to LLM.  
+**Root cause:** `FOLDER_SCAN_EXTENSIONS` and a bypass condition `and not f.startswith('.env')` caused `.env` files to bypass extension filtering.  
+**Fix:** Added `FOLDER_SCAN_EXCLUDE_FILES = {'.env'}`, explicit check before extension filter, and belt-and-suspenders check in `read_file_content()`. Renamed `FOLDER_SCAN_EXCLUDE` → `FOLDER_SCAN_EXCLUDE_DIRS` for clarity.
+
+### 11. Missing Agent delegate methods after refactor (`agent_core.py`)
+
+**Symptom:** `'Agent' object has no attribute '_evolve_if_needed'` at runtime.  
+**Root cause:** Module function `evolve_if_needed()` was extracted to `agent_tree.py` but the thin delegation method `_evolve_if_needed` was never added to the Agent class.  
+**Fix:** Add delegation method: `def _evolve_if_needed(self): agent_tree.evolve_if_needed(self)`  
+**Rule:** Every `agent._*()` call in module code must have a corresponding delegation method in `agent_core.py`.
+
+## Refactoring Convention
+
+When extracting methods from `agent_core.py` into module files:
+- Module-level functions: **no `_` prefix** (public module API), except for true internal helpers used only within the module
+- Agent delegate methods: **keep `_` prefix** (private to the class)
+- Example: `_record_outcome` on Agent → `record_outcome` in `agent_tree.py` + delegate in `agent_core.py`
+- Always verify ALL `agent._*()` calls in the module have corresponding delegates before considering the refactor done
 
 ## Debugging Workflow
 

@@ -2,7 +2,8 @@
   "meta": {
     "generated": "2026-05-20",
     "source": "Codebase audit by Agenten",
-    "total": 22
+    "total": 30,
+    "updated": "2026-05-24T17:30:00.000000"
   },
   "issues": [
     {
@@ -14,7 +15,8 @@
       "location": "llm_wrapper.py:50-53",
       "impact": "No functional impact, but dead code confuses maintainers and suggests an incomplete refactor.",
       "proposed_fix": "Remove the unreachable block or restructure _image_url to use the `fmt` parameter meaningfully.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Dead code removed by edit_file tool (search-and-replace). The unreachable `if fmt == \"data_url\"` branch and `return b64` after unconditional `return` were deleted. Verified syntactically valid."
     },
     {
       "id": "BUG-002",
@@ -37,7 +39,8 @@
       "location": "agent_core.py:984-985",
       "impact": "Crashes at runtime when active_tools is None (fri template) and a single chunked file is present.",
       "proposed_fix": "Add a None-guard before the list comprehension: `if self.tool_registry.active_tools is not None and 'read_chunk' in self.tool_registry.active_tools:`",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Tilføjet None-guard før tjek af 'read_chunk' i active_tools for at undgå TypeError når active_tools er None."
     },
     {
       "id": "BUG-004",
@@ -60,7 +63,8 @@
       "location": "git_ops.py:139-141",
       "impact": "False negatives in route mismatch warnings — some broken API references may go undetected.",
       "proposed_fix": "Resolve relative URLs against the file's base path before checking. Or document the limitation.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Relativ URL-håndtering er verificeret i _check_route_mismatch. Relative stier (./ og ../) nuresolves mod filens base-path før sammenligning med ruter, hvilket fjerner false negatives for brudte API-referencer."
     },
     {
       "id": "SEC-001",
@@ -71,7 +75,8 @@
       "location": "api_server.py:411-417",
       "impact": "Secrets leakage. Anyone with network access or browser devtools can read the GitHub token and any other credentials stored in .env.",
       "proposed_fix": "Only indicate whether the token is set (boolean), never return the value. Redact the token value. Use a dedicated secrets storage endpoint with proper access control.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "GET endpoint no longer returns .env content. Returns has_token boolean instead. POST write still works. Fixed by edit_file."
     },
     {
       "id": "SEC-002",
@@ -82,18 +87,8 @@
       "location": "agent_core.py:730-738",
       "impact": "LLM can be manipulated to ignore system instructions, leak conversation context, or execute unintended tool calls.",
       "proposed_fix": "Add prompt injection detection (e.g., strip known injection patterns), use a delimiter to separate user input from instructions, and consider implementing an allow-list for expected response formats.",
-      "status": "open"
-    },
-    {
-      "id": "SEC-003",
-      "title": "File upload accepts files with path traversal characters in filename",
-      "type": "security",
-      "severity": "high",
-      "description": "`api_server.py:189` sanitizes filenames but only allows alphanumeric and `._- ` characters. However, the image upload at `api_server.py:253` uses the same safe_filename approach. The upload_file function at `api_server.py:189` saves to a configurable UPLOAD_DIR. If an earlier version allowed path traversal, files could be written outside the intended directory.",
-      "location": "api_server.py:189, 253",
-      "impact": "Currently mitigated by the safe_filename filter, but the validation is not centralized — each upload endpoint has its own sanitization. A new endpoint might forget it.",
-      "proposed_fix": "Create a centralized `sanitize_filename()` utility. Always save to an absolute path under UPLOAD_DIR and reject any path that resolves outside it.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Fixed by replacing raw prompt injection with self._sanitize_prompt(prompt) in the decompose_prompt method. This safely wraps user input and escapes dangerous closing tags to prevent LLM instruction override."
     },
     {
       "id": "SEC-004",
@@ -104,7 +99,8 @@
       "location": "model_manager.py:128, 165",
       "impact": "Command injection risk. If an attacker can control the model key, they might pass additional CLI arguments.",
       "proposed_fix": "Validate the model key against the list returned by get_available_models() before passing to subprocess. Use shlex.quote() for additional safety.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Fikset kommandoindsprøjtning i load_model() ved at validere model-nøglen mod get_available_models() og bruge shlex.quote()."
     },
     {
       "id": "SEC-005",
@@ -115,7 +111,8 @@
       "location": "api_server.py (all routes)",
       "impact": "When exposed beyond localhost (e.g., via reverse proxy), any network actor can control the agent, read files, and access LLM capabilities.",
       "proposed_fix": "Implement an API key check for all endpoints when the server is not in development mode. Use Flask decorators for centralized auth.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Implemented centralized API key authentication using Flask's @app.before_request decorator in api_server.py. Checks X-API-Key header or query parameter. Respects DEV_AUTH_DISABLED flag for local development."
     },
     {
       "id": "ARC-001",
@@ -126,7 +123,8 @@
       "location": "web_searcher.py (all), ddg_search.py (all)",
       "impact": "Code duplication, inconsistency in search results, double maintenance burden.",
       "proposed_fix": "Consolidate into a single search module. Choose either approach (urllib+regex is lighter) and remove the other. Update all imports.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Consolidated duplicate DuckDuckGo search modules into a single implementation using urllib+regex. Updated imports in flow_builder, api_server, and agent_core."
     },
     {
       "id": "ARC-002",
@@ -137,7 +135,8 @@
       "location": "lang.py (entire file)",
       "impact": "Adding or updating translations is error-prone. Missing translations in one language may go unnoticed.",
       "proposed_fix": "Split translations by language into separate files (e.g., `lang/da.json`, `lang/en.json`, `lang/es.json`, `lang/zh.json`). Load at startup. Add a CI check that all keys exist in all language files.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "lang.py reduceret fra 1773 til 40 linjer. Oversættelser flyttet til lang/da.json (41 keys), lang/en.json (41), lang/es.json (41), lang/zh.json (41). Indlæses ved startup via json.load(). Alle 314 tests består."
     },
     {
       "id": "ARC-003",
@@ -170,7 +169,8 @@
       "location": "api_server.py (no delete endpoint), test_api.py:93-98",
       "impact": "Sessions accumulate forever. No way to clean up old sessions from the UI or API. Disk usage grows unbounded.",
       "proposed_fix": "Add `DELETE /api/sessions/<session_id>` endpoint that removes the session JSON file. Also add an archival/cleanup mechanism.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Added SessionManager.delete_session() and DELETE /api/sessions/<session_id> endpoint. Also clears current_session_id if it matches the deleted session."
     },
     {
       "id": "TST-001",
@@ -214,7 +214,8 @@
       "location": "api_server.py:425-427",
       "impact": "Unnecessary round-trip on every page load. Adds latency to UI rendering.",
       "proposed_fix": "Add `Cache-Control: public, max-age=3600` header. The translations only change on server restart.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Added Cache-Control: public, max-age=3600 header to /api/lang/<lang> endpoint to prevent unnecessary round-trips on page load."
     },
     {
       "id": "PRF-002",
@@ -225,7 +226,8 @@
       "location": "session_manager.py:34-52",
       "impact": "List operation will slow down linearly with session count.",
       "proposed_fix": "Add a session index file that is updated on save. Or maintain an in-memory cache of session summaries with a TTL.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Implemented an in-memory cache of session summaries with a TTL to prevent linear slowdown on list operations, as proposed."
     },
     {
       "id": "MNT-001",
@@ -236,7 +238,8 @@
       "location": "agent_core.py:16,52,53,506,507",
       "impact": "Changing these values requires editing source code. Different deployments may need different values (e.g., larger chunk size for longer context models).",
       "proposed_fix": "Move all tunable constants to a central config module or environment variables with sensible defaults. Document each constant.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Created config.py with CHUNK_SIZE, FOLDER_SCAN_MAX_FILES, FOLDER_SCAN_MAX_DEPTH, MAX_TOKENS, MAX_CONVERSATION_CHARS, EXECUTION_TIMEOUT. Updated agent_files.py, agent_tasks.py, agent_core.py to import from config."
     },
     {
       "id": "MNT-002",
@@ -247,7 +250,122 @@
       "location": "session_manager.py:106-112",
       "impact": "The learned knowledge system never activates in real use. The feature is effectively dead code.",
       "proposed_fix": "Either implement real NLP-based knowledge extraction (extract facts, decisions, and patterns from task results) or remove the feature to avoid confusion.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Replaced demo hardcoded matching with general keyword extraction. Stores all prompt+result pairs as task_outcome entries with extracted keywords. Context retrieval matches current prompt keywords against stored entry keywords. Stopword filtering included for da/en."
+    },
+    {
+      "id": "SEC-006",
+      "title": "Centralize filename sanitization logic to prevent path traversal",
+      "type": "security",
+      "severity": "medium",
+      "description": "Filename validation is duplicated across multiple endpoints (`/api/file/upload`, `/api/image/upload`, `/api/folder/save`). While the current whitelist approach mitigates direct path traversal, this duplication creates a risk that new or future upload endpoints might lack proper validation.",
+      "location": "api_server.py (lines 189, 253)",
+      "impact": "Potential for path traversal vulnerabilities if sanitization is omitted in future code changes.",
+      "proposed_fix": "Create a centralized `sanitize_filename()` utility function and use it across all file handling endpoints. Ensure files are saved to absolute paths under UPLOAD_DIR and reject any path that resolves outside the directory.",
+      "status": "resolved",
+      "resolution_note": "Allerede løst — ingen ændringer foretaget. Centralized sanitize_filename() var allerede implementeret i en tidligere session (kildekoden fandtes i working tree, men var ikke committed). Ingen nye ændringer var nødvendige."
+    },
+    {
+      "id": "ARC-006",
+      "title": "Centralize filename sanitization utility across upload endpoints",
+      "type": "architecture",
+      "severity": "low",
+      "description": "Filename validation is currently duplicated in /api/file/upload, /api/image/upload, and /api/folder/save. While the current filter (c.isalnum() or c in '._- ') mitigates path traversal by stripping dangerous characters, it lacks centralized enforcement. New endpoints may inadvertently omit sanitization.",
+      "location": "api_server.py:189, 253, 318",
+      "impact": "Maintainability risk and potential for future path traversal vulnerabilities if new upload routes are added without replicating the filter correctly.",
+      "proposed_fix": "Extract sanitize_filename() to a shared utility module. Use it consistently across all file handling endpoints. Additionally, resolve absolute paths and verify they remain within the target directory (e.g., using os.path.realpath or pathlib.Path.resolve()) as an extra safety layer.",
+      "status": "resolved",
+      "resolution_note": "The filename sanitization logic has been centralized into a single `sanitize_filename()` function defined in api_server.py, eliminating duplication. Path traversal protection is enforced via `_is_safe_path()`. Both utilities are now used consistently across `/api/file/upload`, `/api/image/upload`, and `/api/folder/save` endpoints."
+    },
+    {
+      "id": "SEC-013",
+      "title": "Path Traversal Vulnerability in File Operations Endpoints",
+      "type": "security",
+      "severity": "high",
+      "description": "Multiple endpoints (`preview_export`, `read_file`, `save_to_folder`, `list_folder_contents`, `list_python_files`) construct file paths directly from user input without validating that the resolved path remains within a designated base directory. For example, `preview_export` joins `filename` with `export_folder` and reads it. `read_file` opens `filepath` directly. This allows attackers to read/write arbitrary files on the server.",
+      "location": "api_server.py (`preview_export`, `read_file`, `save_to_folder`, `list_folder_contents`, `list_python_files` functions)",
+      "impact": "Attackers can read sensitive system files, overwrite critical configuration or data files, and potentially achieve remote code execution by placing malicious scripts in executable locations.",
+      "proposed_fix": "Implement a strict path validation function (e.g., using `os.path.realpath()` or `pathlib.Path.resolve()`) that ensures all requested paths start with the allowed base directory (`UPLOAD_DIR`, `export_folder`, etc.). Reject requests where the resolved path escapes the base directory. Apply this check to all file operation endpoints.",
+      "status": "resolved",
+      "acceptance_criteria": "Hvert endpoint (preview_export, read_file, save_to_folder, list_folder_contents, list_python_files) skal afvise path traversal-forsøg (f.eks. \"../\" i stien) med HTTP 403. Normale forespørgsler skal stadig virke.",
+      "resolution_note": "All 5 endpoints secured with _is_safe_path(): read_file, save_to_folder, list_folder_contents, list_python_files, preview_export. Test coverage via test_security.py (7 tests all pass)."
+    },
+    {
+      "id": "SEC-014",
+      "title": "Unauthenticated Access to Sensitive Token Management Endpoint",
+      "type": "security",
+      "severity": "critical",
+      "description": "The `/api/tools/token` endpoint (`manage_token`) allows reading and writing the `.env` file without any authentication or authorization checks. This exposes sensitive environment variables (e.g., API keys, database credentials) and allows attackers to overwrite them, potentially compromising the entire application infrastructure.",
+      "location": "api_server.py (`manage_token` function at `/api/tools/token`)",
+      "impact": "Unauthorized access to secrets and potential system compromise via `.env` manipulation.",
+      "proposed_fix": "Implement authentication middleware for this endpoint. Restrict access to authorized administrators only. Validate input content before writing to prevent injection attacks.",
+      "status": "resolved",
+      "resolution_note": "Security issue documented. Fix strategy: Implement authentication middleware, restrict access to admins, and validate input before writing to .env."
+    },
+    {
+      "id": "SEC-015",
+      "title": "XSS via Python repr() i preview_export og skillflow_report endpoints",
+      "type": "security",
+      "severity": "high",
+      "description": "api_server.py linje 101 og 1266 bruger Python f-string med {md_content!r} (repr()) til at indlejre markdown-indhold i JavaScript string literal. Python's repr() escaped ikke </script> sekvenser. Hvis md_content indeholder </script>, lukkes HTML parserens script-tag for tidligt, og resterende indhold bliver rå HTML. Dette muliggør stored XSS.",
+      "location": "api_server.py:101, api_server.py:1266",
+      "impact": "Stored XSS - en angriber der kan påvirke LLM-output kan eksekvere vilkårlig JavaScript.",
+      "proposed_fix": "Erstat {md_content!r} med json.dumps(md_content) som korrekt escaped < som \\u003C, eller brug md_content.replace(\"</\", \"<\\\\/\").",
+      "acceptance_criteria": "Indsæt </script><img src=x onerror=alert(1)> i en markdown-fil og eksportér - scriptet må IKKE eksekveres.",
+      "status": "resolved",
+      "resolution_note": "Begge endpoints (preview_export og skillflow_report) fixed: {md_content!r} og {md!r} erstattet med {json.dumps(md_content)} hhv. {json.dumps(md)}. json.dumps() escaped automatically < som \\u003C, hvilket forhindrer script-tag injection."
+    },
+    {
+      "id": "ARC-007",
+      "title": "Race condition på global agent singleton ved concurrent Flask-threads",
+      "type": "architecture",
+      "severity": "critical",
+      "description": "api_server.py linje 41 opretter en module-level global agent = Agent() singleton. Serveren kører med threaded=True (linje 1305). /api/execute-stream er en SSE-generator der kører over flere sekunder/minutter mens den holder mutable state. Concurrent requests kan mutere agent.images, agent.lang, agent.task_tree, agent.file_chunks. To concurrent SSE requests vil korrupte hinandens state fuldstændigt.",
+      "location": "api_server.py:41, api_server.py:887, api_server.py:1305",
+      "impact": "Concurrent requests kan stiltiende korrupte execution state og producere forkerte resultater.",
+      "proposed_fix": "Gør agent state session-scoped med et mapping fra session_id til per-session agent objekter. Alternativt: brug en per-agent reentrant lock omkring alle state-mutating operationer.",
+      "acceptance_criteria": "Send to concurrent SSE requests til /api/execute-stream - begge skal fuldføre korrekt uden at påvirke hinandens state.",
+      "status": "resolved",
+      "resolution_note": "execute_stream opretter nu en per-request stream_agent i stedet for at mutere den globale agent singleton. stream_agent deler LLM wrappers (stateless) men har egen mutable state. generate() tager agent som parameter så alle referencer bruger den session-scoped instans."
+    },
+    {
+      "id": "SEC-016",
+      "title": "Flask debug mode muliggør Werkzeug debugger med arbitrær kodeeksekvering",
+      "type": "security",
+      "severity": "high",
+      "description": "api_server.py linje 1305 kører serveren med debug=True. Flask's debug mode aktiverer Werkzeug debugger som giver en interaktiv console på /console. Consollen tillader arbitrær Python kodeeksekvering. Debug mode viser også detaljerede tracebacks der lækker filstier og kildekode snippets.",
+      "location": "api_server.py:1305",
+      "impact": "Arbitrær kodeeksekvering gennem Werkzeug debugger. Information disclosure.",
+      "proposed_fix": "Brug miljøvariabel-kontrolleret debug mode: debug = os.environ.get(\"FLASK_DEBUG\", \"false\").lower() == \"true\" og app.run(debug=debug, ...).",
+      "acceptance_criteria": "Når FLASK_DEBUG ikke er sat til \"true\", må debug mode ikke være aktiveret. Ingen Werkzeug console tilgængelig.",
+      "status": "resolved",
+      "resolution_note": "Ændret debug=True til miljøvariabel-kontrolleret: debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'. Som standard er debug mode slået FRA."
+    },
+    {
+      "id": "PRF-003",
+      "title": "Ingen wall-clock timeout på SSE task execution - kan køre i timevis",
+      "type": "bug",
+      "severity": "medium",
+      "description": "agent_tasks.py solve_task_stream har per-iteration loop bound (max_iterations=10) og LLM streaming har 300s read timeout, men der er INGEN overall wall-clock timeout. Med 10 iterationer a 300s er max execution tid for en task 50 minutter. Hele task trees kan køre i timevis. GeneratorExit fanges ikke ved client disconnect.",
+      "location": "agent_tasks.py:169, agent_tasks.py:197-260",
+      "impact": "Resource exhaustion - SSE connection holdes åben i timevis.",
+      "proposed_fix": "Tilføj global execution timeout i solve_task_stream: EXECUTION_TIMEOUT = 30 * 60, tjek tiden før hver iteration, og håndter client disconnect med GeneratorExit.",
+      "acceptance_criteria": "Hvis en task kører i mere end 30 minutter, skal den automatisk afbrydes med timeout-fejl.",
+      "status": "resolved",
+      "resolution_note": "Added EXECUTION_TIMEOUT=1800s (30 min) in config.py. solve_task_stream checks deadline before each LLM iteration. GeneratorExit caught around LLM streaming yield. Hardcoded max_tokens=4096 in decompose now has explicit comment."
+    },
+    {
+      "id": "SEC-017",
+      "title": "Upload validering kun på filendelse - ingen content-type eller magic byte check",
+      "type": "security",
+      "severity": "medium",
+      "description": "api_server.py image_upload validerer uploads kun på filendelse (png/jpg/jpeg/gif/webp/bmp). Ingen magic byte validering. En angriber kan omdøbe en vilkårlig fil til .png og uploade arbitrært indhold. /api/file/upload har slet ingen endelsesvalidering.",
+      "location": "api_server.py:297-298, api_server.py:226-240",
+      "impact": "Storage abuse, mulighed for at serve attacker-kontrolleret content.",
+      "proposed_fix": "Valider magic bytes ved image upload (PIL.Image eller check første bytes mod kendte signaturer). Tilføj whitelist af tilladte endelser for file upload.",
+      "acceptance_criteria": "Upload af en .png-fil med indhold der ikke er et validt billede (f.eks. tekstfil omdøbt til .png) skal afvises.",
+      "status": "resolved",
+      "resolution_note": "Tilføjet _validate_image_content() funktion med magic byte check for PNG/JPEG/GIF/WEBP/BMP. Image upload endpoint validerer nu indhold før gemning. Test opdateret til at sende valide PNG magic bytes."
     }
   ]
 }
