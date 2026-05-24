@@ -87,7 +87,7 @@ Opgave: {prompt}""",
             "issue_handler": """Du skal håndtere en issue. Følg disse faser slavisk i rækkefølge:
 
 1. Læs — læs issue med read_issue. Forstå problemet. Du må IKKE læse kildekode.
-2. Afklar — analysér issue, læs kildekode med read_chunk, kør tests. Opdater med update_issue_status hvis detaljer mangler. Hvis fejlen ALLEREDE er løst: markér resolved og stop.
+2. Afklar — analysér issue, læs kildekode med read_chunk, kør tests. Opdater med update_issue_status hvis detaljer mangler. Hvis fejlen ALLEREDE er løst: markér resolved og skriv 'Allerede løst — ingen ændringer foretaget' i resolution_note.
 3. Fix — ret fejlen med edit_file, kør tests. Må IKKE markere resolved — det gøres i næste fase.
 4. Luk Issue — bekræft at fix og tests er OK, opdater status til 'resolved' med præcis resolution_note.
 
@@ -523,7 +523,7 @@ Task: {prompt}""",
             "issue_handler": """You must handle an issue. Follow these phases strictly in order:
 
 1. Read — read the issue with read_issue. Understand the problem. You MUST NOT read source code.
-2. Clarify — analyze the issue, read source with read_chunk, run tests. Update with update_issue_status if details missing. If bug is ALREADY fixed: mark resolved and stop.
+2. Clarify — analyze the issue, read source with read_chunk, run tests. Update with update_issue_status if details missing. If bug is ALREADY fixed: mark resolved and write 'Already fixed — no changes made' in the resolution_note.
 3. Fix — fix with edit_file, run tests. Do NOT mark resolved — the next phase handles that.
 4. Close Issue — confirm fix and tests pass, update status to 'resolved' with precise resolution_note.
 
@@ -958,7 +958,7 @@ Tarea: {prompt}""",
             "issue_handler": """Debes manejar un issue. Sigue estas fases estrictamente en orden:
 
 1. Leer — lee el issue con read_issue. Entiende el problema. NO debes leer código fuente.
-2. Clarificar — analiza el issue, lee código con read_chunk, ejecuta pruebas. Actualiza con update_issue_status si faltan detalles. Si el bug YA está arreglado: marca resolved y detente.
+2. Clarificar — analiza el issue, lee código con read_chunk, ejecuta pruebas. Actualiza con update_issue_status si faltan detalles. Si el bug YA está arreglado: marca resolved y escribe 'Ya está arreglado — no se hicieron cambios' en la resolution_note.
 3. Arreglar — arregla con edit_file, ejecuta pruebas. NO marques resolved — la siguiente fase lo hace.
 4. Cerrar Issue — confirma que el arreglo y pruebas están OK, actualiza estado a 'resolved' con nota precisa.
 
@@ -1393,7 +1393,7 @@ Tarea: {prompt}""",
             "issue_handler": """你必须处理一个Issue。严格遵守以下阶段顺序：
 
 1. 读取 — 使用read_issue读取issue。理解问题。不得阅读源代码。
-2. 澄清 — 分析issue，使用read_chunk阅读源代码，运行测试。如果缺少详细信息，使用update_issue_status更新。如果bug已修复：标记resolved并停止。
+2. 澄清 — 分析issue，使用read_chunk阅读源代码，运行测试。如果缺少详细信息，使用update_issue_status更新。如果bug已修复：标记resolved并在resolution_note中写'已修复 — 未做任何更改'。
 3. 修复 — 使用edit_file修复，运行测试。不要标记resolved — 下一阶段处理。
 4. 关闭 Issue — 确认修复和测试通过，使用精确的resolution_note将状态更新为'resolved'。
 
