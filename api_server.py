@@ -954,6 +954,8 @@ def execute_stream():
 
         agent.agent_log = []
         agent.execution_log = []
+        agent.issue_resolved = False
+        agent.current_phase = None
 
         # Truncate context for subtask prompts
         MAX_CTX = 150000
