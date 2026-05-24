@@ -2867,7 +2867,8 @@ function useIssueAsTask(encoded) {
     const templateLabel = document.getElementById('templateLabel');
     const promptText = `${issue.id}: ${issue.title}\n\n${issue.description || ''}\n\n${_('issues_detail_location')} ${issue.location || '—'}\n${_('issues_detail_impact')} ${issue.impact || '—'}\n\n${_('issues_detail_fix')} ${issue.proposed_fix || '—'}`;
     prompt.value = promptText;
-    template.value = 'issue_handler';
+    const tplMap = { 'architecture': 'refactor', 'bug': 'bugfix' };
+    template.value = tplMap[issue.type] || 'issue_handler';
     addLogEntry('INFO', `${_('prompt_filled_from')} ${issue.id}`, issue.title);
 }
 
