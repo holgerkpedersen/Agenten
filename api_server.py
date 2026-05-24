@@ -1032,35 +1032,39 @@ def execute_stream():
             if current_session_id:
                 session_manager.add_prompt_result(current_session_id, node.name, full_response, None)
         
-        try:
-            if _check_client():
-                yield f"data: {json.dumps({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui)})}\n\n"
+        saved = False
+        def _save_session():
+            nonlocal saved
+            if saved or not current_session_id:
                 return
-            yield from execute_with_stream(agent.task_tree.root)
             existing = session_manager.load_session(current_session_id) or {}
             existing.update({
-                "tree": agent.task_tree_to_dict(),
+                "tree": agent.task_tree_to_dict() if agent.task_tree else existing.get("tree"),
                 "execution_log": agent.execution_log,
                 "agent_log": agent.agent_log,
                 "original_prompt": agent.original_prompt or (agent.task_tree.root.name if agent.task_tree else ""),
                 "prompt_history": existing.get("prompt_history", []),
                 "lang": agent.lang,
                 "ui_lang": ui_lang,
-                "template": agent.active_template
+                "template": agent.active_template,
+                "file_chunks": agent.file_chunks,
+                "images": agent.images,
             })
-            if current_session_id:
-                session_manager.save_session(current_session_id, existing)
+            session_manager.save_session(current_session_id, existing)
+            saved = True
+
+        try:
+            if _check_client():
+                yield f"data: {json.dumps({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui)})}\n\n"
+                return
+            yield from execute_with_stream(agent.task_tree.root)
+            _save_session()
             yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, _ui)})}\n\n"
         except Exception as e:
-            existing = session_manager.load_session(current_session_id) or {}
-            existing["tree"] = agent.task_tree_to_dict() if agent.task_tree else existing.get("tree")
-            existing["execution_log"] = agent.execution_log
-            existing["agent_log"] = agent.agent_log
-            existing["lang"] = agent.lang
-            existing["template"] = agent.active_template
-            if current_session_id:
-                session_manager.save_session(current_session_id, existing)
+            _save_session()
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        finally:
+            _save_session()
     
     return Response(stream_with_context(generate()), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
 
