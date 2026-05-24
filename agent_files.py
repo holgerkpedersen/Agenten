@@ -2,8 +2,11 @@ import os
 import re
 from lang import t
 from i18n import K
+import config
 
-CHUNK_SIZE = 150000
+CHUNK_SIZE = config.CHUNK_SIZE
+FOLDER_SCAN_MAX_FILES = config.FOLDER_SCAN_MAX_FILES
+FOLDER_SCAN_MAX_DEPTH = config.FOLDER_SCAN_MAX_DEPTH
 
 
 def chunk_text(text, size=CHUNK_SIZE):
@@ -36,8 +39,6 @@ def read_file_content(agent, filepath):
 FOLDER_SCAN_EXCLUDE_DIRS = {'node_modules', '.git', 'venv', '.venv', '__pycache__', '.opencode', '.agent_storage'}
 FOLDER_SCAN_EXCLUDE_FILES = {'.env'}
 FOLDER_SCAN_EXTENSIONS = {'.py', '.js', '.json', '.html', '.css', '.yml', '.yaml', '.toml', '.md', '.txt', '.bat', '.cfg', '.ini', '.sh', '.jsx', '.ts', '.tsx', '.vue', '.svelte'}
-FOLDER_SCAN_MAX_FILES = 20
-FOLDER_SCAN_MAX_DEPTH = 2
 
 
 def get_single_file_context(agent, prompt):

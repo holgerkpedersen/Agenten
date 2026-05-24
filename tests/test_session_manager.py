@@ -67,34 +67,36 @@ class TestSessionManagerBasics:
 
 
 class TestSessionKnowledgeExtraction:
-    def test_extract_math_fact(self, session_manager):
+    def test_extract_task_outcome(self, session_manager):
         sid, _ = session_manager.create_session("Test")
         session_manager.add_prompt_result(sid, "What is 2 + 2?", "4")
         loaded = session_manager.load_session(sid)
         knowledge = loaded["learned_knowledge"]
-        math_items = [k for k in knowledge if k.get("type") == "mathematical_fact"]
-        assert len(math_items) >= 1
-        assert "addition" in math_items[0]["content"].lower() or "true" in math_items[0]["content"].lower()
+        items = [k for k in knowledge if k.get("type") == "task_outcome"]
+        assert len(items) >= 1
+        assert "2 + 2" in items[0]["content"]
 
-    def test_extract_optimization_fact(self, session_manager):
+    def test_extract_multiple_knowledge(self, session_manager):
         sid, _ = session_manager.create_session("Test")
-        session_manager.add_prompt_result(sid, "token optimization", "caching")
+        session_manager.add_prompt_result(sid, "How to optimize token usage?", "Use caching")
+        session_manager.add_prompt_result(sid, "Fix bug in api_server", "Fixed route handler")
         loaded = session_manager.load_session(sid)
         knowledge = loaded["learned_knowledge"]
-        opt_items = [k for k in knowledge if k.get("type") == "optimization"]
-        assert len(opt_items) >= 1
+        assert len(knowledge) >= 1
+        items = [k for k in knowledge if k.get("type") == "task_outcome"]
+        assert len(items) >= 2
 
     def test_knowledge_context_da(self, session_manager):
         sid, _ = session_manager.create_session("Test")
-        session_manager.add_prompt_result(sid, "What is 2 + 2?", "4")
-        context = session_manager.get_knowledge_for_context(sid, "Tell me about addition", lang="da")
+        session_manager.add_prompt_result(sid, "Analyzer kode i agent_core.py", "Kode analyseret")
+        context = session_manager.get_knowledge_for_context(sid, "kode analyse agent_core", lang="da")
         assert context is not None
         assert isinstance(context, str)
         assert len(context) > 0
 
     def test_knowledge_context_en(self, session_manager):
         sid, _ = session_manager.create_session("Test")
-        session_manager.add_prompt_result(sid, "token optimization", "caching")
+        session_manager.add_prompt_result(sid, "token optimization for llm", "Use caching")
         context = session_manager.get_knowledge_for_context(sid, "token optimization", lang="en")
         assert context is not None
         assert isinstance(context, str)
@@ -106,10 +108,9 @@ class TestSessionKnowledgeExtraction:
 
     def test_knowledge_context_respects_lang(self, session_manager):
         sid, _ = session_manager.create_session("Test")
-        session_manager.add_prompt_result(sid, "What is 2 + 2?", "4")
-        ctx_da = session_manager.get_knowledge_for_context(sid, "Tell me about 2 + 2", lang="da")
-        ctx_en = session_manager.get_knowledge_for_context(sid, "Tell me about 2 + 2", lang="en")
-        # Both should be non-empty strings
+        session_manager.add_prompt_result(sid, "How to fix bugs in code?", "Fixed with tests")
+        ctx_da = session_manager.get_knowledge_for_context(sid, "fix bugs code", lang="da")
+        ctx_en = session_manager.get_knowledge_for_context(sid, "fix bugs code", lang="en")
         assert isinstance(ctx_da, str), f"da context not string: {type(ctx_da)}"
         assert isinstance(ctx_en, str), f"en context not string: {type(ctx_en)}"
 

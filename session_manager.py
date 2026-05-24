@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from datetime import datetime
 import uuid
 import threading
@@ -69,11 +70,19 @@ class SessionManager:
         return session_id, session_data
     
     def rename_session(self, session_id, new_name):
-        session_data = self.load_session(session_id)
-        if session_data:
-            session_data["name"] = new_name
-            self.save_session(session_id, session_data)
-            return True
+        session = self.load_session(session_id)
+        if not session:
+            return False
+        session["name"] = new_name
+        self.save_session(session_id, session)
+        return True
+
+    def delete_session(self, session_id):
+        filepath = os.path.join(self.storage_dir, f"{session_id}.json")
+        if not os.path.exists(filepath):
+            return False
+        os.remove(filepath)
+        return True
         return False
 
     def add_prompt_result(self, session_id, prompt, result, tree=None):
@@ -105,10 +114,17 @@ class SessionManager:
     def _extract_knowledge(self, session_data, prompt, result):
         knowledge = session_data.get("learned_knowledge", [])
         prompt_lower = prompt.lower()
-        if "2 + 2" in prompt_lower or "2 plus 2" in prompt_lower:
-            knowledge.append({"type": "mathematical_fact", "content": t("session.demo_math_fact", "da"), "source_prompt": prompt[:50], "timestamp": datetime.now().isoformat()})
-        if "token" in prompt_lower or "komprimere" in prompt_lower:
-            knowledge.append({"type": "optimization", "content": t("session.demo_optimization", "da"), "source_prompt": prompt[:50], "timestamp": datetime.now().isoformat()})
+        keywords = [w for w in re.split(r'[\s.,;:!?()\[\]{}"\']+', prompt_lower) if w]
+        stopwords = {'the', 'and', 'for', 'til', 'der', 'som', 'det', 'den', 'har', 'med', 'kan', 'skal', 'are', 'you', 'not', 'but', 'how', 'was', 'what', 'did', 'all', 'fra', 'is', 'in', 'it', 'to', 'of'}
+        keywords = [kw for kw in keywords if kw not in stopwords]
+        if keywords and result and len(str(result)) > 0:
+            knowledge.append({
+                "type": "task_outcome",
+                "content": f"Prompt: {prompt[:150]} ... Result: {str(result)[:150]}",
+                "source_prompt": prompt[:100],
+                "keywords": keywords[:10],
+                "timestamp": datetime.now().isoformat(),
+            })
         session_data["learned_knowledge"] = knowledge[-20:]
     
     def get_knowledge_for_context(self, session_id, current_prompt, lang="da"):
@@ -121,9 +137,8 @@ class SessionManager:
         current_lower = current_prompt.lower()
         relevant = []
         for k in knowledge[-10:]:
-            content = k.get("content", "").lower()
-            keywords = current_lower.split()[:5]
-            if any(keyword in content for keyword in keywords if len(keyword) > 3):
+            kws = k.get("keywords", [])
+            if kws and any(kw in current_lower for kw in kws if len(kw) > 3):
                 relevant.append(k)
         if relevant:
             context = "\n\n" + t(K.DEMO_KNOWLEDGE_HDR, lang)

@@ -36,7 +36,7 @@ def test_image_upload_path_traversal(client):
     """Test that image_upload rejects or sanitizes path traversal attempts."""
     malicious_filename = "../../etc/shadow.png"
     data = {
-        'image': (BytesIO(b"fake png data"), malicious_filename)
+        'image': (BytesIO(b"\x89PNG\r\n\x1a\n" + b"fake png data"), malicious_filename)
     }
     response = client.post('/api/image/upload', data=data, content_type='multipart/form-data')
     

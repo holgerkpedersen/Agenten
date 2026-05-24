@@ -14,6 +14,7 @@ import agent_tree
 import agent_skills
 import agent_git
 import agent_tasks
+import config
 import re
 import sys
 import time
@@ -58,8 +59,8 @@ class Agent:
         self.active_template = None
         self.current_phase = None
         self.issue_resolved = False
-        self.max_tokens = 4096
-        self.max_conversation_chars = 8000
+        self.max_tokens = config.MAX_TOKENS
+        self.max_conversation_chars = config.MAX_CONVERSATION_CHARS
         self.tool_registry = ToolRegistry()
         self._register_tools()
         self._checkpoint_tools = set()
@@ -464,7 +465,7 @@ class Agent:
             decomposition_prompt += "\n<|channel>thought\n<channel|>"
 
         self._log("LLM", t(K.LOG_SENDING_LLM, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(self.file_context)) if isinstance(self.file_context, list) and self.file_context else "")
-        response = self.decompose_llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)
+        response = self.decompose_llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)  # decompose tree is simpler, needs fewer tokens
         self._log("LLM", t(K.LOG_RECEIVED_LLM, self.lang), t(K.LOG_N_CHARS, self.lang).format(n=len(response)))
 
         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)

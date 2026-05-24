@@ -6,7 +6,9 @@ from i18n import K
 from lang import t
 import agent_skills
 import agent_git
+import config
 
+EXECUTION_TIMEOUT = config.EXECUTION_TIMEOUT
 
 PHASE_ALIASES = {
     "analyse": "analyse", "analysis": "analyse",
@@ -194,8 +196,15 @@ def solve_task_stream(agent, task_node, original_prompt):
                     cropped = "[...]"
                 messages = messages[:2] + [{"role": "user", "content": mid + cropped}]
 
+    _task_deadline = time.time() + EXECUTION_TIMEOUT
+
     for i in range(max_iterations):
         if agent.stop_requested:
+            break
+
+        if time.time() > _task_deadline:
+            agent._log("WARNING", "Task timeout", f"Exceeded {EXECUTION_TIMEOUT//60}-min limit")
+            yield {"type": "timeout", "message": f"Task exceeded {EXECUTION_TIMEOUT//60}-minute limit"}
             break
 
         if agent.pending_reply:
@@ -204,11 +213,15 @@ def solve_task_stream(agent, task_node, original_prompt):
             agent.pending_reply = None
 
         response = ""
-        for chunk in agent.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=agent.max_tokens, images=agent.images):
-            if agent.stop_requested:
-                break
-            response += chunk
-            yield {"type": "chunk", "chunk": chunk}
+        try:
+            for chunk in agent.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=agent.max_tokens, images=agent.images):
+                if agent.stop_requested:
+                    break
+                response += chunk
+                yield {"type": "chunk", "chunk": chunk}
+        except GeneratorExit:
+            agent._log("INFO", "Client disconnected", "GeneratorExit")
+            raise
 
         if agent.stop_requested:
             break

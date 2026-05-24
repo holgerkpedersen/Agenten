@@ -98,7 +98,7 @@ def preview_export(filename):
     img {{ max-width: 100%; border-radius: 8px; }}
 </style></head>
 <body><div id="content"></div>
-<script>document.getElementById('content').innerHTML = marked.parse({md_content!r});</script>
+<script>document.getElementById('content').innerHTML = marked.parse({json.dumps(md_content)});</script>
 </body></html>"""
 
 @app.route("/")
@@ -217,11 +217,32 @@ def _is_safe_path(base_dir, target_path):
     """Ensures that target_path resolves within base_dir to prevent path traversal."""
     try:
         real_base = os.path.realpath(base_dir)
-        # For non-existent paths (e.g., saving), resolve what we can.
         real_target = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
         return real_target.startswith(real_base + os.sep) or real_target == real_base
     except Exception:
         return False
+
+
+_IMAGE_MAGIC_BYTES = {
+    b'\x89PNG\r\n\x1a\n': 'png',
+    b'\xff\xd8\xff': 'jpg',
+    b'GIF8': 'gif',
+    b'RIFF': 'webp',
+    b'BM': 'bmp',
+}
+
+
+def _validate_image_content(file_bytes, ext):
+    """Validate that file_bytes contains actual image content matching ext."""
+    for magic, fmt in _IMAGE_MAGIC_BYTES.items():
+        if file_bytes.startswith(magic):
+            if fmt == 'webp':
+                return len(file_bytes) > 12 and file_bytes[8:12] == b'WEBP'
+            if fmt == 'jpg':
+                return ext in ('.jpg', '.jpeg')
+            return True
+    return False
+
 
 @app.route("/api/file/upload", methods=["POST"])
 def upload_file():
@@ -297,13 +318,16 @@ def image_upload():
     ext = os.path.splitext(f.filename)[1].lower()
     if ext not in ('.png','.jpg','.jpeg','.gif','.webp','.bmp'):
         return jsonify({"success": False, "error": f"Ikke understøttet format: {ext}"}), 400
+    raw_bytes = f.read()
+    if not _validate_image_content(raw_bytes, ext):
+        return jsonify({"success": False, "error": "Filens indhold matcher ikke et gyldigt billedformat"}), 400
+    f.stream.seek(0)
     import base64
     mime = "jpeg" if ext in ('.jpg','.jpeg') else ext.lstrip('.')
     safe_filename = sanitize_filename(f.filename)
     filepath = os.path.join(UPLOAD_DIR, safe_filename)
     f.save(filepath)
-    with open(filepath, "rb") as bf:
-        raw_b64 = base64.b64encode(bf.read()).decode('utf-8')
+    raw_b64 = base64.b64encode(raw_bytes).decode('utf-8')
     agent.images.append({"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath})
     agent._log("TOOL", "🖼️ Billede uploadet", f"{f.filename} → {filepath} ({len(raw_b64)} bytes, {len(agent.images)} billeder i alt)")
     return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(agent.images)})
@@ -458,6 +482,17 @@ def rename_session():
         return jsonify({"error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
     if session_manager.rename_session(session_id, new_name):
         return jsonify({"success": True})
+    return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
+
+@app.route("/api/sessions/<session_id>", methods=["DELETE"])
+def delete_session(session_id):
+    global current_session_id
+    if not session_id:
+        return jsonify({"error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
+    if session_manager.delete_session(session_id):
+        if current_session_id == session_id:
+            current_session_id = None
+        return jsonify({"success": True, "deleted": session_id})
     return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
 @app.route("/api/tools/token", methods=["GET", "POST"])
@@ -888,6 +923,13 @@ def decompose():
 def execute_stream():
     global current_session_id
     ui_lang = "da"
+    
+    # Create a session-scoped agent to avoid race conditions with concurrent SSE requests (ARC-007)
+    stream_agent = Agent()
+    stream_agent.llm = agent.llm
+    stream_agent.decompose_llm = agent.decompose_llm
+    stream_agent.searcher = agent.searcher
+    
     print(f"Execute stream - current_session_id: {current_session_id}")
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
@@ -896,44 +938,44 @@ def execute_stream():
             ui_lang = session_data.get("ui_lang", session_data.get("lang", "da"))
             print(f"Session show_thinking: {st}")
             if session_data.get("original_prompt"):
-                agent.original_prompt = session_data["original_prompt"]
+                stream_agent.original_prompt = session_data["original_prompt"]
             if session_data.get("tree"):
-                agent.task_tree_from_dict(session_data["tree"])
+                stream_agent.task_tree_from_dict(session_data["tree"])
             if session_data.get("lang"):
-                agent.lang = session_data["lang"]
-                agent.tool_registry.lang = agent.lang
+                stream_agent.lang = session_data["lang"]
+                stream_agent.tool_registry.lang = stream_agent.lang
             if session_data.get("file_chunks"):
-                agent.file_chunks = session_data["file_chunks"]
-            agent.images = _normalize_images(session_data.get("images", []))
+                stream_agent.file_chunks = session_data["file_chunks"]
+            stream_agent.images = _normalize_images(session_data.get("images", []))
             if session_data.get("template"):
-                agent.active_template = session_data["template"]
+                stream_agent.active_template = session_data["template"]
                 allowed = agent_skills.TEMPLATE_TOOLS.get(session_data["template"]) if session_data["template"] in agent_skills.TEMPLATE_TOOLS else None
-                agent.tool_registry.set_active_tools(allowed)
+                stream_agent.tool_registry.set_active_tools(allowed)
             if session_data.get("decompose_model"):
-                agent.decompose_llm.set_model(session_data["decompose_model"])
+                stream_agent.decompose_llm.set_model(session_data["decompose_model"])
             if session_data.get("execute_model"):
-                agent.llm.set_model(session_data["execute_model"])
+                stream_agent.llm.set_model(session_data["execute_model"])
             
             fpc = session_data.get("full_prompt_with_context", "")
             if not fpc:
                 fc = session_data.get("file_context", "")
                 if fc and isinstance(fc, list):
-                    file_context_content = "\n\n" + t(K.FILE_CONTEXT_HEADER, agent.lang)
+                    file_context_content = "\n\n" + t(K.FILE_CONTEXT_HEADER, stream_agent.lang)
                     for f in fc:
-                        filename = f.get('filename', t(K.UNKNOWN, agent.lang))
+                        filename = f.get('filename', t(K.UNKNOWN, stream_agent.lang))
                         content = f.get('content', '')
                         file_context_content += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
-                    fpc = agent.original_prompt + file_context_content
+                    fpc = stream_agent.original_prompt + file_context_content
                 else:
-                    fpc = agent.original_prompt
-            agent.full_prompt_with_context = fpc
-            agent.show_thinking = st
-            print(f"Agent show_thinking set to: {agent.show_thinking}")
-            agent.stop_requested = False
+                    fpc = stream_agent.original_prompt
+            stream_agent.full_prompt_with_context = fpc
+            stream_agent.show_thinking = st
+            print(f"Agent show_thinking set to: {stream_agent.show_thinking}")
+            stream_agent.stop_requested = False
 
-    _ensure_model_loaded(agent.llm.model)
+    _ensure_model_loaded(stream_agent.llm.model)
 
-    def generate():
+    def generate(agent):
         _ui = ui_lang  # capture in closure
         if agent.task_tree is None:
             if current_session_id:
@@ -1066,7 +1108,7 @@ def execute_stream():
         finally:
             _save_session()
     
-    return Response(stream_with_context(generate()), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
+    return Response(stream_with_context(generate(stream_agent)), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
 
 @app.route("/api/log", methods=["GET"])
 def get_log():
@@ -1269,7 +1311,7 @@ def skillflow_report():
     a {{ color: #60a5fa; }}
 </style></head>
 <body><div id="content"></div>
-<script>document.getElementById('content').innerHTML = marked.parse({md!r});</script>
+<script>document.getElementById('content').innerHTML = marked.parse({json.dumps(md)});</script>
 </body></html>"""
 
 @app.route("/api/skillflow/apply")
@@ -1308,4 +1350,5 @@ if __name__ == "__main__":
     print("💾 Sessions gemmes i ./sessions/")
     print("📁 Filhåndtering via Python (tkinter)")
     print("=" * 50)
-    app.run(debug=True, use_reloader=False, port=5000, threaded=True)
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    app.run(debug=debug, use_reloader=False, port=5000, threaded=True)

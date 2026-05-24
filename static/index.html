@@ -2859,7 +2859,7 @@ function toggleIssueDetail(row) {
     if (detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
 }
 
-function useIssueAsTask(encoded) {
+async function useIssueAsTask(encoded) {
     const issue = JSON.parse(decodeURIComponent(encoded));
     closeIssuesPanel();
     const prompt = document.getElementById('promptInput');
@@ -2870,6 +2870,30 @@ function useIssueAsTask(encoded) {
     const tplMap = { 'architecture': 'refactor', 'bug': 'bugfix' };
     template.value = tplMap[issue.type] || 'issue_handler';
     addLogEntry('INFO', `${_('prompt_filled_from')} ${issue.id}`, issue.title);
+
+    const fileMatch = issue.location ? issue.location.match(/([\w./-]+\.\w+)/) : null;
+    if (fileMatch) {
+        try {
+            const resp = await fetch('/api/file/read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filepath: fileMatch[1] })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                loadedFilesContent.push({
+                    filename: data.filename,
+                    filepath: data.filepath,
+                    content: data.content,
+                    included: true
+                });
+                document.getElementById('filePathInput').value = data.filename;
+                addLogEntry('INFO', `Fil indlæst: ${data.filename}`, `${data.lines} linjer`);
+            }
+        } catch(e) {
+            addLogEntry('WARNING', 'Kunne ikke auto-indlæse fil', fileMatch[1]);
+        }
+    }
 }
 
 async function deleteIssue(issueId) {

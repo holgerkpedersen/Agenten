@@ -3,7 +3,7 @@
     "generated": "2026-05-20",
     "source": "Codebase audit by Agenten",
     "total": 30,
-    "updated": "2026-05-24T16:44:41.362398"
+    "updated": "2026-05-24T17:30:00.000000"
   },
   "issues": [
     {
@@ -135,7 +135,8 @@
       "location": "lang.py (entire file)",
       "impact": "Adding or updating translations is error-prone. Missing translations in one language may go unnoticed.",
       "proposed_fix": "Split translations by language into separate files (e.g., `lang/da.json`, `lang/en.json`, `lang/es.json`, `lang/zh.json`). Load at startup. Add a CI check that all keys exist in all language files.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "lang.py reduceret fra 1773 til 40 linjer. Oversættelser flyttet til lang/da.json (41 keys), lang/en.json (41), lang/es.json (41), lang/zh.json (41). Indlæses ved startup via json.load(). Alle 314 tests består."
     },
     {
       "id": "ARC-003",
@@ -168,7 +169,8 @@
       "location": "api_server.py (no delete endpoint), test_api.py:93-98",
       "impact": "Sessions accumulate forever. No way to clean up old sessions from the UI or API. Disk usage grows unbounded.",
       "proposed_fix": "Add `DELETE /api/sessions/<session_id>` endpoint that removes the session JSON file. Also add an archival/cleanup mechanism.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Added SessionManager.delete_session() and DELETE /api/sessions/<session_id> endpoint. Also clears current_session_id if it matches the deleted session."
     },
     {
       "id": "TST-001",
@@ -236,7 +238,8 @@
       "location": "agent_core.py:16,52,53,506,507",
       "impact": "Changing these values requires editing source code. Different deployments may need different values (e.g., larger chunk size for longer context models).",
       "proposed_fix": "Move all tunable constants to a central config module or environment variables with sensible defaults. Document each constant.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Created config.py with CHUNK_SIZE, FOLDER_SCAN_MAX_FILES, FOLDER_SCAN_MAX_DEPTH, MAX_TOKENS, MAX_CONVERSATION_CHARS, EXECUTION_TIMEOUT. Updated agent_files.py, agent_tasks.py, agent_core.py to import from config."
     },
     {
       "id": "MNT-002",
@@ -247,7 +250,8 @@
       "location": "session_manager.py:106-112",
       "impact": "The learned knowledge system never activates in real use. The feature is effectively dead code.",
       "proposed_fix": "Either implement real NLP-based knowledge extraction (extract facts, decisions, and patterns from task results) or remove the feature to avoid confusion.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Replaced demo hardcoded matching with general keyword extraction. Stores all prompt+result pairs as task_outcome entries with extracted keywords. Context retrieval matches current prompt keywords against stored entry keywords. Stopword filtering included for da/en."
     },
     {
       "id": "SEC-006",
@@ -306,9 +310,10 @@
       "description": "api_server.py linje 101 og 1266 bruger Python f-string med {md_content!r} (repr()) til at indlejre markdown-indhold i JavaScript string literal. Python's repr() escaped ikke </script> sekvenser. Hvis md_content indeholder </script>, lukkes HTML parserens script-tag for tidligt, og resterende indhold bliver rå HTML. Dette muliggør stored XSS.",
       "location": "api_server.py:101, api_server.py:1266",
       "impact": "Stored XSS - en angriber der kan påvirke LLM-output kan eksekvere vilkårlig JavaScript.",
-      "proposed_fix": "Erstat {md_content!r} med json.dumps(md_content) som korrekt escapes < som \\\\u003C, eller brug md_content.replace(\"</\", \"<\\\\/\").",
+      "proposed_fix": "Erstat {md_content!r} med json.dumps(md_content) som korrekt escaped < som \\u003C, eller brug md_content.replace(\"</\", \"<\\\\/\").",
       "acceptance_criteria": "Indsæt </script><img src=x onerror=alert(1)> i en markdown-fil og eksportér - scriptet må IKKE eksekveres.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Begge endpoints (preview_export og skillflow_report) fixed: {md_content!r} og {md!r} erstattet med {json.dumps(md_content)} hhv. {json.dumps(md)}. json.dumps() escaped automatically < som \\u003C, hvilket forhindrer script-tag injection."
     },
     {
       "id": "ARC-007",
@@ -320,7 +325,8 @@
       "impact": "Concurrent requests kan stiltiende korrupte execution state og producere forkerte resultater.",
       "proposed_fix": "Gør agent state session-scoped med et mapping fra session_id til per-session agent objekter. Alternativt: brug en per-agent reentrant lock omkring alle state-mutating operationer.",
       "acceptance_criteria": "Send to concurrent SSE requests til /api/execute-stream - begge skal fuldføre korrekt uden at påvirke hinandens state.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "execute_stream opretter nu en per-request stream_agent i stedet for at mutere den globale agent singleton. stream_agent deler LLM wrappers (stateless) men har egen mutable state. generate() tager agent som parameter så alle referencer bruger den session-scoped instans."
     },
     {
       "id": "SEC-016",
@@ -332,7 +338,8 @@
       "impact": "Arbitrær kodeeksekvering gennem Werkzeug debugger. Information disclosure.",
       "proposed_fix": "Brug miljøvariabel-kontrolleret debug mode: debug = os.environ.get(\"FLASK_DEBUG\", \"false\").lower() == \"true\" og app.run(debug=debug, ...).",
       "acceptance_criteria": "Når FLASK_DEBUG ikke er sat til \"true\", må debug mode ikke være aktiveret. Ingen Werkzeug console tilgængelig.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Ændret debug=True til miljøvariabel-kontrolleret: debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'. Som standard er debug mode slået FRA."
     },
     {
       "id": "PRF-003",
@@ -344,7 +351,8 @@
       "impact": "Resource exhaustion - SSE connection holdes åben i timevis.",
       "proposed_fix": "Tilføj global execution timeout i solve_task_stream: EXECUTION_TIMEOUT = 30 * 60, tjek tiden før hver iteration, og håndter client disconnect med GeneratorExit.",
       "acceptance_criteria": "Hvis en task kører i mere end 30 minutter, skal den automatisk afbrydes med timeout-fejl.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Added EXECUTION_TIMEOUT=1800s (30 min) in config.py. solve_task_stream checks deadline before each LLM iteration. GeneratorExit caught around LLM streaming yield. Hardcoded max_tokens=4096 in decompose now has explicit comment."
     },
     {
       "id": "SEC-017",
@@ -356,7 +364,8 @@
       "impact": "Storage abuse, mulighed for at serve attacker-kontrolleret content.",
       "proposed_fix": "Valider magic bytes ved image upload (PIL.Image eller check første bytes mod kendte signaturer). Tilføj whitelist af tilladte endelser for file upload.",
       "acceptance_criteria": "Upload af en .png-fil med indhold der ikke er et validt billede (f.eks. tekstfil omdøbt til .png) skal afvises.",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Tilføjet _validate_image_content() funktion med magic byte check for PNG/JPEG/GIF/WEBP/BMP. Image upload endpoint validerer nu indhold før gemning. Test opdateret til at sende valide PNG magic bytes."
     }
   ]
 }
