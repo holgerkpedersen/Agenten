@@ -63,8 +63,8 @@ TEMPLATE_TASK_TOOLS = {
     "issue_handler": {
         "læs": ["read_issue", "list_files"],
         "afklar": ["read_issue", "update_issue_status", "run_tests", "read_chunk", "list_chunks", "list_files"],
-        "fix": ["read_chunk", "edit_file", "run_tests", "list_files"],
-        "luk": ["update_issue_status", "read_issue"],
+        "fix": ["read_chunk", "write_file", "edit_file", "run_tests", "list_files"],
+        "luk": ["update_issue_status", "read_issue", "run_tests"],
     },
 }
 
@@ -129,8 +129,8 @@ SECTION_INSTRUCTIONS = {
     "issue_handler": {
         "Læs": "Læs den tildelte issue med read_issue(). Forstå beskrivelse, location, impact og proposed_fix. Du må IKKE læse kildekode eller redigere filer i dette trin. Brug KUN read_issue(). Afslut med <<<DONE>>>.",
         "Afklar": "Læs issue med read_issue(). Analyser om der mangler detaljer (præcis location, acceptance criteria, repro steps) — opdater i så fald med update_issue_status() (men må IKKE sætte status='resolved'). Læs den relevante kildekode med read_chunk() og kør run_tests() for at verificere om fejlen stadig eksisterer. Hvis fejlen ALLEREDE er løst: opdater status til 'resolved' med update_issue_status() og skriv en HONEST resolution_note — sig 'Allerede løst — ingen ændringer foretaget' frem for at påstå noget blev implementeret. Afslut med <<<DONE>>>. Hvis fejlen stadig findes: afslut med <<<DONE>>> og fortsæt til Fix.",
-        "Fix": "Læs kildekoden med read_chunk(). Ret fejlen med edit_file() — brug PRÆCIS tekst fra filen. Kør run_tests() for at bekræfte rettelsen OG at ingen tests er gået i stykker. Du må IKKE selv markere issue som resolved — det gøres i Luk Issue. Afslut med <<<DONE>>>.",
-        "Luk Issue": "Bekræft at fix'et er implementeret og tests består. Opdater issue-status til 'resolved' med update_issue_status() og tilføj en PRÆCIS resolution_note: beskriv HVAD der blev ændret, HVORFOR, og bekræft at ALLE tests består. Afslut med <<<DONE>>>.",
+        "Fix": "Tjek issue.type med read_issue().\n\n**Hvis type = architecture:** Følg refactor-workflowet:\n  1. Analyse — Læs kildekoden med read_chunk(), forstå struktur og afhængigheder\n  2. Plan — Beslut hvordan koden opdeles/omstruktureres\n  3. Ekstraher — Opret nye filer med write_file()\n  4. Opdatér — Redigér den originale fil med edit_file() (fjern flyttet kode, tilføj imports)\n  5. Test — Kør run_tests(), ret indtil alle består\n\n**Hvis type = bug:** Ret fejlen med edit_file() — brug PRÆCIS tekst fra filen. Kør run_tests().\n\nDu må IKKE selv markere issue som resolved — det gøres i Luk Issue. Afslut med <<<DONE>>>.",
+        "Luk Issue": "Bekræft at fix'et er implementeret og tests består. DU SKAL opdatere issue-status til 'resolved' med update_issue_status() — output alene lukker ikke issuet. Tilføj en PRÆCIS resolution_note: beskriv HVAD der blev ændret, HVORFOR, og bekræft at ALLE tests består. Afslut med <<<DONE>>>.",
     },
 }
 
