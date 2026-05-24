@@ -56,6 +56,8 @@ class Agent:
         self._pending_refactor = None
         self.lang = "da"
         self.active_template = None
+        self.current_phase = None
+        self.issue_resolved = False
         self.max_tokens = 4096
         self.max_conversation_chars = 8000
         self.tool_registry = ToolRegistry()

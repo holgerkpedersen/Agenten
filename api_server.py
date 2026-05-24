@@ -957,6 +957,11 @@ def execute_stream():
             for child in node.children:
                 if _check_client():
                     return
+                if getattr(agent, 'issue_resolved', False):
+                    child.status = "skipped"
+                    child.result = "Skipped — issue was already resolved in an earlier phase"
+                    child_results.append(f"- {child.name}: {child.result}")
+                    continue
                 yield from execute_with_stream(child)
                 if child.result:
                     child_results.append(f"- {child.name}: {child.result}")

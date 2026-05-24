@@ -109,6 +109,9 @@ def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
 
 
 def update_issue_status(agent, issue_id, status, resolution_note=""):
+    phase = getattr(agent, 'current_phase', None)
+    if status == "resolved" and phase == "afklar":
+        return {"success": False, "error": "Afklar-fasen kan ikke sætte status til 'resolved'. Brug update_issue_status til at tilføje detaljer, og fortsæt til Verificer-fasen for at bekræfte om fejlen er løst."}
     data = _load_issues()
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
@@ -118,6 +121,8 @@ def update_issue_status(agent, issue_id, status, resolution_note=""):
             _resolve_referenced_issues(agent, data, issue, status, resolution_note)
             _save_issues(data)
             agent._log("INFO", f"Issue {issue_id} \u2192 {status}", resolution_note[:200])
+            if status == "resolved":
+                agent.issue_resolved = True
             return {"success": True, "issue": issue, "status": status}
     return {"success": False, "error": f"Issue '{issue_id}' not found."}
 

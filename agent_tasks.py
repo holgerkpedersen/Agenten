@@ -101,6 +101,7 @@ def solve_task(agent, task_node, original_prompt):
 def solve_task_stream(agent, task_node, original_prompt):
     task_node.status = "running"
     agent._task_start_time = time.time()
+    agent.current_phase = _normalize_phase(task_node.name)
     agent._log("INFO", t(K.LOG_TASK_START, agent.lang), f"{task_node.name} (model: {agent.llm.model})")
     set_task_tools(agent, task_node.name)
     agent._checkpoint_tools = set()

@@ -129,7 +129,7 @@ SECTION_INSTRUCTIONS = {
     },
     "issue_handler": {
         "Læs": "Læs den tildelte issue med read_issue(). Forstå beskrivelse, location, impact og proposed_fix. Du må IKKE læse kildekode eller redigere filer i dette trin. Brug KUN read_issue(). Afslut med <<<DONE>>>.",
-        "Afklar & Opdater": "Analyser issue-teksten. Hvis der mangler detaljer (præcis location, acceptance criteria, repro steps), opdater da issue med update_issue_status() og tilføj en resolution_note med de nye detaljer. Afslut med <<<DONE>>>.",
+        "Afklar & Opdater": "Analyser issue-teksten. Hvis der mangler detaljer (præcis location, acceptance criteria, repro steps), opdater da issue med update_issue_status() og tilføj en resolution_note med de nye detaljer. Du må IKKE ændre status til 'resolved' i denne fase — kun Verificer- eller Fix-fasen må afslutte et issue. Afslut med <<<DONE>>>.",
         "Verificer": "Kør run_tests() for at bekræfte at testsuiten kører. Læs den relevante kildekode med read_chunk(). Verificér om fejlen stadig eksisterer. Hvis fejlen ALLEREDE er løst: opdater issue-status til 'resolved' med update_issue_status() og afslut med <<<DONE>>>. Hvis fejlen stadig findes: afslut med <<<DONE>>> og fortsæt til Fix.",
         "Luk Issue": "Fejlen blev ikke reproduceret. Opdater issue-status til 'resolved' med update_issue_status() og tilføj en resolution_note om at fejlen ikke kunne reproduceres. Afslut med <<<DONE>>>.",
         "Fix": "Læs kildekoden med read_chunk(). Ret fejlen med edit_file(). Kør run_tests() for at bekræfte rettelsen. Opdater issue-status til 'resolved' med update_issue_status() og tilføj en resolution_note. Afslut med <<<DONE>>>.",
