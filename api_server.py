@@ -150,7 +150,7 @@ def save_to_folder():
     
     try:
         os.makedirs(path, exist_ok=True)
-        safe_filename = "".join(c for c in filename if c.isalnum() or c in '._- ')
+        safe_filename = sanitize_filename(filename)
         filepath = os.path.join(path, safe_filename)
         if not _is_safe_path(BASE_DIR, filepath):
             return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
@@ -188,6 +188,15 @@ import tempfile
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+
+def sanitize_filename(filename):
+    """Sanitize a filename by removing potentially dangerous characters."""
+    if not filename:
+        return ""
+    # Keep alphanumeric and safe punctuation (., -, _)
+    return "".join(c for c in filename if c.isalnum() or c in '._- ')
+
+
 def _is_safe_path(base_dir, target_path):
     """Ensures that target_path resolves within base_dir to prevent path traversal."""
     try:
@@ -207,7 +216,7 @@ def upload_file():
     if file.filename == '':
         return jsonify({"success": False, "error": t(K.ERR_EMPTY_FILENAME, agent.lang)}), 400
     try:
-        safe_filename = "".join(c for c in file.filename if c.isalnum() or c in '._- ')
+        safe_filename = sanitize_filename(file.filename)
         filepath = os.path.join(UPLOAD_DIR, safe_filename)
         file.save(filepath)
         return jsonify({"success": True, "filepath": filepath, "filename": file.filename})
@@ -274,7 +283,7 @@ def image_upload():
         return jsonify({"success": False, "error": f"Ikke understøttet format: {ext}"}), 400
     import base64
     mime = "jpeg" if ext in ('.jpg','.jpeg') else ext.lstrip('.')
-    safe_filename = "".join(c for c in f.filename if c.isalnum() or c in '._- ')
+    safe_filename = sanitize_filename(f.filename)
     filepath = os.path.join(UPLOAD_DIR, safe_filename)
     f.save(filepath)
     with open(filepath, "rb") as bf:
