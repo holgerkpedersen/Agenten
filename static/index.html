@@ -2871,13 +2871,14 @@ async function useIssueAsTask(encoded) {
     template.value = tplMap[issue.type] || 'issue_handler';
     addLogEntry('INFO', `${_('prompt_filled_from')} ${issue.id}`, issue.title);
 
-    const fileMatch = issue.location ? issue.location.match(/([\w./-]+\.\w+)/) : null;
-    if (fileMatch) {
+    const fileMatches = issue.location ? [...issue.location.matchAll(/([\w./-]+\.\w+)/g)] : [];
+    let firstLoaded = false;
+    for (const m of fileMatches) {
         try {
             const resp = await fetch('/api/file/read', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filepath: fileMatch[1] })
+                body: JSON.stringify({ filepath: m[1] })
             });
             const data = await resp.json();
             if (data.success) {
@@ -2887,11 +2888,14 @@ async function useIssueAsTask(encoded) {
                     content: data.content,
                     included: true
                 });
-                document.getElementById('filePathInput').value = data.filename;
+                if (!firstLoaded) {
+                    document.getElementById('filePathInput').value = data.filename;
+                    firstLoaded = true;
+                }
                 addLogEntry('INFO', `Fil indlæst: ${data.filename}`, `${data.lines} linjer`);
             }
         } catch(e) {
-            addLogEntry('WARNING', 'Kunne ikke auto-indlæse fil', fileMatch[1]);
+            addLogEntry('WARNING', 'Kunne ikke auto-indlæse fil', m[1]);
         }
     }
 }

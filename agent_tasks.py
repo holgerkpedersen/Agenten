@@ -156,7 +156,7 @@ def solve_task_stream(agent, task_node, original_prompt):
 
     if not chunk_hint and tools_list:
         read_only = all(t not in ('write_file',) for t in agent.tool_registry.active_tools or [])
-        if read_only and not agent.images:
+        if read_only and not agent.images and not agent.file_chunks:
             user_guidance += f"\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte med <<<DONE>>> uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
 
     messages = [
@@ -237,13 +237,10 @@ def solve_task_stream(agent, task_node, original_prompt):
             dup_count = called_tools.get(tool_key, 0)
             called_tools[tool_key] = dup_count + 1
 
-            if dup_count >= 2:
+            if dup_count >= 1:
                 _add_user_msg(f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. G\u00e5 videre eller brug <<<DONE>>>.")
                 _truncate_messages()
                 continue
-
-            if dup_count == 1:
-                agent._log("TOOL", t(K.TOOL_DUPLICATE, agent.lang), parsed['tool'])
 
             agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=parsed['tool']), str(parsed.get("args", {})))
             result = agent.tool_registry.execute(parsed["tool"], parsed["args"])
@@ -268,7 +265,7 @@ def solve_task_stream(agent, task_node, original_prompt):
 
             _truncate_messages()
             total_calls = sum(called_tools.values())
-            if total_calls >= 8:
+            if total_calls >= 6:
                 full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
                 break
             continue

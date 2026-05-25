@@ -27,13 +27,14 @@ def _extract_filenames(location):
     filenames = []
     if not location:
         return filenames
-    if ":" in location:
-        filenames.append(location.split(":")[0].strip())
-    else:
-        for part in location.split(","):
-            part = part.strip().split()[0].strip("`'\"")
-            if part.endswith(".py"):
-                filenames.append(part)
+    parts = re.split(r',\s*', location)
+    for part in parts:
+        part = part.strip()
+        if ":" in part:
+            part = part.split(":")[0].strip()
+        part = part.strip("`'\"")
+        if part.endswith(".py"):
+            filenames.append(part)
     return filenames
 
 
