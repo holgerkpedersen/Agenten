@@ -6,6 +6,7 @@ from i18n import K
 from lang import t
 import agent_skills
 import agent_git
+import agent_files
 import config
 
 EXECUTION_TIMEOUT = config.EXECUTION_TIMEOUT
@@ -120,6 +121,28 @@ def solve_task_stream(agent, task_node, original_prompt):
         chunk_hint = f"\n\n## TILG\u00c6NGELIGE FILER (brug read_chunk for at l\u00e6se alle chunks):{''.join(chunk_hint_parts)}\n"
     else:
         chunk_hint = ""
+
+    delegation_lines = []
+    for key, chunks in agent.file_chunks.items():
+        content = chunks[0] if chunks else ''
+        if not content:
+            continue
+        for func_name, target_mod in agent_files.detect_delegations(content):
+            target_key = f'file_{target_mod}.py'
+            if target_key in agent.file_chunks:
+                delegation_lines.append(
+                    f'  - {key.replace("file_", "", 1)}:{func_name} → rediger i stedet {target_mod}.py:{func_name}'
+                )
+            else:
+                delegation_lines.append(
+                    f'  - {key.replace("file_", "", 1)}:{func_name} → {target_mod}.py (ikke indl\u00e6st)'
+                )
+    if delegation_lines:
+        chunk_hint += (
+            '\n\n## DELEGERINGER\n'
+            'Nogle funktioner i de indl\u00e6ste filer er stubs, der kun videresender til en anden fil.\n'
+            + '\n'.join(delegation_lines) + '\n'
+        )
 
     section_instr = agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name, "")
     if section_instr:

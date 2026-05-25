@@ -8,63 +8,28 @@ from i18n import K
 def _clean_task_name(name):
     name = re.sub(r'^[\*\-+]\s+', '', name.strip())
     name = re.sub(r'^\d+\.\s+', '', name)
-    patterns = [
-        r'<think>.*?</think>',
-        r'Here\'s a thinking process:.*$',
-        r'^\*\*.*\*\*$',
-        r'^[•\-]\s*$',
-        r'^Let\'s.*$',
-        r'^Check.*$',
-        r'^Draft:.*$',
-        r'^No repetition.*$',
-        r'^Drop politeness.*$',
-        r'^Indentation:.*$',
-        r'^Structure:.*$',
-        r'^Task to break down:.*$',
-        r'^Brainstorming.*$',
-        r'^Main task:.*$',
-        r'^Level \d+ steps.*$',
-        r'^Let\'s break each down.*$',
-        r'^Let\'s ensure.*$',
-        r'^Udf\u00f8r opgave.*$',
-        r'^Analyze User Input:.*$',
-        r'^Deconstruct Constraints.*$',
-        r'^-\s*Task:.*$',
-        r'^-\s*Input Task:.*$',
-        r'^-\s*Example Provided:.*$',
-        r'^-\s*Language:.*$',
-        r'^-\s*Must be a tree structure.*$',
-        r'^-\s*Output:.*$',
-        r'^What does it mean to analyze.*$',
-        r'^Wait, the example shows.*$',
-        r'^This is a bit linear.*$',
-        r'^Final check of the prompt.*$',
-        r'^I will output exactly.*$',
-        r'^Ready. Output matches exactly.*$',
-        r'^\u2705$',
-        r'^Nedbryd nu opgaven.*$',
-        r'^KUN tr\u00e6struktur.*$',
-        r'^Return\u00e9r KUN tr\u00e6struktur.*$',
-        r'^Returner KUN tr\u00e6struktur.*$',
-        r'^Now break down the task.*$',
-        r'^ONLY tree structure.*$',
-        r'^Return ONLY the tree structure.*$',
-        r'^Ahora descomp\u00f3n la tarea.*$',
-        r'^SOLO estructura de \u00e1rbol.*$',
-        r'^Devuelve SOLO la estructura.*$',
-        r'^\u73b0\u5728\u5206\u89e3\u4efb\u52a1.*$',
-        r'^\u4ec5\u6811\u7ed3\u6784.*$',
-        r'^<\|?channel\|?>.*$',
-        r'^thought$',
-        r'^namesearch$',
-        r'^namesekundar.*$',
-    ]
-    for pattern in patterns:
-        name = re.sub(pattern, '', name, flags=re.IGNORECASE | re.DOTALL)
+    name = re.sub(r'<think>.*?</think>', '', name, flags=re.DOTALL)
+    name = re.sub(r'<\|?channel\|?>.*$', '', name, flags=re.DOTALL)
+    if re.match(r'^\*\*.*\*\*$', name):
+        return None
     name = re.sub(r'\*\*', '', name)
     name = re.sub(r'`.*?`', '', name)
     name = re.sub(r'\s+', ' ', name).strip()
     if len(name) < 3 or name in ['', '-', '\u2022', '*']:
+        return None
+    meta_prefix = re.compile(
+        r'^(?:let\'s|check|draft:|no\s+\w+|drop\s+|indentation:|structure:|'
+        r'task to break down:|brainstorming|main task:|level \d+|'
+        r'here\'s a thinking process|udf\u00f8r opgave|analyze user input|deconstruct|'
+        r'-\s*(?:task:|input task:|example provided:|language:|must be|output:)|'
+        r'what does it mean|wait, the example|this is a bit linear|'
+        r'final check|i will output|ready\.|'
+        r'nedbryd nu|kun tr[æe]|return[ée]r kun|now break down|'
+        r'only tree|return only|ahora descomp|solo estructura|'
+        r'devuelve solo|\u73b0\u5728\u5206\u89e3|\u4ec5\u6811\u7ed3\u6784|'
+        r'thought$|namesearch$|namesekundar)', re.IGNORECASE
+    )
+    if meta_prefix.match(name):
         return None
     return name
 

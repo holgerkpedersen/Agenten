@@ -27,14 +27,10 @@ def _extract_filenames(location):
     filenames = []
     if not location:
         return filenames
-    parts = re.split(r',\s*', location)
-    for part in parts:
-        part = part.strip()
-        if ":" in part:
-            part = part.split(":")[0].strip()
-        part = part.strip("`'\"")
-        if part.endswith(".py"):
-            filenames.append(part)
+    for m in re.finditer(r'([\w./-]+\.\w+)', location):
+        fn = m.group(1)
+        if fn not in filenames:
+            filenames.append(fn)
     return filenames
 
 
@@ -69,6 +65,8 @@ class Agent:
         self._skills = SkillLoader.load_all(lang=self.lang)
         self._active_skills = []
         self._task_start_time = 0
+        self._file_hash_registry = {}
+        self._delegation_index = None
 
     def _register_tools(self):
         gh = GithubAPI()
@@ -196,7 +194,10 @@ class Agent:
             "edit_file",
             "Rediger en eksisterende fil med search-and-replace. Kræver: path (filsti), old_text (præcis tekst der skal erstattes), new_text (den nye tekst). Søgeteksten skal findes præcis én gang. Syntestjekkes for .py filer. Opretter IKKE nye filer — brug write_file til det.",
             ["path", "old_text", "new_text"],
-            lambda path, old_text, new_text: git_ops.edit_file(path=path, old_text=old_text, new_text=new_text)
+            lambda path, old_text, new_text: git_ops.edit_file(
+                path=path, old_text=old_text, new_text=new_text,
+                expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path)))
+            )
         ))
         self.tool_registry.register(Tool(
             "list_files",
@@ -323,6 +324,73 @@ class Agent:
     def _clean_task_name(self, name):
         return agent_tree._clean_task_name(name)
 
+    def _ensure_delegation_index(self):
+        if self._delegation_index is not None:
+            return
+        self._delegation_index = {}
+        scanned = {}
+        for fname in os.listdir('.'):
+            if not fname.endswith('.py'):
+                continue
+            content = agent_files.read_file_content(self, fname)
+            if content:
+                stubs = agent_files.detect_delegations(content)
+                if stubs:
+                    scanned[os.path.abspath(fname)] = (fname, content, stubs)
+        for fpath, (fname, content, stubs) in scanned.items():
+            for func_name, target_module in stubs:
+                visited = {fpath}
+                cur_module, cur_file = target_module, f'{target_module}.py'
+                while True:
+                    cur_abspath = os.path.abspath(cur_file)
+                    if cur_abspath in visited or not os.path.exists(cur_file):
+                        break
+                    visited.add(cur_abspath)
+                    inner = agent_files.read_file_content(self, cur_file)
+                    inner_stubs = agent_files.detect_delegations(inner) if inner else []
+                    next_stub = [s for s in inner_stubs if s[0] == func_name]
+                    if not next_stub:
+                        self._delegation_index[func_name] = (cur_abspath, cur_file)
+                        break
+                    cur_module = next_stub[0][1]
+                    cur_file = f'{cur_module}.py'
+
+    def _resolve_delegations_for_context(self, file_context):
+        self._ensure_delegation_index()
+        loaded_files = {os.path.normcase(os.path.abspath(k.replace('file_', '', 1)))
+                        for k in self.file_chunks}
+        for key in list(self.file_chunks.keys()):
+            filename = key.replace('file_', '', 1)
+            content = self.file_chunks.get(key, [None])[0]
+            if not content:
+                continue
+            for func_name, _ in agent_files.detect_delegations(content):
+                if func_name not in self._delegation_index:
+                    continue
+                real_abspath, real_filename = self._delegation_index[func_name]
+                real_norm = os.path.normcase(real_abspath)
+                if real_norm in loaded_files:
+                    continue
+                if f'file_{real_filename}' in self.file_chunks:
+                    continue
+                tgt_content = agent_files.read_file_content(self, real_filename)
+                if not tgt_content:
+                    continue
+                tgt_key = f'file_{real_filename}'
+                chunks = agent_files.chunk_text(tgt_content)
+                self.file_chunks[tgt_key] = chunks
+                self._file_hash_registry[real_norm] = agent_files.file_hash(real_filename)
+                preview = tgt_content[:3000] + ('\n...' if len(tgt_content) > 3000 else '')
+                file_context += (
+                    f'\n\n### {real_filename} (DELEGATIONSM\u00C5L for {func_name})\n\n'
+                    f'```{real_filename}\n{preview}\n```\n'
+                    f'*Ovenst\u00E5ende fil er m\u00E5let for {func_name} \u2014 '
+                    f'den rigtige implementering er HER, ikke i stubbet.*\n'
+                )
+                self._log('INFO', f'Loaded delegation target for {func_name}', real_filename)
+                loaded_files.add(real_norm)
+        return file_context
+
     def _read_file_content(self, filepath):
         return agent_files.read_file_content(self, filepath)
 
@@ -446,6 +514,7 @@ class Agent:
             )
             file_context += oversize_note
 
+        file_context = self._resolve_delegations_for_context(file_context)
         self.full_prompt_with_context = prompt + file_context
 
         if template and template != "fri" and template_config.get("fallback"):
