@@ -17,30 +17,35 @@ python api_server.py   # Åbn http://localhost:5000
 ## 📁 Projektstruktur
 
 ```
-agent_core.py         # Agent-facade (504 linjer): init, tool-registrering, decompose, execute, tynde delegat-metoder
+agent_core.py         # Agent-facade: init, tool-registrering, decompose, execute, tynde delegat-metoder
 agent_tasks.py        # Opgaveudførelse: solve_task_stream, solve_task, handle_tool_call
-agent_tree.py         # Træoperationer: parse_tree_from_llm, create_fallback_tree, record_outcome, evolve_if_needed
-agent_files.py        # Fil/chunk operationer: read/write/chunk, folder-scanning
-agent_skills.py       # Skills-matching, skabelon-konstanter (TEMPLATE_TOOLS, get_templates)
-agent_issues.py       # Issue-værktøjer: read_issue, update_issue_status, oversize-detektion
+agent_tree.py         # Træoperationer: parse, create_fallback_tree, record_outcome, evolve_if_needed
+agent_files.py        # Fil/chunk operationer: read/write/chunk, folder-scanning (.env ekskluderet)
+agent_skills.py       # Skills-matching, skabelon-konstanter (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS)
+agent_issues.py       # Issue-værktøjer: read_issue, update_issue_status, create_issue, oversize-detektion
 agent_git.py          # Git/PR workflow: is_pr_workflow, extract_branch_name, verify_pr_step
-api_server.py         # Flask API: SSE streaming, sessions, billed-upload, version endpoint
+api_server.py         # Flask API: SSE streaming, sessions, billed-upload, version, issues endpoint
 llm_wrapper.py        # LM Studio HTTP wrapper (chat + streaming + vision/image encoding)
 tools.py              # Tool/ToolRegistry — værktøjs-ramme (parse_response, build_system_prompt)
-github_wrapper.py     # GitHub API: repos, issues, PRs
-git_ops.py            # Git + fil operationer (write_file med syntax/dependency/route-validering)
 task_tree.py          # TaskTree / TaskNode datastruktur
+config.py             # Centrale konstanter (CHUNK_SIZE, timeout, max_tokens)
+git_ops.py            # Git + fil operationer (write_file, edit_file med validering)
+github_wrapper.py     # GitHub API: repos, issues, PRs
 session_manager.py    # Session persistence (JSON), threading lock
 web_searcher.py       # DuckDuckGo web scraping
+ddg_search.py         # DuckDuckGo search (fallback)
+flow_builder.py       # Prompt flow builder
+module_builder.py     # Dynamisk modulbygger (eksperimentel)
+model_manager.py      # OpenAI + LM Link REST API model-lister
 skill_loader.py       # Skills-system — frontmatter, keyword-scoring, template-matching
 skill_evolution.py    # SkillFlow — outcome tracking, evolution analysis (Retain/Refine/Prune/Generate)
 skill_tracker.py      # Per-skill outcome recording med success_rate
-module_builder.py     # Dynamisk modulbygger (eksperimentel)
-model_manager.py      # OpenAI + LM Link REST API model-lister
 lang.py               # Oversættelser (da/en/es/zh)
 i18n.py               # Internacionaliserings-nøgler (K enum)
 AGENTS.md             # Knowledge base — bugs, fixes, debugging workflow
-static/index.html     # Browser-UI med drag/resize paneler, template dropdown, billed-preview
+BRUGERVEJLEDNING.md   # Brugervejledning
+static/index.html     # Browser-UI med drag/resize paneler, template dropdown, billed-preview, issues viewer
+tests/                # 384 tests (pytest)
 sessions/             # Sessioner i JSON-format (gem/indlæs/slet)
 skills/               # Skills i markdown med frontmatter
 ```
@@ -57,15 +62,18 @@ Vælg skabelon i dropdown før nedbrydning — LLM får fastlagte sektioner:
 | 📊 **Diff-analyse** | Git log + diff → Risikovurdering → Anbefalinger |
 | 🔀 **PR Agenten** | Branch → Commit → Push → Pull Request (automatiseret PR workflow) |
 | 💻 **Programmeringsopgave** | Kravanalyse → Arkitekturdesign → Implementeringsplan → Sikkerhedsanalyse → Kodeimplementering |
+| 🏗️ **Python Arkitektur** | Arkitekturplanlægning med `write_file` output til `./docs/arkitektur.md` |
+| 🖼️ **Billedanalyse** | Beskrivelse → Kontekst → Detaljer → Vurdering → Eksport (.md) |
 | 🔧 **Refaktorering** | Analyse → Plan → Ekstraher → Opdatér → Test (SOLID refactoring) |
 | 🧪 **Testgenerering** | Analyse → Test (Red) → Implementering → Verifikation (Green) |
 | 🐛 **Bugfix (TDD)** | Analyse → Test (Red) → Implementering → Verifikation (Green) → Opdatering |
+| 📋 **Issue Handler** | Læs → Analysér → Fix → Verificér → Opdatér status |
 
 **Billedanalyse forudsætter:** Upload et billede via 🖼 knappen **før** du klikker Nedbryd. WebP billeder konverteres automatisk til `image/png` MIME for gemma-kompatibilitet.
 
 ## 🔧 Værktøjer
 
-Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører:
+Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (28 værktøjer):
 
 | Værktøj | Handling |
 |---------|----------|
@@ -74,9 +82,11 @@ Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører:
 | `write_file` | Opret NY fil (afviser eksisterende .py filer — brug edit_file) |
 | `edit_file` | Search-and-replace i eksisterende filer (med syntax-tjek) |
 | `list_files` | List filer i en mappe (med filter på filtype og max dybde) |
-| `create_issue` | Opret nyt issue i issues.json |
-| `read_issue` | Læs issue fra issues.json |
+| `create_issue` | Opret nyt issue |
+| `create_refactor_issue` | Opret refactor-issue ved oversize filer |
+| `read_issue` | Læs issue |
 | `update_issue_status` | Opdater status på issue |
+| `run_tests` | Kør pytest og returner resultater |
 | `add_image` | Tilføj billede til kontekst (base64-encodes) |
 | `github_create_repo` | Opret GitHub repository |
 | `github_list_repos` | List dine repos |
@@ -115,13 +125,14 @@ Se `skills/vision_models.md` for fuld kompatibilitetsmatrix og `AGENTS.md` for d
 
 ## ✅ Validering
 
-`write_file` udfører automatisk 3 valideringer på skrevne filer:
+`write_file` og `edit_file` udfører automatisk 3 valideringer på skrevne filer:
 
 | Validering | Hvornår | Beskrivelse |
 |------------|---------|-------------|
-| **Syntax check** | `.py` filer | `ast.parse()` — returnerer `syntax_error` ved fejl |
+| **Syntax check** | `.py` filer | `ast.parse()` — forhindrer skrivning af filer med syntax-fejl |
 | **Dependency check** | `.py` filer | Scanner imports mod `requirements.txt` — auto-opdaterer |
 | **Route mismatch** | `.py/.html/.js` | Sammenligner frontend/backend URL'er — returnerer `route_warnings` |
+| **Overwrite guard** | `.py` filer | `write_file` afviser at overskrive eksisterende filer — brug `edit_file` |
 
 ## 🔐 Sikkerhed
 
@@ -131,6 +142,8 @@ Se `skills/vision_models.md` for fuld kompatibilitetsmatrix og `AGENTS.md` for d
 - **Syntax check før skrivning**: `write_file` og `edit_file` validerer Python syntaks FØR filen skrives
 - **Kun registrerede værktøjer**: `ToolRegistry.execute()` nægter ukendte værktøjsnavne
 - **Per-fase tool-restriktioner**: Hver fase i en skabelon har kun adgang til relevante værktøjer
+- **API key auth**: Valgfri API-key beskyttelse på `/api/*` endpoints (sæt `AGENT_API_KEY`)
+- **Magic byte validering**: Billed-upload validerer magic bytes (ikke kun filendelse)
 - **Subprocess safety**: Git-kommandoer bruger liste-args (ingen shell)
 - **LM Studio**: Kører lokalt — ingen data sendes eksternt (undtagen GitHub API)
 
@@ -165,6 +178,7 @@ Flask API (api_server.py)
     │       └── Skip root node when children exist (no redundant re-execution)
     │
     ├── /api/image/* — upload/list/clear/remove
+    ├── /api/issues — list all tracked issues
     ├── /api/version — server version + file timestamps
     └── sessions/ (JSON persistence)
 ```
@@ -181,23 +195,28 @@ Flask API (api_server.py)
 
 ## 📝 Features
 
+- **Autonom bugfix**: 🐛 Bugfix (TDD) skabelon → Analyse → Test → Implementering → Verifikation → Opdatering
+- **Autonom refactoring**: 🔧 Refactor-skabelon → Analyse → Plan → Ekstraher → Opdatér → Test
+- **Testgenerering**: 🧪 Generer tests for utestede klasser/funktioner/metoder
 - **Billedanalyse**: Upload → Decompose → 5-trins struktureret analyse → .md eksport
 - **Vision support**: Automatisk model-detektion (VISION_KEYWORDS), format-tilpasning (raw_b64/data_url)
-- **Sessions**: Gem/indlæs/omdøb — persistent JSON storage med atomic write
-- **Filanalyse**: Upload filer, folder-scanning (med .env exkludering), automatisk chunk-deling af store filer
-- **Autonom refactoring**: 🔧 Refactor-skabelon → Analyse → Plan → Ekstraher → Opdatér → Test
-- **Autonom bugfix**: 🐛 Bugfix (TDD) skabelon → Analyse → Test → Implementering → Verifikation → Opdatering
-- **Testgenerering**: 🧪 Generer tests for utestede klasser/funktioner/metoder
+- **Issues viewer**: 🐛 Issues knap viser alle issues med detaljer og "Brug som opgave"
+- **Issue Handler**: 📋 Automatisk issue fix workflow (læs → analysér → fix → verificér)
+- **Sessions**: Gem/indlæs/omdøb/slet — persistent JSON storage med atomic write
+- **Filanalyse**: Upload filer, folder-scanning (med .env exkludering), automatisk chunk-deling
 - **Præcise filændringer**: `edit_file` search-and-replace i stedet for full-file rewrites
 - **Auto-opdagelse**: `create_issue` værktøj rapporterer nye fejl/issues under analyse
-- **Streaming**: Real-time SSE output med thinking-toggle
+- **Streaming**: Real-time SSE output med thinking-toggle og stop-knap
 - **Resultatkaskade**: Foregående task-resultater fødes ind i næste opgave
 - **Drag/resize paneler**: Frit layout med maximize/minimize
 - **Markdown eksport**: Preview + download af session rapporter
 - **Multi-sprog**: UI og LLM-instruktioner på dansk, engelsk, spansk, kinesisk
+- **Per-fase tool-restriktioner**: Hver fase har kun relevante værktøjer (f.eks. Analyse = read-only)
+- **Timeout**: Task execution afbrydes efter 30 minutter (EXECUTION_TIMEOUT)
 - **Auto-DONE**: Forhindrer uendelig tool-loop efter 10-15 iterationer
 - **Robust JSON-parsing**: `json.JSONDecoder().raw_decode()` håndterer AI-output
 - **LM Link support**: OpenAI-kompatible REST API modeller
+- **384 tests**: pytest suite med test af alle moduler
 
 ## 📋 Requirements
 
@@ -218,4 +237,4 @@ git commit -m "beskrivelse"
 git push
 ```
 
-Brug **🔀 PR Agenten** skabelonen til automatiseret PR workflow, **💻 Programmeringsopgave** til kodegenerering, og **🖼️ Billedanalyse** til vision-opgaver.
+Brug **🔀 PR Agenten** skabelonen til automatiseret PR workflow, **💻 Programmeringsopgave** til kodegenerering, **🖼️ Billedanalyse** til vision-opgaver, og **🐛 Bugfix (TDD)** til fejlretning.

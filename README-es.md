@@ -17,30 +17,35 @@ python api_server.py   # Abre http://localhost:5000
 ## 📁 Estructura del proyecto
 
 ```
-agent_core.py         # Fachada del agente (504 líneas): init, registro de herramientas, decompose, execute, delegados
+agent_core.py         # Fachada del agente: init, registro de herramientas, decompose, execute, delegados
 agent_tasks.py        # Ejecución de tareas: solve_task_stream, solve_task, handle_tool_call
-agent_tree.py         # Operaciones de árbol: parse_tree_from_llm, create_fallback_tree, record_outcome, evolve_if_needed
+agent_tree.py         # Operaciones de árbol: parse, create_fallback_tree, record_outcome, evolve_if_needed
 agent_files.py        # Operaciones de archivos: lectura/escritura/chunk, escaneo de carpetas (.env excluido)
-agent_skills.py       # Coincidencia de habilidades, constantes de plantillas (TEMPLATE_TOOLS, get_templates)
+agent_skills.py       # Coincidencia de habilidades, constantes de plantillas (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS)
 agent_issues.py       # Herramientas de issues: read_issue, update_issue_status, create_issue, detección de tamaño
 agent_git.py          # Flujo de trabajo Git/PR: is_pr_workflow, extract_branch_name, verify_pr_step
 api_server.py         # API Flask: streaming SSE, sesiones, carga de imágenes, versión, endpoint de issues
 llm_wrapper.py        # Cliente HTTP de LM Studio (chat + streaming + visión/codificación de imágenes)
 tools.py              # Tool/ToolRegistry — marco de herramientas (parse_response, build_system_prompt)
-github_wrapper.py     # API de GitHub: repos, issues, PRs
-git_ops.py            # Operaciones Git + archivos (write_file, edit_file con validación de sintaxis/dependencias/rutas)
 task_tree.py          # Estructuras de datos TaskTree / TaskNode
+config.py             # Constantes centrales (CHUNK_SIZE, timeout, max_tokens)
+git_ops.py            # Operaciones Git + archivos (write_file, edit_file con validación)
+github_wrapper.py     # API de GitHub: repos, issues, PRs
 session_manager.py    # Persistencia de sesiones (JSON), bloqueo de hilos
 web_searcher.py       # Web scraping de DuckDuckGo
+ddg_search.py         # Búsqueda DuckDuckGo (fallback)
+flow_builder.py       # Constructor de flujo de prompts
+module_builder.py     # Constructor dinámico de módulos (experimental)
+model_manager.py      # Listador de modelos API REST OpenAI + LM Link
 skill_loader.py       # Sistema de habilidades — frontmatter, puntuación de palabras clave, coincidencia de plantillas
 skill_evolution.py    # SkillFlow — seguimiento de resultados, análisis de evolución (Retain/Refine/Prune/Generate)
 skill_tracker.py      # Registro de resultados por habilidad con success_rate
-module_builder.py     # Constructor dinámico de módulos (experimental)
-model_manager.py      # Listador de modelos API REST OpenAI + LM Link
 lang.py               # Traducciones (da/en/es/zh)
 i18n.py               # Claves de internacionalización (enum K)
 AGENTS.md             # Base de conocimiento — errores, correcciones, flujo de depuración
+BRUGERVEJLEDNING.md   # Guía de usuario (danés)
 static/index.html     # UI de navegador con paneles de arrastre/redimensión, selector de plantillas, vista previa de imágenes, visor de issues
+tests/                # 384 pruebas (pytest)
 sessions/             # Persistencia de sesiones JSON (guardar/cargar/eliminar)
 skills/               # Habilidades en markdown con frontmatter
 ```
@@ -62,12 +67,13 @@ Selecciona una plantilla en el menú desplegable antes de la descomposición —
 | 🔧 **Refactorización** | Análisis → Plan → Extraer → Actualizar → Probar (refactorización SOLID) |
 | 🧪 **Generación de pruebas** | Análisis → Prueba (Rojo) → Implementación → Verificación (Verde) |
 | 🐛 **Bugfix (TDD)** | Análisis → Prueba (Rojo) → Implementación → Verificación (Verde) → Actualización |
+| 📋 **Issue Handler** | Leer → Analizar → Corregir → Verificar → Actualizar estado |
 
 **El análisis de imagen requiere:** Sube una imagen con el botón 🖼 **antes** de hacer clic en Descomponer. Las imágenes WebP se convierten automáticamente a MIME `image/png` para compatibilidad con gemma.
 
 ## 🔧 Herramientas
 
-El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>`:
+El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>` (28 herramientas):
 
 | Herramienta | Acción |
 |-------------|--------|
@@ -76,11 +82,12 @@ El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>
 | `write_file` | Crea un NUEVO archivo (rechaza sobrescribir .py existente — usa edit_file) |
 | `edit_file` | Búsqueda y reemplazo en archivos existentes (con verificación de sintaxis) |
 | `list_files` | Lista archivos en un directorio (con filtro de patrón y profundidad máxima) |
-| `create_issue` | Crea un nuevo issue en issues.json |
-| `read_issue` | Lee un issue de issues.json |
+| `create_issue` | Crea un nuevo issue |
+| `create_refactor_issue` | Crea issue de refactorización para archivos grandes |
+| `read_issue` | Lee un issue |
 | `update_issue_status` | Actualiza el estado de un issue |
-| `add_image` | Añade imagen al contexto (codificada en base64) |
 | `run_tests` | Ejecuta pytest y devuelve resultados |
+| `add_image` | Añade imagen al contexto (codificada en base64) |
 | `github_create_repo` | Crea un repositorio de GitHub |
 | `github_list_repos` | Lista tus repositorios |
 | `github_create_issue` | Crea un issue en GitHub |
@@ -135,6 +142,8 @@ Consulta `skills/vision_models.md` para la matriz de compatibilidad completa y `
 - **Verificación de sintaxis antes de escribir**: `write_file` y `edit_file` validan la sintaxis de Python ANTES de escribir
 - **Solo herramientas registradas**: `ToolRegistry.execute()` rechaza nombres de herramientas desconocidos
 - **Restricciones de herramientas por fase**: Cada fase de una plantilla solo tiene acceso a las herramientas relevantes
+- **Autenticación API key**: Protección opcional con clave API en endpoints `/api/*` (configurar `AGENT_API_KEY`)
+- **Validación de magic bytes**: La carga de imágenes valida magic bytes (no solo la extensión)
 - **Seguridad de subprocesos**: Los comandos de Git usan argumentos de lista (sin shell)
 - **LM Studio**: Se ejecuta localmente — no se envían datos externamente (excepto la API de GitHub)
 
@@ -166,8 +175,7 @@ API Flask (api_server.py)
     │       ├── agent_tasks.handle_tool_call()
     │       ├── agent_git.verify_pr_step()
     │       ├── agent_tree.record_outcome()
-    │       ├── Saltar nodo raíz cuando existen hijos (sin re-ejecución redundante)
-    │       └── LLM (iteración)
+    │       └── Saltar nodo raíz cuando existen hijos (sin re-ejecución redundante)
     │
     ├── /api/image/* — subir/listar/limpiar/eliminar
     ├── /api/issues — listar todos los issues rastreados
@@ -193,19 +201,22 @@ API Flask (api_server.py)
 - **Análisis de imágenes**: Subir → Descomponer → Análisis estructurado de 5 fases → Exportar .md
 - **Soporte de visión**: Detección automática de modelos, adaptación de formato
 - **Visor de issues**: Botón 🐛 Issues muestra todos los issues rastreados con detalles y acción "Usar como tarea"
+- **Issue Handler**: 📋 Flujo de trabajo automatizado para corregir issues (leer → analizar → corregir → verificar)
 - **Edición precisa de archivos**: `edit_file` búsqueda y reemplazo en lugar de reescrituras completas
 - **Autodescubrimiento**: La herramienta `create_issue` reporta nuevos errores/issues durante el análisis
-- **Sesiones**: Guardar/cargar/renombrar — almacenamiento JSON persistente con escritura atómica
+- **Sesiones**: Guardar/cargar/renombrar/eliminar — almacenamiento JSON persistente con escritura atómica
 - **Análisis de archivos**: Subir archivos, escaneo de carpetas (.env excluido), fragmentación automática
-- **Streaming**: Salida SSE en tiempo real con alternar pensamiento
-- **Cascada de resultados**: Los resultados de tareas anteriores se alimentan a la siguiente tarea (cascada de hermanos eliminada para independencia)
+- **Streaming**: Salida SSE en tiempo real con alternar pensamiento y botón de detener
+- **Cascada de resultados**: Los resultados de tareas anteriores se alimentan a la siguiente tarea
 - **Paneles de arrastre/redimensión**: Diseño libre con maximizar/minimizar
 - **Exportación Markdown**: Vista previa + descarga de informes de sesión
 - **Multilenguaje**: UI e instrucciones LLM en danés, inglés, español y chino
 - **Restricciones de herramientas por fase**: Cada fase obtiene solo las herramientas relevantes (ej. Análisis = solo lectura)
+- **Timeout**: La ejecución de tareas se cancela después de 30 minutos (EXECUTION_TIMEOUT)
 - **Auto-DONE**: Evita bucles infinitos de herramientas después de 10-15 iteraciones
 - **Análisis JSON robusto**: `json.JSONDecoder().raw_decode()` maneja la salida de IA
 - **Soporte LM Link**: Modelos API REST compatibles con OpenAI
+- **384 pruebas**: Suite pytest que cubre todos los módulos
 
 ## 📋 Requisitos
 
@@ -226,4 +237,4 @@ git commit -m "descripción"
 git push
 ```
 
-Usa la plantilla **🔀 PR Agent** para flujo de PR automatizado, **💻 Tarea de programación** para generación de código, **🖼️ Análisis de imagen** para tareas de visión, y **🔧 Refactorización** para reestructuración de código.
+Usa la plantilla **🔀 PR Agent** para flujo de PR automatizado, **💻 Tarea de programación** para generación de código, **🖼️ Análisis de imagen** para tareas de visión, **🔧 Refactorización** para reestructuración de código, y **🐛 Bugfix (TDD)** para corrección de errores.

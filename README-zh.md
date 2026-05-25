@@ -17,30 +17,35 @@ python api_server.py   # 打开 http://localhost:5000
 ## 📁 项目结构
 
 ```
-agent_core.py         # Agent 外观（504行）：初始化、工具注册、分解、执行、委托方法
+agent_core.py         # Agent 外观：初始化、工具注册、分解、执行、委托方法
 agent_tasks.py        # 任务执行：solve_task_stream, solve_task, handle_tool_call
-agent_tree.py         # 树操作：parse_tree_from_llm, create_fallback_tree, record_outcome, evolve_if_needed
+agent_tree.py         # 树操作：parse, create_fallback_tree, record_outcome, evolve_if_needed
 agent_files.py        # 文件/块操作：读/写/分块、文件夹扫描（.env 已排除）
-agent_skills.py       # 技能匹配、模板常量（TEMPLATE_TOOLS, get_templates）
+agent_skills.py       # 技能匹配、模板常量（TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS）
 agent_issues.py       # Issue工具：read_issue, update_issue_status, create_issue, 文件大小检测
 agent_git.py          # Git/PR工作流：is_pr_workflow, extract_branch_name, verify_pr_step
 api_server.py         # Flask API：SSE流、会话、图片上传、版本、issues端点
 llm_wrapper.py        # LM Studio HTTP客户端（聊天 + 流 + 视觉/图像编码）
 tools.py              # Tool/ToolRegistry — 工具框架（parse_response, build_system_prompt）
-github_wrapper.py     # GitHub API：仓库、issues、PRs
-git_ops.py            # Git + 文件操作（write_file, edit_file，带语法/依赖/路由验证）
 task_tree.py          # TaskTree / TaskNode 数据结构
+config.py             # 中心常量（CHUNK_SIZE, timeout, max_tokens）
+git_ops.py            # Git + 文件操作（write_file, edit_file，带验证）
+github_wrapper.py     # GitHub API：仓库、issues、PRs
 session_manager.py    # 会话持久化（JSON），线程锁
 web_searcher.py       # DuckDuckGo 网页抓取
+ddg_search.py         # DuckDuckGo 搜索（备用）
+flow_builder.py       # 提示流构建器
+module_builder.py     # 动态模块构建器（实验性）
+model_manager.py      # OpenAI + LM Link REST API 模型列表器
 skill_loader.py       # 技能系统 — frontmatter、关键词评分、模板匹配
 skill_evolution.py    # SkillFlow — 结果追踪、进化分析（保留/改进/剪枝/生成）
 skill_tracker.py      # 按技能记录结果，含成功率
-module_builder.py     # 动态模块构建器（实验性）
-model_manager.py      # OpenAI + LM Link REST API 模型列表器
 lang.py               # 翻译（da/en/es/zh）
 i18n.py               # 国际化键（K 枚举）
 AGENTS.md             # 知识库 — 错误、修复、调试工作流
+BRUGERVEJLEDNING.md   # 用户指南（丹麦语）
 static/index.html     # 浏览器UI：拖拽/调整面板、模板下拉、图片预览、issues查看器
+tests/                # 384 项测试（pytest）
 sessions/             # JSON 会话持久化（保存/加载/删除）
 skills/               # 带 frontmatter 的 markdown 技能文件
 ```
@@ -62,12 +67,13 @@ skills/               # 带 frontmatter 的 markdown 技能文件
 | 🔧 **重构** | 分析 → 计划 → 提取 → 更新 → 测试（SOLID重构） |
 | 🧪 **测试生成** | 分析 → 测试（红）→ 实施 → 验证（绿） |
 | 🐛 **Bugfix (TDD)** | 分析 → 测试（红）→ 实施 → 验证（绿）→ 更新 |
+| 📋 **Issue Handler** | 读取 → 分析 → 修复 → 验证 → 更新状态 |
 
 **图像分析要求：** 在点击"分解" **之前**，使用 🖼 按钮上传图像。WebP 图像会自动转换为 `image/png` MIME 以兼容 gemma。
 
 ## 🔧 工具
 
-Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作：
+Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作（28 个工具）：
 
 | 工具 | 操作 |
 |------|------|
@@ -76,11 +82,12 @@ Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作：
 | `write_file` | 创建新文件（拒绝覆盖现有 .py — 使用 edit_file） |
 | `edit_file` | 在现有文件中搜索替换（带语法检查） |
 | `list_files` | 列出目录中的文件（支持模式过滤和最大深度） |
-| `create_issue` | 在 issues.json 中创建新 issue |
-| `read_issue` | 从 issues.json 读取 issue |
+| `create_issue` | 创建新 issue |
+| `create_refactor_issue` | 为大文件创建重构 issue |
+| `read_issue` | 读取 issue |
 | `update_issue_status` | 更新 issue 状态 |
-| `add_image` | 添加图像到上下文（base64编码） |
 | `run_tests` | 运行 pytest 并返回结果 |
+| `add_image` | 添加图像到上下文（base64编码） |
 | `github_create_repo` | 创建 GitHub 仓库 |
 | `github_list_repos` | 列出你的仓库 |
 | `github_create_issue` | 创建 GitHub issue |
@@ -135,6 +142,8 @@ Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作：
 - **写入前语法检查**：`write_file` 和 `edit_file` 在写入前验证 Python 语法
 - **仅注册的工具**：`ToolRegistry.execute()` 拒绝未知工具名称
 - **按阶段工具限制**：模板的每个阶段只能访问相关工具
+- **API 密钥认证**：`/api/*` 端点可选 API 密钥保护（设置 `AGENT_API_KEY`）
+- **魔数验证**：图片上传验证魔数（不仅仅是文件扩展名）
 - **子进程安全**：Git 命令使用列表参数（无 shell）
 - **LM Studio**：本地运行 — 不向外部发送数据（GitHub API 除外）
 
@@ -166,8 +175,7 @@ Flask API (api_server.py)
     │       ├── agent_tasks.handle_tool_call()
     │       ├── agent_git.verify_pr_step()
     │       ├── agent_tree.record_outcome()
-    │       ├── 当子节点存在时跳过根节点（无冗余重新执行）
-    │       └── LLM（迭代）
+    │       └── 当子节点存在时跳过根节点（无冗余重新执行）
     │
     ├── /api/image/* — 上传/列出/清除/删除
     ├── /api/issues — 列出所有跟踪的 issues
@@ -193,19 +201,22 @@ Flask API (api_server.py)
 - **图像分析**：上传 → 分解 → 5阶段结构化分析 → 导出 .md
 - **视觉支持**：自动模型检测、格式适配
 - **Issues查看器**：🐛 Issues 按钮显示所有跟踪的 issues，附带详细信息和"用作任务"操作
+- **Issue Handler**：📋 自动问题修复工作流（读取 → 分析 → 修复 → 验证）
 - **精确文件编辑**：`edit_file` 搜索替换而不是全文件重写
 - **自动发现**：`create_issue` 工具在分析期间报告新的错误/issues
-- **会话**：保存/加载/重命名 — 带原子写入的持久 JSON 存储
+- **会话**：保存/加载/重命名/删除 — 带原子写入的持久 JSON 存储
 - **文件分析**：上传文件、文件夹扫描（已排除 .env）、自动分块
-- **流式输出**：带思考切换的实时 SSE 输出
-- **结果级联**：前置任务结果反馈到下一个任务（已移除同级级联以实现独立性）
+- **流式输出**：带思考切换和停止按钮的实时 SSE 输出
+- **结果级联**：前置任务结果反馈到下一个任务
 - **拖拽/调整面板**：自由布局，支持最大化/最小化
 - **Markdown导出**：会话报告的预览 + 下载
 - **多语言**：UI 和 LLM 指令支持丹麦语、英语、西班牙语和中文
 - **按阶段工具限制**：每个阶段只能访问相关工具（例如：分析阶段 = 只读）
+- **超时**：任务执行超过 30 分钟自动终止（EXECUTION_TIMEOUT）
 - **自动完成**：防止 10-15 次迭代后出现无限工具循环
 - **健壮JSON解析**：`json.JSONDecoder().raw_decode()` 处理 AI 输出
 - **LM Link支持**：兼容 OpenAI 的 REST API 模型
+- **384 项测试**：覆盖所有模块的 pytest 测试套件
 
 ## 📋 要求
 
@@ -226,4 +237,4 @@ git commit -m "描述"
 git push
 ```
 
-使用 **🔀 PR Agent** 模板实现自动化 PR 工作流，**💻 编程任务** 用于代码生成，**🖼️ 图像分析** 用于视觉任务，**🔧 重构** 用于代码重构。
+使用 **🔀 PR Agent** 模板实现自动化 PR 工作流，**💻 编程任务** 用于代码生成，**🖼️ 图像分析** 用于视觉任务，**🔧 重构** 用于代码重构，**🐛 Bugfix (TDD)** 用于错误修复。
