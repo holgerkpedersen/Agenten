@@ -293,10 +293,23 @@ def _build_flexible_pattern(text):
     return r'\n'.join(parts), len(lines)
 
 
-def edit_file(path, old_text, new_text):
+def edit_file(path, old_text, new_text, expected_hash=None):
     try:
         if not os.path.exists(path):
             return {"success": False, "error": f"Filen findes ikke: {path}"}
+        if expected_hash is not None:
+            import agent_files
+            current_hash = agent_files.file_hash(path)
+            if current_hash != expected_hash:
+                return {
+                    "success": False,
+                    "error": (
+                        f"HARD BLOCK: Filen '{os.path.basename(path)}' er blevet "
+                        f"ændret siden indlæsning (hash mismatch). Forventet: "
+                        f"{expected_hash[:12]}..., aktuelt: {current_hash[:12]}... "
+                        f"Genindlæs filen og prøv igen."
+                    )
+                }
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read()
 

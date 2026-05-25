@@ -102,6 +102,23 @@ class ToolRegistry:
                 return {"type": "error", "message": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=', '.join(names))}
             return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
 
+        # Handle truncated tool call (starts with marker but missing END)
+        if self.TOOL_MARKER in response and self.END_MARKER not in response:
+            return {"type": "error", "message": "Your response was truncated (missing <<<END>>>). Use shorter content or split into smaller chunks."}
+
+        # Handle malformed tool tag (missing opening <<<)
+        loose_tool = re.search(r'(?:<<<)?TOOL>>>\s*(.*?)\s*' + end_pat, response, re.DOTALL)
+        if loose_tool and not done_match:
+            raw = loose_tool.group(1)
+            raw = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
+            try:
+                data = json.loads(raw)
+                tool_name = data.get("tool", "")
+                if tool_name not in ("navn", "name", "nombre", "\u540d\u79f0"):
+                    return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
+            except (json.JSONDecodeError, ValueError):
+                pass
+
         if done_match:
             try:
                 data = json.loads(done_match.group(1))

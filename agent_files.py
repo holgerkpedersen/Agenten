@@ -1,5 +1,6 @@
 import os
 import re
+import hashlib
 from lang import t
 from i18n import K
 import config
@@ -14,6 +15,26 @@ def chunk_text(text, size=CHUNK_SIZE):
     for i in range(0, len(text), size):
         chunks.append(text[i:i + size])
     return chunks
+
+
+STUB_PATTERN = re.compile(
+    r'def\s+(\w+)\(self[^)]*\):\s*\n\s+return\s+(\w+)\.\1\b'
+)
+
+
+def detect_delegations(content):
+    stubs = []
+    for m in STUB_PATTERN.finditer(content):
+        stubs.append((m.group(1), m.group(2)))
+    return stubs
+
+
+def file_hash(filepath):
+    h = hashlib.sha256()
+    with open(filepath, 'rb') as f:
+        for chunk in iter(lambda: f.read(65536), b''):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def read_file_content(agent, filepath):
