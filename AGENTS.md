@@ -48,7 +48,13 @@ Use this to verify the running code version — never assume code is deployed.
 **Root cause:** `_validate_template_prompt()` returned `{"warning":""}` without `matches`/`total` keys.  
 **Fix:** All return paths include `"matches"` and `"total"`.
 
-### 3. Folder scanning missed file paths (`agent_files.py:68`)
+### 3. `_extract_filenames` failed on parenthetical locations (`agent_core.py:26-38`)
+
+**Symptom:** Issue location `"llm_wrapper.py (entire file)"` returned `[]` — LLM couldn't auto-load the file.  
+**Root cause:** `endswith(".py")` fails when `.py` is not at the very end of the string.  
+**Fix:** Replaced with `re.finditer(r'([\w./-]+\.\w+)', location)` — regex extracts any `.py` filename from arbitrary parenthetical/coloned text.
+
+### 4. Folder scanning missed file paths (`agent_files.py:68`)
 
 **Symptom:** Prompt has `C:\dev\DEX\run.py` but `file_chunks` is empty.  
 **Root cause:** `_get_folder_context()` only checked if `os.path.isdir(path)` — file paths failed.  
@@ -121,6 +127,25 @@ Flask serves uploads at `/uploads/<filename>` so gemma can fetch the image local
 **Root cause:** Module function `evolve_if_needed()` was extracted to `agent_tree.py` but the thin delegation method `_evolve_if_needed` was never added to the Agent class.  
 **Fix:** Add delegation method: `def _evolve_if_needed(self): agent_tree.evolve_if_needed(self)`  
 **Rule:** Every `agent._*()` call in module code must have a corresponding delegation method in `agent_core.py`.
+
+### 12. ARC-004: `_clean_task_name` had 50+ hardcoded regex patterns (`agent_tree.py:8-69`)
+
+**Symptom:** New LLM models produce novel meta-instruction formats not covered by the pattern list — whack-a-mole maintenance.  
+**Root cause:** ~50 hardcoded regex patterns trying to catch every possible LLM output-instruction phrasing.  
+**Fix:** Replaced all 50+ patterns with a two-tier approach: (1) general structural cleaning (think tags, channel markers, markdown, numbering, bullets), (2) a single compiled regex with ~25 prefix alternatives grouped by semantic category. All 26 existing tests pass.  
+**File:** `agent_tree.py:8-34`
+
+### 13. Delegation-aware file resolution + hash verification
+
+**Symptom:** Agent loads `agent_core.py` from an issue location, but the target function is just a 1-line stub delegating to another file (e.g. `agent_tree.py`). The LLM can't find the real implementation, loops on `list_chunks`/`read_chunk` forever.  
+**Root cause:** Issue locations are just filenames — no delegation chain resolution, no file-integrity check.  
+**Fix (4 files):**
+- `agent_files.py`: `detect_delegations(content)` — regex that finds all `def X(self): return module.X(...)` stubs; `file_hash(filepath)` — SHA-256 digest for integrity
+- `agent_core.py`: `_ensure_delegation_index()` — lazy-builds `func_name → (abspath, filename)` map by recursively following chains (handles circular refs); `_resolve_delegations_for_context()` — auto-loads delegation target files into `file_chunks` with context notes; `edit_file` lambda passes `expected_hash` from `_file_hash_registry`
+- `agent_tasks.py`: `solve_task_stream()` scans `file_chunks` for stubs, appends `## DELEGERINGER` guidance block mapping each stub → real file
+- `git_ops.py`: `edit_file()` accepts `expected_hash` parameter — hard block if file changed since load
+**Performance:** Delegation index built once per Agent instance (lazy), O(1) lookups. Hash check only on `edit_file` calls.
+**Files:** `agent_files.py:12-37`, `agent_core.py:326-389`, `agent_tasks.py:124-142`, `git_ops.py:296-312`
 
 ## Refactoring Convention
 
