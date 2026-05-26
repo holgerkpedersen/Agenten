@@ -163,7 +163,7 @@ def format_skills_for_prompt(agent):
     lines = ["\n## \U0001f4cb Retningslinjer (ikke v\u00e6rkt\u00f8jer)\n"]
     for s in agent._active_skills:
         tag = "BASE" if s.get("base") else "MATCH"
-        lines.append(f"- **{s['name']}** [{tag}]: {s.get('description', '')[:120]}")
+        lines.append(f"- **{s.get('name', 'unknown')}** [{tag}]: {s.get('description', '')[:120]}")
     return "\n".join(lines)
 
 

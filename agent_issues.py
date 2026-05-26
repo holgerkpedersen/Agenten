@@ -5,6 +5,7 @@ import sys
 import subprocess
 from lang import t
 from i18n import K
+import config
 
 REFAC_TEMPLATE = {
     "id": None,
@@ -69,10 +70,10 @@ def run_pytest(test_path=""):
         cmd = [sys.executable, "-m", "pytest", "-v"]
         if test_path:
             cmd.append(test_path)
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=config.SUBPROCESS_TIMEOUT)
         return {"success": result.returncode == 0, "stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode}
     except subprocess.TimeoutExpired:
-        return {"success": False, "stdout": "", "stderr": "Timeout (120s)", "exit_code": -1}
+        return {"success": False, "stdout": "", "stderr": f"Timeout ({config.SUBPROCESS_TIMEOUT}s)", "exit_code": -1}
     except FileNotFoundError:
         return {"success": False, "stdout": "", "stderr": "python -m pytest not found", "exit_code": -1}
 
@@ -159,7 +160,12 @@ def create_issue(agent, title, type="bug", severity="medium", description="", lo
     # Normalize location to filename format
     if location:
         if ":" in location:
-            location = location.split(":")[0].strip()
+            drive, rest = os.path.splitdrive(location)
+            if drive:
+                rest = rest.split(":")[0].strip()
+                location = drive + rest
+            else:
+                location = location.split(":")[0].strip()
         else:
             location = location.split()[0].strip("`")
     title_lower = title.lower()
