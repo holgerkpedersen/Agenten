@@ -7,6 +7,8 @@ class TaskNode:
         self.result = None
 
     def add_child(self, child_node):
+        if child_node.parent is not None and child_node in child_node.parent.children:
+            child_node.parent.children.remove(child_node)
         child_node.parent = self
         self.children.append(child_node)
         return child_node
