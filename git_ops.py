@@ -2,7 +2,7 @@ import ast
 import os
 import re
 import subprocess
-import shlex
+
 import threading
 from i18n import K
 from lang import t
@@ -206,11 +206,10 @@ def git_add_all(path="."):
 
 
 def git_commit(message, path="."):
-    safe_msg = shlex.quote(message)
     return _run_git(["commit", "-m", message], cwd=path)
 
 
-def git_push(branch="master", path="."):
+def git_push(branch="main", path="."):
     remote = git_remote_exists(path)
     if not remote["success"]:
         return remote
@@ -249,12 +248,36 @@ def git_branch_list(path="."):
     return _run_git(["branch"], cwd=path)
 
 
-def git_pull(remote="origin", branch="master", path="."):
+def git_pull(remote="origin", branch="main", path="."):
     return _run_git(["pull", remote, branch], cwd=path)
 
 
 def git_checkout(branch, path="."):
     return _run_git(["checkout", branch], cwd=path)
+
+
+def _check_post_write(path, content, result):
+    dirname = os.path.dirname(path)
+    if path.endswith('.py'):
+        req_path = os.path.join(dirname or os.getcwd(), 'requirements.txt')
+        missing = _check_missing_deps(content, req_path)
+        if missing:
+            result["missing_deps"] = missing
+            if os.path.exists(req_path):
+                with _file_lock:
+                    with open(req_path, 'a', encoding='utf-8') as f:
+                        f.write('\n' + '\n'.join(missing) + '\n')
+                result["req_updated"] = missing
+        for ext in ('.html', '.js'):
+            mismatched = _check_route_mismatch(path, ext)
+            if mismatched:
+                result.setdefault('route_warnings', {})[ext] = mismatched
+    elif path.endswith(('.html', '.js')):
+        for ext in ('.py',):
+            mismatched = _check_route_mismatch(path, ext)
+            if mismatched:
+                result.setdefault('route_warnings', {})[ext] = mismatched
+    return result
 
 
 def write_file(path, content):
@@ -284,26 +307,7 @@ def write_file(path, content):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
         result = {"success": True, "path": os.path.abspath(path), "chars": len(content)}
-        if path.endswith('.py'):
-            req_path = os.path.join(dirname or os.getcwd(), 'requirements.txt')
-            missing = _check_missing_deps(content, req_path)
-            if missing:
-                result["missing_deps"] = missing
-                if os.path.exists(req_path):
-                    with _file_lock:
-                        with open(req_path, 'a', encoding='utf-8') as f:
-                            f.write('\n' + '\n'.join(missing) + '\n')
-                    result["req_updated"] = missing
-        if path.endswith('.py'):
-            for ext in ('.html', '.js'):
-                mismatched = _check_route_mismatch(path, ext)
-                if mismatched:
-                    result.setdefault('route_warnings', {})[ext] = mismatched
-        elif path.endswith(('.html', '.js')):
-            for ext in ('.py',):
-                mismatched = _check_route_mismatch(path, ext)
-                if mismatched:
-                    result.setdefault('route_warnings', {})[ext] = mismatched
+        _check_post_write(path, content, result)
         return result
     except (IOError, OSError) as e:
         return {"success": False, "error": str(e)}
@@ -368,9 +372,13 @@ def edit_file(path, old_text, new_text, expected_hash=None):
             pos = idx
             parts = []
             for line in lines:
-                end = content.index('\n', pos) + 1
-                parts.append(content[pos:end])
-                pos = end
+                next_newline = content.find('\n', pos)
+                if next_newline == -1:
+                    # Ved filens ende uden newline
+                    parts.append(content[pos:])
+                    break
+                parts.append(content[pos : next_newline + 1])
+                pos = next_newline + 1
             exact_old = ''.join(parts)
         new_content = content.replace(exact_old, new_text, 1)
         if path.endswith('.py'):
@@ -396,26 +404,7 @@ def edit_file(path, old_text, new_text, expected_hash=None):
             "lines_changed": content.count('\n') - new_content.count('\n')
         }
 
-        dirname = os.path.dirname(path)
-        if dirname and path.endswith('.py'):
-            req_path = os.path.join(dirname or os.getcwd(), 'requirements.txt')
-            missing = _check_missing_deps(new_content, req_path)
-            if missing:
-                result["missing_deps"] = missing
-                if os.path.exists(req_path):
-                    with _file_lock:
-                        with open(req_path, 'a', encoding='utf-8') as f:
-                            f.write('\n' + '\n'.join(missing) + '\n')
-                    result["req_updated"] = missing
-            for ext in ('.html', '.js'):
-                mismatched = _check_route_mismatch(path, ext)
-                if mismatched:
-                    result.setdefault('route_warnings', {})[ext] = mismatched
-        elif path.endswith(('.html', '.js')):
-            for ext in ('.py',):
-                mismatched = _check_route_mismatch(path, ext)
-                if mismatched:
-                    result.setdefault('route_warnings', {})[ext] = mismatched
+        _check_post_write(path, new_content, result)
 
         return result
     except (IOError, OSError) as e:
