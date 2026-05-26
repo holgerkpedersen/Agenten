@@ -3,8 +3,32 @@ import os
 import re
 import subprocess
 import shlex
+import threading
 from i18n import K
 from lang import t
+
+_file_lock = threading.Lock()
+_BASE_DIR = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
+_TEMP_DIRS = set()
+for _p in (
+    os.environ.get('TMPDIR', ''),
+    os.environ.get('TMP', ''),
+    os.environ.get('TEMP', ''),
+    os.path.realpath(os.path.join(_BASE_DIR, 'exports')),
+    os.path.realpath(os.path.join(_BASE_DIR, 'uploads')),
+):
+    if _p:
+        _TEMP_DIRS.add(os.path.realpath(_p))
+
+
+def _is_safe_path(target_path):
+    real = os.path.realpath(target_path)
+    if real.startswith(_BASE_DIR + os.sep) or real == _BASE_DIR:
+        return True
+    for d in _TEMP_DIRS:
+        if d and (real.startswith(d + os.sep) or real == d):
+            return True
+    return False
 
 _STDLIB_MODULES = {
     'abc', 'aifc', 'argparse', 'array', 'ast', 'asynchat', 'asyncio', 'asyncore',
@@ -234,6 +258,8 @@ def git_checkout(branch, path="."):
 
 
 def write_file(path, content):
+    if not _is_safe_path(path):
+        return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
     dirname = os.path.dirname(path)
     if dirname:
         os.makedirs(dirname, exist_ok=True)
@@ -254,8 +280,9 @@ def write_file(path, content):
                     "line": e.lineno,
                     "msg": e.msg
                 }
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
+        with _file_lock:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
         result = {"success": True, "path": os.path.abspath(path), "chars": len(content)}
         if path.endswith('.py'):
             req_path = os.path.join(dirname or os.getcwd(), 'requirements.txt')
@@ -263,8 +290,9 @@ def write_file(path, content):
             if missing:
                 result["missing_deps"] = missing
                 if os.path.exists(req_path):
-                    with open(req_path, 'a', encoding='utf-8') as f:
-                        f.write('\n' + '\n'.join(missing) + '\n')
+                    with _file_lock:
+                        with open(req_path, 'a', encoding='utf-8') as f:
+                            f.write('\n' + '\n'.join(missing) + '\n')
                     result["req_updated"] = missing
         if path.endswith('.py'):
             for ext in ('.html', '.js'):
@@ -294,6 +322,8 @@ def _build_flexible_pattern(text):
 
 
 def edit_file(path, old_text, new_text, expected_hash=None):
+    if not _is_safe_path(path):
+        return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
     try:
         if not os.path.exists(path):
             return {"success": False, "error": f"Filen findes ikke: {path}"}
@@ -354,8 +384,9 @@ def edit_file(path, old_text, new_text, expected_hash=None):
                     "msg": e.msg
                 }
 
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write(new_content)
+        with _file_lock:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(new_content)
 
         result = {
             "success": True,
@@ -372,8 +403,9 @@ def edit_file(path, old_text, new_text, expected_hash=None):
             if missing:
                 result["missing_deps"] = missing
                 if os.path.exists(req_path):
-                    with open(req_path, 'a', encoding='utf-8') as f:
-                        f.write('\n' + '\n'.join(missing) + '\n')
+                    with _file_lock:
+                        with open(req_path, 'a', encoding='utf-8') as f:
+                            f.write('\n' + '\n'.join(missing) + '\n')
                     result["req_updated"] = missing
             for ext in ('.html', '.js'):
                 mismatched = _check_route_mismatch(path, ext)
