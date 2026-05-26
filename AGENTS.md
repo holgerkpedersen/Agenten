@@ -147,6 +147,76 @@ Flask serves uploads at `/uploads/<filename>` so gemma can fetch the image local
 **Performance:** Delegation index built once per Agent instance (lazy), O(1) lookups. Hash check only on `edit_file` calls.
 **Files:** `agent_files.py:12-37`, `agent_core.py:326-389`, `agent_tasks.py:124-142`, `git_ops.py:296-312`
 
+### 14. `solve_task()` called non-existent functions (`agent_tasks.py`)
+**Symptom:** `NameError` when calling `/api/execute-without-stream`.  
+**Root cause:** `solve_task()` called 4 module functions that were never defined (`build_tool_guidance`, `ask_ai`, `handle_tool_call`, `truncate_conversation`).  
+**Fix:** Rewrote `solve_task()` to delegate to `solve_task_stream()` generator, collecting the final result. Also removed 4 dead delegate methods in `agent_core.py` pointing to the same non-existent functions.
+
+### 15. Windows `split(":")` destroys drive letters (`agent_issues.py:162-163`)
+**Symptom:** Location `C:\Dev\file.py:42` becomes just `C`.  
+**Root cause:** `location.split(":")[0]` on a Windows path with drive letter.  
+**Fix:** Use `os.path.splitdrive()` to detect and preserve Windows drive letters before colon-splitting.
+
+### 16. SSE `current_session_id` race condition (`api_server.py:1111`)
+**Symptom:** Concurrent requests save session data to the wrong session file.  
+**Root cause:** `generate()` closure in `execute_stream()` referenced the global `current_session_id`, which can be mutated by concurrent request handlers.  
+**Fix:** Capture `session_id = current_session_id` in a local variable before the closure is created.
+
+### 17. `github_wrapper.py` network error handling
+**Symptom:** Unhandled exception on network failure or non-JSON GitHub response.  
+**Root cause:** No try/except around `requests.*()` calls, and `resp.json()` called on error paths without fallback.  
+**Fix:** Added `_request()` wrapper with `RequestException` handling and `_safe_json()` helper for error paths. Default branch changed from `"master"` to `"main"`.
+
+### 18. `flow_builder.py` URL encoding (`flow_builder.py:61-62`)
+**Symptom:** Topics with `&` or `#` produce broken search URLs.  
+**Root cause:** `topic.replace(' ', '+')` instead of `urllib.parse.quote()`.  
+**Fix:** Replaced with `urllib.parse.quote(topic, safe='')`.
+
+### 19. `agent_git.py` locale-dependent regex (`agent_git.py:55`)
+**Symptom:** Branch name verification fails on systems with non-English git.  
+**Root cause:** Regex `r"Switched to a new branch '...'"` only matches English locale.  
+**Fix:** Extract branch name from `result.args.name` first (tool arguments), fall back to locale-independent quote regex on git output.
+
+### 20. Session file atomic writes (`session_manager.py`)
+**Symptom:** Corrupted session files after power loss.  
+**Root cause:** `save_session` wrote directly to target file — crash during json.dump leaves partial file.  
+**Fix:** Atomic write pattern: `.tmp` file → `os.replace(tmp, target)`. Also fixed TOCTOU in `load_session` (removed `os.path.exists()` check, catch `FileNotFoundError`).
+
+### 21. `skill_evolution.py` `os.rename` Windows failure
+**Symptom:** Skill prune fails on Windows when `.pruned` backup already exists.  
+**Root cause:** `os.rename()` raises `PermissionError` on Windows if target exists.  
+**Fix:** Replaced with `os.replace()` (cross-platform atomic rename).
+
+### 22. `get_folder_context` path traversal (`agent_files.py:94-145`)
+**Symptom:** Agent could scan `C:\Windows` or other sensitive directories.  
+**Root cause:** No path safety check before `os.walk()`.  
+**Fix:** Added `_is_safe_scan_path()` restricting folder scanning to project directory + system temp directories.
+
+### 23. Remaining medium-priority issues
+- `agent_skills.py:166`: Changed `s['name']` to `s.get('name', 'unknown')` — prevents crash on malformed skill dict
+- `task_tree.py:9-12`: `add_child` now removes from old parent before re-parenting — prevents stale references and infinite loops
+- `module_builder.py:17`: Added path traversal protection — rejects `..`, leading `/` or `\\`
+
+### 24. `execution_log` dead code — never populated (`api_server.py`, `agent_tasks.py`)
+
+**Symptom:** Session files always show `"execution_log": []` regardless of what tasks ran.  
+**Root cause:** `execution_log` was initialized, reset, read, and serialized in 3 save paths, but **never appended to**.  
+**Fix:** Add `agent.execution_log.append()` in `_execute_with_stream()` (`api_server.py:1085`) — one entry per completed task with timestamp, task name, and status.
+
+### 25. `agent_log` overwritten by global agent stale data (`api_server.py:520,1097`)
+
+**Symptom:** Session `agent_log` only shows decomposition entries — execution entries from SSE streaming are lost.  
+**Root cause:** Two save paths conflict: (1) `_save_session_data()` saves `stream_agent.agent_log` (execution entries), then (2) frontend calls `/api/sessions/save` which saves global `agent.agent_log` (decomposition-only entries), overwriting the stream data.  
+**Fix:** Both save paths now **merge** `agent_log` with existing entries using timestamp-based dedup instead of replacing:
+  - `existing["agent_log"] = existing_agent_log + [e for e in new_log if e["timestamp"] not in existing_timestamps]`
+  - Applied in `_save_session_data()` (`api_server.py:1093-1100`) and `/api/sessions/save` (`api_server.py:517-525`)
+
+### 26. ADVARSEL false positive on successful tool-call tasks (`agent_tasks.py:232`)
+
+**Symptom:** "⚠️ ADVARSEL: Dette resultat ser ufuldstændigt ud" appended to auto-generated success messages like "Gennemførte 6 værktøjskald. Opgave fuldført automatisk." (~60 chars).  
+**Root cause:** The 100-char `is_short` threshold catches legitimate short success messages when the LLM returned `"ERROR"` after successful tool calls.  
+**Fix:** Skip warning when `called_tools` is non-empty (`if (is_short or asks_for_files) and not called_tools:`). If tools were called, work was done — no warning needed.
+
 ## Refactoring Convention
 
 When extracting methods from `agent_core.py` into module files:

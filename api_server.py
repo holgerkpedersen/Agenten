@@ -36,18 +36,52 @@ def check_api_key():
         
         # Enforce key only if configured in environment
         if expected_key and api_key != expected_key:
-            return jsonify({"error": "Unauthorized: Invalid or missing API key"}), 401
+            return jsonify({"success": False, "error": "Unauthorized: Invalid or missing API key"}), 401
+
+# ============ RATE LIMITING ============
+class _RateLimiter:
+    def __init__(self):
+        self._requests = {}
+        self._lock = threading.Lock()
+
+    def is_allowed(self, key, max_requests=30, window=60):
+        now = time.time()
+        with self._lock:
+            bucket = self._requests.get(key, [])
+            bucket = [t for t in bucket if now - t < window]
+            if len(bucket) >= max_requests:
+                return False
+            bucket.append(now)
+            self._requests[key] = bucket
+        return True
+
+rate_limiter = _RateLimiter()
+
+@app.before_request
+def _rate_limit():
+    if not request.path.startswith('/api/'):
+        return None
+    if request.method == 'GET':
+        limit, window = 60, 60
+    else:
+        limit, window = 20, 60
+    client_ip = request.remote_addr or "unknown"
+    key = f"{client_ip}:{request.path}"
+    if not rate_limiter.is_allowed(key, limit, window):
+        return jsonify({"success": False, "error": "Too many requests — prøv igen om et minut"}), 429
 
 agent = Agent()
 session_manager = SessionManager()
 current_session_id = None
 execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
+execution_status_lock = threading.Lock()
 export_folder = None
+active_streams = {}
 
 # ============ VERSION ============
 def _file_mtime(path):
     try: return datetime.fromtimestamp(os.path.getmtime(os.path.join(BASE_DIR, path))).strftime("%H:%M:%S")
-    except: return "?"
+    except OSError: return "?"
 
 VERSION_FILES = ["api_server.py", "agent_core.py", "llm_wrapper.py", "tools.py", "lang.py", "i18n.py"]
 BUILD_INFO = {f: _file_mtime(f) for f in VERSION_FILES}
@@ -58,6 +92,9 @@ print(f"📦 Startet: {BUILD_INFO['started']} | api_server={BUILD_INFO['api_serv
 # ============ STATIC ROUTES ============
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    if not _is_safe_path(UPLOAD_DIR, filepath):
+        return "<h2>Access denied</h2>", 403
     return send_from_directory(UPLOAD_DIR, filename)
 
 @app.route("/preview-exports/<path:filename>")
@@ -133,25 +170,24 @@ def set_folder():
     global export_folder
     data = request.json
     folder = data.get("folder", "")
-    if folder and os.path.isdir(folder):
-        export_folder = folder
-        return jsonify({"success": True, "folder": export_folder})
-    elif folder and not os.path.exists(folder):
+    if not folder:
+        return jsonify({"success": False, "error": t(K.ERR_INVALID_PATH, agent.lang)})
+    if not _is_safe_path(BASE_DIR, folder):
+        return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
+    if not os.path.exists(folder):
         try:
             os.makedirs(folder, exist_ok=True)
-            export_folder = folder
-            return jsonify({"success": True, "folder": export_folder})
         except Exception as e:
             return jsonify({"success": False, "error": t(K.ERR_CREATE_FOLDER, agent.lang).format(e=str(e))})
-    else:
-        return jsonify({"success": False, "error": t(K.ERR_INVALID_PATH, agent.lang)})
+    export_folder = folder
+    return jsonify({"success": True, "folder": export_folder})
 
 @app.route("/api/folder/status", methods=["GET"])
 def folder_status():
     global export_folder
     if export_folder and os.path.exists(export_folder):
         return jsonify({"success": True, "folder": export_folder})
-    return jsonify({"success": False, "folder": None})
+    return jsonify({"success": False, "error": t(K.ERR_NO_FOLDER, agent.lang), "folder": None})
 
 @app.route("/api/folder/save", methods=["POST"])
 def save_to_folder():
@@ -303,8 +339,8 @@ def _normalize_images(images):
                 try:
                     decoded = base64.urlsafe_b64decode(b64)
                     img["b64"] = base64.b64encode(decoded).decode("utf-8")
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Warning: failed to normalize image: {e}")
     return images
 
 
@@ -328,38 +364,64 @@ def image_upload():
     filepath = os.path.join(UPLOAD_DIR, safe_filename)
     f.save(filepath)
     raw_b64 = base64.b64encode(raw_bytes).decode('utf-8')
-    agent.images.append({"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath})
-    agent._log("TOOL", "🖼️ Billede uploadet", f"{f.filename} → {filepath} ({len(raw_b64)} bytes, {len(agent.images)} billeder i alt)")
-    return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(agent.images)})
+
+    # Use local agent to avoid race conditions on global state (BUG-001)
+    local_agent = Agent()
+    local_agent.llm = agent.llm
+    local_agent.decompose_llm = agent.decompose_llm
+
+    # Load current session images if available
+    loaded_images = []
+    if current_session_id:
+        session_data = session_manager.load_session(current_session_id)
+        if session_data and session_data.get("images"):
+            loaded_images = _normalize_images(session_data["images"])
+
+    local_agent.images = loaded_images + [{"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath}]
+
+    # Save back to session manager to persist changes safely
+    if current_session_id:
+        existing = session_manager.load_session(current_session_id) or {}
+        existing["images"] = local_agent.images
+        session_manager.save_session(current_session_id, existing)
+
+    return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(local_agent.images)})
 
 @app.route("/api/image/list", methods=["GET"])
 def image_list():
+    with agent.images_lock:
+        images_copy = list(agent.images)
+        total = len(images_copy)
     result = []
-    for img in agent.images:
+    for img in images_copy:
         if isinstance(img, dict):
             mime = img.get('mime','png')
             url = f"data:image/{mime};base64,{img['b64']}"
             result.append({"url": url, "filename": img.get("filename","")})
         else:
             result.append({"url": img[:80] + "...", "filename": ""})
-    return jsonify({"success": True, "images": result, "count": len(agent.images)})
+    return jsonify({"success": True, "images": result, "count": total})
 
 @app.route("/api/image/clear", methods=["POST"])
 def image_clear():
-    count = len(agent.images)
-    agent.images = []
+    with agent.images_lock:
+        count = len(agent.images)
+        agent.images = []
     if count:
         agent._log("TOOL", "🗑️ Billeder ryddet", f"{count} billeder fjernet")
     return jsonify({"success": True})
 
 @app.route("/api/image/remove/<int:index>", methods=["POST"])
 def image_remove(index):
-    if 0 <= index < len(agent.images):
-        img = agent.images.pop(index)
-        name = img.get("filename", "?") if isinstance(img, dict) else "?"
-        agent._log("TOOL", "✕ Billede fjernet", f"{name} (indeks {index}, {len(agent.images)} tilbage)")
-        return jsonify({"success": True, "count": len(agent.images)})
-    return jsonify({"success": False, "error": "Invalid index"}), 400
+    with agent.images_lock:
+        if 0 <= index < len(agent.images):
+            img = agent.images.pop(index)
+            name = img.get("filename", "?") if isinstance(img, dict) else "?"
+            remaining = len(agent.images)
+        else:
+            return jsonify({"success": False, "error": "Invalid index"}), 400
+    agent._log("TOOL", "✕ Billede fjernet", f"{name} (indeks {index}, {remaining} tilbage)")
+    return jsonify({"success": True, "count": remaining})
 
 
 @app.route("/api/file/list-python", methods=["POST"])
@@ -403,7 +465,7 @@ def get_current_session():
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
         return jsonify({"success": True, "session": session_data})
-    return jsonify({"success": False, "session": None})
+    return jsonify({"success": False, "error": t(K.ERR_NO_SESSION, agent.lang), "session": None})
 
 @app.route("/api/sessions/create", methods=["POST"])
 def create_session():
@@ -412,7 +474,8 @@ def create_session():
     session_id, session_data = session_manager.create_session(name)
     global current_session_id
     current_session_id = session_id
-    agent.images = []  # clear images from previous session
+    with agent.images_lock:
+        agent.images = []  # clear images from previous session
     return jsonify({"success": True, "session_id": session_id, "session": session_data})
 
 @app.route("/api/sessions/load/<session_id>", methods=["GET"])
@@ -433,7 +496,8 @@ def load_session(session_id):
                 agent.decompose_llm.set_model(session_data["decompose_model"])
             if session_data.get("execute_model"):
                 agent.llm.set_model(session_data["execute_model"])
-        agent.images = _normalize_images(session_data.get("images", []))
+        with agent.images_lock:
+            agent.images = _normalize_images(session_data.get("images", []))
         return jsonify({"success": True, "session": session_data})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
@@ -444,16 +508,22 @@ def save_current_session():
     session_id = data.get("session_id", current_session_id)
     
     if not session_id:
-        return jsonify({"error": t(K.ERR_NO_SESSION, agent.lang)}), 400
+        return jsonify({"success": False, "error": t(K.ERR_NO_SESSION, agent.lang)}), 400
     
     existing = session_manager.load_session(session_id) or {}
+    existing_agent_log = existing.get("agent_log", [])
+    existing_timestamps = {e.get("timestamp") for e in existing_agent_log}
+    merged_log = existing_agent_log + [
+        e for e in (agent.agent_log or [])
+        if e.get("timestamp") not in existing_timestamps
+    ]
     session_data = {
         "id": session_id,
         "name": data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=session_id[:8])),
         "tree": data.get("tree") or (agent.task_tree_to_dict() if agent.task_tree else None),
         "layout": data.get("layout"),
         "execution_log": agent.execution_log,
-        "agent_log": agent.agent_log,
+        "agent_log": merged_log,
         "original_prompt": data.get("original_prompt") or agent.original_prompt or "",
         "full_prompt_with_context": getattr(agent, 'full_prompt_with_context', '') or '',
         "show_thinking": data.get("show_thinking", agent.show_thinking),
@@ -479,38 +549,63 @@ def rename_session():
     session_id = data.get("session_id")
     new_name = data.get("name", "")
     if not session_id or not new_name:
-        return jsonify({"error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
+        return jsonify({"success": False, "error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
     if session_manager.rename_session(session_id, new_name):
         return jsonify({"success": True})
-    return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
+    return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
 @app.route("/api/sessions/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
     global current_session_id
     if not session_id:
-        return jsonify({"error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
+        return jsonify({"success": False, "error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
     if session_manager.delete_session(session_id):
         if current_session_id == session_id:
             current_session_id = None
         return jsonify({"success": True, "deleted": session_id})
-    return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
+    return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
 @app.route("/api/tools/token", methods=["GET", "POST"])
 def manage_token():
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     if request.method == "GET":
+        has_token = False
         if os.path.exists(env_path):
             with open(env_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            has_token = "GITHUB_TOKEN" in content
-            return jsonify({"success": True, "exists": True, "has_token": has_token})
-        return jsonify({"success": True, "exists": False, "has_token": False})
+                for line in f:
+                    if line.strip().startswith("GITHUB_TOKEN="):
+                        has_token = True
+                        break
+        return jsonify({"success": True, "exists": has_token, "has_token": has_token})
     
     data = request.json
-    content = data.get("content", "")
+    raw = data.get("content", "")
+    # Parse token from "GITHUB_TOKEN=abc123\n" format
+    token = ""
+    for line in raw.splitlines():
+        line = line.strip()
+        if line.startswith("GITHUB_TOKEN="):
+            token = line.split("=", 1)[1]
+            break
+    if not token:
+        return jsonify({"success": False, "error": "GITHUB_TOKEN ikke fundet i indhold"}), 400
+    
+    # Only write GITHUB_TOKEN — never arbitrary content
+    lines = []
+    updated = False
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip().startswith("GITHUB_TOKEN="):
+                    lines.append(f"GITHUB_TOKEN={token}\n")
+                    updated = True
+                else:
+                    lines.append(line)
+    if not updated:
+        lines.append(f"GITHUB_TOKEN={token}\n")
     with open(env_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    return jsonify({"success": True, "message": ".env gemt"})
+        f.writelines(lines)
+    return jsonify({"success": True, "message": "GITHUB_TOKEN gemt"})
 
 @app.route("/api/lang/<lang>")
 def get_lang(lang):
@@ -570,9 +665,9 @@ def load_model_route():
     data = request.json
     key = data.get("key", "")
     if not key:
-        return jsonify({"success": False, "message": "No model key"}), 400
+        return jsonify({"success": False, "error": "No model key"}), 400
     ok, msg = model_manager.load_model(key)
-    return jsonify({"success": ok, "message": msg})
+    return jsonify({"success": ok, "error": msg if not ok else None, "message": msg})
 
 @app.route("/api/models/unload", methods=["POST"])
 def unload_model_route():
@@ -583,7 +678,14 @@ def unload_model_route():
 
 @app.route("/api/stop", methods=["POST"])
 def stop_execution():
-    agent.stop_requested = True
+    global current_session_id
+    
+    # BUG-001 Fix: Stop specific session stream if active, else fallback to global
+    if current_session_id and current_session_id in active_streams:
+        active_streams[current_session_id].stop_requested = True
+    else:
+        agent.stop_requested = True
+        
     return jsonify({"success": True})
 
 @app.route("/api/reply", methods=["POST"])
@@ -602,20 +704,20 @@ def save_layout():
     session_id = data.get("session_id")
     layout = data.get("layout")
     if not session_id:
-        return jsonify({"error": t(K.ERR_NO_SESSION_ID, agent.lang)}), 400
+        return jsonify({"success": False, "error": t(K.ERR_NO_SESSION_ID, agent.lang)}), 400
     session_data = session_manager.load_session(session_id)
     if session_data:
         session_data["layout"] = layout
         session_manager.save_session(session_id, session_data)
         return jsonify({"success": True})
-    return jsonify({"error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
+    return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
 @app.route("/api/sessions/load-layout/<session_id>", methods=["GET"])
 def load_layout(session_id):
     session_data = session_manager.load_session(session_id)
     if session_data and "layout" in session_data:
         return jsonify({"success": True, "layout": session_data["layout"]})
-    return jsonify({"success": False, "layout": None}), 404
+    return jsonify({"success": False, "error": t(K.ERR_LAYOUT_NOT_FOUND, agent.lang), "layout": None}), 404
 
 @app.route("/api/sessions/prompts/<session_id>", methods=["GET"])
 def get_session_prompts(session_id):
@@ -630,7 +732,7 @@ def get_context_for_prompt():
     if session_id and prompt:
         context = session_manager.get_knowledge_for_context(session_id, prompt)
         return jsonify({"success": True, "context": context})
-    return jsonify({"success": False, "context": ""})
+    return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang), "context": ""})
 
 @app.route("/api/sessions/add-prompt", methods=["POST"])
 def add_prompt_to_session():
@@ -642,7 +744,7 @@ def add_prompt_to_session():
     if session_id and prompt:
         session_manager.add_prompt_result(session_id, prompt, result, tree)
         return jsonify({"success": True})
-    return jsonify({"success": False})
+    return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)})
 
 # ============ AGENT ENDPOINTS ============
 @app.route("/api/reset-execution", methods=["POST"])
@@ -654,37 +756,35 @@ def reset_execution():
 def execute_without_stream():
     global execution_status
     if agent.task_tree is None:
-        return jsonify({"error": t(K.ERR_DECOMPOSE_FIRST, agent.lang)}), 400
+        return jsonify({"success": False, "error": t(K.ERR_DECOMPOSE_FIRST, agent.lang)}), 400
     
-    execution_status = {"running": True, "progress": 0, "current_task": "", "log": []}
-    
-    def count_tasks(node):
-        total = 1
-        for child in node.children:
-            total += count_tasks(child)
-        return total
-    
-    total_tasks = count_tasks(agent.task_tree.root)
+
+
+    total_tasks = _count_tasks(agent.task_tree.root)
     completed = 0
     
     def execute_with_progress(node):
         nonlocal completed
-        execution_status["current_task"] = node.name
+        with execution_status_lock:
+            execution_status["current_task"] = node.name
         for child in node.children:
             execute_with_progress(child)
         result = agent.solve_task(node, agent.original_prompt)
         completed += 1
-        execution_status["progress"] = int((completed / total_tasks) * 100)
-        execution_status["log"].append({"task": node.name, "status": node.status, "result": result[:200]})
+        with execution_status_lock:
+            execution_status["progress"] = int((completed / total_tasks) * 100)
+            execution_status["log"].append({"task": node.name, "status": node.status, "result": result[:200]})
         return result
     
     try:
         results = execute_with_progress(agent.task_tree.root)
-        execution_status["results"] = results
-        execution_status["running"] = False
+        with execution_status_lock:
+            execution_status["results"] = results
+            execution_status["running"] = False
         return jsonify({"success": True, "results": results, "total_tasks": total_tasks})
     except Exception as e:
-        execution_status["running"] = False
+        with execution_status_lock:
+            execution_status["running"] = False
         return jsonify({"success": False, "error": str(e)}), 500
 
 def _ensure_model_loaded(model_key):
@@ -796,8 +896,8 @@ def _validate_template_prompt(prompt: str, template: str) -> dict:
                     f"Din prompt matcher skabelonen '🐛 {better}' bedre.\n{hint}"
                 )
                 return {"warning": warning, "suggestion": better, "suggested_template": better, "matches": 0, "total": 0}
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Warning: template validation error: {e}")
         return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
     
     guidance = TEMPLATE_GUIDANCE.get(template)
@@ -821,8 +921,8 @@ def _validate_template_prompt(prompt: str, template: str) -> dict:
                 better_guidance = TEMPLATE_GUIDANCE.get(better)
                 if better_guidance:
                     suggested = f"\n\nForslag: Brug skabelonen '{better}' i stedet.\n{better_guidance['hint']}"
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Warning: template suggestion error: {e}")
         
         examples = "\n".join(f"  • {ex}" for ex in guidance["examples"])
         warning = (
@@ -846,7 +946,7 @@ def decompose():
     ui_lang = data.get("ui_lang", lang)
     
     if not prompt:
-        return jsonify({"error": t(K.ERR_NO_PROMPT, ui_lang)}), 400
+        return jsonify({"success": False, "error": t(K.ERR_NO_PROMPT, ui_lang)}), 400
     
     global current_session_id
     if session_id:
@@ -860,7 +960,9 @@ def decompose():
     
     # Guard: billedanalyse needs an image
     image_warning = ""
-    if template == "billedanalyse" and not agent.images and not files:
+    with agent.images_lock:
+        has_images = bool(agent.images)
+    if template == "billedanalyse" and not has_images and not files:
         image_warning = "🖼️  Billedanalyse kræver et billede! Upload et billede med 🖼 knappen før du kører Nedbryd."
         agent._log("WARNING", "Billedanalyse uden billede", image_warning)
     
@@ -919,17 +1021,115 @@ def decompose():
         print(f"❌ Fejl: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+# ============ EXECUTE STREAM HELPERS ============
+
+def _count_tasks(node):
+    total = 1
+    for child in node.children:
+        total += _count_tasks(child)
+    return total
+
+
+def _check_client(agent):
+    return agent.stop_requested
+
+
+def _execute_with_stream(node, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id):
+    if _check_client(agent):
+        return
+    yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
+
+    child_results = []
+    for child in node.children:
+        if _check_client(agent):
+            return
+        if getattr(agent, 'issue_resolved', False):
+            child.status = "skipped"
+            child.result = "Skipped — issue was already resolved in an earlier phase"
+            child_results.append(f"- {child.name}: {child.result}")
+            continue
+        yield from _execute_with_stream(child, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id)
+        if child.result:
+            child_results.append(f"- {child.name}: {child.result}")
+
+    if child_results:
+        node.status = "done"
+        node.result = "\n".join(child_results)
+        completed[0] += 1
+        progress = int((completed[0] / total_tasks) * 100)
+        yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+        yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': node.result[:500]})}\n\n"
+        return
+
+    node.status = "running"
+    full_response = ""
+    for event in agent.solve_task_stream(node, task_context_prompt):
+        if _check_client(agent):
+            return
+        if event["type"] == "chunk":
+            full_response += event["chunk"]
+            if show_thinking:
+                yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']})}\n\n"
+        elif event["type"] == "tool_call":
+            yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
+        elif event["type"] == "tool_result":
+            yield f"data: {json.dumps({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']})}\n\n"
+        elif event["type"] == "done":
+            full_response = event["result"]
+    if not full_response:
+        full_response = t(K.UI_TASK_RESULT_PREFIX, ui_lang) + ": " + node.name
+    node.status = "done"
+    node.result = full_response
+    if _check_client(agent):
+        return
+    completed[0] += 1
+    progress = int((completed[0] / total_tasks) * 100)
+    yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+    yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': full_response[:500]})}\n\n"
+    agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, ui_lang) + ": " + node.name, "detail": full_response})
+    agent.execution_log.append({"timestamp": time.time(), "task": node.name, "status": "done", "result_length": len(full_response)})
+    yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+    if current_session_id:
+        session_manager.add_prompt_result(current_session_id, node.name, full_response, None)
+
+
+def _save_session_data(current_session_id, stream_agent, ui_lang):
+    if not current_session_id:
+        return
+    existing = session_manager.load_session(current_session_id) or {}
+    existing_agent_log = existing.get("agent_log", [])
+    existing_timestamps = {e.get("timestamp") for e in existing_agent_log}
+    merged_log = existing_agent_log + [
+        e for e in stream_agent.agent_log
+        if e.get("timestamp") not in existing_timestamps
+    ]
+    existing.update({
+        "tree": stream_agent.task_tree_to_dict() if stream_agent.task_tree else existing.get("tree"),
+        "execution_log": stream_agent.execution_log,
+        "agent_log": merged_log,
+        "original_prompt": stream_agent.original_prompt or (stream_agent.task_tree.root.name if stream_agent.task_tree else ""),
+        "prompt_history": existing.get("prompt_history", []),
+        "lang": stream_agent.lang,
+        "ui_lang": ui_lang,
+        "template": stream_agent.active_template,
+        "file_chunks": stream_agent.file_chunks,
+        "images": stream_agent.images,
+    })
+    session_manager.save_session(current_session_id, existing)
+
+
 @app.route("/api/execute-stream")
 def execute_stream():
     global current_session_id
     ui_lang = "da"
-    
+
     # Create a session-scoped agent to avoid race conditions with concurrent SSE requests (ARC-007)
     stream_agent = Agent()
     stream_agent.llm = agent.llm
     stream_agent.decompose_llm = agent.decompose_llm
     stream_agent.searcher = agent.searcher
-    
+
     print(f"Execute stream - current_session_id: {current_session_id}")
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
@@ -955,7 +1155,7 @@ def execute_stream():
                 stream_agent.decompose_llm.set_model(session_data["decompose_model"])
             if session_data.get("execute_model"):
                 stream_agent.llm.set_model(session_data["execute_model"])
-            
+
             fpc = session_data.get("full_prompt_with_context", "")
             if not fpc:
                 fc = session_data.get("file_context", "")
@@ -973,141 +1173,61 @@ def execute_stream():
             print(f"Agent show_thinking set to: {stream_agent.show_thinking}")
             stream_agent.stop_requested = False
 
+    # Register this agent in active streams for session-scoped access (BUG-001)
+    session_id = current_session_id  # capture locally to avoid race condition (BUG-011)
+    if session_id:
+        active_streams[session_id] = stream_agent
+
     _ensure_model_loaded(stream_agent.llm.model)
 
     def generate(agent):
-        _ui = ui_lang  # capture in closure
+        _ui = ui_lang
         if agent.task_tree is None:
-            if current_session_id:
-                session_data = session_manager.load_session(current_session_id)
+            if session_id:
+                session_data = session_manager.load_session(session_id)
                 if session_data and session_data.get("tree"):
                     agent.task_tree_from_dict(session_data["tree"])
                     print("Tree restored from session in generate()")
             if agent.task_tree is None:
                 yield f"data: {json.dumps({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, _ui)})}\n\n"
                 return
-        
+
         original_prompt = getattr(agent, 'full_prompt_with_context', '') or agent.original_prompt
         show_thinking = getattr(agent, 'show_thinking', True)
         yield f"data: {json.dumps({'type': 'context', 'original_prompt': original_prompt, 'show_thinking': show_thinking})}\n\n"
-
-        def _check_client():
-            return agent.stop_requested
 
         agent.agent_log = []
         agent.execution_log = []
         agent.issue_resolved = False
         agent.current_phase = None
 
-        # Truncate context for subtask prompts
         MAX_CTX = 150000
         task_context_prompt = original_prompt[:MAX_CTX] + ("\n\n[... trunkeret — brug read_chunk() for at læse flere chunks ...]" if len(original_prompt) > MAX_CTX else "")
-        
+
         for log in agent.agent_log[-10:]:
             yield f"data: {json.dumps({'type': 'log', 'log': log})}\n\n"
-        
-        def count_tasks(node):
-            total = 1
-            for child in node.children:
-                total += count_tasks(child)
-            return total
-        
-        total_tasks = count_tasks(agent.task_tree.root)
-        completed = 0
-        yield f"data: {json.dumps({'type': 'start', 'total_tasks': total_tasks})}\n\n"
-        
-        def execute_with_stream(node):
-            nonlocal completed
-            if _check_client():
-                return
-            yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
-            
-            child_results = []
-            for child in node.children:
-                if _check_client():
-                    return
-                if getattr(agent, 'issue_resolved', False):
-                    child.status = "skipped"
-                    child.result = "Skipped — issue was already resolved in an earlier phase"
-                    child_results.append(f"- {child.name}: {child.result}")
-                    continue
-                yield from execute_with_stream(child)
-                if child.result:
-                    child_results.append(f"- {child.name}: {child.result}")
-            
-            if child_results:
-                node.status = "done"
-                node.result = "\n".join(child_results)
-                completed += 1
-                progress = int((completed / total_tasks) * 100)
-                yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-                yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': node.result[:500]})}\n\n"
-                return
-            
-            node.status = "running"
-            full_response = ""
-            for event in agent.solve_task_stream(node, task_context_prompt):
-                if _check_client():
-                    return
-                if event["type"] == "chunk":
-                    full_response += event["chunk"]
-                    if show_thinking:
-                        yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']})}\n\n"
-                elif event["type"] == "tool_call":
-                    yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
-                elif event["type"] == "tool_result":
-                    yield f"data: {json.dumps({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']})}\n\n"
-                elif event["type"] == "done":
-                    full_response = event["result"]
-            if not full_response:
-                full_response = t(K.UI_TASK_RESULT_PREFIX, _ui) + ": " + node.name
-            node.status = "done"
-            node.result = full_response
-            if _check_client():
-                return
-            completed += 1
-            progress = int((completed / total_tasks) * 100)
-            yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-            yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': full_response[:500]})}\n\n"
-            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, _ui) + ": " + node.name, "detail": full_response})
-            yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
-            if current_session_id:
-                session_manager.add_prompt_result(current_session_id, node.name, full_response, None)
-        
-        saved = False
-        def _save_session():
-            nonlocal saved
-            if saved or not current_session_id:
-                return
-            existing = session_manager.load_session(current_session_id) or {}
-            existing.update({
-                "tree": agent.task_tree_to_dict() if agent.task_tree else existing.get("tree"),
-                "execution_log": agent.execution_log,
-                "agent_log": agent.agent_log,
-                "original_prompt": agent.original_prompt or (agent.task_tree.root.name if agent.task_tree else ""),
-                "prompt_history": existing.get("prompt_history", []),
-                "lang": agent.lang,
-                "ui_lang": ui_lang,
-                "template": agent.active_template,
-                "file_chunks": agent.file_chunks,
-                "images": agent.images,
-            })
-            session_manager.save_session(current_session_id, existing)
-            saved = True
 
+        total_tasks = _count_tasks(agent.task_tree.root)
+        completed = [0]
+        yield f"data: {json.dumps({'type': 'start', 'total_tasks': total_tasks})}\n\n"
+
+        saved = False
         try:
-            if _check_client():
+            if _check_client(agent):
                 yield f"data: {json.dumps({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui)})}\n\n"
                 return
-            yield from execute_with_stream(agent.task_tree.root)
-            _save_session()
+            yield from _execute_with_stream(agent.task_tree.root, agent, total_tasks, completed, task_context_prompt, show_thinking, _ui, session_id)
+            _save_session_data(session_id, agent, _ui)
+            saved = True
             yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, _ui)})}\n\n"
         except Exception as e:
-            _save_session()
+            if not saved:
+                _save_session_data(session_id, agent, _ui)
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         finally:
-            _save_session()
-    
+            if not saved:
+                _save_session_data(session_id, agent, _ui)
+
     return Response(stream_with_context(generate(stream_agent)), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
 
 @app.route("/api/log", methods=["GET"])
@@ -1123,7 +1243,7 @@ def search():
     data = request.json
     query = data.get("query", "")
     if not query:
-        return jsonify({"error": "No query"}), 400
+        return jsonify({"success": False, "error": "No query"}), 400
     results = agent.searcher.search(query)
     return jsonify({"success": True, "search_results": results})
 
@@ -1133,7 +1253,7 @@ def flow_search():
     query = data.get("query", "")
     max_results = int(data.get("maxResults", 10))
     if not query:
-        return jsonify({"error": "No query"}), 400
+        return jsonify({"success": False, "error": "No query"}), 400
 
     from ddg_search import websearch
     results = websearch(query, max_results)
@@ -1147,7 +1267,7 @@ def flow_generate():
     max_results = int(data.get("maxResults", 10))
 
     if not topic:
-        return jsonify({"error": "No topic"}), 400
+        return jsonify({"success": False, "error": "No topic"}), 400
 
     from ddg_search import websearch
     from flow_builder import generate_research_flow, flow_to_mermaid_full, format_flow_json
@@ -1203,7 +1323,7 @@ def delete_issue(issue_id):
 
 @app.route("/api/test", methods=["GET"])
 def test():
-    return jsonify({"status": "ok", "message": t(K.UI_API_RUNNING, agent.lang), "static_folder": STATIC_DIR, "has_agent": agent is not None})
+    return jsonify({"success": True, "status": "ok", "message": t(K.UI_API_RUNNING, agent.lang), "static_folder": STATIC_DIR, "has_agent": agent is not None})
 
 @app.route("/skillflow")
 def skillflow_report():
