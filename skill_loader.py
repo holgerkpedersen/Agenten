@@ -35,25 +35,33 @@ class SkillLoader:
                 body = parts[2].strip()
                 for line in parts[1].splitlines():
                     line = line.strip()
-                    if line.startswith("name:"):
-                        header["name"] = line.split(":", 1)[1].strip()
-                    elif line.startswith("keywords:"):
-                        raw_kw = line.split(":", 1)[1].strip().strip("[]")
-                        header["keywords"] = [k.strip() for k in raw_kw.split(",") if k.strip()]
-                    elif line.startswith("template:"):
-                        header["template"] = line.split(":", 1)[1].strip()
-                    elif line.startswith("description:"):
-                        header["description"] = line.split(":", 1)[1].strip()
-                    elif line.startswith("base:"):
-                        header["base"] = line.split(":", 1)[1].strip().lower() == "true"
-                    elif line.startswith("min_score:"):
-                        try:
-                            header["min_score"] = int(line.split(":", 1)[1].strip())
-                        except ValueError:
-                            header["min_score"] = 1
-                    elif line.startswith("action_types:"):
-                        raw_at = line.split(":", 1)[1].strip().strip("[]")
-                        header["action_types"] = [a.strip() for a in raw_at.split(",") if a.strip()]
+                    if not line:
+                        continue
+                    try:
+                        key, _, val = line.partition(":")
+                        key = key.strip()
+                        val = val.strip()
+                        if key == "name":
+                            header["name"] = val
+                        elif key == "keywords":
+                            raw_kw = val.strip("[]")
+                            header["keywords"] = [k.strip() for k in raw_kw.split(",") if k.strip()]
+                        elif key == "template":
+                            header["template"] = val
+                        elif key == "description":
+                            header["description"] = val
+                        elif key == "base":
+                            header["base"] = val.lower() == "true"
+                        elif key == "min_score":
+                            try:
+                                header["min_score"] = int(val)
+                            except ValueError:
+                                header["min_score"] = 1
+                        elif key == "action_types":
+                            raw_at = val.strip("[]")
+                            header["action_types"] = [a.strip() for a in raw_at.split(",") if a.strip()]
+                    except (IndexError, AttributeError):
+                        continue
         return header, body
 
     @staticmethod

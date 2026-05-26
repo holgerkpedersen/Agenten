@@ -348,7 +348,7 @@ def apply_evolution_actions(actions: list, dry_run: bool = True) -> list:
             path, _content = _load_skill_file(skill_name)
             if path and not dry_run:
                 backup = path + ".pruned"
-                os.rename(path, backup)
+                os.replace(path, backup)
                 log.append({
                     "timestamp": datetime.now().isoformat(),
                     "action": "prune",
@@ -465,8 +465,6 @@ def evolve_if_needed(dry_run: bool = True) -> dict:
 
 
 def _log_applied(results: list):
-    import json, os
-    from datetime import datetime
     log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".agent_storage", "evolution_log.json")
     try:
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
