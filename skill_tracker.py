@@ -64,10 +64,11 @@ class SkillTracker:
         self._save()
 
     def get_outcomes(self, skill_name: str = None, limit: int = None):
-        if skill_name:
-            filtered = [o for o in self._outcomes if o.get("skill") == skill_name]
-        else:
-            filtered = list(self._outcomes)
+        with self._lock:
+            if skill_name:
+                filtered = [o for o in self._outcomes if o.get("skill") == skill_name]
+            else:
+                filtered = list(self._outcomes)
         if limit:
             filtered = filtered[-limit:]
         return filtered
@@ -85,14 +86,25 @@ class SkillTracker:
         }
 
     def get_all_skill_stats(self, recent: int = 50):
-        names = set(o.get("skill") for o in self._outcomes)
+        with self._lock:
+            names = set(o.get("skill") for o in self._outcomes)
         return {n: self.get_stats(n, recent) for n in sorted(names)}
 
     def get_unmatched_tasks(self, limit: int = 20):
-        return [
-            o.get("task") for o in self._outcomes
-            if o.get("skill") == "__none__" or o.get("skill") == ""
-        ][-limit:]
+        with self._lock:
+            result = [
+                o.get("task") for o in self._outcomes
+                if o.get("skill") == "__none__" or o.get("skill") == ""
+            ]
+        return result[-limit:]
+
+    def get_unmatched_outcomes(self, limit: int = 100):
+        with self._lock:
+            result = [
+                o for o in self._outcomes
+                if o.get("skill") == "__none__" or o.get("skill") == ""
+            ]
+        return result[-limit:]
 
     def clear(self):
         with self._lock:

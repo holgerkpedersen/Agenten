@@ -173,8 +173,10 @@ class TestApplyEvolutionActions:
             "action": "generate",
             "skill": "new_skill",
             "frequency": 3,
-            "example_task": "do something new",
+            "cluster": ["do something new with the parser",
+                        "do something new in the renderer"],
             "suggested_action_types": ["write"],
+            "suggested_keywords": ["parser", "renderer", "something"],
         }]
         results = apply_evolution_actions(actions, dry_run=True)
         assert results[0]["action"] == "generate"

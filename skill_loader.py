@@ -78,6 +78,10 @@ class SkillLoader:
             if not name:
                 return {}
 
+            # Skip auto-generated stubs with no real instructions
+            if "_(Add instructions here based on observed patterns)_" in body:
+                return {}
+
             description = header.get("description")
             if not description and body:
                 for line in body.splitlines():

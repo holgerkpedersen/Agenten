@@ -21,7 +21,8 @@ REFINE_MIN_RATE = 0.50
 PRUNE_MAX_RATE = 0.50
 PRUNE_MIN_COUNT = 5
 EVOLVE_EVERY_N = 15
-GENERATE_MIN_REPEAT = 2
+GENERATE_MIN_REPEAT = 5
+GENERATE_MIN_TASK_LENGTH = 10
 
 
 def _load_json(path, default):
@@ -63,6 +64,132 @@ def _deduce_action_type(task: str) -> list:
                                        "kodegennemgang", "refactor", "omstrukturer"]):
         types.append("analyze")
     return types if types else ["general"]
+
+
+STOPWORDS = {
+    "the", "this", "that", "with", "from", "what", "which", "and", "for",
+    "not", "are", "was", "had", "has", "but", "can", "all", "will", "its",
+    "also", "than", "then", "each", "could", "would", "should", "about",
+    "into", "over", "such", "only", "other", "more", "very", "just",
+    "hvad", "med", "fra", "den", "det", "til", "kan", "jeg",
+    "vil", "skal", "har", "ver", "ich", "und", "der", "die",
+    "das", "ist", "nicht", "eine", "auch", "mit", "auf", "aus",
+}
+
+
+def _normalize_task(text: str) -> set:
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return {w for w in words if len(w) > 2 and w not in STOPWORDS}
+
+
+def _task_similarity(t1: str, t2: str) -> float:
+    a = _normalize_task(t1)
+    b = _normalize_task(t2)
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _cluster_unmatched(outcomes: list) -> list:
+    clusters = []
+    SIMILARITY_THRESHOLD = 0.25
+    for o in outcomes:
+        task = o.get("task", "")
+        if not task or len(task.strip()) < GENERATE_MIN_TASK_LENGTH:
+            continue
+        best_idx = None
+        best_score = 0
+        for i, c in enumerate(clusters):
+            rep = c[0]
+            score = _task_similarity(task, rep)
+            if score > best_score:
+                best_score = score
+                best_idx = i
+        if best_idx is not None and best_score >= SIMILARITY_THRESHOLD:
+            clusters[best_idx].append(task)
+        else:
+            clusters.append([task])
+    return [c for c in clusters if len(c) >= GENERATE_MIN_REPEAT]
+
+
+def _extract_cluster_name(tasks: list) -> str:
+    counter = Counter()
+    for t in tasks:
+        counter.update(_normalize_task(t))
+    top = [w for w, _ in counter.most_common(3) if len(w) > 2][:3]
+    if not top:
+        return "auto_generated_skill"
+    return "_".join(top).lower()[:60]
+
+
+def _extract_cluster_keywords(tasks: list) -> list:
+    counter = Counter()
+    for t in tasks:
+        counter.update(_normalize_task(t))
+    return [w for w, _ in counter.most_common(8) if len(w) > 2][:8]
+
+
+def _aggregate_action_types(tasks: list) -> list:
+    merged = set()
+    for t in tasks:
+        merged.update(_deduce_action_type(t))
+    return sorted(merged) if merged else ["general"]
+
+
+def _generate_instructions(tasks: list, action_types: list) -> str:
+    action_type = action_types[0] if action_types else "general"
+    merged_words = Counter()
+    for t in tasks:
+        merged_words.update(_normalize_task(t))
+    top_words = [w for w, _ in merged_words.most_common(10) if len(w) > 3][:5]
+    domain = ", ".join(top_words) if top_words else "the task"
+
+    steps = []
+    steps.append("1. **Analyze the request**: Identify the specific files, components, or areas involved. "
+                 f"Tasks in this category typically relate to: **{domain}**.")
+
+    if "read" in action_types or action_type == "read":
+        steps.append("2. **Read relevant files**: Use `list_chunks` and `read_chunk` to examine the code "
+                     "or documents referenced in the request.")
+    elif action_type in ("write", "edit"):
+        steps.append("2. **Understand current state**: Read existing files to understand the structure "
+                     "before making changes.")
+    else:
+        steps.append("2. **Gather context**: Load relevant files and data needed to complete the task.")
+
+    if "write" in action_types or "analyze" in action_types:
+        steps.append("3. **Plan the approach**: Outline the changes or analysis needed based on "
+                     "the gathered context.")
+        steps.append("4. **Execute**: Make the changes or perform the analysis.")
+        steps.append("5. **Verify**: Confirm the result matches the expected outcome.")
+    elif "read" in action_types:
+        steps.append("3. **Synthesize findings**: Summarize what was learned from the files.")
+        steps.append("4. **Report**: Present the findings clearly.")
+    elif "git" in action_types or "github" in action_types:
+        steps.append("3. **Execute git workflow**: Perform the necessary git operations.")
+        steps.append("4. **Verify**: Check the git status and ensure everything is correct.")
+    else:
+        steps.append("3. **Execute**: Complete the task using appropriate tools.")
+        steps.append("4. **Verify**: Confirm the result is correct.")
+
+    patterns = _extract_common_patterns(tasks)
+    pattern_lines = "\n".join(f"- {p}" for p in patterns) if patterns else "- _(No specific patterns extracted yet — update as you use this skill)_"
+
+    return (
+        "\n".join(steps) +
+        "\n\n**Common patterns from similar tasks:**\n" +
+        pattern_lines
+    )
+
+
+def _extract_common_patterns(tasks: list) -> list:
+    bigrams = Counter()
+    for t in tasks:
+        words = re.findall(r"[a-z0-9]+", t.lower())
+        for i in range(len(words) - 1):
+            if len(words[i]) > 2 and len(words[i + 1]) > 2:
+                bigrams[words[i] + " " + words[i + 1]] += 1
+    return [bg for bg, count in bigrams.most_common(5) if count > 1][:3]
 
 
 def analyze():
@@ -123,21 +250,22 @@ def analyze():
             })
             evolved.add(skill_name)
 
-    # Generate: detect repeated tasks that had no skill match
-    unmatched = tracker.get_unmatched_tasks(50)
-    task_counter = Counter(unmatched)
-    for task_text, frequency in task_counter.most_common(5):
-        if frequency >= GENERATE_MIN_REPEAT and frequency >= 1:
-            suggested_name = _suggest_skill_name(task_text)
-            action_types = _deduce_action_type(task_text)
-            actions.append({
-                "action": "generate",
-                "skill": suggested_name,
-                "reason": f"Task repeated {frequency}x with no matching skill",
-                "frequency": frequency,
-                "example_task": task_text[:150],
-                "suggested_action_types": action_types,
-            })
+    # Generate: detect clusters of repeated unmatched tasks
+    unmatched_outcomes = tracker.get_unmatched_outcomes(100)
+    clusters = _cluster_unmatched(unmatched_outcomes)
+    for cluster in sorted(clusters, key=len, reverse=True)[:5]:
+        suggested_name = _extract_cluster_name(cluster)
+        action_types = _aggregate_action_types(cluster)
+        keywords = _extract_cluster_keywords(cluster)
+        actions.append({
+            "action": "generate",
+            "skill": suggested_name,
+            "reason": f"Cluster of {len(cluster)} similar unmatched tasks",
+            "frequency": len(cluster),
+            "cluster": cluster,
+            "suggested_action_types": action_types,
+            "suggested_keywords": keywords,
+        })
 
     _save_json(ACTIONS_LOG, {
         "analyzed_at": datetime.now().isoformat(),
@@ -234,28 +362,39 @@ def apply_evolution_actions(actions: list, dry_run: bool = True) -> list:
                 result["message"] = f"Cannot prune '{skill_name}' — file not found"
 
         elif act == "generate":
-            if not dry_run:
-                suggested_name = skill_name
-                action_types = action.get("suggested_action_types", ["general"])
-                example = action.get("example_task", "")
+            cluster = action.get("cluster", [])
+            suggested_name = skill_name
+            action_types = action.get("suggested_action_types", ["general"])
+            keywords = action.get("suggested_keywords", suggested_name.split("_")[:3])
+
+            if len(cluster) < 1:
+                result["message"] = (
+                    f"Skipped: no task cluster for skill generation"
+                )
+            elif not dry_run:
+                instructions = _generate_instructions(cluster, action_types)
+                example = cluster[0][:80]
+                kw_str = ", ".join(k for k in keywords if k)
                 frontmatter = (
                     f"---\n"
                     f"name: {suggested_name}\n"
-                    f"keywords: [{', '.join(suggested_name.split('_')[:3])}]\n"
+                    f"keywords: [{kw_str}]\n"
                     f"action_types: [{', '.join(action_types)}]\n"
-                    f"description: Auto-generated from SkillFlow — {example[:80]}\n"
+                    f"description: SkillFlow-generated — {len(cluster)} tasks: {example}...\n"
+                    f"base: true\n"
                     f"min_score: 1\n"
                     f"---\n"
                     f"\n"
                     f"## {suggested_name.replace('_', ' ').title()}\n"
                     f"\n"
-                    f"Auto-generated skill based on repeated unmatched tasks.\n"
+                    f"Auto-generated skill based on {len(cluster)} similar unmatched tasks.\n"
                     f"\n"
-                    f"**Example task:** {example}\n"
+                    f"**Example tasks:**\n" +
+                    "".join(f"- {t[:100]}\n" for t in cluster[:5]) +
                     f"\n"
                     f"### Instructions\n"
                     f"\n"
-                    f"_(Add instructions here based on observed patterns)_\n"
+                    f"{instructions}\n"
                 )
                 gen_path = os.path.join("skills", f"{suggested_name}.md")
                 with open(gen_path, "w", encoding="utf-8") as f:
@@ -265,13 +404,15 @@ def apply_evolution_actions(actions: list, dry_run: bool = True) -> list:
                     "action": "generate",
                     "skill": suggested_name,
                     "path": gen_path,
-                    "example_task": example[:200],
+                    "cluster_size": len(cluster),
+                    "keywords": keywords,
                 })
-                result["message"] = f"Generated new skill '{suggested_name}' at {gen_path}"
+                result["message"] = f"Generated skill '{suggested_name}' from {len(cluster)} tasks"
             else:
                 result["message"] = (
                     f"Would generate skill '{skill_name}' "
-                    f"(action_types: {action.get('suggested_action_types', ['general'])})"
+                    f"(action_types: {action.get('suggested_action_types', ['general'])}, "
+                    f"cluster: {len(cluster)} tasks)"
                 )
 
         results.append(result)
@@ -339,5 +480,5 @@ def _log_applied(results: list):
         })
         with open(log_path, "w", encoding="utf-8") as f:
             json.dump(entries, f, indent=2, ensure_ascii=False)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Warning: failed to log applied evolution actions: {e}")
