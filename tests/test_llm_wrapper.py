@@ -8,8 +8,9 @@ from llm_wrapper import LMStudioWrapper
 
 class TestLMStudioWrapperInit:
     def test_default_init(self):
+        import config as _cfg
         wrapper = LMStudioWrapper()
-        assert wrapper.model == "google/gemma-4-26b-a4b"
+        assert wrapper.model == _cfg.LLM_MODEL
         assert wrapper.base_url == "http://localhost:1234/v1"
         assert wrapper.timeout == 120
 
