@@ -21,6 +21,7 @@ import time
 import os
 import json
 import subprocess
+import threading
 
 
 def _extract_filenames(location):
@@ -32,6 +33,114 @@ def _extract_filenames(location):
         if fn not in filenames:
             filenames.append(fn)
     return filenames
+
+
+def _auto_load_issue_files(agent, prompt, template, files):
+    if template not in ("bugfix", "issue_handler") or files:
+        return
+    issue_match = re.search(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)', prompt)
+    if not issue_match:
+        return
+    issue_id = issue_match.group(1)
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        issues_path = os.path.join(base_dir, "docs", "issues", "observed", "issues.json")
+        if not os.path.exists(issues_path):
+            return
+        with open(issues_path, encoding="utf-8") as f:
+            issues_data = json.load(f)
+        for issue in issues_data.get("issues", []):
+            if issue.get("id", "").lower() != issue_id.lower():
+                continue
+            location = issue.get("location", "")
+            filenames = _extract_filenames(location)
+            for filename in filenames:
+                if not filename.endswith('.py'):
+                    continue
+                for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
+                    if os.path.exists(path):
+                        content = agent._read_file_content(path)
+                        if content:
+                            files.append({"filename": filename, "content": content, "path": path})
+                            agent._log("INFO", f"Auto-loaded fil fra {issue_id}", path)
+                        break
+    except Exception as e:
+        agent._log("WARNING", "Kunne ikke auto-loade issue-fil", str(e))
+
+
+def _build_file_context(agent, files, prompt):
+    file_context = ""
+    if files and len(files) > 0:
+        file_context = t(K.FILE_CONTEXT_HEADER, agent.lang)
+        for f in files:
+            filename = f.get('filename', t(K.UNKNOWN, agent.lang))
+            content = f.get('content', '')
+            chunk_key = f"file_{filename}"
+            chunks = agent_files.chunk_text(content)
+            agent.file_chunks[chunk_key] = chunks
+            agent_issues.detect_oversize_file(agent, filename, content)
+            if len(chunks) <= 1:
+                file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
+            else:
+                file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
+                file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
+        agent._log("INFO", t(K.LOG_ADDING_FILES, agent.lang), t(K.LOG_N_FILES, agent.lang).format(n=len(files)))
+    else:
+        scanned_files = agent._get_folder_context(prompt)
+        if scanned_files:
+            file_context = t(K.FILE_CONTEXT_HEADER, agent.lang)
+            agent.file_context = scanned_files
+            for item in scanned_files:
+                filename = item['filename']
+                content = item['content']
+                chunk_key = f"file_{filename}"
+                chunks = agent_files.chunk_text(content)
+                agent.file_chunks[chunk_key] = chunks
+                agent_issues.detect_oversize_file(agent, filename, content)
+                if len(chunks) <= 1:
+                    file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
+                else:
+                    file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
+                    file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
+            agent._log("INFO", t(K.LOG_ADDING_FILES, agent.lang), t(K.LOG_N_FILES, agent.lang).format(n=len(scanned_files)))
+        else:
+            file_path, file_content = agent._get_single_file_context(prompt)
+            if file_content:
+                filename = os.path.basename(file_path)
+                chunk_key = f"file_{filename}"
+                chunks = agent_files.chunk_text(file_content)
+                agent.file_chunks[chunk_key] = chunks
+                file_context = t(K.FILE_CONTEXT_HEADER, agent.lang) + filename + t(K.FILE_CONTEXT_PYTHON, agent.lang).replace("{content}", file_content)
+    return file_context
+
+
+def _decompose_via_llm(agent, prompt, file_context, template_config):
+    decomposition_prompt = template_config["prompt"].replace("{prompt}", agent._sanitize_prompt(prompt))
+    file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
+    decomposition_prompt += file_context_entry
+
+    if "gemma" in agent.decompose_llm.model.lower():
+        decomposition_prompt += "\n<|channel>thought\n<channel|>"
+
+    agent._log("LLM", t(K.LOG_SENDING_LLM, agent.lang), t(K.LOG_N_FILES, agent.lang).format(n=len(agent.file_context)) if isinstance(agent.file_context, list) and agent.file_context else "")
+    response = agent.decompose_llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)
+    agent._log("LLM", t(K.LOG_RECEIVED_LLM, agent.lang), t(K.LOG_N_CHARS, agent.lang).format(n=len(response)))
+
+    response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+    response = re.sub(r'<\|channel>thought\s*<channel\|>.*?(?=<\|channel>|\Z)', '', response, flags=re.DOTALL)
+    response = re.sub(r'<\|?channel\|?>.*$', '', response, flags=re.MULTILINE)
+
+    agent.task_tree = agent._parse_tree_from_llm(prompt, response)
+    task_count = agent._count_tasks(agent.task_tree.root)
+    agent._log("INFO", t(K.LOG_DECOMPOSE_DONE, agent.lang), t(K.LOG_TASKS_CREATED, agent.lang).format(n=task_count))
+
+    if task_count <= 1 and template_config.get("id") in (None, "", "fri"):
+        agent._log("INFO", "Kun én opgave — bruger generisk nedbrydning", "")
+        agent.task_tree = agent._create_fallback_tree(prompt)
+        task_count = agent._count_tasks(agent.task_tree.root)
+        agent._log("INFO", t(K.LOG_DECOMPOSE_DONE, agent.lang), t(K.LOG_TASKS_CREATED, agent.lang).format(n=task_count))
+
+    return agent.task_tree_to_dict()
 
 
 class Agent:
@@ -49,6 +158,7 @@ class Agent:
         self.file_context = []
         self.file_chunks = {}
         self.images = []
+        self.images_lock = threading.Lock()
         self.pending_reply = None
         self.stop_requested = False
         self._pending_refactor = None
@@ -62,7 +172,7 @@ class Agent:
         self._register_tools()
         self._checkpoint_tools = set()
         self._checkpoint_branch = ""
-        self._skills = SkillLoader.load_all(lang=self.lang)
+        self._skills = None
         self._active_skills = []
         self._task_start_time = 0
         self._file_hash_registry = {}
@@ -92,7 +202,7 @@ class Agent:
             "github_create_pr",
             t(K.TOOL_GITHUB_CREATE_PR, self.lang),
             ["owner", "repo", "title", "branch"],
-            lambda owner, repo, title, branch, base="master": gh.create_pr(owner=owner, repo=repo, title=title, head=branch, base=base)
+            lambda owner, repo, title, branch, base="main": gh.create_pr(owner=owner, repo=repo, title=title, head=branch, base=base)
         ))
         self.tool_registry.register(Tool(
             "git_status",
@@ -116,7 +226,7 @@ class Agent:
             "git_push",
             t(K.TOOL_GIT_PUSH, self.lang),
             ["branch"],
-            lambda branch="master": git_ops.git_push(branch=branch)
+            lambda branch="main": git_ops.git_push(branch=branch)
         ))
         self.tool_registry.register(Tool(
             "git_set_remote",
@@ -164,7 +274,7 @@ class Agent:
             "git_pull",
             t(K.TOOL_GIT_PULL, self.lang),
             ["remote", "branch"],
-            lambda remote="origin", branch="master": git_ops.git_pull(remote=remote, branch=branch)
+            lambda remote="origin", branch="main": git_ops.git_pull(remote=remote, branch=branch)
         ))
         self.tool_registry.register(Tool(
             "git_checkout",
@@ -244,48 +354,6 @@ class Agent:
 
     def _add_image(self, path):
         return agent_tasks.add_image(self, path)
-
-    def _run_pytest(self, test_path=""):
-        try:
-            cmd = [sys.executable, "-m", "pytest", "-v"]
-            if test_path:
-                cmd.append(test_path)
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            return {"success": result.returncode == 0, "stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode}
-        except subprocess.TimeoutExpired:
-            return {"success": False, "stdout": "", "stderr": "Timeout (120s)", "exit_code": -1}
-        except FileNotFoundError:
-            return {"success": False, "stdout": "", "stderr": "python -m pytest not found", "exit_code": -1}
-
-    def _read_issue(self, issue_id):
-        import json as _json
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
-        if not os.path.exists(path):
-            return {"success": False, "error": f"Issue file not found at {path}"}
-        with open(path, encoding="utf-8") as f:
-            data = _json.load(f)
-        for issue in data.get("issues", []):
-            if issue.get("id", "").lower() == issue_id.lower():
-                return {"success": True, "issue": issue}
-        return {"success": False, "error": f"Issue '{issue_id}' not found. Available: {[i['id'] for i in data.get('issues', [])]}"}
-
-    def _update_issue_status(self, issue_id, status, resolution_note=""):
-        import json as _json
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
-        if not os.path.exists(path):
-            return {"success": False, "error": f"Issue file not found at {path}"}
-        with open(path, encoding="utf-8") as f:
-            data = _json.load(f)
-        for issue in data.get("issues", []):
-            if issue.get("id", "").lower() == issue_id.lower():
-                issue["status"] = status
-                if resolution_note:
-                    issue["resolution_note"] = resolution_note
-                with open(path, "w", encoding="utf-8") as f:
-                    _json.dump(data, f, ensure_ascii=False, indent=2)
-                self._log("INFO", f"Issue {issue_id} → {status}", resolution_note[:200])
-                return {"success": True, "issue": issue, "status": status}
-        return {"success": False, "error": f"Issue '{issue_id}' not found."}
 
     def _list_chunks(self):
         return agent_files.list_chunks(self)
@@ -436,74 +504,9 @@ class Agent:
         self.file_context = files or []
         self.file_chunks = {}
 
-        if template in ("bugfix", "issue_handler") and not files:
-            issue_match = re.search(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)', prompt)
-            if issue_match:
-                issue_id = issue_match.group(1)
-                try:
-                    issues_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
-                    if os.path.exists(issues_path):
-                        with open(issues_path, encoding="utf-8") as f:
-                            issues_data = json.load(f)
-                        for issue in issues_data.get("issues", []):
-                            if issue.get("id", "").lower() == issue_id.lower():
-                                location = issue.get("location", "")
-                                filenames = _extract_filenames(location)
-                                for filename in filenames:
-                                    if filename.endswith('.py'):
-                                        base_dir = os.path.dirname(os.path.abspath(__file__))
-                                        for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
-                                            if os.path.exists(path):
-                                                content = self._read_file_content(path)
-                                                if content:
-                                                    files.append({"filename": filename, "content": content, "path": path})
-                                                    self._log("INFO", f"Auto-loaded fil fra {issue_id}", path)
-                                                break
-                except Exception as e:
-                    self._log("WARNING", "Kunne ikke auto-loade issue-fil", str(e))
+        _auto_load_issue_files(self, prompt, template, files)
 
-        file_context = ""
-        if files and len(files) > 0:
-            file_context = t(K.FILE_CONTEXT_HEADER, self.lang)
-            for f in files:
-                filename = f.get('filename', t(K.UNKNOWN, self.lang))
-                content = f.get('content', '')
-                chunk_key = f"file_{filename}"
-                chunks = agent_files.chunk_text(content)
-                self.file_chunks[chunk_key] = chunks
-                oversize = agent_issues.detect_oversize_file(self, filename, content)
-                if len(chunks) <= 1:
-                    file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
-                else:
-                    file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
-                    file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
-            self._log("INFO", t(K.LOG_ADDING_FILES, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(files)))
-        else:
-            scanned_files = self._get_folder_context(prompt)
-            if scanned_files:
-                file_context = t(K.FILE_CONTEXT_HEADER, self.lang)
-                self.file_context = scanned_files
-                for item in scanned_files:
-                    filename = item['filename']
-                    content = item['content']
-                    chunk_key = f"file_{filename}"
-                    chunks = agent_files.chunk_text(content)
-                    self.file_chunks[chunk_key] = chunks
-                    agent_issues.detect_oversize_file(self, filename, content)
-                    if len(chunks) <= 1:
-                        file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
-                    else:
-                        file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
-                        file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
-                self._log("INFO", t(K.LOG_ADDING_FILES, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(scanned_files)))
-            else:
-                file_path, file_content = self._get_single_file_context(prompt)
-                if file_content:
-                    filename = os.path.basename(file_path)
-                    chunk_key = f"file_{filename}"
-                    chunks = agent_files.chunk_text(file_content)
-                    self.file_chunks[chunk_key] = chunks
-                    file_context = t(K.FILE_CONTEXT_HEADER, self.lang) + filename + t(K.FILE_CONTEXT_PYTHON, self.lang).replace("{content}", file_content)
+        file_context = _build_file_context(self, files, prompt)
 
         if self._pending_refactor:
             oversize_note = (
@@ -518,41 +521,15 @@ class Agent:
         self.full_prompt_with_context = prompt + file_context
 
         if template and template != "fri" and template_config.get("fallback"):
-            if template_config.get("fallback"):
-                tree = TaskTree(prompt)
-                for section in template_config["fallback"]:
-                    tree.root.add_child(TaskNode(section))
-                self.task_tree = tree
-                task_count = len(template_config["fallback"]) + 1
-                self._log("INFO", t(K.LOG_USING_TEMPLATE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
-                return self.task_tree_to_dict()
+            tree = TaskTree(prompt)
+            for section in template_config["fallback"]:
+                tree.root.add_child(TaskNode(section))
+            self.task_tree = tree
+            task_count = len(template_config["fallback"]) + 1
+            self._log("INFO", t(K.LOG_USING_TEMPLATE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
+            return self.task_tree_to_dict()
 
-        decomposition_prompt = template_config["prompt"].replace("{prompt}", self._sanitize_prompt(prompt))
-        file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
-        decomposition_prompt += file_context_entry
-
-        if "gemma" in self.decompose_llm.model.lower():
-            decomposition_prompt += "\n<|channel>thought\n<channel|>"
-
-        self._log("LLM", t(K.LOG_SENDING_LLM, self.lang), t(K.LOG_N_FILES, self.lang).format(n=len(self.file_context)) if isinstance(self.file_context, list) and self.file_context else "")
-        response = self.decompose_llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)  # decompose tree is simpler, needs fewer tokens
-        self._log("LLM", t(K.LOG_RECEIVED_LLM, self.lang), t(K.LOG_N_CHARS, self.lang).format(n=len(response)))
-
-        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|channel>thought\s*<channel\|>.*?(?=<\|channel>|\Z)', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|?channel\|?>.*$', '', response, flags=re.MULTILINE)
-
-        self.task_tree = self._parse_tree_from_llm(prompt, response)
-        task_count = self._count_tasks(self.task_tree.root)
-        self._log("INFO", t(K.LOG_DECOMPOSE_DONE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
-
-        if task_count <= 1 and template in (None, "", "fri"):
-            self._log("INFO", "Kun én opgave — bruger generisk nedbrydning", "")
-            self.task_tree = self._create_fallback_tree(prompt)
-            task_count = self._count_tasks(self.task_tree.root)
-            self._log("INFO", t(K.LOG_DECOMPOSE_DONE, self.lang), t(K.LOG_TASKS_CREATED, self.lang).format(n=task_count))
-
-        return self.task_tree_to_dict()
+        return _decompose_via_llm(self, prompt, file_context, template_config)
 
     def reset_execution(self):
         if not self.task_tree:
@@ -574,18 +551,6 @@ class Agent:
 
     def task_tree_from_dict(self, d):
         agent_tree.task_tree_from_dict(self, d)
-
-    def _truncate_conversation(self, conversation, system_prompt):
-        return agent_tasks.truncate_conversation(self, conversation, system_prompt)
-
-    def _build_tool_guidance(self, attempt):
-        return agent_tasks.build_tool_guidance(self, attempt)
-
-    def _ask_ai(self, prompt):
-        return agent_tasks.ask_ai(self, prompt)
-
-    def _handle_tool_call(self, action, conversation, already_called, attempt):
-        return agent_tasks.handle_tool_call(self, action, conversation, already_called, attempt)
 
     def _set_task_tools(self, task_name):
         agent_tasks.set_task_tools(self, task_name)

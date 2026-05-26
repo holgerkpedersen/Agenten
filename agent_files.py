@@ -1,6 +1,7 @@
 import os
 import re
 import hashlib
+import tempfile
 from lang import t
 from i18n import K
 import config
@@ -8,6 +9,23 @@ import config
 CHUNK_SIZE = config.CHUNK_SIZE
 FOLDER_SCAN_MAX_FILES = config.FOLDER_SCAN_MAX_FILES
 FOLDER_SCAN_MAX_DEPTH = config.FOLDER_SCAN_MAX_DEPTH
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_SAFE_DIRS = {os.path.realpath(p) for p in [_BASE_DIR] if p}
+for _td in (os.environ.get(k) for k in ('TMPDIR', 'TEMP', 'TMP')):
+    if _td:
+        _SAFE_DIRS.add(os.path.realpath(_td))
+_SAFE_DIRS.add(os.path.realpath(tempfile.gettempdir()))
+
+
+def _is_safe_scan_path(target_path):
+    try:
+        real = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
+        for safe in _SAFE_DIRS:
+            if real.startswith(safe + os.sep) or real == safe:
+                return True
+        return False
+    except Exception:
+        return False
 
 
 def chunk_text(text, size=CHUNK_SIZE):
@@ -45,8 +63,6 @@ def read_file_content(agent, filepath):
     if ext in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.svg', '.pdf', '.zip', '.exe', '.dll'}:
         return None
     try:
-        if not os.path.exists(filepath):
-            return None
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
         if len(content) > CHUNK_SIZE:
@@ -105,6 +121,11 @@ def get_folder_context(agent, prompt):
                 folders.add(parent)
 
     if not folders:
+        return None
+
+    folders = {f for f in folders if _is_safe_scan_path(f)}
+    if not folders:
+        agent._log("WARNING", "Ingen tilladte mapper at scanne", "Alle fundne stier var udenfor projektet")
         return None
 
     agent._log("INFO", "Automatisk scanning af mapper", ", ".join(sorted(folders)))

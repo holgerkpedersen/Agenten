@@ -1,4 +1,5 @@
 import re
+import os
 from lang import t
 from i18n import K
 
@@ -9,6 +10,8 @@ PR_PUSH_TOOLS = {"git_push"}
 PR_BRANCH_TOOLS = {"git_create_branch"}
 PR_REMOTE_TOOLS = {"git_remote_status"}
 PR_GIT_TOOLS = {"git_diff", "git_log", "git_status", "git_current_branch", "git_branch_list", "git_pull", "git_checkout"}
+
+_LOCALE_ENV = {"LC_ALL": "C", "LANG": "C", "LANGUAGE": "C"}
 
 
 def is_pr_workflow(task_name):
@@ -51,12 +54,12 @@ def verify_pr_step(agent, tool_name, result, task_name, original_prompt):
 
     if tool_name in PR_BRANCH_TOOLS:
         expected = extract_branch_name(task_name, original_prompt)
-        actual = result.get("result", {}).get("error", "")
-        m = re.search(r"Switched to a new branch '([^']+)'", actual)
-        if m:
-            actual_branch = m.group(1)
-        else:
-            actual_branch = result.get("args", {}).get("name", "")
+        actual_branch = result.get("args", {}).get("name", "")
+        if not actual_branch:
+            actual_output = result.get("result", {}).get("error", "")
+            m = re.search(r"'([^']+)'", actual_output)
+            if m:
+                actual_branch = m.group(1)
         if expected and actual_branch and actual_branch != expected:
             return t(K.CP_BRANCH_NAME, agent.lang).format(actual=actual_branch, expected=expected)
         agent._checkpoint_branch = actual_branch or expected
