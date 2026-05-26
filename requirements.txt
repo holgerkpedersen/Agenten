@@ -9,3 +9,7 @@ api_server
 pytest
 
 model_manager
+
+agent_files
+i18n
+lang
