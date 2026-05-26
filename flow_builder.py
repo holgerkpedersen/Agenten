@@ -1,5 +1,6 @@
 import json
 from typing import List, Dict, Optional
+from urllib.parse import quote
 
 FLOW_SCHEMA = "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
 
@@ -59,7 +60,7 @@ def generate_research_flow(topic: str, results: List[Dict]) -> dict:
     flow["definition"]["triggers"]["manual"]["inputs"]["schema"]["properties"]["query"]["default"] = topic
 
     flow["definition"]["actions"]["Search_the_web"]["inputs"]["uri"] = \
-        f"https://html.duckduckgo.com/html/?q={topic.replace(' ', '+')}"
+        f"https://html.duckduckgo.com/html/?q={quote(topic, safe='')}"
 
     parsed = []
     for r in results:
