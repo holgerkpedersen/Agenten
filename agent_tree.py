@@ -163,9 +163,11 @@ def record_outcome(agent, task_node):
 def evolve_if_needed(agent):
     try:
         from skill_evolution import evolve_if_needed as _evolve
-        result = _evolve(dry_run=True)
+        result = _evolve(dry_run=False)
         if result.get("status") == "evolved":
             agent._log("SKILLFLOW", "Evolution triggered", f"{len(result.get('analysis', {}).get('actions', []))} actions")
+            for r in result.get("results", []):
+                agent._log("SKILLFLOW", f"Action: {r.get('action', '?')}", str(r.get('detail', ''))[:200])
         elif result.get("status") == "ok":
             agent._log("SKILLFLOW", "Analysis ready", f"{len(result.get('actions', []))} actions available")
     except ImportError:

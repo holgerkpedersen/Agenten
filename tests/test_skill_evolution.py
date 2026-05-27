@@ -144,7 +144,7 @@ class TestShouldEvolve:
 
     def test_not_at_threshold(self):
         with patch("skill_evolution.tracker") as mock_tracker:
-            mock_tracker.total_outcomes = 10
+            mock_tracker.total_outcomes = 3
             from skill_evolution import should_evolve, _reset_evolve_counter
             _reset_evolve_counter()
             assert should_evolve() is False
