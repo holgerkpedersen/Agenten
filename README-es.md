@@ -10,7 +10,7 @@ cp .env.example .env   # Edita .env con tu token de GitHub
 python api_server.py   # Abre http://localhost:5000
 ```
 
-**Requisitos:** [LM Studio](https://lmstudio.ai) ejecutándose en `localhost:1234` con un modelo compatible.  
+**Requisitos:** [LM Studio](https://lmstudio.ai) ejecutándose en `localhost:1234` con un modelo compatible — or [OpenCode Go](https://opencode.ai) with `OPENCODE_API_KEY`.
 **Visión:** Usa un modelo compatible con visión (Gemma 4, Qwen-VL, Llava).  
 **Salida inicial:** `🕐 Startet: 2026-05-19 15:21:30 | api_server=15:21:30 | llm=15:15:05` — verifica la versión.
 

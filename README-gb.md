@@ -10,7 +10,7 @@ cp .env.example .env   # Edit .env with your GitHub token
 python api_server.py   # Open http://localhost:5000
 ```
 
-**Requirements:** [LM Studio](https://lmstudio.ai) running on `localhost:1234` with a compatible model.  
+**Requirements:** [LM Studio](https://lmstudio.ai) running on `localhost:1234` with a compatible model — or [OpenCode Go](https://opencode.ai) with `OPENCODE_API_KEY`.  
 **Vision:** Use a vision-capable model (Gemma 4, Qwen-VL, Llava).  
 **Start output:** `🕐 Startet: 2026-05-19 15:21:30 | api_server=15:21:30 | llm=15:15:05` — verify version.
 
@@ -45,7 +45,7 @@ i18n.py               # Internationalization keys (K enum)
 AGENTS.md             # Knowledge base — bugs, fixes, debugging workflow
 BRUGERVEJLEDNING.md   # User guide (Danish)
 static/index.html     # Browser UI with drag/resize panels, template dropdown, image preview, issues viewer
-tests/                # 384 tests (pytest)
+tests/                # 432 tests (pytest, all pass in 3.6s)
 sessions/             # JSON session persistence (save/load/delete)
 skills/               # Skills in markdown with frontmatter
 ```
@@ -73,18 +73,19 @@ Select a template from the dropdown before decomposition — the LLM receives fi
 
 ## 🔧 Tools
 
-The agent can perform system operations via `<<<TOOL>>>` markers (28 tools):
+The agent can perform system operations via `<<<TOOL>>>` markers (29 tools):
 
 | Tool | Action |
 |------|--------|
 | `list_chunks` | List all loaded files |
 | `read_chunk` | Read a chunk of a large file |
-| `write_file` | Create NEW file (refuses to overwrite existing .py — use edit_file) |
+| `locate` | Find current line of function/class via AST |
+| `write_file` | Create NEW file (rejects existing .py files — use edit_file) |
 | `edit_file` | Search-and-replace in existing files (with syntax check) |
-| `list_files` | List files in a directory (with pattern filter and max depth) |
-| `create_issue` | Create a new issue |
-| `create_refactor_issue` | Create refactor issue for oversize files |
-| `read_issue` | Read an issue |
+| `list_files` | List files in a directory (with file type filter and max depth) |
+| `create_issue` | Create new issue |
+| `create_refactor_issue` | Create refactor issue for oversized files |
+| `read_issue` | Read issue (include_hints=false default — problem-only) |
 | `update_issue_status` | Update issue status |
 | `run_tests` | Run pytest and return results |
 | `add_image` | Add image to context (base64-encoded) |
@@ -216,7 +217,11 @@ Flask API (api_server.py)
 - **Auto-DONE**: Prevents infinite tool loops after 10-15 iterations
 - **Robust JSON parsing**: `json.JSONDecoder().raw_decode()` handles AI output
 - **LM Link support**: OpenAI-compatible REST API models
-- **384 tests**: pytest suite covering all modules
+- **Context-CoT integration**: Extract-first guidance (LLM must summarize context before tools), anti-leakage read_issue (problem-only default, hints on request), rubric-based validation per skill (binary checks → retry)
+- **OpenCode Go support**: Set `OPENCODE_BASE_URL` + `OPENCODE_API_KEY` to use OpenCode Go instead of LM Studio
+- **Native function calling**: OpenAI native `tools` parameter sent with chat completions — model returns structured tool_calls instead of marker parsing
+- **Session persistence fix**: `current_session_id` leak between test files fixed, `_save_session_data` debounce removed (always saves at SSE end), tree serialization now includes `result` field
+- **432 tests**: pytest suite covering all modules (all pass in 3.6s)
 
 ## 📋 Requirements
 

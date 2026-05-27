@@ -10,7 +10,7 @@ cp .env.example .env   # Rediger .env med din GitHub token
 python api_server.py   # Åbn http://localhost:5000
 ```
 
-**Krav:** [LM Studio](https://lmstudio.ai) kørende på `localhost:1234` med en kompatibel model.  
+**Krav:** [LM Studio](https://lmstudio.ai) kørende på `localhost:1234` med en kompatibel model — eller [OpenCode Go](https://opencode.ai) med `OPENCODE_API_KEY`.  
 **Vision:** Brug en vision-kompatibel model (Gemma 4, Qwen-VL, Llava).  
 **Start output:** `🕐 Startet: 2026-05-19 15:21:30 | api_server=15:21:30 | llm=15:15:05` — verificér version.
 
@@ -73,18 +73,19 @@ Vælg skabelon i dropdown før nedbrydning — LLM får fastlagte sektioner:
 
 ## 🔧 Værktøjer
 
-Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (28 værktøjer):
+Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (29 værktøjer):
 
 | Værktøj | Handling |
 |---------|----------|
 | `list_chunks` | List alle indlæste filer |
 | `read_chunk` | Læs en chunk af en stor fil |
+| `locate` | Find aktuel linje for funktion/klasse via AST |
 | `write_file` | Opret NY fil (afviser eksisterende .py filer — brug edit_file) |
 | `edit_file` | Search-and-replace i eksisterende filer (med syntax-tjek) |
 | `list_files` | List filer i en mappe (med filter på filtype og max dybde) |
 | `create_issue` | Opret nyt issue |
 | `create_refactor_issue` | Opret refactor-issue ved oversize filer |
-| `read_issue` | Læs issue |
+| `read_issue` | Læs issue (include_hints=false default — problem-only) |
 | `update_issue_status` | Opdater status på issue |
 | `run_tests` | Kør pytest og returner resultater |
 | `add_image` | Tilføj billede til kontekst (base64-encodes) |
@@ -216,7 +217,11 @@ Flask API (api_server.py)
 - **Auto-DONE**: Forhindrer uendelig tool-loop efter 10-15 iterationer
 - **Robust JSON-parsing**: `json.JSONDecoder().raw_decode()` håndterer AI-output
 - **LM Link support**: OpenAI-kompatible REST API modeller
-- **384 tests**: pytest suite med test af alle moduler
+- **Context-CoT integration**: Extract-first guidance (LLM skal opsummere kontekst før værktøjer), anti-leakage read_issue (problem-only default, hints på request), rubric-based validation per skill (binary checks → retry)
+- **OpenCode Go support**: Sæt `OPENCODE_BASE_URL` + `OPENCODE_API_KEY` for at bruge OpenCode Go i stedet for LM Studio
+- **Native function calling**: OpenAI native `tools` parameter sendes med chat completions — model returnerer strukturerede tool_calls i stedet for marker-parsing
+- **Session persistence fix**: `current_session_id` læk mellem test-filer fikset, `_save_session_data` debounce fjernet (altid gem ved SSE afslutning), tree serialisering inkluderer nu `result` felt
+- **432 tests**: pytest suite med test af alle moduler (alle passerer på 3.6s)
 
 ## 📋 Requirements
 
