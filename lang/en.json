@@ -427,5 +427,11 @@
     "issues_table_priority": "Priority",
     "loading": "Loading...",
     "issues_error": "Error"
-  }
+  },
+  "extract_context_first": "Before calling any tools, you MUST first extract relevant information from the context above. Write 2-3 sentences summarizing what you know about the task based ONLY on the given context. Then call the necessary tools.",
+  "extract_context_skipped": "You skipped context extraction. First read and summarize relevant information from the context, then call tools.",
+  "rubric_passed": "✓",
+  "rubric_failed": "✗ FAILED:",
+  "rubric_failed_detail": "  ✗ {desc}",
+  "anti_leakage_warning": "⚠️ This issue has solution suggestions you have not read. Call read_issue with include_hints=true to read them before writing/editing code."
 }

@@ -427,5 +427,11 @@
     "issues_table_priority": "Prioritet",
     "loading": "Indlæser...",
     "issues_error": "Fejl"
-  }
+  },
+  "extract_context_first": "Før du kalder nogen værktøjer, SKAL du først udtrække relevant information fra konteksten ovenfor. Skriv 2-3 sætninger der opsummerer hvad du ved om opgaven baseret KUN på den givne kontekst. Derefter kald de nødvendige værktøjer.",
+  "extract_context_skipped": "Du sprang kontekstudtrækningen over. Læs først og opsummer relevant information fra konteksten, og kald derefter værktøjer.",
+  "rubric_passed": "✓",
+  "rubric_failed": "✗ MISLYKKET:",
+  "rubric_failed_detail": "  ✗ {desc}",
+  "anti_leakage_warning": "⚠️ Dette issue har løsningsforslag du ikke har læst. Kald read_issue med include_hints=true for at læse dem før du skriver/redigerer kode."
 }

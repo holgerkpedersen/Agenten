@@ -427,5 +427,11 @@
     "issues_table_priority": "Prioridad",
     "loading": "Cargando...",
     "issues_error": "Error"
-  }
+  },
+  "extract_context_first": "Antes de llamar a cualquier herramienta, DEBES extraer información relevante del contexto anterior. Escribe 2-3 frases resumiendo lo que sabes sobre la tarea basándote SOLO en el contexto dado. Luego llama a las herramientas necesarias.",
+  "extract_context_skipped": "Omitiste la extracción de contexto. Primero lee y resume la información relevante del contexto, luego llama a las herramientas.",
+  "rubric_passed": "✓",
+  "rubric_failed": "✗ FALLÓ:",
+  "rubric_failed_detail": "  ✗ {desc}",
+  "anti_leakage_warning": "⚠️ Este issue tiene sugerencias de solución que no has leído. Llama a read_issue con include_hints=true para leerlas antes de escribir/editar código."
 }

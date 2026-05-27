@@ -21,6 +21,7 @@ class LMStudioWrapper:
         self._cache_max = 50
         self.timeout = timeout
         self.model = model or os.environ.get('LM_MODEL') or config.LLM_MODEL
+        self._pending_tool_calls = []
 
     def _headers(self):
         h = {}
@@ -30,8 +31,6 @@ class LMStudioWrapper:
 
     @staticmethod
     def _resolve_base_url(base_url):
-        if os.environ.get('OPENCODE_BASE_URL'):
-            return os.environ['OPENCODE_BASE_URL'].rstrip('/')
         if base_url:
             return base_url.rstrip('/')
         if os.environ.get('LM_BASE_URL'):
@@ -192,12 +191,12 @@ class LMStudioWrapper:
             log.error("Error: %s", e)
             return f"ERROR:{str(e)}"
 
-    def generate_stream(self, prompt=None, messages=None, temperature=0.7, max_tokens=None, images=None):
+    def generate_stream(self, prompt=None, messages=None, temperature=0.7, max_tokens=None, images=None, tools=None):
         if max_tokens is None:
             max_tokens = config.MAX_TOKENS
         msgs = self._to_messages(prompt, messages, images)
         compressed = self._compress_messages(msgs)
-        # Log image info for debugging
+        self._pending_tool_calls.clear()
         if images:
             log.info("Sending %s images with model %s", len(images), self.model)
             for i, m in enumerate(compressed):
@@ -212,16 +211,19 @@ class LMStudioWrapper:
                     log.info("  msg[%s] type=text len=%s", i, len(c))
         log.info("Streaming chat request to LLM")
         stream_timeout = config.LLM_STREAM_TIMEOUT
+        body = {
+            "model": self.model,
+            "messages": compressed,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True
+        }
+        if tools:
+            body["tools"] = tools
         try:
             response = requests.post(
                 f"{self.base_url}/chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": compressed,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "stream": True
-                },
+                json=body,
                 headers=self._headers(),
                 timeout=(config.LLM_CONNECT_TIMEOUT, stream_timeout),
                 stream=True
@@ -234,6 +236,7 @@ class LMStudioWrapper:
                     log.warning("Failed to read error body: %s", e)
                 yield f"[ERROR: HTTP {response.status_code}]"
                 return
+            tool_calls_acc = {}
             for line in response.iter_lines():
                 if line:
                     try:
@@ -247,6 +250,39 @@ class LMStudioWrapper:
                                     text = delta.get("content") or delta.get("reasoning_content") or ""
                                     if text:
                                         yield text
+                                    tool_calls_list = delta.get("tool_calls")
+                                    if tool_calls_list:
+                                        for tc in tool_calls_list:
+                                            idx = tc["index"]
+                                            if idx not in tool_calls_acc:
+                                                tool_calls_acc[idx] = {
+                                                    "id": tc.get("id"),
+                                                    "function": {
+                                                        "name": tc.get("function", {}).get("name", ""),
+                                                        "arguments": ""
+                                                    }
+                                                }
+                                            args_chunk = tc.get("function", {}).get("arguments", "")
+                                            if args_chunk:
+                                                tool_calls_acc[idx]["function"]["arguments"] += args_chunk
+                                    finish_reason = chunk["choices"][0].get("finish_reason")
+                                    if finish_reason == "tool_calls" and tool_calls_acc:
+                                        for idx in sorted(tool_calls_acc):
+                                            tc_data = tool_calls_acc[idx]
+                                            try:
+                                                parsed_args = json.loads(tc_data["function"]["arguments"])
+                                            except (json.JSONDecodeError, ValueError):
+                                                parsed_args = {}
+                                            tc_data["function"]["arguments"] = parsed_args
+                                            self._pending_tool_calls.append({
+                                                "id": tc_data.get("id", f"call_{idx}"),
+                                                "type": "function",
+                                                "function": {
+                                                    "name": tc_data["function"]["name"],
+                                                    "arguments": parsed_args
+                                                }
+                                            })
+                                        yield f"\n[Kalde: {self._pending_tool_calls[0]['function']['name']}]"
                     except (json.JSONDecodeError, UnicodeDecodeError) as e:
                         log.error("Parse error in stream: %s", e)
                         continue

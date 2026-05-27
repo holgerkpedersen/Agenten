@@ -42,6 +42,25 @@ class ToolRegistry:
                 lines.append(tool.to_prompt_desc())
         return "\n".join(lines)
 
+    def get_openai_tools_for_active(self):
+        tools = []
+        for name, tool in self.tools.items():
+            if self.active_tools is not None and name not in self.active_tools:
+                continue
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": {p: {"type": "string", "description": p} for p in tool.parameters},
+                        "required": tool.parameters,
+                    }
+                }
+            })
+        return tools
+
     def build_system_prompt(self, task):
         tools_desc = self.get_tool_descriptions()
         active_names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
@@ -59,8 +78,10 @@ class ToolRegistry:
             task=task,
         )
         example_prefix = t(K.SYS_EXAMPLE_PREFIX, self.lang)
-        param_hint = "\"param1\":\"value1\"" if active_names else ""
-        prompt += f"\n\n{example_prefix}: {self.TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{{param_hint}}}}}{self.END_MARKER}"
+        real_example = active_names[0]
+        first_params = [p for p in self.tools[real_example].parameters][:2] if real_example in self.tools else []
+        param_kvs = ", ".join(f'"{p}":"..."' for p in first_params)
+        prompt += f"\n\n{example_prefix}: {self.TOOL_MARKER}{{\"tool\":\"{real_example}\",\"args\":{{{param_kvs}}}}}{self.END_MARKER}"
         return prompt
 
     @staticmethod
@@ -93,21 +114,28 @@ class ToolRegistry:
                 data = json.loads(raw)
             except json.JSONDecodeError:
                 try:
-                    data, _ = json.JSONDecoder().raw_decode(raw)
+                    data, idx = json.JSONDecoder().raw_decode(raw)
+                    if idx < len(raw) and raw[idx:].strip() and not all(c in ']})>' for c in raw[idx:].strip()):
+                        raise ValueError("Trailing content after JSON")
                 except (json.JSONDecodeError, ValueError):
                     escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
                     try:
                         data = json.loads(escaped)
                     except json.JSONDecodeError:
                         try:
-                            data, _ = json.JSONDecoder().raw_decode(escaped)
+                            data, idx = json.JSONDecoder().raw_decode(escaped)
+                            if idx < len(escaped) and escaped[idx:].strip() and not all(c in ']})>' for c in escaped[idx:].strip()):
+                                raise ValueError("Trailing content after JSON")
                         except (json.JSONDecodeError, ValueError):
                             return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
             tool_name = data.get("tool", "")
             if tool_name.lower() in ("navn", "name", "nombre", "名称"):
                 names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
                 return {"type": "error", "message": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=', '.join(names))}
-            return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
+            args = data.get("args", {})
+            if not isinstance(args, dict):
+                args = {}
+            return {"type": "tool", "tool": tool_name, "args": args}
 
         # Handle truncated tool call (starts with marker but missing END)
         if self.TOOL_MARKER in response and self.END_MARKER not in response:
@@ -127,7 +155,7 @@ class ToolRegistry:
                     return {"type": "error", "message": "JSON parse error"}
             if isinstance(data, dict):
                 tool_name = data.get("tool", "")
-                if tool_name not in ("navn", "name", "nombre", "\u540d\u79f0"):
+                if tool_name.lower() not in ("navn", "name", "nombre", "\u540d\u79f0"):
                     return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
         if done_match:
             try:

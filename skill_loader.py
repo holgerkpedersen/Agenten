@@ -5,6 +5,7 @@ Baseret på ReactAgent skills-arkitektur, tilpasset til Agentens template-basere
 
 import os
 import re
+import json
 from typing import List, Optional
 from config import get_logger
 log = get_logger(__name__)
@@ -12,6 +13,7 @@ log = get_logger(__name__)
 
 class SkillLoader:
     SKILLS_DIR = "skills"
+    _rate_cache = {}
 
     # Patterns to deduce action types from task text
     ACTION_TYPE_PATTERNS = {
@@ -62,6 +64,11 @@ class SkillLoader:
                         elif key == "action_types":
                             raw_at = val.strip("[]")
                             header["action_types"] = [a.strip() for a in raw_at.split(",") if a.strip()]
+                        elif key == "rubrics":
+                            try:
+                                header["rubrics"] = json.loads(val)
+                            except (json.JSONDecodeError, ValueError):
+                                pass
                     except (IndexError, AttributeError):
                         continue
         return header, body
@@ -109,6 +116,7 @@ class SkillLoader:
                 "description": description or "",
                 "body": body,
                 "action_types": header.get("action_types", []),
+                "rubrics": header.get("rubrics", []),
             }
         except Exception as e:
             log.warning("Failed to parse skill %s: %s", path, e)
@@ -137,15 +145,20 @@ class SkillLoader:
 
     @classmethod
     def _get_success_rate(cls, skill_name: str) -> float:
+        cached = cls._rate_cache.get(skill_name)
+        if cached is not None:
+            return cached
         try:
             from skill_tracker import tracker
             stats = tracker.get_stats(skill_name, recent=50)
-            return stats.get("success_rate", 0)
+            rate = stats.get("success_rate", 0)
         except ImportError:
-            return 0
+            rate = 0
         except Exception as e:
             log.warning("Failed to get success rate for %s: %s", skill_name, e)
-            return 0
+            rate = 0
+        cls._rate_cache[skill_name] = rate
+        return rate
 
     @classmethod
     def _score(cls, text: str, skill: dict) -> float:

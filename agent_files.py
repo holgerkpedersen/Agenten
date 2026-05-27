@@ -85,11 +85,13 @@ def read_file_content(agent, filepath):
     if basename in {'.env'}:
         return None
     ext = os.path.splitext(filepath)[1].lower()
-    if ext in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.svg', '.pdf', '.zip', '.exe', '.dll'}:
+    if ext in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.zip', '.exe', '.dll'}:
         return None
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
+        if '\x00' in content:
+            return None
         if len(content) > CHUNK_SIZE:
             content = content[:CHUNK_SIZE] + "\n" + t(K.FILE_TRUNCATED, agent.lang)
         return content

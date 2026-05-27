@@ -92,14 +92,17 @@ def _build_chunk_hint(agent):
 
 
 def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
+    clean_prompt = getattr(agent, 'prompt', original_prompt)
+    file_ctx = getattr(agent, '_file_context_str', '')
+
     section_instr = agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name, "")
     if section_instr:
-        task_prompt = f"{section_instr}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
+        task_prompt = f"{section_instr}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
-        task_prompt = f"{task_node.name}\n\nKontekst / Context: {original_prompt}{chunk_hint}"
+        task_prompt = f"{task_node.name}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
     agent._refresh_skills()
-    agent._match_skills(original_prompt)
+    agent._match_skills(clean_prompt)
     skills_block = agent._format_skills_for_prompt()
     if skills_block:
         task_prompt = skills_block + task_prompt
@@ -107,7 +110,7 @@ def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
 
     system_prompt = agent.tool_registry.build_system_prompt(task_prompt)
     agent._log("DEBUG", f"file_chunks keys: {list(agent.file_chunks.keys())}", "")
-    agent._log("DEBUG", f"original_prompt length: {len(original_prompt)}", f"starts with: {original_prompt[:100]}")
+    agent._log("DEBUG", f"clean_prompt length: {len(clean_prompt)}", f"starts with: {clean_prompt[:100]}")
     agent._log("DEBUG", f"system_prompt length: {len(system_prompt)}", f"contains file content: {'###' in system_prompt}")
 
     tools_list = ', '.join([k for k in agent.tool_registry.tools if agent.tool_registry.active_tools is None or k in agent.tool_registry.active_tools])
@@ -123,11 +126,19 @@ def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
         read_only = all(t not in ('write_file',) for t in agent.tool_registry.active_tools or [])
         if read_only and not agent.images and not agent.file_chunks:
             user_guidance += f"\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte med <<<DONE>>> uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
+    has_write = any(t in ('write_file', 'edit_file') for t in (agent.tool_registry.active_tools or []))
+    if has_write:
+        user_guidance += "\n\n\u26a0\ufe0f DU SKAL redigere kode i denne fase. Brug write_file eller edit_file for at udf\u00f8re \u00e6ndringer. L\u00e6s maks. \u00e9n gang for at forst\u00e5 koden \u2014 skriv derefter din l\u00f8sning. Gentagne l\u00e6sninger uden at producere kode er spild af tid."
 
-    messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_guidance}]
+    messages = [{"role": "system", "content": system_prompt}]
+    if file_ctx:
+        messages.append({"role": "system", "content": f"## Filindhold (f\u00f8rste iteration)\n\n{file_ctx}"})
+        extraction_guidance = t(K.EXTRACT_CONTEXT_FIRST, agent.lang)
+        user_guidance = extraction_guidance + "\n\n" + user_guidance
+    messages.append({"role": "user", "content": user_guidance})
     agent._log("LLM", "System prompt", f"{len(system_prompt)} chars \u2014 {system_prompt[:300]}...")
     agent._log("LLM", "User guidance", user_guidance)
-    return messages, tools_list
+    return messages, tools_list, bool(file_ctx)
 
 
 def _msg_content_len(m):
@@ -139,19 +150,55 @@ def _msg_content_len(m):
     return 0
 
 
+def _validate_rubrics(agent, called_tools):
+    skill = agent._active_skills[0] if agent._active_skills else None
+    if not skill:
+        return [], []
+    skill_rubrics = skill.get("rubrics", [])
+    if not skill_rubrics:
+        return [], []
+    called = {k.split("{")[0] for k in called_tools}
+    passed, failed = [], []
+    for rubric in skill_rubrics:
+        check = rubric.get("check", "")
+        ok = _evaluate_rubric_check(check, called)
+        if ok:
+            passed.append(rubric)
+        else:
+            failed.append(rubric)
+    return passed, failed
+
+
+def _evaluate_rubric_check(check_str, called_tools):
+    if not check_str:
+        return True
+    for part in check_str.split(" or "):
+        cond = part.strip()
+        if cond.startswith("tool_used:"):
+            target = cond[len("tool_used:"):].strip()
+            if target in called_tools:
+                return True
+    return False
+
+
 def _truncate_messages(messages, max_chars):
     total = sum(_msg_content_len(m) for m in messages)
-    if total > max_chars and len(messages) > 3:
-        mid = "\n[... tidligere kontekst afkortet ...]"
-        keep = max_chars - _msg_content_len(messages[0]) - _msg_content_len(messages[1]) - len(mid)
-        if keep > 0:
-            tail_content = messages[-1]["content"]
-            if isinstance(tail_content, str):
-                cropped = tail_content[-keep:] if len(tail_content) > keep else tail_content
-            else:
-                cropped = "[...]"
-            return messages[:2] + [{"role": "user", "content": mid + cropped}]
-    return messages
+    if total <= max_chars or len(messages) <= 3:
+        return messages
+    mid = "\n[... tidligere kontekst afkortet ...]"
+    system = [m for m in messages if m["role"] == "system"]
+    non_system = [m for m in messages if m["role"] != "system"]
+    keep_pairs = 4
+    tail = non_system[-keep_pairs:] if len(non_system) > keep_pairs else non_system
+    keep_chars = max_chars - sum(_msg_content_len(m) for m in system) - len(mid)
+    if keep_chars > 0:
+        tail_content = tail[-1]["content"]
+        if isinstance(tail_content, str):
+            cropped = tail_content[-keep_chars:] if len(tail_content) > keep_chars else tail_content
+        else:
+            cropped = "[...]"
+        return system + [{"role": "user", "content": mid + cropped}] if tail else system
+    return system + tail
 
 
 def _cont_hint(agent, tools_list):
@@ -174,6 +221,22 @@ def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_no
     result = agent.tool_registry.execute(parsed["tool"], parsed["args"])
     result_str = json.dumps(result, ensure_ascii=False)
     agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=parsed['tool']), result_str)
+
+    if parsed["tool"] in ("write_file", "edit_file"):
+        unread_hints = agent._hints_available - agent._hints_requested
+        if unread_hints:
+            ids = ", ".join(sorted(unread_hints)[:3])
+            _add_user_msg(messages, f"\u26a0\ufe0f {t(K.ANTI_LEAKAGE_WARNING, agent.lang)} ({ids})")
+
+    if parsed["tool"] == "read_issue":
+        if isinstance(result, dict) and result.get("success"):
+            issue_data = result.get("issue", {})
+            iid = issue_data.get("id", "")
+            if iid:
+                if issue_data.get("_hints_available"):
+                    agent._hints_available.add(iid)
+                if issue_data.get("_hints_read"):
+                    agent._hints_requested.add(iid)
 
     checkpoint_msg = agent_git.verify_pr_step(agent, parsed["tool"], result, task_node.name, original_prompt)
     if checkpoint_msg:
@@ -250,14 +313,16 @@ def solve_task_stream(agent, task_node, original_prompt):
     set_task_tools(agent, task_node.name)
     agent._checkpoint_tools = set()
     agent._checkpoint_branch = ""
+    agent._rubric_retried = False
 
     chunk_hint = _build_chunk_hint(agent)
-    messages, tools_list = _build_initial_messages(agent, task_node, original_prompt, chunk_hint)
+    messages, tools_list, has_file_ctx = _build_initial_messages(agent, task_node, original_prompt, chunk_hint)
 
     full_response = ""
     text_fallback = ""
     max_iterations = config.MAX_PR_TASK_ITERATIONS if agent_git.is_pr_workflow(task_node.name) else config.MAX_TASK_ITERATIONS
     called_tools = {}
+    consecutive_errors = 0
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -275,8 +340,10 @@ def solve_task_stream(agent, task_node, original_prompt):
             agent.pending_reply = None
 
         response = ""
+        tool_defs = agent.tool_registry.get_openai_tools_for_active() if config.NATIVE_TOOLS else []
+        tools_param = tool_defs if tool_defs else None
         try:
-            for chunk in agent.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=agent.max_tokens, images=agent.images):
+            for chunk in agent.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=agent.max_tokens, images=agent.images, tools=tools_param):
                 if agent.stop_requested:
                     break
                 response += chunk
@@ -292,7 +359,33 @@ def solve_task_stream(agent, task_node, original_prompt):
             yield {"type": "error", "message": response}
             break
 
+        pending_tc = getattr(agent.llm, '_pending_tool_calls', [])
+        if pending_tc:
+            tool_call_msg = {"role": "assistant", "content": None, "tool_calls": pending_tc}
+            messages.append(tool_call_msg)
+            for tc in pending_tc:
+                parsed = {"type": "tool", "tool": tc["function"]["name"], "args": tc["function"]["arguments"]}
+                tool_result = _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_node, original_prompt)
+                if tool_result is None:
+                    continue
+                yield {"type": "tool_call", "tool": tool_result["tool"], "args": tool_result["args"]}
+                yield {"type": "tool_result", "tool": tool_result["tool"], "result": tool_result["result"]}
+                if tool_result.get("checkpoint_msg"):
+                    yield {"type": "checkpoint", "message": tool_result["checkpoint_msg"], "tool": parsed["tool"]}
+                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                total_calls = sum(called_tools.values())
+                if total_calls >= config.MAX_TOOL_CALLS:
+                    full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
+                    break
+            if full_response:
+                break
+            continue
+
         messages.append({"role": "assistant", "content": response})
+
+        if i == 0 and has_file_ctx:
+            messages = [m for m in messages if not (isinstance(m.get("content"), str) and m["content"].startswith("## Filindhold"))]
+            has_file_ctx = False
 
         parsed = agent.tool_registry.parse_response(response)
         agent._log("LLM", t(K.LOG_ITERATION, agent.lang).format(n=i+1), t(K.LOG_TYPE, agent.lang).format(type=parsed.get('type')))
@@ -320,6 +413,15 @@ def solve_task_stream(agent, task_node, original_prompt):
                 if agent_git.is_pr_workflow(task_node.name):
                     yield {"type": "checkpoint", "message": t(K.CP_PR_FAILED, agent.lang), "tool": "done"}
                 continue
+            passed, failed = _validate_rubrics(agent, called_tools)
+            if failed and not agent._rubric_retried:
+                agent._rubric_retried = True
+                feedback = t(K.RUBRIC_FAILED, agent.lang)
+                for r in failed:
+                    feedback += "\n" + t(K.RUBRIC_FAILED_DETAIL, agent.lang).format(desc=r["desc"])
+                _add_user_msg(messages, feedback)
+                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                continue
             full_response = parsed["result"]
             done_idx = response.find(agent.tool_registry.DONE_MARKER)
             if done_idx > 0:
@@ -329,7 +431,15 @@ def solve_task_stream(agent, task_node, original_prompt):
             break
 
         if parsed["type"] == "error":
-            _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {parsed['message']}")
+            consecutive_errors += 1
+            if consecutive_errors >= 3:
+                yield {"type": "error", "message": f"3 consecutive format errors — stopping. Use format: {agent.tool_registry.TOOL_MARKER}{{\"tool\":\"...\",\"args\":{{...}}}}{agent.tool_registry.END_MARKER} or {agent.tool_registry.DONE_MARKER}{{...}}{agent.tool_registry.END_MARKER}"}
+                break
+            if consecutive_errors == 1:
+                hint = f"Write your response in the correct format: {agent.tool_registry.TOOL_MARKER}{{\"tool\":\"{list(called_tools.keys())[0] if called_tools else 'write_file'}\",\"args\":{{...}}}}{agent.tool_registry.END_MARKER}"
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {parsed['message']}. {hint}")
+            else:
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {parsed['message']}. Only use <<<TOOL>>> or <<<DONE>>> — no English text before or after.")
             messages = _truncate_messages(messages, agent.max_conversation_chars)
             continue
 

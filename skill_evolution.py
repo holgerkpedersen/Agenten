@@ -199,6 +199,11 @@ def analyze():
     Analyse all tracked outcomes and produce a list of evolution actions.
     Returns a dict with skill-level recommendations and potential new skill gaps.
     """
+    try:
+        outcomes = tracker.get_outcomes()
+    except (ImportError, NameError):
+        return {"status": "error", "message": "skill_tracker not available"}
+
     outcomes = tracker.get_outcomes()
     total = len(outcomes)
     if total < 5:
@@ -451,7 +456,10 @@ def _reset_evolve_counter():
 
 def should_evolve() -> bool:
     global _last_evolved_at
-    total = tracker.total_outcomes
+    try:
+        total = tracker.total_outcomes
+    except (ImportError, NameError, AttributeError):
+        return False
     if total == 0:
         return False
     if total - _last_evolved_at >= EVOLVE_EVERY_N:

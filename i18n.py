@@ -104,6 +104,16 @@ class K(StrEnum):
     TOOL_DUPLICATE      = "tool_duplicate"
     TOOL_DUPLICATE_MSG  = "tool_duplicate_msg"
     FIRST_TOOL_REQUIRED = "first_tool_required"
+    EXTRACT_CONTEXT_FIRST = "extract_context_first"
+    EXTRACT_CONTEXT_SKIPPED = "extract_context_skipped"
+
+    # === Rubric validation ===
+    RUBRIC_PASSED         = "rubric_passed"
+    RUBRIC_FAILED         = "rubric_failed"
+    RUBRIC_FAILED_DETAIL  = "rubric_failed_detail"
+
+    # === Anti-leakage ===
+    ANTI_LEAKAGE_WARNING  = "anti_leakage_warning"
 
     # === System prompt fragments ===
     SYS_EXAMPLE_PREFIX  = "sys_example_prefix"

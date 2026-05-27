@@ -268,6 +268,35 @@ Flask serves uploads at `/uploads/<filename>` so gemma can fetch the image local
 - **Pattern:** Use `locate` tool instead of hardcoded line numbers. Functions survive edits; line numbers don't.
 - **Files:** `agent_files.py:198-299` (locate_code), `agent_core.py:310-314` (tool reg), `agent_issues.py:164-200` (auto-resolve), `scripts/migrate_issue_locations.py` (migration)
 
+### 35. Native function calling: `generate_stream` crash on `tool_calls: null` (`llm_wrapper.py:255-257`)
+
+**Symptom:** Every task iteration returns `[ERROR: 'NoneType' object is not iterable]` with models like `glm-5.1`.  
+**Root cause:** Some OpenAI-compatible APIs include `"tool_calls": null` in streaming deltas (not omitting the key). `if "tool_calls" in delta: for tc in delta["tool_calls"]:` iterates over `None`.  
+**Fix:** Replace with `tool_calls_list = delta.get("tool_calls"); if tool_calls_list: for tc in tool_calls_list:`. Uses `.get()` which returns `None` when key absent or value is null → falsy → skip.
+
+### 36. `_resolve_base_url` priority: `OPENCODE_BASE_URL` moved to config (`llm_wrapper.py:32-41`, `config.py:59`)
+
+**Symptom:** When `OPENCODE_BASE_URL` env var is set, all `LMStudioWrapper` instances connect to OpenCode Go — even when an explicit `base_url` is passed (e.g. `base_url=config.LLM_BASE_URL`). This breaks fallback to LM Studio and makes tests that need localhost unreachable.  
+**Root cause:** `_resolve_base_url` checked `OPENCODE_BASE_URL` env BEFORE the explicit `base_url` parameter. Since `Agent()` always passes `config.LLM_BASE_URL` (always set from LM_HOST/LM_PORT defaults), `OPENCODE_BASE_URL` always won.  
+**Fix (2 parts):**
+1. `config.py`: `LLM_BASE_URL` now checks `OPENCODE_BASE_URL` env first — the OpenCode URL is baked into config at import time.
+2. `llm_wrapper.py` `_resolve_base_url`: removed `OPENCODE_BASE_URL` env check entirely. Priority is now: explicit `base_url` param → `LM_BASE_URL` env → auto-construct from `LM_HOST`/`LM_PORT`. This makes tests pass clean base_url values without interference.
+
+### 37. Test suite: `current_session_id` leaks between test files (`tests/test_sse_streaming.py:12-17`, `tests/test_api.py:11-16`)
+
+**Symptom:** Full test suite hangs for 3+ minutes at `test_sse_streaming.py`. SSE tests take 6s+ each instead of <0.1s.  
+**Root cause:** `test_api.py` creates real sessions via `POST /api/sessions/create`, setting `api_server.current_session_id` to a real session ID. When `test_sse_streaming.py` runs next, SSE tests without session mocking pick up the leaked `current_session_id`, load real session data with a real LLM model, and try to execute the task tree with the REAL LLM (not mocked). The `_ensure_model_loaded("test-model")` call takes 2-4s to fail, and `solve_task_stream` runs 4+ real LLM iterations.  
+**Fix:** Reset `api_server.current_session_id = None` in the `client` fixture of both `test_api.py` and `test_sse_streaming.py`. Combined with `_ensure_model_loaded` TESTING guard, SSE tests now complete in <0.05s.
+
+### 38. `model_manager` and `_ensure_model_loaded` guard for non-LM-Studio backends (`api_server.py:824-829,646`, `model_manager.py:34-56,78-84,87-116`)
+
+**Symptom:** Tests and server try to call LM Studio model APIs (load/unload/list) when using OpenCode Go or other external LLM providers. Requests to wrong endpoints (e.g. `https://opencode.ai/zen/go/api/v1/models`) hang or fail.  
+**Root cause:** `model_manager` functions (`get_loaded_models`, `get_available_models`, `get_all_rest_models`) and `_ensure_model_loaded` unconditionally connect to LM Studio. No check for whether the backend is actually LM Studio.  
+**Fix (3 parts):**
+1. `_ensure_model_loaded()`: returns early if `app.config["TESTING"]` is True OR if `config.LLM_BASE_URL` contains "opencode" or doesn't point to localhost.
+2. `/api/models` endpoint: skips `model_manager` calls when `app.config["TESTING"]` is True OR OpenCode URL detected.
+3. `model_manager.py`: `get_loaded_models()`, `get_available_models()`, `get_all_rest_models()` each return early (`None`/`[]`) when `os.environ.get('OPENCODE_BASE_URL')` is set. Belt-and-suspenders guard in case any code path calls them directly.
+
 ## Refactoring Convention
 
 When extracting methods from `agent_core.py` into module files:

@@ -120,6 +120,7 @@ def task_tree_to_dict(agent):
         return {
             "name": node.name,
             "status": node.status,
+            "result": node.result,
             "children": [node_to_dict(child) for child in node.children] if node.children else []
         }
 
@@ -130,6 +131,7 @@ def task_tree_from_dict(agent, d):
     def dict_to_node(item):
         node = TaskNode(item["name"])
         node.status = item.get("status", "pending")
+        node.result = item.get("result")
         for child_data in item.get("children", []):
             node.add_child(dict_to_node(child_data))
         return node

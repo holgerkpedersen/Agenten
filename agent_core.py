@@ -169,6 +169,7 @@ class Agent:
         self.agent_log = []
         self.original_prompt = ""
         self.full_prompt_with_context = ""
+        self._file_context_str = ""
         self.show_thinking = True
         self.file_context = []
         self.file_chunks = {}
@@ -189,9 +190,12 @@ class Agent:
         self._checkpoint_branch = ""
         self._skills = None
         self._active_skills = []
-        self._task_start_time = 0
+        self._task_start_time = None
         self._file_hash_registry = {}
         self._delegation_index = None
+        self._hints_requested = set()
+        self._hints_available = set()
+        self._rubric_retried = False
 
     def _register_tools(self):
         gh = GithubAPI()
@@ -350,9 +354,9 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "read_issue",
-            "Læs et issue fra docs/issues/observed/issues.json. Args: issue_id (f.eks. 'BUG-003'). Returnerer issue-detaljer.",
+            "L\u00e6s et issue fra docs/issues/observed/issues.json. Args: issue_id (f.eks. 'BUG-003'), include_hints (valgfri boolean, default false \u2014 s\u00e6t til true for at se proposed_fix).",
             ["issue_id"],
-            lambda issue_id: agent_issues.read_issue(issue_id)
+            lambda issue_id, include_hints=False: agent_issues.read_issue(issue_id, include_hints)
         ))
         self.tool_registry.register(Tool(
             "update_issue_status",
@@ -410,7 +414,9 @@ class Agent:
         self.agent_log.append(log_entry)
         try:
             log_fn = {'INFO': log.info, 'WARNING': log.warning, 'ERROR': log.error}.get(str(level).upper(), log.info)
-            log_fn("%s: %s", str(message), str(detail)[:200])
+            msg = str(message).encode('cp1252', errors='replace').decode('cp1252')
+            det = str(detail)[:200].encode('cp1252', errors='replace').decode('cp1252')
+            log_fn("%s: %s", msg, det)
         except Exception:
             pass
 
@@ -549,6 +555,7 @@ class Agent:
             file_context += oversize_note
 
         file_context = self._resolve_delegations_for_context(file_context)
+        self._file_context_str = file_context
         self.full_prompt_with_context = prompt + file_context
 
         if template and template != "fri" and template_config.get("fallback"):

@@ -23,6 +23,7 @@ class TaskNode:
         return {
             "name": self.name,
             "status": self.status,
+            "result": self.result,
             "children": [c.to_dict() for c in self.children]
         }
 

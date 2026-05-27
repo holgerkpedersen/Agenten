@@ -85,13 +85,20 @@ def run_pytest(test_path=""):
         return {"success": False, "stdout": "", "stderr": "python -m pytest not found", "exit_code": -1}
 
 
-def read_issue(issue_id):
+def read_issue(issue_id, include_hints=False):
     data = _load_issues()
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
             result = {"success": True, "issue": dict(issue)}
-            # Ensure acceptance_criteria is shown even if empty
             result["issue"].setdefault("acceptance_criteria", "")
+            has_hints = bool(issue.get("proposed_fix"))
+            result["issue"]["_hints_available"] = has_hints
+            if include_hints:
+                result["issue"]["_hints_read"] = True
+            else:
+                result["issue"]["_hints_read"] = False
+                for key in ("proposed_fix", "resolution_note", "acceptance_criteria"):
+                    result["issue"].pop(key, None)
             return result
     available = [i["id"] for i in data.get("issues", [])]
     return {"success": False, "error": f"Issue '{issue_id}' not found. Available: {available}"}

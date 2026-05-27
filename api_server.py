@@ -534,7 +534,12 @@ def save_current_session():
     
     if not session_id:
         return jsonify({"success": False, "error": t(K.ERR_NO_SESSION, agent.lang)}), 400
-    
+    now = time.time()
+    with _session_save_lock:
+        last = _session_save_debounce.get(session_id, 0)
+        if now - last < 0.5:
+            return jsonify({"success": True, "debounced": True})
+        _session_save_debounce[session_id] = now
     existing = session_manager.load_session(session_id) or {}
     existing_agent_log = existing.get("agent_log", [])
     existing_timestamps = {e.get("timestamp") for e in existing_agent_log}
@@ -545,9 +550,9 @@ def save_current_session():
     session_data = {
         "id": session_id,
         "name": data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=session_id[:8])),
-        "tree": data.get("tree") or (agent.task_tree_to_dict() if agent.task_tree else None),
+        "tree": data.get("tree") or existing.get("tree") or (agent.task_tree_to_dict() if agent.task_tree else None),
         "layout": data.get("layout"),
-        "execution_log": agent.execution_log,
+        "execution_log": agent.execution_log or existing.get("execution_log", []),
         "agent_log": merged_log,
         "original_prompt": data.get("original_prompt") or agent.original_prompt or "",
         "full_prompt_with_context": getattr(agent, 'full_prompt_with_context', '') or '',
@@ -643,7 +648,7 @@ def get_models():
     openai_models = agent.llm.list_models()
     loaded = None
     rest_models = []
-    if os.environ.get('OPENCODE_BASE_URL'):
+    if app.config.get("TESTING") or 'opencode' in config.LLM_BASE_URL or ('localhost' not in config.LLM_BASE_URL and '127.0.0.1' not in config.LLM_BASE_URL):
         merged = sorted(openai_models)
     else:
         loaded = model_manager.get_loaded_models()
@@ -824,7 +829,10 @@ def execute_without_stream():
 def _ensure_model_loaded(model_key):
     if not model_key:
         return
-    if os.environ.get('OPENCODE_BASE_URL'):
+    if app.config.get("TESTING"):
+        return
+    base = config.LLM_BASE_URL
+    if 'opencode' in base or ('localhost' not in base and '127.0.0.1' not in base):
         return
     loaded, matched = model_manager.is_model_loaded(model_key)
     if loaded:
@@ -1130,6 +1138,9 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
     if current_session_id:
         session_manager.add_prompt_result(current_session_id, node.name, full_response, None)
 
+
+_session_save_debounce = {}
+_session_save_lock = threading.Lock()
 
 def _save_session_data(current_session_id, stream_agent, ui_lang):
     if not current_session_id:

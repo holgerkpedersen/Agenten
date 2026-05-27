@@ -12,6 +12,8 @@ from api_server import app as flask_app
 @pytest.fixture
 def client():
     flask_app.config["TESTING"] = True
+    import api_server
+    api_server.current_session_id = None
     with flask_app.test_client() as c:
         yield c
 
@@ -77,8 +79,8 @@ class TestSSEWithSessionTree:
             mock_llm = MagicMock()
             mock_llm.model = "test-model"
 
-            def fake_stream(messages, temperature=0.3, max_tokens=4096, images=None):
-                yield "test result"
+            def fake_stream(messages, temperature=0.3, max_tokens=4096, images=None, tools=None):
+                yield '<<<DONE>>>{"result":"completed"}<<<END>>>'
 
             mock_llm.generate_stream = fake_stream
             mock_agent.llm = mock_llm
@@ -129,13 +131,13 @@ class TestSSEWithSessionTree:
             mock_llm.model = "test"
             call_count = 0
 
-            def fake_stream(messages, temperature=0.3, max_tokens=4096, images=None):
+            def fake_stream(messages, temperature=0.3, max_tokens=4096, images=None, tools=None):
                 nonlocal call_count
                 call_count += 1
                 if call_count > 1:
-                    yield "<<<DONE>>>"
+                    yield '<<<DONE>>>{"result":"done"}<<<END>>>'
                 else:
-                    yield "first result"
+                    yield '<<<DONE>>>{"result":"completed"}<<<END>>>'
 
             mock_llm.generate_stream = fake_stream
             mock_agent.llm = mock_llm

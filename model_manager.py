@@ -8,9 +8,16 @@ from urllib.parse import urlparse
 from config import get_logger
 log = get_logger(__name__)
 
-LMS_PATH = shutil.which('lms') or shutil.which('lms.exe') or os.path.join(
-    os.environ.get('USERPROFILE', os.environ.get('HOME', '')), '.lmstudio', 'bin', 'lms.exe'
-)
+_LMS_CACHE = None
+
+
+def _get_lms_path():
+    global _LMS_CACHE
+    if _LMS_CACHE is None:
+        _LMS_CACHE = shutil.which('lms') or shutil.which('lms.exe') or os.path.join(
+            os.environ.get('USERPROFILE', os.environ.get('HOME', '')), '.lmstudio', 'bin', 'lms.exe'
+        )
+    return _LMS_CACHE
 
 
 def _rest_api_base():
@@ -26,6 +33,8 @@ def _rest_api_base():
 
 def get_loaded_models():
     """Fetch currently loaded models from LM Studio REST API."""
+    if os.environ.get('OPENCODE_BASE_URL'):
+        return None
     try:
         r = requests.get(f'{config.LLM_BASE_URL.replace("/v1", "")}/api/v1/models', timeout=5)
         if r.status_code == 200:
@@ -68,6 +77,8 @@ def is_model_loaded(model_key):
 
 def get_available_models():
     """Fetch all known models from LM Studio (OpenAI-compatible endpoint)."""
+    if os.environ.get('OPENCODE_BASE_URL'):
+        return []
     try:
         r = requests.get(f'{config.LLM_BASE_URL}/models', timeout=5)
         if r.status_code == 200:
@@ -81,6 +92,8 @@ def get_all_rest_models():
     """Fetch ALL models (local + remote/LM Link) from LM Studio v1 REST API.
     LM Link is transparent — remote models appear with same key as local ones.
     Requests to localhost:1234 are automatically routed to the right device."""
+    if os.environ.get('OPENCODE_BASE_URL'):
+        return []
     try:
         r = requests.get(f'{_rest_api_base()}/models', timeout=5)
         if r.status_code == 200:
@@ -128,10 +141,11 @@ def resolve_model_key(partial_name):
 def load_model(model_key, parallel=4, identifier=None, callback=None):
     """Load a model into LM Studio using lms CLI.
     Returns (success: bool, message: str)."""
-    if not LMS_PATH:
+    lms_path = _get_lms_path()
+    if not lms_path:
         return False, 'lms CLI not found'
-    if not os.path.exists(LMS_PATH):
-        return False, f'lms not found at {LMS_PATH}'
+    if not os.path.exists(lms_path):
+        return False, f'lms not found at {lms_path}'
 
     resolved = resolve_model_key(model_key)
 
@@ -143,7 +157,7 @@ def load_model(model_key, parallel=4, identifier=None, callback=None):
     if callback:
         callback(f'Loading {resolved}...')
 
-    cmd = [LMS_PATH, 'load', resolved, '--parallel', str(parallel), '--yes']
+    cmd = [lms_path, 'load', resolved, '--parallel', str(parallel), '--yes']
     if identifier:
         cmd.extend(['--identifier', identifier])
 
@@ -164,11 +178,11 @@ def unload_model(identifier, callback=None):
     """Unload a model from LM Studio using lms CLI.
     Use identifier='--all' to unload all models.
     Returns (success: bool, message: str)."""
-    if not LMS_PATH:
+    if not _get_lms_path():
         return False, 'lms CLI not found'
 
     if identifier == '--all':
-        cmd = [LMS_PATH, 'unload', '--all']
+        cmd = [_get_lms_path(), 'unload', '--all']
         if callback:
             callback('Unloading all models...')
     else:
@@ -181,7 +195,7 @@ def unload_model(identifier, callback=None):
                 if identifier.lower() in iid.lower() or identifier.lower() in key.lower():
                     match_id = iid
                     break
-        cmd = [LMS_PATH, 'unload', match_id]
+        cmd = [_get_lms_path(), 'unload', match_id]
         if callback:
             callback(f'Unloading {match_id}...')
 

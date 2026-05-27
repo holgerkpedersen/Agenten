@@ -63,8 +63,18 @@ def _check_missing_deps(py_content, req_path):
     if not imports or not os.path.exists(req_path):
         return []
     with open(req_path, 'r', encoding='utf-8') as f:
-        req_pkgs = {line.split('==')[0].split('>=')[0].split('~=')[0].strip().lower()
-                    for line in f if line.strip() and not line.startswith(('#', '-i', '--'))}
+        req_pkgs = set()
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            if line.startswith(('-', '#', '--')):
+                continue
+            if '#' in line:
+                line = line[:line.index('#')].strip()
+            pkg = re.split(r'[=<>~!]', line, maxsplit=1)[0].strip().lower()
+            if pkg:
+                req_pkgs.add(pkg)
     return sorted(name for name in imports if name.lower() not in req_pkgs)
 
 
@@ -273,7 +283,6 @@ def write_file(path, content):
                 "success": False,
                 "error": f"Filen findes allerede: {path}. Brug edit_file til at redigere eksisterende filer."
             }
-        content = content.replace('\\r\\n', '\r\n').replace('\\n', '\n')
         if path.endswith('.py'):
             try:
                 ast.parse(content)

@@ -34,7 +34,7 @@ def get_logger(name):
     return logging.getLogger(name)
 
 # Chunking
-CHUNK_SIZE = 150000
+CHUNK_SIZE = 60000
 
 # Folder scanning
 FOLDER_SCAN_MAX_FILES = 20
@@ -56,7 +56,7 @@ if '://' in _LM_HOST_RAW:
     LM_HOST = 'localhost'
 else:
     LM_HOST = _LM_HOST_RAW or 'localhost'
-    LLM_BASE_URL = os.environ.get('LLM_BASE_URL', f'http://{LM_HOST}:{_LM_PORT}/v1')
+    LLM_BASE_URL = os.environ.get('OPENCODE_BASE_URL') or os.environ.get('LLM_BASE_URL') or os.environ.get('LM_BASE_URL') or f'http://{LM_HOST}:{_LM_PORT}/v1'
 LM_PORT = _LM_PORT
 LLM_MODEL = os.environ.get("LM_MODEL", "qwen3.5-9b-mtp")
 LLM_STREAM_TIMEOUT = 300
@@ -68,6 +68,7 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB max per image file
 # Task execution
 EXECUTION_TIMEOUT = 1800  # 30 min wall-clock per task
 SUBPROCESS_TIMEOUT = 120  # seconds per subprocess call (pytest, git, etc.)
-MAX_TOOL_CALLS = 6  # max LLM tool calls per task step
-MAX_TASK_ITERATIONS = 10  # max LLM conversation turns per task
-MAX_PR_TASK_ITERATIONS = 15  # max turns for PR/git workflow tasks
+MAX_TOOL_CALLS = 4  # max LLM tool calls per task step
+MAX_TASK_ITERATIONS = 6  # max LLM conversation turns per task
+MAX_PR_TASK_ITERATIONS = 10  # max turns for PR/git workflow tasks
+NATIVE_TOOLS = True  # Use OpenAI native function calling when available

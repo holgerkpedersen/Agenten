@@ -36,7 +36,7 @@ class TestReadFileContent:
 
     def test_read_file_content_binary_extensions(self, tmp_path):
         from agent_files import read_file_content
-        for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.svg', '.pdf', '.zip', '.exe', '.dll']:
+        for ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.zip', '.exe', '.dll']:
             f = tmp_path / f"test{ext}"
             f.write_bytes(b'\x00\x01')
             agent = MagicMock()
@@ -49,6 +49,32 @@ class TestReadFileContent:
         env_file.write_text("GITHUB_TOKEN=secret123", encoding='utf-8')
         agent = MagicMock()
         result = read_file_content(agent, str(env_file))
+        assert result is None
+
+    def test_read_file_content_svg_text(self, tmp_path):
+        from agent_files import read_file_content
+        f = tmp_path / "test.svg"
+        f.write_text('<svg><circle cx="50" cy="50" r="40"/></svg>', encoding='utf-8')
+        agent = MagicMock()
+        result = read_file_content(agent, str(f))
+        assert result is not None
+        assert '<circle' in result
+
+    def test_read_file_content_pdf_text(self, tmp_path):
+        from agent_files import read_file_content
+        f = tmp_path / "test.pdf"
+        f.write_text('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj', encoding='utf-8')
+        agent = MagicMock()
+        result = read_file_content(agent, str(f))
+        assert result is not None
+        assert '%PDF-' in result
+
+    def test_read_file_content_null_byte_detected(self, tmp_path):
+        from agent_files import read_file_content
+        f = tmp_path / "sneaky.bin"
+        f.write_bytes(b'\x00\x01\x02')
+        agent = MagicMock()
+        result = read_file_content(agent, str(f))
         assert result is None
 
     def test_read_file_content_nonexistent(self):

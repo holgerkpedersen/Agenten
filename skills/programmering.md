@@ -4,6 +4,7 @@ keywords: programmer, kode, program, implementer, opret, byg, skriv, kod, kodnin
 action_types: [write]
 template: programmering
 description: Arkitektonisk analyse og planlægning af programmeringsopgaver med kravanalyse, design, implementeringsplan, sikkerhed og kodeimplementering.
+rubrics: [{"id":"context_read","desc":"Læste kontekst før kodeimplementering","check":"tool_used:read_chunk or tool_used:list_chunks or tool_used:list_files or tool_used:locate"},{"id":"code_written","desc":"Implementerede kode med write_file eller edit_file","check":"tool_used:write_file or tool_used:edit_file"}]
 ---
 
 # Programmeringsopgave — Arkitektonisk analyse

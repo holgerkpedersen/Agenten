@@ -427,5 +427,11 @@
     "issues_table_priority": "优先级",
     "loading": "加载中...",
     "issues_error": "错误"
-  }
+  },
+  "extract_context_first": "在调用任何工具之前，你必须首先从以上上下文中提取相关信息。写2-3句话总结你对任务的了解，仅基于给定的上下文。然后调用必要的工具。",
+  "extract_context_skipped": "你跳过了上下文提取。首先阅读并总结上下文中的相关信息，然后调用工具。",
+  "rubric_passed": "✓",
+  "rubric_failed": "✗ 失败:",
+  "rubric_failed_detail": "  ✗ {desc}",
+  "anti_leakage_warning": "⚠️ 此问题有解决方案建议，你尚未阅读。在编写/编辑代码之前，调用 read_issue 并设置 include_hints=true 来阅读它们。"
 }
