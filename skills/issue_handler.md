@@ -3,7 +3,7 @@ name: issue_handler
 keywords: [issue, handler, håndtering, bug, fix, fejl, defekt, rettelse, patch, error, task, opgave]
 template: issue_handler
 action_types: [analyze, read, write, test, verify]
-rubrics: [{"id":"issue_read","desc":"Læste issue med read_issue","check":"tool_used:read_issue"},{"id":"context_aware","desc":"Læste kildekode eller chunks før handling","check":"tool_used:read_chunk or tool_used:list_chunks or tool_used:list_files or tool_used:locate"}]
+rubrics: [{"id":"issue_read","desc":"Læste issue med read_issue før handling","check":"tool_used:read_issue"}]
 ---
 
 ## Issue Håndtering
