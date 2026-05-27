@@ -279,7 +279,7 @@ class LMStudioWrapper:
                                                 "type": "function",
                                                 "function": {
                                                     "name": tc_data["function"]["name"],
-                                                    "arguments": parsed_args
+                                                    "arguments": json.dumps(parsed_args)
                                                 }
                                             })
                                         yield f"\n[Kalde: {self._pending_tool_calls[0]['function']['name']}]"

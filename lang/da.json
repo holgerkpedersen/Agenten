@@ -436,5 +436,6 @@
   "rubric_failed_detail": "  ✗ {desc}",
   "anti_leakage_warning": "⚠️ Dette issue har løsningsforslag du ikke har læst. Kald read_issue med include_hints=true for at læse dem før du skriver/redigerer kode.",
   "write_required": "\n\n⛔ DU SKAL skrive/redigere kode i denne fase. Brug write_file eller edit_file. Hvis du kun læser filer uden at skrive kode, er opgaven mislykket. Læs maksimalt én gang — skriv derefter din løsning.",
-  "tool_system_prompt_native": "Du har adgang til værktøjer. Kald dem når det er nødvendigt for at fuldføre opgaven.\n\n{tools_desc}\n\n## Opgave\n{task}"
+  "tool_system_prompt_native": "Du har adgang til værktøjer. Kald dem når det er nødvendigt for at fuldføre opgaven.\n\n{tools_desc}\n\n## Opgave\n{task}",
+  "tool_continuation_native": "Tilgængelige: {tools_list}. Brug værktøjerne til at fuldføre opgaven."
 }

@@ -122,13 +122,16 @@ def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
     if chunk_hint:
         user_guidance += chunk_hint.replace("## TILG\u00c6NGELIGE FILER (brug read_chunk for at l\u00e6se alle chunks):", "FILER:").strip() + " "
     if tools_list:
-        user_guidance += t(K.TOOL_CONTINUATION, agent.lang).format(tools_list=tools_list, TOOL_MARKER=agent.tool_registry.TOOL_MARKER, DONE_MARKER=agent.tool_registry.DONE_MARKER)
+        if config.NATIVE_TOOLS:
+            user_guidance += t(K.TOOL_CONTINUATION_NATIVE, agent.lang).format(tools_list=tools_list)
+        else:
+            user_guidance += t(K.TOOL_CONTINUATION, agent.lang).format(tools_list=tools_list, TOOL_MARKER=agent.tool_registry.TOOL_MARKER, DONE_MARKER=agent.tool_registry.DONE_MARKER)
     else:
         user_guidance += t(K.DONE_CONTINUATION, agent.lang).format(DONE_MARKER=agent.tool_registry.DONE_MARKER)
     if not chunk_hint and tools_list:
         read_only = all(t not in ('write_file',) for t in agent.tool_registry.active_tools or [])
         if read_only and not agent.images and not agent.file_chunks:
-            user_guidance += f"\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte med <<<DONE>>> uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
+            user_guidance += "\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
     has_write = any(t in ('write_file', 'edit_file') for t in (agent.tool_registry.active_tools or []))
     if has_write:
         user_guidance += t(K.WRITE_REQUIRED, agent.lang)
@@ -205,6 +208,8 @@ def _truncate_messages(messages, max_chars):
 
 
 def _cont_hint(agent, tools_list):
+    if config.NATIVE_TOOLS:
+        return t(K.TOOL_CONTINUATION_NATIVE, agent.lang).format(tools_list=tools_list)
     return t(K.TOOL_CONTINUATION, agent.lang).format(tools_list=tools_list, TOOL_MARKER=agent.tool_registry.TOOL_MARKER, DONE_MARKER=agent.tool_registry.DONE_MARKER)
 
 
@@ -376,7 +381,13 @@ def solve_task_stream(agent, task_node, original_prompt):
             tool_call_msg = {"role": "assistant", "content": None, "tool_calls": pending_tc}
             messages.append(tool_call_msg)
             for tc in pending_tc:
-                parsed = {"type": "tool", "tool": tc["function"]["name"], "args": tc["function"]["arguments"]}
+                args_val = tc["function"]["arguments"]
+                if isinstance(args_val, str):
+                    try:
+                        args_val = json.loads(args_val)
+                    except (json.JSONDecodeError, ValueError):
+                        args_val = {}
+                parsed = {"type": "tool", "tool": tc["function"]["name"], "args": args_val}
                 tool_result = _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_node, original_prompt)
                 if tool_result is None:
                     continue
@@ -445,10 +456,16 @@ def solve_task_stream(agent, task_node, original_prompt):
         if parsed["type"] == "error":
             consecutive_errors += 1
             if consecutive_errors >= 3:
-                yield {"type": "error", "message": f"3 consecutive format errors — stopping. Use format: {agent.tool_registry.TOOL_MARKER}{{\"tool\":\"...\",\"args\":{{...}}}}{agent.tool_registry.END_MARKER} or {agent.tool_registry.DONE_MARKER}{{...}}{agent.tool_registry.END_MARKER}"}
+                if config.NATIVE_TOOLS:
+                    yield {"type": "error", "message": f"3 consecutive format errors — stopping. Use the available tools to complete the task."}
+                else:
+                    yield {"type": "error", "message": f"3 consecutive format errors — stopping. Use format: {agent.tool_registry.TOOL_MARKER}{{\"tool\":\"...\",\"args\":{{...}}}}{agent.tool_registry.END_MARKER} or {agent.tool_registry.DONE_MARKER}{{...}}{agent.tool_registry.END_MARKER}"}
                 break
             if consecutive_errors == 1:
-                hint = f"Write your response in the correct format: {agent.tool_registry.TOOL_MARKER}{{\"tool\":\"{list(called_tools.keys())[0] if called_tools else 'write_file'}\",\"args\":{{...}}}}{agent.tool_registry.END_MARKER}"
+                if config.NATIVE_TOOLS:
+                    hint = f"Use the available tools to complete the task: {', '.join(list(called_tools.keys())[:3]) if called_tools else ', '.join(agent.tool_registry.active_tools[:3])}"
+                else:
+                    hint = f"Write your response in the correct format: {agent.tool_registry.TOOL_MARKER}{{\"tool\":\"{list(called_tools.keys())[0] if called_tools else 'write_file'}\",\"args\":{{...}}}}{agent.tool_registry.END_MARKER}"
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {parsed['message']}. {hint}")
             else:
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {parsed['message']}. Only use <<<TOOL>>> or <<<DONE>>> — no English text before or after.")
@@ -463,8 +480,9 @@ def solve_task_stream(agent, task_node, original_prompt):
                     full_response = text_fallback
                     break
             if parsed["type"] == "text":
-                tool_for_msg = agent.tool_registry.active_tools[0] if agent.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, agent.lang)
-                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.FIRST_TOOL_REQUIRED, agent.lang).format(tool=tool_for_msg)}")
+                if not config.NATIVE_TOOLS:
+                    tool_for_msg = agent.tool_registry.active_tools[0] if agent.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, agent.lang)
+                    _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.FIRST_TOOL_REQUIRED, agent.lang).format(tool=tool_for_msg)}")
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 continue
 

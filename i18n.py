@@ -95,6 +95,7 @@ class K(StrEnum):
     # === Tool messages (LLM-facing) ===
     TOOL_CONTINUATION   = "tool_continuation"
     DONE_CONTINUATION   = "done_continuation"
+    TOOL_CONTINUATION_NATIVE = "tool_continuation_native"
     TOOL_RESULT_PREFIX  = "tool_result_prefix"
     TOOL_NO_RESULT      = "tool_no_result"
     TOOL_INVALID_JSON   = "tool_invalid_json"
