@@ -361,6 +361,9 @@ def edit_file(path, old_text, new_text, expected_hash=None):
             pattern, nlines = _build_flexible_pattern(search)
             m = re.search(pattern, content)
             if not m:
+                pattern, nlines = _build_fuzzy_pattern(search)
+                m = re.search(pattern, content)
+            if not m:
                 return {"success": False, "error": f"Teksten blev ikke fundet i {path}"}
             matches = list(re.finditer(pattern, content))
             if len(matches) > 1:
