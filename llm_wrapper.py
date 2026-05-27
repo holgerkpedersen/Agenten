@@ -22,6 +22,7 @@ class LMStudioWrapper:
         self.timeout = timeout
         self.model = model or os.environ.get('LM_MODEL') or config.LLM_MODEL
         self._pending_tool_calls = []
+        self._pending_reasoning = None
 
     def _headers(self):
         h = {}
@@ -197,6 +198,7 @@ class LMStudioWrapper:
         msgs = self._to_messages(prompt, messages, images)
         compressed = self._compress_messages(msgs)
         self._pending_tool_calls.clear()
+        self._pending_reasoning = None
         if images:
             log.info("Sending %s images with model %s", len(images), self.model)
             for i, m in enumerate(compressed):
@@ -247,9 +249,12 @@ class LMStudioWrapper:
                                 chunk = json.loads(data)
                                 if "choices" in chunk and chunk["choices"]:
                                     delta = chunk["choices"][0].get("delta", {})
-                                    text = delta.get("content") or delta.get("reasoning_content") or ""
-                                    if text:
-                                        yield text
+                                    text = delta.get("content") or ""
+                                    reasoning = delta.get("reasoning_content") or ""
+                                    if reasoning:
+                                        self._pending_reasoning = (self._pending_reasoning or "") + reasoning
+                                    if text or reasoning:
+                                        yield text or reasoning
                                     tool_calls_list = delta.get("tool_calls")
                                     if tool_calls_list:
                                         for tc in tool_calls_list:

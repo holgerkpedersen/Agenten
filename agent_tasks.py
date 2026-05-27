@@ -377,8 +377,11 @@ def solve_task_stream(agent, task_node, original_prompt):
             break
 
         pending_tc = getattr(agent.llm, '_pending_tool_calls', [])
+        pending_reasoning = getattr(agent.llm, '_pending_reasoning', None)
         if pending_tc:
             tool_call_msg = {"role": "assistant", "content": None, "tool_calls": pending_tc}
+            if pending_reasoning:
+                tool_call_msg["reasoning_content"] = pending_reasoning
             messages.append(tool_call_msg)
             for tc in pending_tc:
                 args_val = tc["function"]["arguments"]
@@ -414,7 +417,11 @@ def solve_task_stream(agent, task_node, original_prompt):
                 break
             continue
 
-        messages.append({"role": "assistant", "content": response})
+        pending_reasoning = getattr(agent.llm, '_pending_reasoning', None)
+        assistant_msg = {"role": "assistant", "content": response}
+        if pending_reasoning and not pending_tc:
+            assistant_msg["reasoning_content"] = pending_reasoning
+        messages.append(assistant_msg)
 
         if i == 0 and has_file_ctx:
             messages = [m for m in messages if not (isinstance(m.get("content"), str) and m["content"].startswith("## Filindhold"))]
