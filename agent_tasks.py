@@ -66,15 +66,18 @@ def solve_task(agent, task_node, original_prompt):
 
 def _build_chunk_hint(agent):
     available_keys = list(agent.file_chunks.keys())
-    is_chunked = any(len(v) > 1 for v in agent.file_chunks.values())
     hint = ""
-    if is_chunked:
+    if available_keys:
         parts = []
         for key in available_keys:
             total = len(agent.file_chunks[key])
             display = key.replace("file_", "", 1)
-            parts.append(f"\n  read_chunk(file_key='{display}', index=2..{total}) eller file_key='{key}', index=2..{total}")
-        hint = f"\n\n## TILG\u00c6NGELIGE FILER (brug read_chunk for at l\u00e6se alle chunks):{''.join(parts)}\n"
+            if total > 1:
+                parts.append(f"\n  read_chunk(file_key='{display}', index=1..{total})")
+            else:
+                parts.append(f"\n  read_chunk(file_key='{display}', index=1)")
+        base_dir = os.path.abspath('.')
+        hint = f"\n\n## TILG\u00c6NGELIGE FILER (projektmappe: {base_dir}){''.join(parts)}\n"
     delegation_lines = []
     for key, chunks in agent.file_chunks.items():
         content = chunks[0] if chunks else ''
@@ -120,7 +123,7 @@ def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
     lang_instr = t(K.ANSWER_IN, agent.lang)
     user_guidance = f"{lang_instr}. "
     if chunk_hint:
-        user_guidance += chunk_hint.replace("## TILG\u00c6NGELIGE FILER (brug read_chunk for at l\u00e6se alle chunks):", "FILER:").strip() + " "
+        user_guidance += chunk_hint.strip() + " "
     if tools_list:
         if config.NATIVE_TOOLS:
             user_guidance += t(K.TOOL_CONTINUATION_NATIVE, agent.lang).format(tools_list=tools_list)
@@ -400,7 +403,7 @@ def solve_task_stream(agent, task_node, original_prompt):
                     "content": result_str
                 })
                 yield {"type": "tool_call", "tool": tool_name, "args": args_val}
-                yield {"type": "tool_result", "tool": tool_name, "result": result_str}
+                yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 total_calls = sum(called_tools.values())
                 if total_calls >= config.MAX_TOOL_CALLS:
