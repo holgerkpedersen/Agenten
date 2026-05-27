@@ -326,6 +326,7 @@ When extracting methods from `agent_core.py` into module files:
 
 **Symptom:** Session f502154d — 5 phases (Analysis, Plan, Extract, Update, Test). LLM called `list_files`, `read_chunk`, `list_chunks` extensively but NEVER called `write_file` or `edit_file`. Even with "⛔ YOU MUST write/edit code" warning + `write_file` in active tools, model reads and says Done.  
 **Root cause:** `deepseek-v4-pro` is trained for analysis/reasoning, not code editing. It produces text analysis (in Done markers) but refuses to call write/edit tools. This is a model capability limitation, not a prompt issue.  
+**Native tools verified:** DeepSeek API docs confirm function calling support. Agenten now properly sends `role:"tool"` messages with `tool_call_id` matching assistant `tool_calls`. No HTTP 400 errors. Model uses native tool calls for read tools but still refuses write_file/edit_file.  
 **Fix:** Use `minimax-m2.5` for code-editing tasks (issue_handler, programming, refactoring). `deepseek-v4-pro` is fine for read-only analysis (kodeanalyse, resume). Other tested models: `minimax-m2.5` ✓ (edits code), `glm-5.1` ✓ (native tools).  
 **Warning hardcoded fix:** Line 134 was hardcoded Danish "⚠️ DU SKAL redigere kode" — replaced with i18n key `K.WRITE_REQUIRED` in all 4 languages.
 
