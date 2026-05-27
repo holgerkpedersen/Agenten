@@ -161,7 +161,12 @@ class SkillLoader:
         return rate
 
     @classmethod
-    def _score(cls, text: str, skill: dict) -> float:
+    def _score(cls, text: str, skill: dict, _cached_scores: dict = None) -> float:
+        skill_name = skill.get("name", "")
+        # Use cached score if available (avoids redundant _get_success_rate calls)
+        if _cached_scores is not None and skill_name in _cached_scores:
+            return _cached_scores[skill_name]
+        
         expanded = re.sub(r"([A-Z])", r" \1", text)
         t = expanded.lower()
         t = re.sub(r"\s+", " ", t).strip()
@@ -202,23 +207,16 @@ class SkillLoader:
 
     @classmethod
     def find_for_task(cls, task: str, skills: List[dict]) -> Optional[dict]:
-        scored = [
-            (cls._score(task, s), s)
-            for s in skills
-            if cls._score(task, s) >= s.get("min_score", 1)
-        ]
+        scored = [(cls._score(task, s), s) for s in skills]
+        scored = [(sc, s) for sc, s in scored if sc >= s.get("min_score", 1)]
         best_score, best = max(scored, key=lambda x: x[0], default=(0, None))
         return best if best_score > 0 else None
 
     @classmethod
     def find_all_for_task(cls, task: str, skills: List[dict], top: int = 3) -> List[dict]:
         base_skills = [s for s in skills if s.get("base")]
-        scored = [
-            (sc, s)
-            for s in skills
-            for sc in (cls._score(task, s),)
-            if sc >= max(1, s.get("min_score", 1)) and not s.get("base")
-        ]
+        scored = [(cls._score(task, s), s) for s in skills if not s.get("base")]
+        scored = [(sc, s) for sc, s in scored if sc >= max(1, s.get("min_score", 1))]
         scored.sort(key=lambda x: x[0], reverse=True)
         return [s for _, s in scored[:top]] + base_skills
 
