@@ -372,7 +372,7 @@ def solve_task_stream(agent, task_node, original_prompt):
         pending_tc = getattr(agent.llm, '_pending_tool_calls', [])
         pending_reasoning = getattr(agent.llm, '_pending_reasoning', None)
         if pending_tc:
-            tool_call_msg = {"role": "assistant", "content": None, "tool_calls": pending_tc}
+            tool_call_msg = {"role": "assistant", "content": None, "tool_calls": list(pending_tc)}
             if pending_reasoning:
                 tool_call_msg["reasoning_content"] = pending_reasoning
             messages.append(tool_call_msg)
