@@ -147,7 +147,7 @@
     "git_pull": "从远程拉取更改。需要：remote（如 'origin'）、branch",
     "git_checkout": "切换到分支。需要：branch"
   },
-  "tool_system_prompt": "你可以使用工具。这样调用：\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\n完成后这样回复：\n{DONE_MARKER}{{\"result\":\"...\"}}{END_MARKER}\n\n{tools_desc}\n\n{task}",
+  "tool_system_prompt": "你可以使用工具。像这样调用它们：\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\n完成后，像这样回复：\n{DONE_MARKER}{{\"result\":\"你的详细结论 — 不仅仅是done\"}}{END_MARKER}\n\n{tools_desc}\n\n## 任务\n{task}",
   "tool_continuation": "可用：{tools_list}。使用 {TOOL_MARKER} 或用 {DONE_MARKER} 完成。",
   "done_continuation": "用 {DONE_MARKER} 完成。",
   "tool_result_prefix": "工具 {tool} 的结果：",
@@ -433,5 +433,6 @@
   "rubric_passed": "✓",
   "rubric_failed": "✗ 失败:",
   "rubric_failed_detail": "  ✗ {desc}",
-  "anti_leakage_warning": "⚠️ 此问题有解决方案建议，你尚未阅读。在编写/编辑代码之前，调用 read_issue 并设置 include_hints=true 来阅读它们。"
+  "anti_leakage_warning": "⚠️ 此问题有解决方案建议，你尚未阅读。在编写/编辑代码之前，调用 read_issue 并设置 include_hints=true 来阅读它们。",
+  "log.read_only": "已读取 {tools} 但未采取进一步操作。考虑使用更具体的提示重新运行，或选择其他模型。"
 }

@@ -66,7 +66,7 @@ class ToolRegistry:
         active_names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
         if not active_names:
             answer_in = t('answer_in', self.lang)
-            return f'{answer_in}. Svar KUN med <<<DONE>>>{{"result":"din analyse her"}}<<<END>>>. INGEN tekst før eller efter.\n\n{task}'
+            return f'{answer_in}. Svar KUN med <<<DONE>>>{{"result":"DIN KONKLUSION — ikke bare done"}}<<<END>>>. Skriv en detaljeret opsummering af hvad du fandt og hvilke beslutninger du traf.\n\n{task}'
         example_tool = active_names[0]
         marker_warning = t(K.SYS_MARKER_WARNING, self.lang).format(TOOL=self.TOOL_MARKER, DONE=self.DONE_MARKER)
         prompt = f"{t('answer_in', self.lang)}. {marker_warning}.\n\n"

@@ -3,28 +3,40 @@ import logging
 import os
 import sys
 
+# Force UTF-8 on Windows consoles at import time
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 def setup_logging():
     """Configure logging with console + file handlers. Call once at startup."""
     import sys
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
     fmt = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s',
                             datefmt='%H:%M:%S')
     root = logging.getLogger()
     root.setLevel(logging.INFO)
 
-    # Console handler
+    # Console handler — explicit UTF-8 encoding
     ch = logging.StreamHandler(sys.stdout)
     ch.setFormatter(fmt)
+    try:
+        ch.setStream(sys.stdout)
+    except AttributeError:
+        pass
     root.addHandler(ch)
 
-    # File handler
+    # File handler — UTF-8 by default on Python 3
     try:
         log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
         os.makedirs(log_dir, exist_ok=True)
-        fh = logging.FileHandler(os.path.join(log_dir, 'agenten.log'))
+        fh = logging.FileHandler(os.path.join(log_dir, 'agenten.log'), encoding='utf-8')
         fh.setFormatter(fmt)
         root.addHandler(fh)
     except OSError:

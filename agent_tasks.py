@@ -276,7 +276,16 @@ def _check_done_pr_requirements(agent, messages, called_tools, original_prompt, 
 def _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools):
     if not full_response or "ERROR" in full_response:
         if called_tools:
-            full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=len(called_tools))
+            called_names = {k.split("{")[0] for k in called_tools}
+            action_tools = called_names & {"write_file", "edit_file", "update_issue_status", "github_create_pr", "git_commit", "run_tests"}
+            if action_tools:
+                full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=len(called_tools))
+            else:
+                read_tools = called_names & {"read_issue", "read_chunk", "list_chunks", "list_files", "locate"}
+                if read_tools:
+                    full_response = t(K.LOG_READ_ONLY, agent.lang).format(tools=", ".join(sorted(read_tools)))
+                else:
+                    full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=len(called_tools))
             task_node.status = "done"
         elif text_fallback and "ERROR" not in text_fallback:
             full_response = text_fallback

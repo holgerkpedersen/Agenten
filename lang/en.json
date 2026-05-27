@@ -147,7 +147,7 @@
     "git_pull": "Pull changes from remote. Requires: remote (e.g. 'origin'), branch",
     "git_checkout": "Switch to a branch. Requires: branch"
   },
-  "tool_system_prompt": "You have access to tools. Call them like this:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nWhen done, respond like this:\n{DONE_MARKER}{{\"result\":\"...\"}}{END_MARKER}\n\n{tools_desc}\n\n{task}",
+  "tool_system_prompt": "You have access to tools. Call them like this:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nWhen done, respond like this:\n{DONE_MARKER}{{\"result\":\"YOUR DETAILED CONCLUSION — NOT just done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Task\n{task}",
   "tool_continuation": "Available: {tools_list}. Use {TOOL_MARKER} or finish with {DONE_MARKER}.",
   "done_continuation": "Finish with {DONE_MARKER}.",
   "tool_result_prefix": "TOOL RESULT for {tool}:",
@@ -433,5 +433,6 @@
   "rubric_passed": "✓",
   "rubric_failed": "✗ FAILED:",
   "rubric_failed_detail": "  ✗ {desc}",
-  "anti_leakage_warning": "⚠️ This issue has solution suggestions you have not read. Call read_issue with include_hints=true to read them before writing/editing code."
+  "anti_leakage_warning": "⚠️ This issue has solution suggestions you have not read. Call read_issue with include_hints=true to read them before writing/editing code.",
+  "log.read_only": "Read {tools} but took no further action. Consider re-running with a more specific prompt or choose a different model."
 }

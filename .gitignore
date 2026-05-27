@@ -28,6 +28,7 @@ exports/
 
 # logs
 flask_output.log
+logs/
 
 # docs
 docs/
@@ -39,3 +40,6 @@ docs/**/*.*
 # agent storage and tmp files
 .agent_storage/
 .agent_tmp/
+
+# opencode plans
+.opencode/

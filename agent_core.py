@@ -414,9 +414,7 @@ class Agent:
         self.agent_log.append(log_entry)
         try:
             log_fn = {'INFO': log.info, 'WARNING': log.warning, 'ERROR': log.error}.get(str(level).upper(), log.info)
-            msg = str(message).encode('cp1252', errors='replace').decode('cp1252')
-            det = str(detail)[:200].encode('cp1252', errors='replace').decode('cp1252')
-            log_fn("%s: %s", msg, det)
+            log_fn("%s: %s", str(message), str(detail)[:200])
         except Exception:
             pass
 

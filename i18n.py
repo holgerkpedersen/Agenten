@@ -159,6 +159,7 @@ class K(StrEnum):
     LOG_TASK_DONE           = "log.task_done"
     LOG_TASK_FAILED         = "log.task_failed"
     LOG_AUTO_DONE           = "log.auto_done"
+    LOG_READ_ONLY           = "log.read_only"
     LOG_TREE_EXECUTION      = "log.tree_execution_start"
     LOG_READING_FILE        = "log.reading_file"
     LOG_FILE_FOUND          = "log.file_found"
