@@ -387,14 +387,24 @@ def solve_task_stream(agent, task_node, original_prompt):
                         args_val = json.loads(args_val)
                     except (json.JSONDecodeError, ValueError):
                         args_val = {}
-                parsed = {"type": "tool", "tool": tc["function"]["name"], "args": args_val}
-                tool_result = _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_node, original_prompt)
-                if tool_result is None:
+                tool_name = tc["function"]["name"]
+                tool_key = tool_name + str(args_val)
+                dup_count = called_tools.get(tool_key, 0)
+                called_tools[tool_key] = dup_count + 1
+                if dup_count >= 1:
+                    _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. G\u00e5 videre eller brug <<<DONE>>>.")
                     continue
-                yield {"type": "tool_call", "tool": tool_result["tool"], "args": tool_result["args"]}
-                yield {"type": "tool_result", "tool": tool_result["tool"], "result": tool_result["result"]}
-                if tool_result.get("checkpoint_msg"):
-                    yield {"type": "checkpoint", "message": tool_result["checkpoint_msg"], "tool": parsed["tool"]}
+                agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                result = agent.tool_registry.execute(tool_name, args_val)
+                result_str = json.dumps(result, ensure_ascii=False)
+                agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.get("id", ""),
+                    "content": result_str
+                })
+                yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                yield {"type": "tool_result", "tool": tool_name, "result": result_str}
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 total_calls = sum(called_tools.values())
                 if total_calls >= config.MAX_TOOL_CALLS:

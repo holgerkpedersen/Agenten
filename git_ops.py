@@ -309,12 +309,24 @@ def _build_flexible_pattern(text):
     lines = text.split('\n')
     parts = []
     for line in lines:
-        stripped = line.lstrip()
+        stripped = line.strip()
         if stripped:
             parts.append(r'[ \t]*' + re.escape(stripped))
         else:
             parts.append(r'[ \t]*')
     return r'\n'.join(parts), len(lines)
+
+
+def _build_fuzzy_pattern(text):
+    lines = text.split('\n')
+    parts = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped:
+            parts.append(r'[ \t]*' + re.escape(stripped))
+    if len(parts) < 2:
+        return _build_flexible_pattern(text)
+    return r'[ \t]*\n(?:[ \t]*\n)*[ \t]*'.join(parts), len(parts)
 
 
 def edit_file(path, old_text, new_text, expected_hash=None):
