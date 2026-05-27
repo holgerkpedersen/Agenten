@@ -196,15 +196,8 @@ def _truncate_messages(messages, max_chars):
     non_system = [m for m in messages if m["role"] != "system"]
     keep_pairs = 4
     tail = non_system[-keep_pairs:] if len(non_system) > keep_pairs else non_system
-    keep_chars = max_chars - sum(_msg_content_len(m) for m in system) - len(mid)
-    if keep_chars > 0:
-        tail_content = tail[-1]["content"]
-        if isinstance(tail_content, str):
-            cropped = tail_content[-keep_chars:] if len(tail_content) > keep_chars else tail_content
-        else:
-            cropped = "[...]"
-        return system + [{"role": "user", "content": mid + cropped}] if tail else system
-    return system + tail
+    insert = [{"role": "user", "content": mid}]
+    return system + insert + tail
 
 
 def _cont_hint(agent, tools_list):
