@@ -435,5 +435,6 @@
   "rubric_failed": "✗ FAILED:",
   "rubric_failed_detail": "  ✗ {desc}",
   "anti_leakage_warning": "⚠️ This issue has solution suggestions you have not read. Call read_issue with include_hints=true to read them before writing/editing code.",
-  "write_required": "\n\n⛔ YOU MUST write/edit code in this phase. Use write_file or edit_file. Only reading files without writing code means the task has FAILED. Read at most once — then write your solution."
+  "write_required": "\n\n⛔ YOU MUST write/edit code in this phase. Use write_file or edit_file. Only reading files without writing code means the task has FAILED. Read at most once — then write your solution.",
+  "tool_system_prompt_native": "You have access to tools. Call them when needed to complete the task.\n\n{tools_desc}\n\n## Task\n{task}"
 }

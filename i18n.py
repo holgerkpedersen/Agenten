@@ -124,6 +124,7 @@ class K(StrEnum):
     SYS_ERROR_PREFIX    = "sys_error_prefix"
     SYS_FALLBACK_TOOL   = "sys_fallback_tool"
     SYS_FILE_CONTEXT    = "sys_file_context"
+    TOOL_SYSTEM_PROMPT_NATIVE = "tool_system_prompt_native"
 
     # === File context ===
     FILE_CONTEXT_HEADER  = "file_context_header"

@@ -435,5 +435,6 @@
   "rubric_failed": "✗ FALLÓ:",
   "rubric_failed_detail": "  ✗ {desc}",
   "anti_leakage_warning": "⚠️ Este issue tiene sugerencias de solución que no has leído. Llama a read_issue con include_hints=true para leerlas antes de escribir/editar código.",
-  "write_required": "\n\n⛔ DEBES escribir/editar código en esta fase. Usa write_file o edit_file. Solo leer archivos sin escribir código significa que la tarea ha FALLADO. Lee como máximo una vez — luego escribe tu solución."
+  "write_required": "\n\n⛔ DEBES escribir/editar código en esta fase. Usa write_file o edit_file. Solo leer archivos sin escribir código significa que la tarea ha FALLADO. Lee como máximo una vez — luego escribe tu solución.",
+  "tool_system_prompt_native": "Tienes acceso a herramientas. Llámalas cuando sea necesario para completar la tarea.\n\n{tools_desc}\n\n## Tarea\n{task}"
 }

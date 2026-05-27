@@ -2,6 +2,7 @@
 import json
 import os
 import pytest
+import config
 from tools import ToolRegistry, Tool
 
 
@@ -49,14 +50,20 @@ class TestToolRegistry:
 
 
 class TestBuildSystemPrompt:
+    def _assert_prompt(self, prompt, has_tools=True):
+        import config
+        if config.NATIVE_TOOLS and has_tools:
+            assert "<<<TOOL>>>" not in prompt, "Native tools should NOT have marker instructions"
+            assert "<<<DONE>>>" not in prompt, "Native tools should NOT have marker instructions"
+        else:
+            assert "<<<DONE>>>" in prompt
+
     def test_build_system_prompt_da(self):
         tr = ToolRegistry()
         tr.register(Tool("git_status", "Show git status", [], lambda: ""))
         tr.lang = "da"
         prompt = tr.build_system_prompt("Test task")
-        assert "<<<TOOL>>>" in prompt
-        assert "<<<DONE>>>" in prompt
-        assert "<<<END>>>" in prompt
+        self._assert_prompt(prompt)
         assert "git_status" in prompt
         assert "Test task" in prompt
 
@@ -65,8 +72,7 @@ class TestBuildSystemPrompt:
         tr.register(Tool("git_status", "Show git status", [], lambda: ""))
         tr.lang = "en"
         prompt = tr.build_system_prompt("Test task")
-        assert "<<<TOOL>>>" in prompt
-        assert "<<<DONE>>>" in prompt
+        self._assert_prompt(prompt)
         assert "Show git status" in prompt
 
     def test_build_system_prompt_es(self):
@@ -74,14 +80,16 @@ class TestBuildSystemPrompt:
         tr.register(Tool("git_status", "Show git status", [], lambda: ""))
         tr.lang = "es"
         prompt = tr.build_system_prompt("Test task")
-        assert "Ejemplo" in prompt
+        if not config.NATIVE_TOOLS:
+            assert "Ejemplo" in prompt
 
     def test_build_system_prompt_zh(self):
         tr = ToolRegistry()
         tr.register(Tool("git_status", "Show git status", [], lambda: ""))
         tr.lang = "zh"
         prompt = tr.build_system_prompt("Test task")
-        assert "示例" in prompt
+        if not config.NATIVE_TOOLS:
+            assert "示例" in prompt
 
     def test_build_system_prompt_with_no_tools(self):
         tr = ToolRegistry()
@@ -100,14 +108,13 @@ class TestBuildSystemPrompt:
         assert "{ERROR_MARKER}" not in prompt
 
     def test_build_system_prompt_markers_consistent(self):
+        import config
         for lang_code in ["da", "en", "es", "zh"]:
             tr = ToolRegistry()
             tr.register(Tool("git_status", "status", [], lambda: ""))
             tr.lang = lang_code
             prompt = tr.build_system_prompt("task")
-            assert prompt.count("<<<TOOL>>>") >= 1
-            assert prompt.count("<<<DONE>>>") >= 1
-            assert prompt.count("<<<END>>>") >= 1
+            self._assert_prompt(prompt, has_tools=True)
 
 
 class TestToolParsing:

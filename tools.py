@@ -2,6 +2,7 @@ import json
 import re
 import inspect
 import traceback
+import config
 from lang import t
 from i18n import K
 from config import get_logger
@@ -68,6 +69,15 @@ class ToolRegistry:
             answer_in = t('answer_in', self.lang)
             return f'{answer_in}. Svar KUN med <<<DONE>>>{{"result":"DIN KONKLUSION — ikke bare done"}}<<<END>>>. Skriv en detaljeret opsummering af hvad du fandt og hvilke beslutninger du traf.\n\n{task}'
         example_tool = active_names[0]
+
+        if config.NATIVE_TOOLS:
+            prompt = f"{t('answer_in', self.lang)}. Use the available tools to complete the task. When done, provide your result.\n\n"
+            prompt += t(K.TOOL_SYSTEM_PROMPT_NATIVE, self.lang).format(
+                tools_desc=tools_desc,
+                task=task,
+            )
+            return prompt
+
         marker_warning = t(K.SYS_MARKER_WARNING, self.lang).format(TOOL=self.TOOL_MARKER, DONE=self.DONE_MARKER)
         prompt = f"{t('answer_in', self.lang)}. {marker_warning}.\n\n"
         prompt += t(K.TOOL_SYSTEM_PROMPT, self.lang).format(
