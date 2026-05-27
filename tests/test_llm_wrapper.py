@@ -1,6 +1,7 @@
 """Test llm_wrapper.py — LM Studio client, image encoding, vision support."""
 import json
 import os
+import pytest
 from unittest.mock import MagicMock, patch, mock_open
 
 from llm_wrapper import LMStudioWrapper
@@ -115,3 +116,40 @@ class TestCompressMessages:
         assert text_part["text"] == "Hello World"
         img_part = result[0]["content"][1]
         assert img_part["type"] == "image_url"
+
+
+class TestVisionKeywords:
+    def test_supports_vision_qwen(self):
+        assert LMStudioWrapper._supports_vision("qwen/qwen3.5-9b") is True
+
+    def test_supports_vision_gemma(self):
+        assert LMStudioWrapper._supports_vision("gemma-4-26b") is True
+
+    def test_supports_vision_gpt(self):
+        assert LMStudioWrapper._supports_vision("gpt-4-vision") is True
+
+    def test_does_not_support_vision_deepseek(self):
+        assert LMStudioWrapper._supports_vision("deepseek-chat-v3") is False
+
+    def test_does_not_support_vision_none(self):
+        assert LMStudioWrapper._supports_vision(None) is False
+        assert LMStudioWrapper._supports_vision("") is False
+
+    def test_vision_keywords_not_empty(self):
+        assert len(LMStudioWrapper.VISION_KEYWORDS) > 0
+        assert "qwen" in LMStudioWrapper.VISION_KEYWORDS
+        assert "gemma" in LMStudioWrapper.VISION_KEYWORDS
+
+    def test_images_skipped_for_non_vision_model(self):
+        wrapper = LMStudioWrapper(model="deepseek-chat-v3")
+        result = wrapper._to_messages(prompt="Hello", images=[{"b64": "AAAA", "mime": "png"}])
+        assert len(result) == 1
+        assert isinstance(result[0]["content"], str)
+        assert result[0]["content"] == "Hello"
+
+    def test_encode_image_size_limit(self, tmp_path):
+        import config
+        img = tmp_path / "huge.png"
+        img.write_bytes(b'x' * (config.MAX_IMAGE_SIZE + 1))
+        with pytest.raises(ValueError, match="Image too large"):
+            LMStudioWrapper.encode_image(str(img))

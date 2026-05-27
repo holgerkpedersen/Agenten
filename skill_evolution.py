@@ -10,6 +10,8 @@ from datetime import datetime
 from collections import defaultdict, Counter
 
 from skill_tracker import tracker
+from config import get_logger
+log = get_logger(__name__)
 
 
 EVOLUTION_FILE = ".agent_storage/skill_evolution_log.json"
@@ -441,11 +443,21 @@ def _add_refinement_note(content: str, action: dict) -> str:
     return "\n".join(lines)
 
 
+_last_evolved_at = 0
+
+def _reset_evolve_counter():
+    global _last_evolved_at
+    _last_evolved_at = 0
+
 def should_evolve() -> bool:
+    global _last_evolved_at
     total = tracker.total_outcomes
     if total == 0:
         return False
-    return total % EVOLVE_EVERY_N == 0
+    if total - _last_evolved_at >= EVOLVE_EVERY_N:
+        _last_evolved_at = total
+        return True
+    return False
 
 
 def evolve_if_needed(dry_run: bool = True) -> dict:
@@ -479,4 +491,4 @@ def _log_applied(results: list):
         with open(log_path, "w", encoding="utf-8") as f:
             json.dump(entries, f, indent=2, ensure_ascii=False)
     except Exception as e:
-        print(f"Warning: failed to log applied evolution actions: {e}")
+        log.warning("Failed to log applied evolution actions: %s", e)

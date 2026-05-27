@@ -9,6 +9,12 @@ class TaskNode:
     def add_child(self, child_node):
         if child_node.parent is not None and child_node in child_node.parent.children:
             child_node.parent.children.remove(child_node)
+        # Cycle detection: prevent adding an ancestor as child
+        node = self
+        while node is not None:
+            if node is child_node:
+                return child_node
+            node = getattr(node, 'parent', None)
         child_node.parent = self
         self.children.append(child_node)
         return child_node

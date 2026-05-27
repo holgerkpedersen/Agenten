@@ -6,29 +6,10 @@ import subprocess
 import threading
 from i18n import K
 from lang import t
+from agent_files import is_safe_location
 
 _file_lock = threading.Lock()
 _BASE_DIR = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
-_TEMP_DIRS = set()
-for _p in (
-    os.environ.get('TMPDIR', ''),
-    os.environ.get('TMP', ''),
-    os.environ.get('TEMP', ''),
-    os.path.realpath(os.path.join(_BASE_DIR, 'exports')),
-    os.path.realpath(os.path.join(_BASE_DIR, 'uploads')),
-):
-    if _p:
-        _TEMP_DIRS.add(os.path.realpath(_p))
-
-
-def _is_safe_path(target_path):
-    real = os.path.realpath(target_path)
-    if real.startswith(_BASE_DIR + os.sep) or real == _BASE_DIR:
-        return True
-    for d in _TEMP_DIRS:
-        if d and (real.startswith(d + os.sep) or real == d):
-            return True
-    return False
 
 _STDLIB_MODULES = {
     'abc', 'aifc', 'argparse', 'array', 'ast', 'asynchat', 'asyncio', 'asyncore',
@@ -281,7 +262,7 @@ def _check_post_write(path, content, result):
 
 
 def write_file(path, content):
-    if not _is_safe_path(path):
+    if not is_safe_location(path):
         return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
     dirname = os.path.dirname(path)
     if dirname:
@@ -326,7 +307,7 @@ def _build_flexible_pattern(text):
 
 
 def edit_file(path, old_text, new_text, expected_hash=None):
-    if not _is_safe_path(path):
+    if not is_safe_location(path):
         return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
     try:
         if not os.path.exists(path):
@@ -347,15 +328,16 @@ def edit_file(path, old_text, new_text, expected_hash=None):
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        search = old_text.replace('\r\n', '\n')
-        norm = content.replace('\r\n', '\n')
-        count = norm.count(search)
+        # Normalize to \n-only for consistent byte positions (BUG-076 fix)
+        content = content.replace('\r\n', '\n').replace('\r', '\n')
+        search = old_text.replace('\r\n', '\n').replace('\r', '\n')
+        count = content.count(search)
         if count == 0:
             pattern, nlines = _build_flexible_pattern(search)
-            m = re.search(pattern, norm)
+            m = re.search(pattern, content)
             if not m:
                 return {"success": False, "error": f"Teksten blev ikke fundet i {path}"}
-            matches = list(re.finditer(pattern, norm))
+            matches = list(re.finditer(pattern, content))
             if len(matches) > 1:
                 return {"success": False, "error": f"Teksten fundet {len(matches)} gange — brug en mere specifik søgestreng"}
             idx = m.start()
@@ -363,7 +345,7 @@ def edit_file(path, old_text, new_text, expected_hash=None):
         else:
             if count > 1:
                 return {"success": False, "error": f"Teksten fundet {count} gange — brug en mere specifik søgestreng"}
-            idx = norm.index(search)
+            idx = content.index(search)
             search_len = len(search)
 
         exact_old = content[idx:idx + search_len]
@@ -415,6 +397,8 @@ EXCLUDE_LIST_FILES = {'.env', '.env.example', 'credentials.json', 'secrets.json'
 
 def list_files(path=".", pattern=None, max_depth=2):
     try:
+        if not is_safe_location(path):
+            return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
         if not os.path.isdir(path):
             return {"success": False, "error": f"Mappen findes ikke: {path}"}
         result = []

@@ -13,3 +13,16 @@ model_manager
 agent_files
 i18n
 lang
+
+agent_core
+agent_skills
+ddg_search
+flask_cors
+flow_builder
+llm_wrapper
+session_manager
+skill_evolution
+skill_loader
+task_tree
+
+config

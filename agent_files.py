@@ -1,3 +1,4 @@
+import ast
 import os
 import re
 import hashlib
@@ -15,9 +16,23 @@ for _td in (os.environ.get(k) for k in ('TMPDIR', 'TEMP', 'TMP')):
     if _td:
         _SAFE_DIRS.add(os.path.realpath(_td))
 _SAFE_DIRS.add(os.path.realpath(tempfile.gettempdir()))
+for _sub in ('exports', 'uploads'):
+    _p = os.path.realpath(os.path.join(_BASE_DIR, _sub))
+    _SAFE_DIRS.add(_p)
 
 
-def _is_safe_scan_path(target_path):
+def _is_safe_path(base_dir, target_path):
+    """Ensures that target_path resolves within base_dir to prevent path traversal."""
+    try:
+        real_base = os.path.realpath(base_dir)
+        real_target = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
+        return real_target.startswith(real_base + os.sep) or real_target == real_base
+    except Exception:
+        return False
+
+
+def is_safe_location(target_path):
+    """Checks if target_path is within any known-safe directory (project root, exports, uploads, temp)."""
     try:
         real = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
         for safe in _SAFE_DIRS:
@@ -26,6 +41,10 @@ def _is_safe_scan_path(target_path):
         return False
     except Exception:
         return False
+
+
+def _is_safe_scan_path(target_path):
+    return is_safe_location(target_path)
 
 
 def chunk_text(text, size=CHUNK_SIZE):
@@ -48,11 +67,17 @@ def detect_delegations(content):
 
 
 def file_hash(filepath):
-    h = hashlib.sha256()
-    with open(filepath, 'rb') as f:
-        for chunk in iter(lambda: f.read(65536), b''):
-            h.update(chunk)
-    return h.hexdigest()
+    try:
+        size = os.path.getsize(filepath)
+        if size > config.MAX_IMAGE_SIZE * 2:
+            return None
+        h = hashlib.sha256()
+        with open(filepath, 'rb') as f:
+            for chunk in iter(lambda: f.read(65536), b''):
+                h.update(chunk)
+        return h.hexdigest()
+    except (IOError, OSError):
+        return None
 
 
 def read_file_content(agent, filepath):
@@ -98,6 +123,9 @@ def get_single_file_context(agent, prompt):
 
     for path in possible_paths:
         if os.path.exists(path):
+            resolved = os.path.realpath(path)
+            if not (resolved.startswith(base_dir + os.sep) or resolved == base_dir):
+                continue
             content = read_file_content(agent, path)
             if content:
                 agent._log("INFO", t(K.LOG_FILE_FOUND, agent.lang), path)
@@ -187,3 +215,141 @@ def read_chunk(agent, chunk, index):
     if index < 1 or index > len(chunks):
         return {"success": False, "error": f"Chunk {index} findes ikke (1..{len(chunks)})"}
     return {"success": True, "chunk": chunk, "index": index, "total": len(chunks), "content": chunks[index - 1]}
+
+
+def _find_enclosing_symbol(tree, target_line):
+    best = None
+    class NodeVisitor(ast.NodeVisitor):
+        def visit_FunctionDef(self, node):
+            nonlocal best
+            if node.lineno <= target_line <= (getattr(node, 'end_lineno', node.lineno) or node.lineno):
+                best = node
+            self.generic_visit(node)
+
+        def visit_AsyncFunctionDef(self, node):
+            nonlocal best
+            if node.lineno <= target_line <= (getattr(node, 'end_lineno', node.lineno) or node.lineno):
+                best = node
+            self.generic_visit(node)
+
+        def visit_ClassDef(self, node):
+            nonlocal best
+            if node.lineno <= target_line <= (getattr(node, 'end_lineno', node.lineno) or node.lineno):
+                best = node
+            self.generic_visit(node)
+
+    NodeVisitor().visit(tree)
+    return best
+
+
+def locate_code(filepath, name=None, line_no=None):
+    if not os.path.exists(filepath):
+        return {"success": False, "error": f"File not found: {filepath}"}
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            code = f.read()
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return {"success": False, "error": f"Syntax error in {os.path.basename(filepath)}: {e}"}
+    except Exception as e:
+        return {"success": False, "error": f"Could not parse {os.path.basename(filepath)}: {e}"}
+
+    if name:
+        parts = name.split(".", 1)
+        func_name = parts[-1]
+        class_name = parts[0] if len(parts) == 2 else None
+
+        for node in ast.walk(tree):
+            if class_name:
+                if isinstance(node, ast.ClassDef) and node.name == class_name:
+                    for child in node.body:
+                        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name == func_name:
+                            start = child.lineno
+                            end = getattr(child, 'end_lineno', start) or start
+                            return {
+                                "success": True,
+                                "file": filepath,
+                                "name": name,
+                                "type": "method",
+                                "line": start,
+                                "end_line": end,
+                                "body": "\n".join(code.splitlines()[start - 1:end]),
+                            }
+                    return {"success": False, "error": f"Method '{func_name}' not found in class '{class_name}' in {os.path.basename(filepath)}"}
+            else:
+                if isinstance(node, ast.FunctionDef) and node.name == func_name:
+                    start = node.lineno
+                    end = getattr(node, 'end_lineno', start) or start
+                    return {
+                        "success": True,
+                        "file": filepath,
+                        "name": name,
+                        "type": "function",
+                        "line": start,
+                        "end_line": end,
+                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                    }
+                elif isinstance(node, ast.ClassDef) and node.name == func_name:
+                    start = node.lineno
+                    end = getattr(node, 'end_lineno', start) or start
+                    return {
+                        "success": True,
+                        "file": filepath,
+                        "name": name,
+                        "type": "class",
+                        "line": start,
+                        "end_line": end,
+                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                    }
+                elif isinstance(node, ast.AsyncFunctionDef) and node.name == func_name:
+                    start = node.lineno
+                    end = getattr(node, 'end_lineno', start) or start
+                    return {
+                        "success": True,
+                        "file": filepath,
+                        "name": name,
+                        "type": "async_function",
+                        "line": start,
+                        "end_line": end,
+                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                    }
+        return {"success": False, "error": f"Symbol '{name}' not found in {os.path.basename(filepath)}"}
+
+    if line_no is not None:
+        symbol = _find_enclosing_symbol(tree, line_no)
+        if symbol is None:
+            return {
+                "success": True,
+                "file": filepath,
+                "name": None,
+                "type": "module",
+                "line": line_no,
+                "end_line": line_no,
+                "body": code.splitlines()[line_no - 1] if 1 <= line_no <= len(code.splitlines()) else "",
+            }
+
+        node_type = "class" if isinstance(symbol, ast.ClassDef) else "async_function" if isinstance(symbol, ast.AsyncFunctionDef) else "function"
+        start = symbol.lineno
+        end = getattr(symbol, 'end_lineno', start) or start
+
+        class_name = None
+        for parent in ast.walk(tree):
+            if isinstance(parent, ast.ClassDef) and hasattr(parent, 'body'):
+                if symbol in [child for child in ast.walk(parent) if child is symbol]:
+                    class_name = parent.name
+                    break
+
+        full_name = f"{class_name}.{symbol.name}" if class_name else symbol.name
+        node_type = "method" if class_name else node_type
+
+        return {
+            "success": True,
+            "file": filepath,
+            "name": full_name,
+            "type": node_type,
+            "line": start,
+            "end_line": end,
+            "body": "\n".join(code.splitlines()[start - 1:end]),
+        }
+
+    return {"success": False, "error": "Specify either 'name' or 'line_no'"}

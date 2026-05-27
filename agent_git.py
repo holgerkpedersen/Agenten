@@ -11,10 +11,10 @@ PR_BRANCH_TOOLS = {"git_create_branch"}
 PR_REMOTE_TOOLS = {"git_remote_status"}
 PR_GIT_TOOLS = {"git_diff", "git_log", "git_status", "git_current_branch", "git_branch_list", "git_pull", "git_checkout"}
 
-_LOCALE_ENV = {"LC_ALL": "C", "LANG": "C", "LANGUAGE": "C"}
-
 
 def is_pr_workflow(task_name):
+    if not task_name:
+        return False
     if re.search(r'\bpr\b', task_name, re.IGNORECASE):
         return True
     keywords = ["pull request", "github", "push og opret", "push and create"]
@@ -41,7 +41,8 @@ def verify_pr_step(agent, tool_name, result, task_name, original_prompt):
         if missing:
             return t(K.CP_NO_COMMIT, agent.lang)
 
-    result_ok = result.get("success", False) and result.get("result", {}).get("success", True) is not False
+    nested_success = result.get("result", {}).get("success", True)
+    result_ok = result.get("success", False) and nested_success is not False
     if not result_ok:
         err = result.get("error") or result.get("result", {}).get("error", "ukendt fejl")
         err_str = str(err)

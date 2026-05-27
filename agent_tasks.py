@@ -256,7 +256,7 @@ def solve_task_stream(agent, task_node, original_prompt):
 
     full_response = ""
     text_fallback = ""
-    max_iterations = 15 if agent_git.is_pr_workflow(task_node.name) else 10
+    max_iterations = config.MAX_PR_TASK_ITERATIONS if agent_git.is_pr_workflow(task_node.name) else config.MAX_TASK_ITERATIONS
     called_tools = {}
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
@@ -286,6 +286,10 @@ def solve_task_stream(agent, task_node, original_prompt):
             raise
 
         if agent.stop_requested:
+            break
+
+        if response.startswith("[ERROR:") or response.startswith("ERROR:"):
+            yield {"type": "error", "message": response}
             break
 
         messages.append({"role": "assistant", "content": response})
@@ -333,7 +337,7 @@ def solve_task_stream(agent, task_node, original_prompt):
             all_files_loaded = all(len(v) <= 1 for v in agent.file_chunks.values()) if agent.file_chunks else True
             if all_files_loaded and parsed["type"] in ("text", "done"):
                 text_fallback = response.strip() if parsed["type"] == "text" else parsed.get("result", response.strip())
-                if text_fallback and "ERROR" not in text_fallback and not text_fallback.startswith("<<<"):
+                if text_fallback and "ERROR" not in text_fallback and not text_fallback.startswith("<<<") and len(text_fallback) > 100:
                     full_response = text_fallback
                     break
             if parsed["type"] == "text":
@@ -348,7 +352,7 @@ def solve_task_stream(agent, task_node, original_prompt):
         _add_user_msg(messages, t(K.TOOL_NO_RESULT, agent.lang))
         messages = _truncate_messages(messages, agent.max_conversation_chars)
         full_response = response
-        if i >= 3:
+        if i >= 3 and not called_tools:
             break
 
     yield from _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools)

@@ -220,7 +220,8 @@
     "empty_filename": "Tomt filnavn",
     "no_path_given": "Ingen sti angivet",
     "index_missing": "index.html ikke fundet. Opret filen i static mappen.",
-    "cannot_create_folder": "Kunne ikke oprette mappe: {e}"
+    "cannot_create_folder": "Kunne ikke oprette mappe: {e}",
+    "layout_not_found": "Layout ikke fundet"
   },
   "ui": {
     "title": "Agenten",

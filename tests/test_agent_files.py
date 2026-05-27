@@ -221,3 +221,285 @@ class TestReadChunk:
         agent.file_chunks = {"file_test.py": ["c1"]}
         result = read_chunk(agent, "file_test.py", 1)
         assert result["success"] is True
+
+
+class TestLocateCode:
+    def test_find_function_by_name(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("class Foo:\n    def bar(self):\n        pass\n\ndef baz():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f), name="baz")
+        assert r["success"] is True
+        assert r["name"] == "baz"
+        assert r["type"] == "function"
+
+    def test_find_class_by_name(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("class Foo:\n    def bar(self):\n        pass\n", encoding='utf-8')
+        r = locate_code(str(f), name="Foo")
+        assert r["success"] is True
+        assert r["name"] == "Foo"
+        assert r["type"] == "class"
+
+    def test_find_method_by_name(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("class Foo:\n    def bar(self):\n        pass\n", encoding='utf-8')
+        r = locate_code(str(f), name="Foo.bar")
+        assert r["success"] is True
+        assert r["name"] == "Foo.bar"
+        assert r["type"] == "method"
+
+    def test_find_enclosing_function_by_line(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("def foo():\n    x = 1\n    y = 2\n\ndef bar():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f), line_no=3)
+        assert r["success"] is True
+        assert r["name"] == "foo"
+        assert r["type"] == "function"
+
+    def test_find_enclosing_method_by_line(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("class Foo:\n    def bar(self):\n        x = 1\n        y = 2\n", encoding='utf-8')
+        r = locate_code(str(f), line_no=3)
+        assert r["success"] is True
+        assert r["name"] == "Foo.bar"
+        assert r["type"] == "method"
+
+    def test_find_nested_function_by_line(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("def outer():\n    def inner():\n        x = 1\n    return inner\n", encoding='utf-8')
+        r = locate_code(str(f), line_no=3)
+        assert r["success"] is True
+        assert r["name"] == "inner"
+
+    def test_module_level_code_no_enclosing(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("x = 1\ny = 2\n\ndef foo():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f), line_no=1)
+        assert r["success"] is True
+        assert r["name"] is None
+        assert r["type"] == "module"
+
+    def test_line_at_function_start_finds_function(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("def foo():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f), line_no=1)
+        assert r["success"] is True
+        assert r["name"] == "foo"
+
+    def test_async_function(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("import asyncio\n\nasync def fetch():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f), line_no=3)
+        assert r["success"] is True
+        assert r["name"] == "fetch"
+
+    def test_find_async_function_by_name(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("import asyncio\n\nasync def fetch():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f), name="fetch")
+        assert r["success"] is True
+        assert r["name"] == "fetch"
+        assert r["type"] == "async_function"
+
+    def test_file_not_found(self):
+        from agent_files import locate_code
+        r = locate_code("nonexistent.py", line_no=10)
+        assert r["success"] is False
+        assert "File not found" in r["error"]
+
+    def test_symbol_not_found(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("def foo():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f), name="nonexistent")
+        assert r["success"] is False
+        assert "not found" in r["error"]
+
+    def test_syntax_error(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("def foo(", encoding='utf-8')
+        r = locate_code(str(f), line_no=1)
+        assert r["success"] is False
+        assert "Syntax error" in r["error"]
+
+    def test_no_name_or_line(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("def foo():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f))
+        assert r["success"] is False
+        assert "name" in r["error"] or "line_no" in r["error"]
+
+    def test_method_not_found_in_class(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("class Foo:\n    def bar(self):\n        pass\n", encoding='utf-8')
+        r = locate_code(str(f), name="Foo.nonexistent")
+        assert r["success"] is False
+        assert "not found" in r["error"]
+
+    def test_line_out_of_range(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("def foo():\n    pass\n", encoding='utf-8')
+        r = locate_code(str(f), line_no=999)
+        assert r["success"] is True
+        assert r["name"] is None
+        assert r["type"] == "module"
+
+    def test_body_contains_function_content(self, tmp_path):
+        from agent_files import locate_code
+        f = tmp_path / "test.py"
+        f.write_text("def foo():\n    x = 1\n    return x\n", encoding='utf-8')
+        r = locate_code(str(f), name="foo")
+        assert r["success"] is True
+        assert "x = 1" in r["body"]
+        assert "return x" in r["body"]
+
+
+class TestIsSafePath:
+    @pytest.fixture(autouse=True)
+    def setup(self, tmp_path):
+        self.base_dir = str(tmp_path)
+        self.inside_file = tmp_path / "inside.py"
+        self.inside_file.write_text("x = 1", encoding='utf-8')
+        self.sub_dir = tmp_path / "sub"
+        self.sub_dir.mkdir()
+        self.nested_file = self.sub_dir / "nested.py"
+        self.nested_file.write_text("y = 2", encoding='utf-8')
+
+    def _is_safe_path(self, base_dir, target_path):
+        from agent_files import _is_safe_path
+        return _is_safe_path(base_dir, target_path)
+
+    def test_file_inside_dir(self):
+        assert self._is_safe_path(self.base_dir, str(self.inside_file)) is True
+
+    def test_file_outside_dir(self):
+        assert self._is_safe_path(self.base_dir, r"C:\Windows\system32\config") is False
+
+    def test_base_dir_itself(self):
+        assert self._is_safe_path(self.base_dir, self.base_dir) is True
+
+    def test_nested_subdirectory(self):
+        assert self._is_safe_path(self.base_dir, str(self.nested_file)) is True
+
+    def test_path_traversal_dotdot(self):
+        malicious = os.path.join(self.base_dir, "..", "..", "Windows", "system32")
+        assert self._is_safe_path(self.base_dir, malicious) is False
+
+    def test_path_traversal_encoded(self):
+        malicious = os.path.join(self.base_dir, "..", "..", "..", "etc", "passwd")
+        assert self._is_safe_path(self.base_dir, malicious) is False
+
+    def test_nonexistent_path_inside(self):
+        nonexistent = os.path.join(self.base_dir, "nonexistent", "file.py")
+        assert self._is_safe_path(self.base_dir, nonexistent) is True
+
+    def test_nonexistent_path_outside(self):
+        nonexistent = r"C:\DoesNotExist\file.py"
+        assert self._is_safe_path(self.base_dir, nonexistent) is False
+
+    def test_different_base_dir(self, tmp_path):
+        other = tmp_path / "other"
+        other.mkdir()
+        other_file = other / "other.py"
+        other_file.write_text("z = 3", encoding='utf-8')
+        assert self._is_safe_path(str(other), str(other_file)) is True
+        assert self._is_safe_path(str(other), str(self.inside_file)) is False
+
+
+class TestIsSafeLocation:
+    @pytest.fixture(autouse=True)
+    def setup(self, tmp_path):
+        self.project_file = tmp_path / "project.py"
+        self.project_file.write_text("x = 1", encoding='utf-8')
+
+    def _is_safe_location(self, target_path):
+        from agent_files import is_safe_location
+        return is_safe_location(target_path)
+
+    @patch('agent_files._SAFE_DIRS', new_callable=set)
+    def test_path_in_safe_dirs(self, mock_safe_dirs, tmp_path):
+        mock_safe_dirs.add(os.path.realpath(str(tmp_path)))
+        safe_file = tmp_path / "safe.py"
+        safe_file.write_text("ok", encoding='utf-8')
+        assert self._is_safe_location(str(safe_file)) is True
+
+    @patch('agent_files._SAFE_DIRS', new_callable=set)
+    def test_path_outside_safe_dirs(self, mock_safe_dirs):
+        mock_safe_dirs.add(str(self.project_file.parent))
+        assert self._is_safe_location(r"C:\Windows\system32") is False
+
+    @patch('agent_files._SAFE_DIRS', new_callable=set)
+    def test_temp_dir_is_safe(self, mock_safe_dirs, tmp_path):
+        mock_safe_dirs.add(os.path.realpath(str(tmp_path)))
+        inside = tmp_path / "inside.txt"
+        inside.write_text("temp", encoding='utf-8')
+        assert self._is_safe_location(str(inside)) is True
+
+    @patch('agent_files._SAFE_DIRS', new_callable=set)
+    def test_path_traversal_rejected(self, mock_safe_dirs, tmp_path):
+        mock_safe_dirs.add(os.path.realpath(str(tmp_path)))
+        malicious = os.path.join(str(tmp_path), "..", "..", "Windows", "system32")
+        assert self._is_safe_location(malicious) is False
+
+    @patch('agent_files._SAFE_DIRS', new_callable=set)
+    def test_nonexistent_path_in_safe_dir(self, mock_safe_dirs, tmp_path):
+        mock_safe_dirs.add(os.path.realpath(str(tmp_path)))
+        nonexistent = os.path.join(str(tmp_path), "future_dir", "future_file.py")
+        assert self._is_safe_location(nonexistent) is True
+
+    @patch('agent_files._SAFE_DIRS', new_callable=set)
+    def test_exception_returns_false(self, mock_safe_dirs):
+        mock_safe_dirs.add(os.path.realpath("."))
+        assert self._is_safe_location(None) is False
+
+    def test_project_root_in_safe_dirs(self):
+        import tempfile
+        from agent_files import is_safe_location, _SAFE_DIRS
+        assert len(_SAFE_DIRS) >= 2
+
+    def test_exports_uploads_in_safe_dirs(self):
+        from agent_files import _SAFE_DIRS
+        bases = {p for p in _SAFE_DIRS if 'exports' in p or 'uploads' in p}
+        assert len(bases) == 2, f"Expected exports/ and uploads/ in _SAFE_DIRS, got: {bases}"
+
+
+class TestIsSafeScanPath:
+    def _is_safe_scan_path(self, target_path):
+        from agent_files import _is_safe_scan_path
+        return _is_safe_scan_path(target_path)
+
+    def test_delegates_to_is_safe_location(self, monkeypatch):
+        from agent_files import is_safe_location
+        called_with = []
+        def mock_is_safe_location(path):
+            called_with.append(path)
+            return True
+        monkeypatch.setattr('agent_files.is_safe_location', mock_is_safe_location)
+        assert self._is_safe_scan_path("some/path") is True
+        assert called_with == ["some/path"]
+
+    @patch('agent_files._SAFE_DIRS', new_callable=set)
+    def test_path_in_safe_returns_true(self, mock_safe_dirs, tmp_path):
+        mock_safe_dirs.add(os.path.realpath(str(tmp_path)))
+        safe = tmp_path / "safe.txt"
+        safe.write_text("ok", encoding='utf-8')
+        assert self._is_safe_scan_path(str(safe)) is True
+
+    @patch('agent_files._SAFE_DIRS', new_callable=set)
+    def test_path_outside_returns_false(self, mock_safe_dirs, tmp_path):
+        mock_safe_dirs.add(os.path.realpath(str(tmp_path)))
+        assert self._is_safe_scan_path(r"C:\Windows\system32") is False

@@ -2,14 +2,19 @@
 
 import os
 import json as _json
+from config import get_logger
+log = get_logger(__name__)
 
 _LANG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lang")
 LANG = {}
 for _lang_code in ["da", "en", "es", "zh"]:
     _path = os.path.join(_LANG_DIR, f"{_lang_code}.json")
     if os.path.exists(_path):
-        with open(_path, encoding="utf-8") as _f:
-            LANG[_lang_code] = _json.load(_f)
+        try:
+            with open(_path, encoding="utf-8") as _f:
+                LANG[_lang_code] = _json.load(_f)
+        except (_json.JSONDecodeError, OSError) as e:
+            log.warning("Failed to load translation %s: %s", _lang_code, e)
 
 def t(key, lang="da"):
     """Get translated string via dot notation: t('log.task_start', 'en')
@@ -22,11 +27,8 @@ def t(key, lang="da"):
             if k in d:
                 d = d[k]
                 continue
-        # Key not found in nested path — try flat key in ui
-        ui = base.get("ui", {})
-        if key in ui:
-            return ui[key]
-        return f"?{key}"
+            # Key not found in nested path — return marker
+            return f"?{key}"
     return d if isinstance(d, (str, list)) else str(d)
 
 

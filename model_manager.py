@@ -3,19 +3,31 @@ import shutil
 import os
 import requests
 import difflib
+import config
+from urllib.parse import urlparse
+from config import get_logger
+log = get_logger(__name__)
 
 LMS_PATH = shutil.which('lms') or shutil.which('lms.exe') or os.path.join(
     os.environ.get('USERPROFILE', os.environ.get('HOME', '')), '.lmstudio', 'bin', 'lms.exe'
 )
-LM_STUDIO_HOST = os.environ.get('LM_HOST', '127.0.0.1')
-LM_STUDIO_PORT = os.environ.get('LM_PORT', '1234')
-LM_STUDIO_API = f'http://{LM_STUDIO_HOST}:{LM_STUDIO_PORT}/api/v1'
+
+
+def _rest_api_base():
+    """Derive LM Studio REST API base (no /v1 path suffix) from config LLM_BASE_URL."""
+    parsed = urlparse(config.LLM_BASE_URL)
+    base = f"{parsed.scheme}://{parsed.hostname}"
+    if parsed.port:
+        base += f":{parsed.port}"
+    if parsed.path and parsed.path.rstrip('/') != '/v1':
+        base += parsed.path.rstrip('/')
+    return base + '/api/v1'
 
 
 def get_loaded_models():
     """Fetch currently loaded models from LM Studio REST API."""
     try:
-        r = requests.get(f'{LM_STUDIO_API}/models', timeout=5)
+        r = requests.get(f'{config.LLM_BASE_URL.replace("/v1", "")}/api/v1/models', timeout=5)
         if r.status_code == 200:
             data = r.json()
             loaded = {}
@@ -32,8 +44,8 @@ def get_loaded_models():
                 }
             return loaded
     except Exception as e:
-        print(f'[model_manager] Failed to fetch models: {e}')
-    return {}
+        log.warning("Failed to fetch models: %s", e)
+        return None
 
 
 def is_model_loaded(model_key):
@@ -57,11 +69,11 @@ def is_model_loaded(model_key):
 def get_available_models():
     """Fetch all known models from LM Studio (OpenAI-compatible endpoint)."""
     try:
-        r = requests.get(f'http://{LM_STUDIO_HOST}:{LM_STUDIO_PORT}/v1/models', timeout=5)
+        r = requests.get(f'{config.LLM_BASE_URL}/models', timeout=5)
         if r.status_code == 200:
             return [m['id'] for m in r.json().get('data', []) if 'embedding' not in m.get('id', '').lower()]
-    except Exception:
-        pass
+    except Exception as e:
+        log.warning("Failed to fetch models from LM Studio: %s", e)
     return []
 
 
@@ -70,7 +82,7 @@ def get_all_rest_models():
     LM Link is transparent — remote models appear with same key as local ones.
     Requests to localhost:1234 are automatically routed to the right device."""
     try:
-        r = requests.get(f'{LM_STUDIO_API}/models', timeout=5)
+        r = requests.get(f'{_rest_api_base()}/models', timeout=5)
         if r.status_code == 200:
             data = r.json()
             models = []
@@ -93,7 +105,7 @@ def get_all_rest_models():
                 })
             return models
     except Exception as e:
-        print(f'[model_manager] Failed to fetch REST models: {e}')
+        log.warning("Failed to fetch REST models: %s", e)
     return []
 
 
@@ -136,7 +148,8 @@ def load_model(model_key, parallel=4, identifier=None, callback=None):
         cmd.extend(['--identifier', identifier])
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, errors='replace')
+        import config
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=config.SUBPROCESS_TIMEOUT, errors='replace')
         if result.returncode == 0:
             return True, f'Loaded: {resolved}'
         else:
@@ -160,7 +173,7 @@ def unload_model(identifier, callback=None):
             callback('Unloading all models...')
     else:
         # Try to fuzzy-match identifier
-        loaded = get_loaded_models()
+        loaded = get_loaded_models() or {}
         match_id = identifier
         for key, info in loaded.items():
             for inst in info.get('loaded_instances', []):

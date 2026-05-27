@@ -4,14 +4,21 @@ from agent_core import Agent
 from session_manager import SessionManager
 import agent_skills
 import model_manager
+import config
 import json
 import time
 import threading
 import os
+import hmac
 import tempfile
 from datetime import datetime
 from lang import t, get_ui_translations
 from i18n import K
+from agent_files import _is_safe_path
+from config import get_logger
+log = get_logger(__name__)
+
+config.setup_logging()
 
 # ============ KONFIGURATION ============
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +27,8 @@ STATIC_DIR = os.path.join(BASE_DIR, 'static')
 os.makedirs(STATIC_DIR, exist_ok=True)
 
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='/static')
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGINS', 'http://localhost:*').split(',')}})
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB max upload
 
 # ============ SECURITY CONFIGURATION ============
 def _is_development_mode():
@@ -70,13 +78,24 @@ def _rate_limit():
     if not rate_limiter.is_allowed(key, limit, window):
         return jsonify({"success": False, "error": "Too many requests — prøv igen om et minut"}), 429
 
+@app.before_request
+def _guard_json_body():
+    if request.method in ('POST', 'PUT', 'PATCH') and request.path.startswith('/api/'):
+        if request.path in ('/api/upload', '/api/image/upload', '/api/file/upload', '/api/stop'):
+            return None
+        if not request.is_json:
+            return jsonify({"success": False, "error": "Content-Type must be application/json"}), 400
+
 agent = Agent()
 session_manager = SessionManager()
 current_session_id = None
 execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
 execution_status_lock = threading.Lock()
 export_folder = None
+export_folder_lock = threading.Lock()
 active_streams = {}
+active_streams_lock = threading.Lock()
+current_session_lock = threading.Lock()
 
 # ============ VERSION ============
 def _file_mtime(path):
@@ -87,7 +106,7 @@ VERSION_FILES = ["api_server.py", "agent_core.py", "llm_wrapper.py", "tools.py",
 BUILD_INFO = {f: _file_mtime(f) for f in VERSION_FILES}
 BUILD_INFO["started"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-print(f"📦 Startet: {BUILD_INFO['started']} | api_server={BUILD_INFO['api_server.py']} | llm={BUILD_INFO['llm_wrapper.py']}")
+log.info("Startet: %s | api_server=%s | llm=%s", BUILD_INFO['started'], BUILD_INFO['api_server.py'], BUILD_INFO['llm_wrapper.py'])
 
 # ============ STATIC ROUTES ============
 @app.route("/uploads/<path:filename>")
@@ -106,17 +125,19 @@ def preview_export(filename):
     # Security check: Path Traversal Prevention (SEC-013)
     if not _is_safe_path(base, filepath):
         return "<h2>Access denied</h2>", 403
-        
-    if not os.path.exists(filepath):
+    try:
+        with open(filepath, encoding="utf-8") as f:
+            md_content = f.read()
+    except (FileNotFoundError, IOError, OSError):
         return "<h2>File not found</h2>", 404
-    with open(filepath, encoding="utf-8") as f:
-        md_content = f.read()
     md_content = md_content.replace('<<<', '&lt;&lt;&lt;').replace('>>>', '&gt;&gt;&gt;')
     md_content = re.sub(r'&lt;&lt;&lt;TOOL&gt;&gt;&gt;(\{.*?\})&lt;&lt;&lt;END&gt;&gt;&gt;', r'<pre class="tool-call">&lt;&lt;&lt;TOOL&gt;&gt;&gt;\1&lt;&lt;&lt;END&gt;&gt;&gt;</pre>', md_content)
     md_content = re.sub(r'&lt;&lt;&lt;DONE&gt;&gt;&gt;(\{.*?\})&lt;&lt;&lt;END&gt;&gt;&gt;', r'<pre class="tool-result">&lt;&lt;&lt;DONE&gt;&gt;&gt;\1&lt;&lt;&lt;END&gt;&gt;&gt;</pre>', md_content)
+    safe_json = json.dumps(md_content).replace('</', '<\\/')
     return f"""<!DOCTYPE html>
 <html lang="da">
 <head><meta charset="UTF-8"><title>{filename}</title>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
     body {{ font-family: 'Segoe UI', system-ui; max-width: 960px; margin: 40px auto; padding: 20px; background: #0f172a; color: #e2e8f0; }}
@@ -135,7 +156,7 @@ def preview_export(filename):
     img {{ max-width: 100%; border-radius: 8px; }}
 </style></head>
 <body><div id="content"></div>
-<script>document.getElementById('content').innerHTML = marked.parse({json.dumps(md_content)});</script>
+<script>document.getElementById('content').innerHTML = DOMPurify.sanitize(marked.parse({safe_json}));</script>
 </body></html>"""
 
 @app.route("/")
@@ -179,7 +200,8 @@ def set_folder():
             os.makedirs(folder, exist_ok=True)
         except Exception as e:
             return jsonify({"success": False, "error": t(K.ERR_CREATE_FOLDER, agent.lang).format(e=str(e))})
-    export_folder = folder
+    with export_folder_lock:
+        export_folder = folder
     return jsonify({"success": True, "folder": export_folder})
 
 @app.route("/api/folder/status", methods=["GET"])
@@ -224,12 +246,15 @@ def list_folder_contents():
         items = []
         for item in os.listdir(folder_path):
             full_path = os.path.join(folder_path, item)
-            items.append({
-                "name": item,
-                "is_dir": os.path.isdir(full_path),
-                "size": os.path.getsize(full_path) if os.path.isfile(full_path) else 0,
-                "modified": os.path.getmtime(full_path)
-            })
+            try:
+                items.append({
+                    "name": item,
+                    "is_dir": os.path.isdir(full_path),
+                    "size": os.path.getsize(full_path) if os.path.isfile(full_path) else 0,
+                    "modified": os.path.getmtime(full_path)
+                })
+            except OSError:
+                continue
         return jsonify({"success": True, "items": items, "current_path": folder_path})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -246,17 +271,9 @@ def sanitize_filename(filename):
     if not filename:
         return ""
     # Keep alphanumeric and safe punctuation (., -, _)
-    return "".join(c for c in filename if c.isalnum() or c in '._- ')
-
-
-def _is_safe_path(base_dir, target_path):
-    """Ensures that target_path resolves within base_dir to prevent path traversal."""
-    try:
-        real_base = os.path.realpath(base_dir)
-        real_target = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
-        return real_target.startswith(real_base + os.sep) or real_target == real_base
-    except Exception:
-        return False
+    result = "".join(c for c in filename if c.isalnum() or c in '._- ')
+    # Replace spaces with underscores for URL safety
+    return result.replace(' ', '_')
 
 
 _IMAGE_MAGIC_BYTES = {
@@ -288,11 +305,15 @@ def upload_file():
     file = request.files['file']
     if file.filename == '':
         return jsonify({"success": False, "error": t(K.ERR_EMPTY_FILENAME, agent.lang)}), 400
+    ext = os.path.splitext(file.filename)[1].lower()
+    SAFE_UPLOAD_EXTS = {'.py', '.js', '.ts', '.html', '.css', '.md', '.txt', '.json', '.yaml', '.yml', '.toml', '.cfg', '.ini', '.xml', '.csv', '.env.example', '.gitignore'}
+    if ext and ext not in SAFE_UPLOAD_EXTS:
+        return jsonify({"success": False, "error": f"Filtypen '{ext}' er ikke tilladt. Tilladte typer: {', '.join(sorted(SAFE_UPLOAD_EXTS))}"}), 400
     try:
         safe_filename = sanitize_filename(file.filename)
         filepath = os.path.join(UPLOAD_DIR, safe_filename)
         file.save(filepath)
-        return jsonify({"success": True, "filepath": filepath, "filename": file.filename})
+        return jsonify({"success": True, "filepath": filepath, "filename": safe_filename})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -335,12 +356,14 @@ def _normalize_images(images):
     for img in images:
         if isinstance(img, dict):
             b64 = img.get("b64", "")
+            if not isinstance(b64, str):
+                continue
             if b64 and "/" not in b64 and "+" not in b64 and ("-" in b64 or "_" in b64):
                 try:
                     decoded = base64.urlsafe_b64decode(b64)
                     img["b64"] = base64.b64encode(decoded).decode("utf-8")
                 except Exception as e:
-                    print(f"Warning: failed to normalize image: {e}")
+                    log.warning("Failed to normalize image: %s", e)
     return images
 
 
@@ -438,10 +461,12 @@ def list_python_files():
     
     try:
         python_files = []
-        for root, dirs, files in os.walk(folder_path):
+        for root, dirs, files in os.walk(folder_path, followlinks=False):
             for file in files:
                 if file.endswith('.py'):
                     full_path = os.path.join(root, file)
+                    if not os.path.realpath(full_path).startswith(BASE_DIR + os.sep):
+                        continue
                     rel_path = os.path.relpath(full_path, BASE_DIR)
                     python_files.append({
                         "name": file,
@@ -616,20 +641,28 @@ def get_lang(lang):
 @app.route("/api/models")
 def get_models():
     openai_models = agent.llm.list_models()
-    loaded = model_manager.get_loaded_models()
-    rest_models = model_manager.get_all_rest_models()
+    loaded = None
+    rest_models = []
+    if os.environ.get('OPENCODE_BASE_URL'):
+        merged = sorted(openai_models)
+    else:
+        loaded = model_manager.get_loaded_models()
+        rest_models = model_manager.get_all_rest_models()
+        all_ids = set(openai_models)
+        if rest_models:
+            for m in rest_models:
+                mid = m.get('id')
+                if mid:
+                    all_ids.add(mid)
+        if loaded:
+            for k in loaded:
+                if loaded[k].get('is_loaded'):
+                    all_ids.add(k)
+                    for inst in loaded[k].get('loaded_instances', []):
+                        all_ids.add(inst.get('id', ''))
+        merged = sorted(all_ids)
 
-    all_ids = set(openai_models)
-    for m in rest_models:
-        all_ids.add(m['id'])
-    for k in loaded:
-        if loaded[k].get('is_loaded'):
-            all_ids.add(k)
-            for inst in loaded[k].get('loaded_instances', []):
-                all_ids.add(inst.get('id', ''))
-    merged = sorted(all_ids)
-
-    print(f'[models] Merged ({len(merged)}): {merged[:10]}{"..." if len(merged) > 10 else ""}')
+    log.info("Merged models (%s): %s...", len(merged), str(merged[:10]))
 
     return jsonify({
         "models": merged,
@@ -680,12 +713,13 @@ def unload_model_route():
 def stop_execution():
     global current_session_id
     
-    # BUG-001 Fix: Stop specific session stream if active, else fallback to global
-    if current_session_id and current_session_id in active_streams:
-        active_streams[current_session_id].stop_requested = True
-    else:
-        agent.stop_requested = True
-        
+    if current_session_id:
+        with active_streams_lock:
+            if current_session_id in active_streams:
+                active_streams[current_session_id].stop_requested = True
+                return jsonify({"success": True})
+    agent.stop_requested = True
+    
     return jsonify({"success": True})
 
 @app.route("/api/reply", methods=["POST"])
@@ -790,16 +824,18 @@ def execute_without_stream():
 def _ensure_model_loaded(model_key):
     if not model_key:
         return
+    if os.environ.get('OPENCODE_BASE_URL'):
+        return
     loaded, matched = model_manager.is_model_loaded(model_key)
     if loaded:
-        print(f"✅ Model already loaded: {matched}")
-        return
-    print(f"⏳ Loading model: {model_key}...")
+        log.info("Model already loaded: %s", matched)
+        return matched
+    log.info("Loading model: %s...", model_key)
     ok, msg = model_manager.load_model(model_key)
     if ok:
-        print(f"✅ {msg}")
+        log.info(msg)
     else:
-        print(f"⚠️  {msg}")
+        log.warning(msg)
 
 
 TEMPLATE_GUIDANCE = {
@@ -897,7 +933,7 @@ def _validate_template_prompt(prompt: str, template: str) -> dict:
                 )
                 return {"warning": warning, "suggestion": better, "suggested_template": better, "matches": 0, "total": 0}
         except Exception as e:
-            print(f"Warning: template validation error: {e}")
+            log.warning("Template validation error: %s", e)
         return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
     
     guidance = TEMPLATE_GUIDANCE.get(template)
@@ -922,7 +958,7 @@ def _validate_template_prompt(prompt: str, template: str) -> dict:
                 if better_guidance:
                     suggested = f"\n\nForslag: Brug skabelonen '{better}' i stedet.\n{better_guidance['hint']}"
         except Exception as e:
-            print(f"Warning: template suggestion error: {e}")
+            log.warning("Template suggestion error: %s", e)
         
         examples = "\n".join(f"  • {ex}" for ex in guidance["examples"])
         warning = (
@@ -969,11 +1005,11 @@ def decompose():
     # Validate prompt against selected template
     validation = _validate_template_prompt(prompt, template)
     if validation["warning"]:
-        print(f"⚠️ Skabelon-advarsel ({template}): kun {validation['matches']}/{validation['total']} keywords matchede")
+        log.warning("Template warning (%s): only %s/%s keywords matched", template, validation['matches'], validation['total'])
     
-    print(f"🌳 Nedbryder: {prompt[:50]}..." + (f" skabelon: {template}" if template else ""))
+    log.info("Decomposing: %s...%s", prompt[:50], f" template: {template}" if template else "")
     if files:
-        print(f"📄 Med {len(files)} filer")
+        log.info("With %s files", len(files))
 
     decompose_model = data.get("decompose_model")
     execute_model = data.get("execute_model")
@@ -992,7 +1028,7 @@ def decompose():
             "id": current_session_id,
             "name": prompt[:30],
             "tree": tree,
-            "execution_log": agent.execution_log,
+        "execution_log": agent.execution_log or existing.get("execution_log", []),
             "agent_log": agent.agent_log,
             "original_prompt": agent.original_prompt,
             "full_prompt_with_context": agent.full_prompt_with_context,
@@ -1018,7 +1054,7 @@ def decompose():
             "image_warning": image_warning,
         })
     except Exception as e:
-        print(f"❌ Fejl: {e}")
+        log.error("Error: %s", e)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -1048,6 +1084,7 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
             child.status = "skipped"
             child.result = "Skipped — issue was already resolved in an earlier phase"
             child_results.append(f"- {child.name}: {child.result}")
+            completed[0] += _count_tasks(child)
             continue
         yield from _execute_with_stream(child, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id)
         if child.result:
@@ -1119,7 +1156,7 @@ def _save_session_data(current_session_id, stream_agent, ui_lang):
     session_manager.save_session(current_session_id, existing)
 
 
-@app.route("/api/execute-stream")
+@app.route("/api/execute-stream", methods=["GET", "POST"])
 def execute_stream():
     global current_session_id
     ui_lang = "da"
@@ -1130,13 +1167,13 @@ def execute_stream():
     stream_agent.decompose_llm = agent.decompose_llm
     stream_agent.searcher = agent.searcher
 
-    print(f"Execute stream - current_session_id: {current_session_id}")
+    log.info("Execute stream - session: %s", current_session_id)
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
         if session_data:
             st = session_data.get("show_thinking", True)
             ui_lang = session_data.get("ui_lang", session_data.get("lang", "da"))
-            print(f"Session show_thinking: {st}")
+            log.info("Session show_thinking: %s", st)
             if session_data.get("original_prompt"):
                 stream_agent.original_prompt = session_data["original_prompt"]
             if session_data.get("tree"):
@@ -1170,13 +1207,14 @@ def execute_stream():
                     fpc = stream_agent.original_prompt
             stream_agent.full_prompt_with_context = fpc
             stream_agent.show_thinking = st
-            print(f"Agent show_thinking set to: {stream_agent.show_thinking}")
+            log.info("Agent show_thinking set to: %s", stream_agent.show_thinking)
             stream_agent.stop_requested = False
 
     # Register this agent in active streams for session-scoped access (BUG-001)
     session_id = current_session_id  # capture locally to avoid race condition (BUG-011)
     if session_id:
-        active_streams[session_id] = stream_agent
+        with active_streams_lock:
+            active_streams[session_id] = stream_agent
 
     _ensure_model_loaded(stream_agent.llm.model)
 
@@ -1187,7 +1225,7 @@ def execute_stream():
                 session_data = session_manager.load_session(session_id)
                 if session_data and session_data.get("tree"):
                     agent.task_tree_from_dict(session_data["tree"])
-                    print("Tree restored from session in generate()")
+                    log.info("Tree restored from session in generate()")
             if agent.task_tree is None:
                 yield f"data: {json.dumps({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, _ui)})}\n\n"
                 return
@@ -1251,7 +1289,10 @@ def search():
 def flow_search():
     data = request.json
     query = data.get("query", "")
-    max_results = int(data.get("maxResults", 10))
+    try:
+        max_results = int(data.get("maxResults", 10))
+    except (ValueError, TypeError):
+        max_results = 10
     if not query:
         return jsonify({"success": False, "error": "No query"}), 400
 
@@ -1264,7 +1305,10 @@ def flow_search():
 def flow_generate():
     data = request.json
     topic = data.get("topic", "")
-    max_results = int(data.get("maxResults", 10))
+    try:
+        max_results = int(data.get("maxResults", 10))
+    except (ValueError, TypeError):
+        max_results = 10
 
     if not topic:
         return jsonify({"success": False, "error": "No topic"}), 400
@@ -1327,6 +1371,11 @@ def test():
 
 @app.route("/skillflow")
 def skillflow_report():
+    if not _is_development_mode():
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        expected_key = os.environ.get('AGENT_API_KEY', '')
+        if expected_key and api_key != expected_key:
+            return jsonify({"success": False, "error": "Unauthorized"}), 401
     import json as _json
     outcomes_path = os.path.join(BASE_DIR, ".agent_storage", "skill_outcomes.json")
     evolution_path = os.path.join(BASE_DIR, ".agent_storage", "evolution_actions.json")
@@ -1461,14 +1510,14 @@ def skillflow_status():
 
 if __name__ == "__main__":
     started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print("=" * 50)
-    print("🚀 Dansk Agent API starter...")
-    print(f"🕐 Startet: {started}")
-    print("📍 http://localhost:5000")
-    print(f"📁 Static mappe: {STATIC_DIR}")
-    print(f"📦 api_server={BUILD_INFO['api_server.py']} | agent_core={BUILD_INFO['agent_core.py']} | llm={BUILD_INFO['llm_wrapper.py']}")
-    print("💾 Sessions gemmes i ./sessions/")
-    print("📁 Filhåndtering via Python (tkinter)")
-    print("=" * 50)
+    log.info("=" * 50)
+    log.info("Dansk Agent API starter...")
+    log.info("Startet: %s", started)
+    log.info("http://localhost:5000")
+    log.info("Static mappe: %s", STATIC_DIR)
+    log.info("api_server=%s | agent_core=%s | llm=%s", BUILD_INFO['api_server.py'], BUILD_INFO['agent_core.py'], BUILD_INFO['llm_wrapper.py'])
+    log.info("Sessions gemmes i ./sessions/")
+    log.info("Filhåndtering via Python (tkinter)")
+    log.info("=" * 50)
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(debug=debug, use_reloader=False, port=5000, threaded=True)

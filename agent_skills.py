@@ -6,8 +6,8 @@ from skill_loader import SkillLoader
 
 TEMPLATE_TOOLS = {
     "resume": ["list_chunks", "read_chunk", "list_files"],
-    "kodeanalyse": ["list_chunks", "read_chunk", "list_files", "create_issue"],
-    "diffanalyse": ["list_chunks", "read_chunk", "git_diff", "git_log", "list_files", "create_issue"],
+    "kodeanalyse": ["list_chunks", "read_chunk", "list_files", "create_issue", "create_refactor_issue"],
+    "diffanalyse": ["list_chunks", "read_chunk", "git_diff", "git_log", "list_files", "create_issue", "create_refactor_issue"],
     "fri": None,
     "agenten": [
         "list_chunks",
@@ -19,17 +19,17 @@ TEMPLATE_TOOLS = {
         "git_create_branch", "git_current_branch", "git_pull", "git_checkout",
         "git_remote_status"
     ],
-    "programmering": ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue"],
-    "python-arkitektur": ["list_chunks", "read_chunk", "write_file", "list_files", "create_issue"],
-    "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk", "list_files", "create_issue"],
+    "programmering": ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue", "create_refactor_issue"],
+    "python-arkitektur": ["list_chunks", "read_chunk", "write_file", "list_files", "create_issue", "create_refactor_issue"],
+    "billedanalyse": ["add_image", "write_file", "list_chunks", "read_chunk", "list_files", "create_issue", "create_refactor_issue"],
     "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_chunk", "write_file", "edit_file", "list_files"],
-    "refactor": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue"],
-    "testgenerering": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue", "update_issue_status"],
+    "refactor": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue", "create_refactor_issue"],
+    "testgenerering": ["list_chunks", "read_chunk", "write_file", "edit_file", "run_tests", "list_files", "create_issue", "create_refactor_issue", "update_issue_status"],
     "issue_handler": [
         "read_issue", "update_issue_status", "run_tests",
         "read_chunk", "list_chunks", "list_files",
         "edit_file", "write_file",
-        "create_issue",
+        "create_issue", "create_refactor_issue",
     ],
 }
 
@@ -41,28 +41,28 @@ TEMPLATE_TASK_TOOLS = {
         "pull request": ["github_create_pr", "git_remote_status", "git_diff", "git_log"],
     },
     "bugfix": {
-        "analyse": ["read_issue", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue", "update_issue_status"],
-        "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_chunk", "create_issue"],
+        "analyse": ["read_issue", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
+        "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_chunk", "create_issue", "create_refactor_issue"],
         "implementering": ["edit_file", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
         "verifikation": ["run_tests", "edit_file", "list_files", "list_chunks", "read_chunk", "create_issue"],
         "opdatering": ["update_issue_status", "list_files", "list_chunks", "read_chunk", "create_issue"],
     },
     "refactor": {
-        "analyse": ["list_files", "list_chunks", "read_chunk"],
+        "analyse": ["list_files", "list_chunks", "read_chunk", "create_refactor_issue"],
         "plan": ["list_files", "list_chunks", "read_chunk"],
         "ekstraher": ["write_file", "list_files", "list_chunks", "read_chunk"],
         "opdatér": ["edit_file", "list_files", "list_chunks", "read_chunk"],
         "test": ["run_tests", "list_files", "list_chunks", "read_chunk"],
     },
     "testgenerering": {
-        "analyse": ["list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
+        "analyse": ["list_files", "list_chunks", "read_chunk", "run_tests", "create_issue", "create_refactor_issue"],
         "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_chunk", "create_issue"],
         "implementering": ["edit_file", "list_files", "list_chunks", "read_chunk", "run_tests", "create_issue"],
         "verifikation": ["run_tests", "edit_file", "list_files", "list_chunks", "read_chunk", "create_issue"],
     },
     "issue_handler": {
         "læs": ["read_issue", "list_files"],
-        "afklar": ["read_issue", "update_issue_status", "run_tests", "read_chunk", "list_chunks", "list_files"],
+        "afklar": ["read_issue", "update_issue_status", "run_tests", "read_chunk", "list_chunks", "list_files", "create_refactor_issue"],
         "fix": ["read_chunk", "write_file", "edit_file", "run_tests", "list_files"],
         "luk": ["update_issue_status", "read_issue", "run_tests"],
     },

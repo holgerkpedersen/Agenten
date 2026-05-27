@@ -113,7 +113,8 @@ class SkillTracker:
 
     @property
     def total_outcomes(self):
-        return len(self._outcomes)
+        with self._lock:
+            return len(self._outcomes)
 
 
 tracker = SkillTracker()

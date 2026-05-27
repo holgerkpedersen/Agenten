@@ -1,4 +1,37 @@
 """Centralized configuration constants for Agenten."""
+import logging
+import os
+import sys
+
+def setup_logging():
+    """Configure logging with console + file handlers. Call once at startup."""
+    import sys
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+    fmt = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+                            datefmt='%H:%M:%S')
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    # Console handler
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setFormatter(fmt)
+    root.addHandler(ch)
+
+    # File handler
+    try:
+        log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+        fh = logging.FileHandler(os.path.join(log_dir, 'agenten.log'))
+        fh.setFormatter(fmt)
+        root.addHandler(fh)
+    except OSError:
+        pass
+
+def get_logger(name):
+    return logging.getLogger(name)
 
 # Chunking
 CHUNK_SIZE = 150000
@@ -11,11 +44,30 @@ FOLDER_SCAN_MAX_DEPTH = 2
 MAX_TOKENS = 16000
 MAX_CONVERSATION_CHARS = 32000
 
-# LLM connection (env vars LM_HOST/LM_PORT/LM_MODEL override these)
-LLM_BASE_URL = "http://localhost:1234/v1"
-LLM_MODEL = "qwen/qwen3.5-9b"
+# LLM connection
+# LM_HOST / LM_PORT: host and port for LM Studio (e.g. localhost:1234).
+# LLM_BASE_URL: full URL for chat completions — overrides LM_HOST/LM_PORT.
+# LLM_MODEL: default model identifier (overridable via LM_MODEL env).
+_LM_HOST_RAW = os.environ.get('LM_HOST', '')
+_LM_PORT = os.environ.get('LM_PORT', '1234')
+if '://' in _LM_HOST_RAW:
+    # User passed full URL as LM_HOST — treat it as LLM_BASE_URL instead
+    LLM_BASE_URL = os.environ.get('LLM_BASE_URL', _LM_HOST_RAW.rstrip('/'))
+    LM_HOST = 'localhost'
+else:
+    LM_HOST = _LM_HOST_RAW or 'localhost'
+    LLM_BASE_URL = os.environ.get('LLM_BASE_URL', f'http://{LM_HOST}:{_LM_PORT}/v1')
+LM_PORT = _LM_PORT
+LLM_MODEL = os.environ.get("LM_MODEL", "qwen3.5-9b-mtp")
+LLM_STREAM_TIMEOUT = 300
+LLM_CONNECT_TIMEOUT = 30
+
+# Image upload
+MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB max per image file
 
 # Task execution
 EXECUTION_TIMEOUT = 1800  # 30 min wall-clock per task
 SUBPROCESS_TIMEOUT = 120  # seconds per subprocess call (pytest, git, etc.)
 MAX_TOOL_CALLS = 6  # max LLM tool calls per task step
+MAX_TASK_ITERATIONS = 10  # max LLM conversation turns per task
+MAX_PR_TASK_ITERATIONS = 15  # max turns for PR/git workflow tasks

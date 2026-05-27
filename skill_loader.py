@@ -6,6 +6,8 @@ Baseret på ReactAgent skills-arkitektur, tilpasset til Agentens template-basere
 import os
 import re
 from typing import List, Optional
+from config import get_logger
+log = get_logger(__name__)
 
 
 class SkillLoader:
@@ -108,7 +110,8 @@ class SkillLoader:
                 "body": body,
                 "action_types": header.get("action_types", []),
             }
-        except (IOError, OSError):
+        except Exception as e:
+            log.warning("Failed to parse skill %s: %s", path, e)
             return {}
 
     @classmethod
@@ -138,7 +141,10 @@ class SkillLoader:
             from skill_tracker import tracker
             stats = tracker.get_stats(skill_name, recent=50)
             return stats.get("success_rate", 0)
-        except (ImportError, Exception):
+        except ImportError:
+            return 0
+        except Exception as e:
+            log.warning("Failed to get success rate for %s: %s", skill_name, e)
             return 0
 
     @classmethod

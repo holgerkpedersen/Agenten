@@ -13,8 +13,17 @@ class ModuleBuilder:
         return len(self.get_repeated_actions(threshold)) > 0
 
     def build_module(self, action_name, action_code_template):
+        safe_name = action_name.replace(' ', '_')
+        if not safe_name or '..' in safe_name or safe_name.startswith('/') or safe_name.startswith('\\'):
+            return {"error": "Invalid module name"}
+        allowed_ext = '.py'
+        if not safe_name.endswith(allowed_ext):
+            safe_name += allowed_ext
         os.makedirs("custom_modules", exist_ok=True)
-        module_path = f"custom_modules/{action_name.replace(' ', '_')}.py"
-        with open(module_path, "w") as f:
+        custom_dir = os.path.realpath("custom_modules")
+        module_path = os.path.join(custom_dir, safe_name)
+        if not module_path.startswith(custom_dir + os.sep):
+            return {"error": "Path traversal detected"}
+        with open(module_path, "w", encoding="utf-8") as f:
             f.write(action_code_template)
         return {"module_path": module_path, "message": f"Module {action_name} created"}

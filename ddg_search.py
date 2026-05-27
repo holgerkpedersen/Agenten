@@ -2,7 +2,10 @@ import re
 import urllib.request
 import urllib.parse
 import os
+import time
 from typing import List, Dict, Optional
+from config import get_logger
+log = get_logger(__name__)
 
 _UA_LIST = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -41,12 +44,17 @@ def _domain(url: str) -> str:
 def search_ddg(query: str, max_results: int = 5) -> List[Dict]:
     params = urllib.parse.urlencode({'q': query, 'kl': 'en-us'})
     url = f'https://html.duckduckgo.com/html/?{params}'
-    req = urllib.request.Request(url, headers={'User-Agent': _UA})
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            html = resp.read().decode('utf-8', errors='replace')
-    except Exception as e:
-        return [{'title': 'Error', 'url': '', 'snippet': str(e)}]
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': _UA})
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                html = resp.read().decode('utf-8', errors='replace')
+            break
+        except Exception as e:
+            if attempt == 2:
+                log.warning("ddg search failed for '%s' after 3 attempts: %s", query, e)
+                return []
+            time.sleep(0.5 * (attempt + 1))
 
     results = []
     blocks = re.findall(
@@ -77,10 +85,3 @@ def search_ddg(query: str, max_results: int = 5) -> List[Dict]:
 
 def websearch(query: str, max_results: Optional[int] = None) -> List[Dict]:
     return search_ddg(query, max_results or MAX_RESULTS)
-
-
-def evaluate_techstack(tech_name):
-    robust = ["React", "Flask", "FastAPI", "PostgreSQL", "Redis", "Docker"]
-    if tech_name in robust:
-        return "robust"
-    return "ukendt"

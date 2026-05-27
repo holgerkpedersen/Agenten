@@ -145,7 +145,8 @@ def record_outcome(agent, task_node):
             if not s.get("base"):
                 skill_name = s["name"]
                 break
-        duration = int((time.time() - agent._task_start_time) * 1000) if agent._task_start_time else 0
+        ts = getattr(agent, '_task_start_time', 0)
+        duration = int((time.time() - ts) * 1000) if ts else 0
         tracker.record(
             skill_name=skill_name,
             task_summary=task_node.name,

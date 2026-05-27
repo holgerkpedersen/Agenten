@@ -220,7 +220,8 @@
     "empty_filename": "Nombre de archivo vacío",
     "no_path_given": "No se proporcionó ruta",
     "index_missing": "index.html no encontrado. Crea el archivo en la carpeta static.",
-    "cannot_create_folder": "No se pudo crear la carpeta: {e}"
+    "cannot_create_folder": "No se pudo crear la carpeta: {e}",
+    "layout_not_found": "Layout no encontrado"
   },
   "ui": {
     "title": "Agenten",

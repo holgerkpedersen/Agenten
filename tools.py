@@ -4,6 +4,8 @@ import inspect
 import traceback
 from lang import t
 from i18n import K
+from config import get_logger
+log = get_logger(__name__)
 
 
 class Tool:
@@ -71,7 +73,7 @@ class ToolRegistry:
         response = re.sub(r'<\|channel>.*?<\|end>', '', response, flags=re.DOTALL)
         response = re.sub(r'<\|[^|]*\|>', '', response)
         response = re.sub(r'<\|[^|]*>', '', response)
-        response = re.sub(r'\bfinal\s*', '', response)
+        response = re.sub(r'\bfinal\s*(?=<<<)', '', response)
         response = re.sub(r'```\w*\n?', '', response)
         response = re.sub(r'```', '', response)
 
@@ -87,17 +89,22 @@ class ToolRegistry:
 
         if tool_match:
             raw = tool_match.group(1)
-            raw = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
                 try:
-                    decoder = json.JSONDecoder()
-                    data, _ = decoder.raw_decode(raw)
+                    data, _ = json.JSONDecoder().raw_decode(raw)
                 except (json.JSONDecodeError, ValueError):
-                    return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
+                    escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
+                    try:
+                        data = json.loads(escaped)
+                    except json.JSONDecodeError:
+                        try:
+                            data, _ = json.JSONDecoder().raw_decode(escaped)
+                        except (json.JSONDecodeError, ValueError):
+                            return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
             tool_name = data.get("tool", "")
-            if tool_name in ("navn", "name", "nombre", "名称"):
+            if tool_name.lower() in ("navn", "name", "nombre", "名称"):
                 names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
                 return {"type": "error", "message": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=', '.join(names))}
             return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
@@ -110,15 +117,18 @@ class ToolRegistry:
         loose_tool = re.search(r'(?:<<<)?TOOL>>>\s*(.*?)\s*' + end_pat, response, re.DOTALL)
         if loose_tool and not done_match:
             raw = loose_tool.group(1)
-            raw = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
             try:
                 data = json.loads(raw)
+            except json.JSONDecodeError:
+                escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
+                try:
+                    data = json.loads(escaped)
+                except json.JSONDecodeError:
+                    return {"type": "error", "message": "JSON parse error"}
+            if isinstance(data, dict):
                 tool_name = data.get("tool", "")
                 if tool_name not in ("navn", "name", "nombre", "\u540d\u79f0"):
                     return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
-            except (json.JSONDecodeError, ValueError):
-                pass
-
         if done_match:
             try:
                 data = json.loads(done_match.group(1))
@@ -132,7 +142,7 @@ class ToolRegistry:
         return {"type": "text", "text": response}
 
     def execute(self, tool_name, args):
-        if tool_name in ("navn", "name", "nombre", "\u540d\u79f0"):
+        if tool_name.lower() in ("navn", "name", "nombre", "\u540d\u79f0"):
             names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
             tools_hint = ', '.join(names)
             return {"success": False, "error": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=tools_hint)}
@@ -143,7 +153,12 @@ class ToolRegistry:
         try:
             fn = self.tools[tool_name].function
             sig = inspect.signature(fn)
+            if not isinstance(args, dict):
+                args = {}
             valid_args = {k: v for k, v in args.items() if k in sig.parameters}
+            extra = [k for k in args if k not in sig.parameters]
+            if extra:
+                log.warning("Tool '%s' received unknown args (ignored): %s", tool_name, extra)
             missing = [name for name, p in sig.parameters.items() if p.default is p.empty and name not in valid_args]
             if missing:
                 return {"success": False, "error": f"Manglende argumenter: {', '.join(missing)}. Kræves: {', '.join(self.tools[tool_name].parameters)}"}

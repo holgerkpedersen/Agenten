@@ -217,6 +217,57 @@ Flask serves uploads at `/uploads/<filename>` so gemma can fetch the image local
 **Root cause:** The 100-char `is_short` threshold catches legitimate short success messages when the LLM returned `"ERROR"` after successful tool calls.  
 **Fix:** Skip warning when `called_tools` is non-empty (`if (is_short or asks_for_files) and not called_tools:`). If tools were called, work was done — no warning needed.
 
+### 27. `\bfinal\b` regex corrupts legitimate text (`tools.py:74`)
+
+**Symptom:** LLM responses containing the word "final" in code or prose are silently stripped. Java `final` keyword, TypeScript code, normal English all corrupted.  
+**Root cause:** `re.sub(r'\bfinal\s*', '', response)` universally removes the word "final" from ALL LLM responses, not just before tool/done markers.  
+**Fix:** Changed to `re.sub(r'\bfinal\s*(?=<<<)', '', response)` — uses lookahead assertion to only strip "final" when immediately followed by `<<<` markers.
+
+### 28. `edit_file` CRLF corruption on Windows (`git_ops.py:347-383`)
+
+**Symptom:** `edit_file()` produces wrong byte positions when editing files with `\r\n` line endings. Normalized search text uses `\n` (1 byte) but content has `\r\n` (2 bytes) — byte offsets mismatch.  
+**Root cause:** Content was read with `\r\n` preserved, then search normalized to `\n`-only on a separate `norm` variable. Byte positions from `norm` applied to original content produce wrong slices.  
+**Fix:** Normalize content to `\n`-only at read time (`content.replace('\r\n', '\n').replace('\r', '\n')`), then search directly on content. Removed the separate `norm` variable entirely.
+
+### 29. `VISION_KEYWORDS` prevents images sent to text-only models (`llm_wrapper.py`)
+
+**Symptom:** HTTP 400 when images are sent to text-only models like `deepseek-chat`.  
+**Root cause:** `_to_messages()` unconditionally injects images regardless of model capabilities.  
+**Fix:** Added `VISION_KEYWORDS` class variable listing vision-capable model prefixes (qwen, gemma, gpt, llava, claude, gemini, vision, vl). Added `_supports_vision(model)` method. `_to_messages()` now checks `self._supports_vision(model)` before injecting images — if the model isn't vision-capable, images are silently dropped from the request (`images = None`).
+
+### 30. `encode_image` file size limit prevents OOM (`llm_wrapper.py`)
+
+**Symptom:** 100MB image upload becomes 133MB base64 string in memory.  
+**Root cause:** `encode_image()` reads entire file without size check.  
+**Fix:** Added `config.MAX_IMAGE_SIZE = 10 * 1024 * 1024` (10 MB). `encode_image()` checks `os.path.getsize(path)` before reading and raises `ValueError` if exceeded.
+
+### 31. CORS + file upload hardening (`api_server.py:24,258-315`)
+
+**Symptom:** Production CORS allows `*` origins. File uploads accept .html/.exe files. Spaces in filenames cause URL issues.  
+**Fix:** CORS restricted to `CORS_ORIGINS` env var (defaults to `http://localhost:*`). File upload extension whitelist (`SAFE_UPLOAD_EXTS`). Return sanitized filename (not original) in upload response. `sanitize_filename()` replaces spaces with underscores. `MAX_CONTENT_LENGTH = 50 MB` Flask config.
+
+### 32. Thread safety: globals locked (`api_server.py:74-91`)
+
+**Symptom:** `active_streams`, `export_folder` mutated without locks — concurrent requests could corrupt or lose data.  
+**Fix:** Added `active_streams_lock`, `export_folder_lock`, `current_session_lock`. All mutations wrapped in `with lock:` context managers. Added `_guard_json_body()` before_request handler — returns 400 on missing JSON body for POST endpoints, preventing `NoneType` crashes.
+
+### 33. `list_files` and `get_single_file_context` path traversal (`git_ops.py:417`, `agent_files.py:81`)
+
+**Symptom:** LLM can call `list_files("C:\\Windows")` to enumerate arbitrary directories. `get_single_file_context` attempts `os.path.join(base_dir, '..', filename)` without validation.  
+**Fix:** Added `_is_safe_path()` check at top of `list_files()`. Added `os.path.realpath()` check in `get_single_file_context()` loop — rejects paths that resolve outside `base_dir`.  
+
+### 34. Stale line numbers in issue locations → resolved by AST (`agent_files.py:locate_code`)
+
+**Symptom:** Issues reference line numbers in `location` fields (e.g. `tools.py:95-96`). After edits to those files, line numbers shift and point to wrong/irrelevant code. The LLM reads wrong code, wastes iterations.  
+**Root cause:** 145 of 161 issues used line-number-based locations. No mechanism to resolve current location from a stable identifier.  
+**Fix (3 parts):**
+- **`locate_code(filepath, name=None, line_no=None)`** in `agent_files.py` — new AST-based function finder. Given a line number, finds the innermost enclosing function/class and returns its name + current line number + full body. Given a function name (or `Class.method`), returns its current location. Handles nested functions, async functions, decorators.
+- **Tool registration** — `locate` tool in `agent_core.py` lets the LLM call `locate(filepath='tools.py', name='parse_response')` to find the current line of any function. This means issues never need to store current line numbers — the agent resolves them at runtime.
+- **Issue location migration** — `scripts/migrate_issue_locations.py` converts all `file.py:LL` locations to `file.py:function_name` (145 issues migrated). Adds `code_context` field with function signature (e.g. `def parse_response(self, response):`) as a secondary search anchor.
+- **`create_issue()` auto-resolution** — `agent_issues.py` now auto-detects line-number locations at issue creation time and resolves them to function names via AST, adding a warning if function not found.
+- **Pattern:** Use `locate` tool instead of hardcoded line numbers. Functions survive edits; line numbers don't.
+- **Files:** `agent_files.py:198-299` (locate_code), `agent_core.py:310-314` (tool reg), `agent_issues.py:164-200` (auto-resolve), `scripts/migrate_issue_locations.py` (migration)
+
 ## Refactoring Convention
 
 When extracting methods from `agent_core.py` into module files:

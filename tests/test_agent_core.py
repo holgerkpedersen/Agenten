@@ -46,12 +46,12 @@ class TestAgentInit:
 
     def test_template_tools_mapping(self):
         assert agent_skills.TEMPLATE_TOOLS["resume"] == ["list_chunks", "read_chunk", "list_files"]
-        assert agent_skills.TEMPLATE_TOOLS["kodeanalyse"] == ["list_chunks", "read_chunk", "list_files", "create_issue"]
-        assert agent_skills.TEMPLATE_TOOLS["diffanalyse"] == ["list_chunks", "read_chunk", "git_diff", "git_log", "list_files", "create_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["kodeanalyse"] == ["list_chunks", "read_chunk", "list_files", "create_issue", "create_refactor_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["diffanalyse"] == ["list_chunks", "read_chunk", "git_diff", "git_log", "list_files", "create_issue", "create_refactor_issue"]
         assert agent_skills.TEMPLATE_TOOLS["fri"] is None
-        assert agent_skills.TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue"]
-        assert agent_skills.TEMPLATE_TOOLS["python-arkitektur"] == ["list_chunks", "read_chunk", "write_file", "list_files", "create_issue"]
-        assert agent_skills.TEMPLATE_TOOLS["billedanalyse"] == ["add_image", "write_file", "list_chunks", "read_chunk", "list_files", "create_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue", "create_refactor_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["python-arkitektur"] == ["list_chunks", "read_chunk", "write_file", "list_files", "create_issue", "create_refactor_issue"]
+        assert agent_skills.TEMPLATE_TOOLS["billedanalyse"] == ["add_image", "write_file", "list_chunks", "read_chunk", "list_files", "create_issue", "create_refactor_issue"]
         assert agent_skills.TEMPLATE_TOOLS["bugfix"] == ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_chunk", "write_file", "edit_file", "list_files"]
 
 
@@ -262,3 +262,21 @@ class TestSetTaskTools:
         agent._set_task_tools("Some unrelated task name")
         assert agent.tool_registry.active_tools is not None
         assert "github_create_pr" in agent.tool_registry.active_tools
+
+
+class TestSafeInt:
+    def test_safe_int_valid(self):
+        from agent_core import _safe_int
+        assert _safe_int("10") == 10
+        assert _safe_int("0") == 0
+        assert _safe_int(5) == 5
+
+    def test_safe_int_invalid(self):
+        from agent_core import _safe_int
+        assert _safe_int("abc") == 0
+        assert _safe_int("abc", 5) == 5
+        assert _safe_int(None) == 0
+
+    def test_safe_int_empty(self):
+        from agent_core import _safe_int
+        assert _safe_int("") == 0

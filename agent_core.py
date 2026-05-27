@@ -15,6 +15,8 @@ import agent_skills
 import agent_git
 import agent_tasks
 import config
+from config import get_logger
+log = get_logger(__name__)
 import re
 import sys
 import time
@@ -23,12 +25,18 @@ import json
 import subprocess
 import threading
 
+def _safe_int(val, default=0):
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
 
 def _extract_filenames(location):
     filenames = []
     if not location:
         return filenames
-    for m in re.finditer(r'([\w./-]+\.\w+)', location):
+    for m in re.finditer(r'([\w./\\-]+\.\w+)', location):
         fn = m.group(1)
         if fn not in filenames:
             filenames.append(fn)
@@ -79,6 +87,8 @@ def _build_file_context(agent, files, prompt):
             chunks = agent_files.chunk_text(content)
             agent.file_chunks[chunk_key] = chunks
             agent_issues.detect_oversize_file(agent, filename, content)
+            if agent._pending_refactor:
+                agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
             if len(chunks) <= 1:
                 file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
             else:
@@ -97,6 +107,8 @@ def _build_file_context(agent, files, prompt):
                 chunks = agent_files.chunk_text(content)
                 agent.file_chunks[chunk_key] = chunks
                 agent_issues.detect_oversize_file(agent, filename, content)
+                if agent._pending_refactor:
+                    agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
                 if len(chunks) <= 1:
                     file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
                 else:
@@ -107,6 +119,9 @@ def _build_file_context(agent, files, prompt):
             file_path, file_content = agent._get_single_file_context(prompt)
             if file_content:
                 filename = os.path.basename(file_path)
+                agent_issues.detect_oversize_file(agent, filename, file_content)
+                if agent._pending_refactor:
+                    agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
                 chunk_key = f"file_{filename}"
                 chunks = agent_files.chunk_text(file_content)
                 agent.file_chunks[chunk_key] = chunks
@@ -134,7 +149,7 @@ def _decompose_via_llm(agent, prompt, file_context, template_config):
     task_count = agent._count_tasks(agent.task_tree.root)
     agent._log("INFO", t(K.LOG_DECOMPOSE_DONE, agent.lang), t(K.LOG_TASKS_CREATED, agent.lang).format(n=task_count))
 
-    if task_count <= 1 and template_config.get("id") in (None, "", "fri"):
+    if task_count <= 1 and template_config.get("name") in (None, "", "fri"):
         agent._log("INFO", "Kun én opgave — bruger generisk nedbrydning", "")
         agent.task_tree = agent._create_fallback_tree(prompt)
         task_count = agent._count_tasks(agent.task_tree.root)
@@ -145,8 +160,8 @@ def _decompose_via_llm(agent, prompt, file_context, template_config):
 
 class Agent:
     def __init__(self):
-        self.llm = LMStudioWrapper(timeout=600, model="qwen/qwen3.5-9b")
-        self.decompose_llm = LMStudioWrapper(timeout=600, model="qwen/qwen3.5-9b")
+        self.llm = LMStudioWrapper(timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL, api_key=os.environ.get('OPENCODE_API_KEY'))
+        self.decompose_llm = LMStudioWrapper(timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL, api_key=os.environ.get('OPENCODE_API_KEY'))
         self.searcher = WebSearcher()
         self.task_tree = None
         self.action_history = []
@@ -250,7 +265,7 @@ class Agent:
             "git_log",
             t(K.TOOL_GIT_LOG, self.lang),
             ["count"],
-            lambda count=10: git_ops.git_log(int(count))
+            lambda count=10: git_ops.git_log(_safe_int(count, 10))
         ))
         self.tool_registry.register(Tool(
             "git_create_branch",
@@ -295,6 +310,12 @@ class Agent:
             lambda: self._list_chunks()
         ))
         self.tool_registry.register(Tool(
+            "locate",
+            "Find en funktion/metode/klasse i en Python-fil via AST. Brug name='ClassName.metode' eller line_no=<linjetal>. Returnerer aktuelt linjenummer, typen (function/class/method), og funktionens fulde kode (body). Brug denne til at finde den aktuelle placering af kode som et issue refererer til.",
+            ["filepath"],
+            lambda filepath, name=None, line_no=None: agent_files.locate_code(filepath=filepath, name=name, line_no=line_no)
+        ))
+        self.tool_registry.register(Tool(
             "write_file",
             "Opret en NY fil med indhold. Virker KUN til nye filer — findes filen i forvejen, brug edit_file i stedet. Opretter mappen hvis den ikke findes. Syntestjekker .py filer.",
             ["path", "content"],
@@ -313,7 +334,7 @@ class Agent:
             "list_files",
             "List filer i en mappe. Kræver: path (mappesti, default '.'). Valgfri: pattern (filtype f.eks. '.py'). Valgfri: max_depth (max dybde, default 2). Returnerer filnavne og størrelser.",
             ["path"],
-            lambda path=".", pattern="", max_depth=2: git_ops.list_files(path=path, pattern=pattern or None, max_depth=int(max_depth))
+            lambda path=".", pattern="", max_depth=2: git_ops.list_files(path=path, pattern=pattern or None, max_depth=_safe_int(max_depth, 2))
         ))
         self.tool_registry.register(Tool(
             "add_image",
@@ -343,7 +364,7 @@ class Agent:
             "create_refactor_issue",
             "Opret et REFAC-issue i issues.json for en fil der er for stor. Kræver: filepath (filsti), line_count (antal linjer). Valgfri: related_issues (liste af issue-IDs).",
             ["filepath", "line_count"],
-            lambda filepath, line_count, related_issues="": agent_issues.create_refactor_issue(self, filepath, int(line_count), related_issues.split(",") if related_issues else None)
+            lambda filepath, line_count, related_issues="": agent_issues.create_refactor_issue(self, filepath, int(line_count), (related_issues.split(",") if isinstance(related_issues, str) else related_issues) if related_issues else None)
         ))
         self.tool_registry.register(Tool(
             "create_issue",
@@ -384,10 +405,14 @@ class Agent:
             "timestamp": time.time(),
             "level": level,
             "message": message,
-            "detail": detail if detail else ""
+            "detail": str(detail) if detail else ""
         }
         self.agent_log.append(log_entry)
-        print(f"[{level}] {message}: {detail[:200]}")
+        try:
+            log_fn = {'INFO': log.info, 'WARNING': log.warning, 'ERROR': log.error}.get(str(level).upper(), log.info)
+            log_fn("%s: %s", str(message), str(detail)[:200])
+        except Exception:
+            pass
 
     def _clean_task_name(self, name):
         return agent_tree._clean_task_name(name)
@@ -397,19 +422,24 @@ class Agent:
             return
         self._delegation_index = {}
         scanned = {}
+        file_count = 0
         for fname in os.listdir('.'):
             if not fname.endswith('.py'):
                 continue
+            if file_count >= 100:
+                break
             content = agent_files.read_file_content(self, fname)
             if content:
                 stubs = agent_files.detect_delegations(content)
                 if stubs:
                     scanned[os.path.abspath(fname)] = (fname, content, stubs)
+                    file_count += 1
         for fpath, (fname, content, stubs) in scanned.items():
             for func_name, target_module in stubs:
                 visited = {fpath}
                 cur_module, cur_file = target_module, f'{target_module}.py'
-                while True:
+                depth = 0
+                while depth < 20:
                     cur_abspath = os.path.abspath(cur_file)
                     if cur_abspath in visited or not os.path.exists(cur_file):
                         break
@@ -422,6 +452,7 @@ class Agent:
                         break
                     cur_module = next_stub[0][1]
                     cur_file = f'{cur_module}.py'
+                    depth += 1
 
     def _resolve_delegations_for_context(self, file_context):
         self._ensure_delegation_index()
@@ -429,10 +460,10 @@ class Agent:
                         for k in self.file_chunks}
         for key in list(self.file_chunks.keys()):
             filename = key.replace('file_', '', 1)
-            content = self.file_chunks.get(key, [None])[0]
-            if not content:
+            all_content = '\n'.join(self.file_chunks.get(key, []))
+            if not all_content:
                 continue
-            for func_name, _ in agent_files.detect_delegations(content):
+            for func_name, _ in agent_files.detect_delegations(all_content):
                 if func_name not in self._delegation_index:
                     continue
                 real_abspath, real_filename = self._delegation_index[func_name]
@@ -476,10 +507,10 @@ class Agent:
         return agent_tree.parse_tree_from_llm(self, prompt, llm_response)
 
     def _sanitize_prompt(self, prompt):
-        """Sanitize user input to prevent prompt injection attacks."""
-        # Escape potential closing tags that might break the wrapper structure
-        safe_input = prompt.replace("</user_input>", "<SECURITY_TAG>")
-        return f"<user_input>\n{safe_input}\n<END_USER_INPUT>"
+        safe = str(prompt)[:10000]  # limit length
+        safe = ''.join(c for c in safe if ord(c) >= 32 or c in '\n\r\t')
+        safe = safe.replace("</user_input>", "<SECURITY_TAG>")
+        return f"<user_input>\n{safe}\n<END_USER_INPUT>"
 
     def decompose_prompt(self, prompt, files=None, template=None):
         self.agent_log = []
@@ -512,8 +543,8 @@ class Agent:
             oversize_note = (
                 f"\n\n## \u26A0\uFE0F BEM\u00C6RKNING: Filen '{self._pending_refactor['file']}' er "
                 f"{self._pending_refactor['lines']} linjer (gr\u00E6nse: {agent_issues.OVERSIZE_LINE_LIMIT}).\n"
-                f"Sp\u00F8rg venligst brugeren om de \u00F8nsker et REFAC-issue oprettet "
-                f"(brug `create_refactor_issue` v\u00E6rkt\u00F8jet).\n"
+                f"Der er automatisk oprettet et REFAC-issue. "
+                f"Brug `read_issue` for at se detaljer.\n"
             )
             file_context += oversize_note
 

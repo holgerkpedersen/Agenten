@@ -220,7 +220,8 @@
     "empty_filename": "文件名为空",
     "no_path_given": "未提供路径",
     "index_missing": "未找到index.html。请在static文件夹中创建该文件。",
-    "cannot_create_folder": "无法创建文件夹：{e}"
+    "cannot_create_folder": "无法创建文件夹：{e}",
+    "layout_not_found": "布局未找到"
   },
   "ui": {
     "title": "Agenten",

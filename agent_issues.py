@@ -6,6 +6,9 @@ import subprocess
 from lang import t
 from i18n import K
 import config
+import agent_files
+from config import get_logger
+log = get_logger(__name__)
 
 REFAC_TEMPLATE = {
     "id": None,
@@ -31,8 +34,12 @@ def _load_issues():
     path = _get_issues_path()
     if not os.path.exists(path):
         return {"meta": {"generated": "2026-05-20", "source": "Agenten", "total": 0}, "issues": []}
-    with open(path, encoding="utf-8") as f:
-        return _json.load(f)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return _json.load(f)
+    except (json.JSONDecodeError, IOError, OSError) as e:
+        log.warning("Failed to load issues.json: %s", e)
+        return {"meta": {"generated": "2026-05-20", "source": "Agenten", "total": 0}, "issues": []}
 
 
 def _save_issues(data):
@@ -157,17 +164,29 @@ def create_refactor_issue(agent, filepath, line_count, related_issues=None):
 
 def create_issue(agent, title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="", acceptance_criteria=""):
     data = _load_issues()
-    # Normalize location to filename format
     if location:
-        if ":" in location:
-            drive, rest = os.path.splitdrive(location)
-            if drive:
-                rest = rest.split(":")[0].strip()
-                location = drive + rest
+        parts = re.split(r'\s*[,;]\s*', location)
+        resolved_parts = []
+        for part in parts:
+            m = re.match(r'([\w./\\-]+\.\w+):(\d+)(?:\s*-\s*\d+)?$', part.strip())
+            if m:
+                fname = m.group(1)
+                linenum = int(m.group(2))
+                for candidate in [fname, os.path.join(os.path.dirname(os.path.abspath(__file__)), fname)]:
+                    if os.path.exists(candidate):
+                        result = agent_files.locate_code(filepath=candidate, line_no=linenum)
+                        if result.get("success") and result.get("name"):
+                            resolved_parts.append(f"{fname}:{result['name']}")
+                            break
+                        elif result.get("success") and result.get("name") is None:
+                            resolved_parts.append(f"{fname}:{linenum}")
+                            break
+                else:
+                    resolved_parts.append(part)
             else:
-                location = location.split(":")[0].strip()
-        else:
-            location = location.split()[0].strip("`")
+                resolved_parts.append(part)
+        location = ", ".join(resolved_parts)
+
     title_lower = title.lower()
     title_keywords = {w for w in title_lower.split() if len(w) > 3}
     for i in data.get("issues", []):

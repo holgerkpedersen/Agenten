@@ -131,19 +131,22 @@ class TestShouldEvolve:
     def test_no_outcomes(self):
         with patch("skill_evolution.tracker") as mock_tracker:
             mock_tracker.total_outcomes = 0
-            from skill_evolution import should_evolve
+            from skill_evolution import should_evolve, _reset_evolve_counter
+            _reset_evolve_counter()
             assert should_evolve() is False
 
     def test_evolve_at_threshold(self):
         with patch("skill_evolution.tracker") as mock_tracker:
             mock_tracker.total_outcomes = 15
-            from skill_evolution import should_evolve, EVOLVE_EVERY_N
+            from skill_evolution import should_evolve, EVOLVE_EVERY_N, _reset_evolve_counter
+            _reset_evolve_counter()
             assert should_evolve() is True
 
     def test_not_at_threshold(self):
         with patch("skill_evolution.tracker") as mock_tracker:
             mock_tracker.total_outcomes = 10
-            from skill_evolution import should_evolve
+            from skill_evolution import should_evolve, _reset_evolve_counter
+            _reset_evolve_counter()
             assert should_evolve() is False
 
 

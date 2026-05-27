@@ -21,7 +21,7 @@ class TestTemplateTools:
 
     def test_programmering_tools(self):
         from agent_skills import TEMPLATE_TOOLS
-        assert TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue"]
+        assert TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue", "create_refactor_issue"]
 
 
 class TestTemplateTaskTools:

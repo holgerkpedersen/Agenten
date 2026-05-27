@@ -220,7 +220,8 @@
     "empty_filename": "Empty filename",
     "no_path_given": "No path provided",
     "index_missing": "index.html not found. Please create the file in the static folder.",
-    "cannot_create_folder": "Could not create folder: {e}"
+    "cannot_create_folder": "Could not create folder: {e}",
+    "layout_not_found": "Layout not found"
   },
   "ui": {
     "title": "Agenten",

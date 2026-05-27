@@ -177,6 +177,7 @@ class K(StrEnum):
     ERR_INDEX_MISSING       = "errors.index_missing"
     ERR_CREATE_FOLDER       = "errors.cannot_create_folder"
     ERR_NO_SESSION_ID       = "errors.no_session_id"
+    ERR_LAYOUT_NOT_FOUND    = "errors.layout_not_found"
 
     # === Misc ===
     ANSWER_IN       = "answer_in"
