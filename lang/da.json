@@ -434,5 +434,6 @@
   "rubric_passed": "✓",
   "rubric_failed": "✗ MISLYKKET:",
   "rubric_failed_detail": "  ✗ {desc}",
-  "anti_leakage_warning": "⚠️ Dette issue har løsningsforslag du ikke har læst. Kald read_issue med include_hints=true for at læse dem før du skriver/redigerer kode."
+  "anti_leakage_warning": "⚠️ Dette issue har løsningsforslag du ikke har læst. Kald read_issue med include_hints=true for at læse dem før du skriver/redigerer kode.",
+  "write_required": "\n\n⛔ DU SKAL skrive/redigere kode i denne fase. Brug write_file eller edit_file. Hvis du kun læser filer uden at skrive kode, er opgaven mislykket. Læs maksimalt én gang — skriv derefter din løsning."
 }

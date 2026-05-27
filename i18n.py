@@ -115,6 +115,9 @@ class K(StrEnum):
     # === Anti-leakage ===
     ANTI_LEAKAGE_WARNING  = "anti_leakage_warning"
 
+    # === Write/edit guidance ===
+    WRITE_REQUIRED        = "write_required"
+
     # === System prompt fragments ===
     SYS_EXAMPLE_PREFIX  = "sys_example_prefix"
     SYS_MARKER_WARNING  = "sys_marker_warning"

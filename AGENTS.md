@@ -322,6 +322,13 @@ When extracting methods from `agent_core.py` into module files:
 | `billedanalyse` | add_image, write_file, list_chunks, read_chunk | Image analysis → .md export |
 | `agenten` | git tools + read_chunk | Git/GitHub PR workflow |
 
+### 39. deepseek-v4-pro refuses to write/edit files — model training bias (`agent_tasks.py:132-134`)
+
+**Symptom:** Session f502154d — 5 phases (Analysis, Plan, Extract, Update, Test). LLM called `list_files`, `read_chunk`, `list_chunks` extensively but NEVER called `write_file` or `edit_file`. Even with "⛔ YOU MUST write/edit code" warning + `write_file` in active tools, model reads and says Done.  
+**Root cause:** `deepseek-v4-pro` is trained for analysis/reasoning, not code editing. It produces text analysis (in Done markers) but refuses to call write/edit tools. This is a model capability limitation, not a prompt issue.  
+**Fix:** Use `minimax-m2.5` for code-editing tasks (issue_handler, programming, refactoring). `deepseek-v4-pro` is fine for read-only analysis (kodeanalyse, resume). Other tested models: `minimax-m2.5` ✓ (edits code), `glm-5.1` ✓ (native tools).  
+**Warning hardcoded fix:** Line 134 was hardcoded Danish "⚠️ DU SKAL redigere kode" — replaced with i18n key `K.WRITE_REQUIRED` in all 4 languages.
+
 ## Model Knowledge
 
 See `skills/vision_models.md` for full vision model compatibility matrix.  

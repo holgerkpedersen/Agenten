@@ -131,7 +131,7 @@ def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
             user_guidance += f"\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte med <<<DONE>>> uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
     has_write = any(t in ('write_file', 'edit_file') for t in (agent.tool_registry.active_tools or []))
     if has_write:
-        user_guidance += "\n\n\u26a0\ufe0f DU SKAL redigere kode i denne fase. Brug write_file eller edit_file for at udf\u00f8re \u00e6ndringer. L\u00e6s maks. \u00e9n gang for at forst\u00e5 koden \u2014 skriv derefter din l\u00f8sning. Gentagne l\u00e6sninger uden at producere kode er spild af tid."
+        user_guidance += t(K.WRITE_REQUIRED, agent.lang)
 
     messages = [{"role": "system", "content": system_prompt}]
     if file_ctx:

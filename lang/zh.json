@@ -434,5 +434,6 @@
   "rubric_passed": "✓",
   "rubric_failed": "✗ 失败:",
   "rubric_failed_detail": "  ✗ {desc}",
-  "anti_leakage_warning": "⚠️ 此问题有解决方案建议，你尚未阅读。在编写/编辑代码之前，调用 read_issue 并设置 include_hints=true 来阅读它们。"
+  "anti_leakage_warning": "⚠️ 此问题有解决方案建议，你尚未阅读。在编写/编辑代码之前，调用 read_issue 并设置 include_hints=true 来阅读它们。",
+  "write_required": "\n\n⛔ 你必须在此阶段编写/编辑代码。使用 write_file 或 edit_file。只读取文件而不编写代码意味着任务已失败。最多读取一次 — 然后编写你的解决方案。"
 }
