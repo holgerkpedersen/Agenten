@@ -48,11 +48,11 @@ TEMPLATE_TASK_TOOLS = {
         "opdatering": ["update_issue_status", "list_files", "list_chunks", "read_chunk", "create_issue"],
     },
     "refactor": {
-        "analyse": ["list_files", "list_chunks", "read_chunk", "create_refactor_issue"],
-        "plan": ["list_files", "list_chunks", "read_chunk"],
+        "analyse": ["write_file", "list_files", "list_chunks", "read_chunk", "create_refactor_issue"],
+        "plan": ["write_file", "list_files", "list_chunks", "read_chunk"],
         "ekstraher": ["write_file", "list_files", "list_chunks", "read_chunk"],
-        "opdatér": ["edit_file", "list_files", "list_chunks", "read_chunk"],
-        "test": ["run_tests", "list_files", "list_chunks", "read_chunk"],
+        "opdatér": ["edit_file", "write_file", "list_files", "list_chunks", "read_chunk"],
+        "test": ["run_tests", "write_file", "list_files", "list_chunks", "read_chunk"],
     },
     "testgenerering": {
         "analyse": ["list_files", "list_chunks", "read_chunk", "run_tests", "create_issue", "create_refactor_issue"],
