@@ -204,7 +204,8 @@
     "module_ready": "Module builder ready",
     "iteration": "Iteration {n}",
     "type": "Type: {type}",
-    "decomposed": "Decomposed to tree"
+    "decomposed": "Decomposed to tree",
+    "read_only": "Read {tools} but took no further action. Consider re-running with a more specific prompt or choose a different model."
   },
   "errors": {
     "no_prompt": "No prompt provided",
@@ -433,6 +434,5 @@
   "rubric_passed": "✓",
   "rubric_failed": "✗ FAILED:",
   "rubric_failed_detail": "  ✗ {desc}",
-  "anti_leakage_warning": "⚠️ This issue has solution suggestions you have not read. Call read_issue with include_hints=true to read them before writing/editing code.",
-  "log.read_only": "Read {tools} but took no further action. Consider re-running with a more specific prompt or choose a different model."
+  "anti_leakage_warning": "⚠️ This issue has solution suggestions you have not read. Call read_issue with include_hints=true to read them before writing/editing code."
 }

@@ -204,7 +204,8 @@
     "module_ready": "Constructor de módulos listo",
     "iteration": "Iteración {n}",
     "type": "Tipo: {type}",
-    "decomposed": "Descompuesto en árbol"
+    "decomposed": "Descompuesto en árbol",
+    "read_only": "Leyó {tools} pero no tomó más acciones. Considere volver a ejecutar con una instrucción más específica o elija otro modelo."
   },
   "errors": {
     "no_prompt": "No se proporcionó ninguna tarea",
@@ -433,6 +434,5 @@
   "rubric_passed": "✓",
   "rubric_failed": "✗ FALLÓ:",
   "rubric_failed_detail": "  ✗ {desc}",
-  "anti_leakage_warning": "⚠️ Este issue tiene sugerencias de solución que no has leído. Llama a read_issue con include_hints=true para leerlas antes de escribir/editar código.",
-  "log.read_only": "Leyó {tools} pero no tomó más acciones. Considere volver a ejecutar con una instrucción más específica o elija otro modelo."
+  "anti_leakage_warning": "⚠️ Este issue tiene sugerencias de solución que no has leído. Llama a read_issue con include_hints=true para leerlas antes de escribir/editar código."
 }

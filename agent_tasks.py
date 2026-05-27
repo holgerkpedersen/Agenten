@@ -95,7 +95,9 @@ def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
     clean_prompt = getattr(agent, 'prompt', original_prompt)
     file_ctx = getattr(agent, '_file_context_str', '')
 
-    section_instr = agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name, "") or \
+    section_instr = agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(agent.lang + "_" + task_node.name.lower(), "") or \
+                    agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name.lower(), "") or \
+                    agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name, "") or \
                     agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(_normalize_phase(task_node.name), "")
     if section_instr:
         task_prompt = f"{section_instr}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"

@@ -204,7 +204,8 @@
     "module_ready": "Modulbygger klar",
     "iteration": "Iteration {n}",
     "type": "Type: {type}",
-    "decomposed": "Nedbrudt til træ"
+    "decomposed": "Nedbrudt til træ",
+    "read_only": "Læste {tools} men tog ingen yderligere handling. Overvej at genkøre med en mere specifik prompt eller vælg en anden model."
   },
   "errors": {
     "no_prompt": "Ingen prompt angivet",
@@ -433,6 +434,5 @@
   "rubric_passed": "✓",
   "rubric_failed": "✗ MISLYKKET:",
   "rubric_failed_detail": "  ✗ {desc}",
-  "anti_leakage_warning": "⚠️ Dette issue har løsningsforslag du ikke har læst. Kald read_issue med include_hints=true for at læse dem før du skriver/redigerer kode.",
-  "log.read_only": "Læste {tools} men tog ingen yderligere handling. Overvej at genkøre med en mere specifik prompt eller vælg en anden model."
+  "anti_leakage_warning": "⚠️ Dette issue har løsningsforslag du ikke har læst. Kald read_issue med include_hints=true for at læse dem før du skriver/redigerer kode."
 }

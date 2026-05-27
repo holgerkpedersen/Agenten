@@ -204,7 +204,8 @@
     "module_ready": "模块构建器就绪",
     "iteration": "迭代 {n}",
     "type": "类型：{type}",
-    "decomposed": "已分解为树"
+    "decomposed": "已分解为树",
+    "read_only": "已读取 {tools} 但未采取进一步操作。考虑使用更具体的提示重新运行，或选择其他模型。"
   },
   "errors": {
     "no_prompt": "未提供任务",
@@ -433,6 +434,5 @@
   "rubric_passed": "✓",
   "rubric_failed": "✗ 失败:",
   "rubric_failed_detail": "  ✗ {desc}",
-  "anti_leakage_warning": "⚠️ 此问题有解决方案建议，你尚未阅读。在编写/编辑代码之前，调用 read_issue 并设置 include_hints=true 来阅读它们。",
-  "log.read_only": "已读取 {tools} 但未采取进一步操作。考虑使用更具体的提示重新运行，或选择其他模型。"
+  "anti_leakage_warning": "⚠️ 此问题有解决方案建议，你尚未阅读。在编写/编辑代码之前，调用 read_issue 并设置 include_hints=true 来阅读它们。"
 }
