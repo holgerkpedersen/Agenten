@@ -272,6 +272,8 @@ def _check_post_write(path, content, result):
 
 
 def write_file(path, content):
+    if not os.path.isabs(path):
+        path = os.path.abspath(path)
     if not is_safe_location(path):
         return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
     dirname = os.path.dirname(path)
@@ -316,6 +318,8 @@ def _build_flexible_pattern(text):
 
 
 def edit_file(path, old_text, new_text, expected_hash=None):
+    if not os.path.isabs(path):
+        path = os.path.abspath(path)
     if not is_safe_location(path):
         return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
     try:
@@ -406,6 +410,8 @@ EXCLUDE_LIST_FILES = {'.env', '.env.example', 'credentials.json', 'secrets.json'
 
 def list_files(path=".", pattern=None, max_depth=2):
     try:
+        if not os.path.isabs(path):
+            path = os.path.abspath(path)
         if not is_safe_location(path):
             return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
         if not os.path.isdir(path):
