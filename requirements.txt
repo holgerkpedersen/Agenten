@@ -28,3 +28,14 @@ task_tree
 config
 
 skill_tracker
+
+__future__
+agent_git
+agent_issues
+agent_tasks
+agent_tree
+git_ops
+github_wrapper
+module_builder
+tools
+web_searcher
