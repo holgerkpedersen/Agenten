@@ -10,14 +10,18 @@ log = get_logger(__name__)
 
 
 class Tool:
-    def __init__(self, name, description, parameters, function):
+    def __init__(self, name, description, parameters, function, optional_params=None):
         self.name = name
         self.description = description
         self.parameters = parameters
         self.function = function
+        self.optional_params = set(optional_params or [])
 
     def to_prompt_desc(self):
-        return f"- {self.name}({', '.join(self.parameters)}): {self.description}"
+        parts = []
+        for p in self.parameters:
+            parts.append(f"[{p}]" if p in self.optional_params else p)
+        return f"- {self.name}({', '.join(parts)}): {self.description}"
 
 
 class ToolRegistry:
@@ -48,6 +52,7 @@ class ToolRegistry:
         for name, tool in self.tools.items():
             if self.active_tools is not None and name not in self.active_tools:
                 continue
+            required = [p for p in tool.parameters if p not in tool.optional_params]
             tools.append({
                 "type": "function",
                 "function": {
@@ -56,7 +61,7 @@ class ToolRegistry:
                     "parameters": {
                         "type": "object",
                         "properties": {p: {"type": "string", "description": p} for p in tool.parameters},
-                        "required": tool.parameters,
+                        "required": required,
                     }
                 }
             })
