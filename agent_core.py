@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from llm_wrapper import LMStudioWrapper
 from web_searcher import WebSearcher
 from task_tree import TaskTree, TaskNode
@@ -24,15 +26,16 @@ import os
 import json
 import subprocess
 import threading
+from typing import Any, Generator
 
-def _safe_int(val, default=0):
+def _safe_int(val: Any, default: int = 0) -> int:
     try:
         return int(val)
     except (ValueError, TypeError):
         return default
 
 
-def _extract_filenames(location):
+def _extract_filenames(location: str) -> list[str]:
     filenames = []
     if not location:
         return filenames
@@ -43,7 +46,7 @@ def _extract_filenames(location):
     return filenames
 
 
-def _auto_load_issue_files(agent, prompt, template, files):
+def _auto_load_issue_files(agent: Agent, prompt: str, template: str | None, files: list[dict[str, Any]]) -> None:
     if template not in ("bugfix", "issue_handler") or files:
         return
     issue_match = re.search(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)', prompt)
@@ -76,24 +79,38 @@ def _auto_load_issue_files(agent, prompt, template, files):
         agent._log("WARNING", "Kunne ikke auto-loade issue-fil", str(e))
 
 
-def _build_file_context(agent, files, prompt):
+def _add_file_entry(file_context, agent, filename, content):
+    chunk_key = f"file_{filename}"
+    chunks = agent_files.chunk_text(content)
+    agent.file_chunks[chunk_key] = chunks
+    agent_issues.detect_oversize_file(agent, filename, content)
+    if agent._pending_refactor:
+        agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
+    is_python = filename.endswith('.py')
+    if is_python:
+        ast_index = agent_files.build_ast_index(content, filename)
+        if ast_index:
+            file_context += f"\n{ast_index}\n"
+            if len(chunks) > 1:
+                file_context += f"\n*Filen er stor ({len(chunks)} chunks) \u2014 brug read_chunk(file_key='{chunk_key}', index=1..{len(chunks)}) for at l\u00e6se indhold.*\n"
+            file_context += f"\n*Brug locate(filepath='{filename}', name='funktionsnavn') for at l\u00e6se en bestemt funktion/metode.*\n"
+            return file_context
+    display_content = content[:config.MAX_FILE_CONTEXT_CHARS]
+    truncated_note = "\n[... indhold afkortet \u2014 brug read_chunk() for at l\u00e6se hele filen ...]" if len(content) > config.MAX_FILE_CONTEXT_CHARS else ""
+    if len(chunks) <= 1:
+        file_context += f"\n### {filename}\n\n```{filename}\n{display_content}{truncated_note}\n```\n"
+    else:
+        file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{display_content}{truncated_note}\n```\n"
+        file_context += f"\n*Filen er stor \u2014 indl\u00e6s flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
+    return file_context
+
+
+def _build_file_context(agent: Agent, files: list[dict[str, Any]] | None, prompt: str) -> str:
     file_context = ""
     if files and len(files) > 0:
         file_context = t(K.FILE_CONTEXT_HEADER, agent.lang)
         for f in files:
-            filename = f.get('filename', t(K.UNKNOWN, agent.lang))
-            content = f.get('content', '')
-            chunk_key = f"file_{filename}"
-            chunks = agent_files.chunk_text(content)
-            agent.file_chunks[chunk_key] = chunks
-            agent_issues.detect_oversize_file(agent, filename, content)
-            if agent._pending_refactor:
-                agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
-            if len(chunks) <= 1:
-                file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
-            else:
-                file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
-                file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
+            file_context = _add_file_entry(file_context, agent, f.get('filename', t(K.UNKNOWN, agent.lang)), f.get('content', ''))
         agent._log("INFO", t(K.LOG_ADDING_FILES, agent.lang), t(K.LOG_N_FILES, agent.lang).format(n=len(files)))
     else:
         scanned_files = agent._get_folder_context(prompt)
@@ -101,35 +118,18 @@ def _build_file_context(agent, files, prompt):
             file_context = t(K.FILE_CONTEXT_HEADER, agent.lang)
             agent.file_context = scanned_files
             for item in scanned_files:
-                filename = item['filename']
-                content = item['content']
-                chunk_key = f"file_{filename}"
-                chunks = agent_files.chunk_text(content)
-                agent.file_chunks[chunk_key] = chunks
-                agent_issues.detect_oversize_file(agent, filename, content)
-                if agent._pending_refactor:
-                    agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
-                if len(chunks) <= 1:
-                    file_context += f"\n### {filename}\n\n```{filename}\n{content}\n```\n"
-                else:
-                    file_context += f"\n### {filename} (chunk 1/{len(chunks)}, ~{agent_files.CHUNK_SIZE}tgn/chunk)\n\n```{filename}\n{chunks[0]}\n```\n"
-                    file_context += f"\n*Filen er stor — indlæs flere chunks med read_chunk(file_key='{chunk_key}', index=2..{len(chunks)})*\n"
+                file_context = _add_file_entry(file_context, agent, item['filename'], item['content'])
             agent._log("INFO", t(K.LOG_ADDING_FILES, agent.lang), t(K.LOG_N_FILES, agent.lang).format(n=len(scanned_files)))
         else:
             file_path, file_content = agent._get_single_file_context(prompt)
             if file_content:
                 filename = os.path.basename(file_path)
-                agent_issues.detect_oversize_file(agent, filename, file_content)
-                if agent._pending_refactor:
-                    agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
-                chunk_key = f"file_{filename}"
-                chunks = agent_files.chunk_text(file_content)
-                agent.file_chunks[chunk_key] = chunks
-                file_context = t(K.FILE_CONTEXT_HEADER, agent.lang) + filename + t(K.FILE_CONTEXT_PYTHON, agent.lang).replace("{content}", file_content)
+                file_context = _add_file_entry("", agent, filename, file_content)
+                file_context = t(K.FILE_CONTEXT_HEADER, agent.lang) + file_context.lstrip()
     return file_context
 
 
-def _decompose_via_llm(agent, prompt, file_context, template_config):
+def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_config: dict[str, Any]) -> dict[str, Any]:
     decomposition_prompt = template_config["prompt"].replace("{prompt}", agent._sanitize_prompt(prompt))
     file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
     decomposition_prompt += file_context_entry
@@ -159,45 +159,47 @@ def _decompose_via_llm(agent, prompt, file_context, template_config):
 
 
 class Agent:
-    def __init__(self):
-        self.llm = LMStudioWrapper(timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL, api_key=os.environ.get('OPENCODE_API_KEY'))
-        self.decompose_llm = LMStudioWrapper(timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL, api_key=os.environ.get('OPENCODE_API_KEY'))
-        self.searcher = WebSearcher()
-        self.task_tree = None
-        self.action_history = []
-        self.execution_log = []
-        self.agent_log = []
-        self.original_prompt = ""
-        self.full_prompt_with_context = ""
-        self._file_context_str = ""
-        self.show_thinking = True
-        self.file_context = []
-        self.file_chunks = {}
-        self.images = []
-        self.images_lock = threading.Lock()
-        self.pending_reply = None
-        self.stop_requested = False
-        self._pending_refactor = None
-        self.lang = "da"
-        self.active_template = None
-        self.current_phase = None
-        self.issue_resolved = False
-        self.max_tokens = config.MAX_TOKENS
-        self.max_conversation_chars = config.MAX_CONVERSATION_CHARS
-        self.tool_registry = ToolRegistry()
+    def __init__(self) -> None:
+        self.llm: LMStudioWrapper = LMStudioWrapper(timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL, api_key=os.environ.get('OPENCODE_API_KEY'))
+        self.decompose_llm: LMStudioWrapper = LMStudioWrapper(timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL, api_key=os.environ.get('OPENCODE_API_KEY'))
+        self.searcher: WebSearcher = WebSearcher()
+        self.task_tree: TaskTree | None = None
+        self.action_history: list[str] = []
+        self.execution_log: list[dict[str, Any]] = []
+        self.agent_log: list[dict[str, Any]] = []
+        self.original_prompt: str = ""
+        self.full_prompt_with_context: str = ""
+        self._file_context_str: str = ""
+        self.show_thinking: bool = True
+        self.file_context: list[dict[str, Any]] = []
+        self.file_chunks: dict[str, list[str]] = {}
+        self.images: list[dict[str, Any]] = []
+        self.images_lock: threading.Lock = threading.Lock()
+        self.pending_reply: str | None = None
+        self.stop_requested: bool = False
+        self._pending_refactor: dict[str, Any] | None = None
+        self.lang: str = "da"
+        self.active_template: str | None = None
+        self.current_phase: str | None = None
+        self.issue_resolved: bool = False
+        self.max_tokens: int = config.MAX_TOKENS
+        self.max_conversation_chars: int = config.MAX_CONVERSATION_CHARS
+        self.tool_registry: ToolRegistry = ToolRegistry()
         self._register_tools()
-        self._checkpoint_tools = set()
-        self._checkpoint_branch = ""
-        self._skills = None
-        self._active_skills = []
-        self._task_start_time = None
-        self._file_hash_registry = {}
-        self._delegation_index = None
-        self._hints_requested = set()
-        self._hints_available = set()
-        self._rubric_retried = False
+        self._checkpoint_tools: set[str] = set()
+        self._checkpoint_branch: str = ""
+        self._skills: list[dict[str, Any]] | None = None
+        self._active_skills: list[dict[str, Any]] = []
+        self._task_start_time: float | None = None
+        self._file_hash_registry: dict[str, str] = {}
+        self._delegation_index: dict[str, tuple[str, str]] | None = None
+        self._hints_requested: set[str] = set()
+        self._hints_available: set[str] = set()
+        self._rubric_retried: bool = False
+        self._write_failed: bool = False
+        self._tests_failed: bool = False
 
-    def _register_tools(self):
+    def _register_tools(self) -> None:
         gh = GithubAPI()
         self.tool_registry.register(Tool(
             "github_create_repo",
@@ -377,34 +379,34 @@ class Agent:
             lambda title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="", acceptance_criteria="": agent_issues.create_issue(self, title=title, type=type, severity=severity, description=description, location=location, impact=impact, proposed_fix=proposed_fix, acceptance_criteria=acceptance_criteria)
         ))
 
-    def _add_image(self, path):
+    def _add_image(self, path: str) -> dict[str, Any]:
         return agent_tasks.add_image(self, path)
 
-    def _list_chunks(self):
+    def _list_chunks(self) -> dict[str, Any]:
         return agent_files.list_chunks(self)
 
-    def _read_chunk(self, chunk, index):
+    def _read_chunk(self, chunk: str, index: int) -> dict[str, Any]:
         return agent_files.read_chunk(self, chunk, int(index))
 
-    def _refresh_skills(self):
+    def _refresh_skills(self) -> None:
         agent_skills.refresh_skills(self)
 
-    def _match_skills(self, prompt):
+    def _match_skills(self, prompt: str) -> list[dict[str, Any]]:
         return agent_skills.match_skills(self, prompt)
 
-    def _format_skills_for_prompt(self):
+    def _format_skills_for_prompt(self) -> str:
         return agent_skills.format_skills_for_prompt(self)
 
-    def _get_templates(self):
+    def _get_templates(self) -> dict[str, Any]:
         return agent_skills.get_templates(self)
 
-    def _record_outcome(self, task_node):
+    def _record_outcome(self, task_node: TaskNode) -> None:
         agent_tree.record_outcome(self, task_node)
 
-    def _evolve_if_needed(self):
+    def _evolve_if_needed(self) -> None:
         agent_tree.evolve_if_needed(self)
 
-    def _log(self, level, message, detail=""):
+    def _log(self, level: str, message: str, detail: str = "") -> None:
         log_entry = {
             "timestamp": time.time(),
             "level": level,
@@ -418,10 +420,10 @@ class Agent:
         except Exception:
             pass
 
-    def _clean_task_name(self, name):
+    def _clean_task_name(self, name: str) -> str:
         return agent_tree._clean_task_name(name)
 
-    def _ensure_delegation_index(self):
+    def _ensure_delegation_index(self) -> None:
         if self._delegation_index is not None:
             return
         self._delegation_index = {}
@@ -458,7 +460,7 @@ class Agent:
                     cur_file = f'{cur_module}.py'
                     depth += 1
 
-    def _resolve_delegations_for_context(self, file_context):
+    def _resolve_delegations_for_context(self, file_context: str) -> str:
         self._ensure_delegation_index()
         loaded_files = {os.path.normcase(os.path.abspath(k.replace('file_', '', 1)))
                         for k in self.file_chunks}
@@ -494,29 +496,29 @@ class Agent:
                 loaded_files.add(real_norm)
         return file_context
 
-    def _read_file_content(self, filepath):
+    def _read_file_content(self, filepath: str) -> str | None:
         return agent_files.read_file_content(self, filepath)
 
-    def _get_single_file_context(self, prompt):
+    def _get_single_file_context(self, prompt: str) -> tuple[str | None, str | None]:
         return agent_files.get_single_file_context(self, prompt)
 
-    def _get_folder_context(self, prompt):
+    def _get_folder_context(self, prompt: str) -> list[dict[str, Any]] | None:
         return agent_files.get_folder_context(self, prompt)
 
-    def _create_fallback_tree(self, prompt):
+    def _create_fallback_tree(self, prompt: str) -> dict[str, Any]:
         self.original_prompt = prompt
         return agent_tree.create_fallback_tree(self, prompt)
 
-    def _parse_tree_from_llm(self, prompt, llm_response):
+    def _parse_tree_from_llm(self, prompt: str, llm_response: str) -> dict[str, Any]:
         return agent_tree.parse_tree_from_llm(self, prompt, llm_response)
 
-    def _sanitize_prompt(self, prompt):
+    def _sanitize_prompt(self, prompt: str) -> str:
         safe = str(prompt)[:10000]  # limit length
         safe = ''.join(c for c in safe if ord(c) >= 32 or c in '\n\r\t')
         safe = safe.replace("</user_input>", "<SECURITY_TAG>")
         return f"<user_input>\n{safe}\n<END_USER_INPUT>"
 
-    def decompose_prompt(self, prompt, files=None, template=None):
+    def decompose_prompt(self, prompt: str, files: list[dict[str, Any]] | None = None, template: str | None = None) -> dict[str, Any]:
         self.agent_log = []
         self.original_prompt = prompt
         self.tool_registry.lang = self.lang
@@ -567,10 +569,10 @@ class Agent:
 
         return _decompose_via_llm(self, prompt, file_context, template_config)
 
-    def reset_execution(self):
+    def reset_execution(self) -> None:
         if not self.task_tree:
             return
-        def reset_node(node):
+        def reset_node(node: TaskNode) -> None:
             node.status = "pending"
             node.result = None
             for child in node.children:
@@ -579,25 +581,25 @@ class Agent:
         self.execution_log = []
         self._log("INFO", t(K.LOG_EXECUTION_RESET, self.lang), "")
 
-    def _count_tasks(self, node):
+    def _count_tasks(self, node: TaskNode) -> int:
         return agent_tree.count_tasks(node)
 
-    def task_tree_to_dict(self):
+    def task_tree_to_dict(self) -> dict[str, Any] | None:
         return agent_tree.task_tree_to_dict(self)
 
-    def task_tree_from_dict(self, d):
+    def task_tree_from_dict(self, d: dict[str, Any]) -> None:
         agent_tree.task_tree_from_dict(self, d)
 
-    def _set_task_tools(self, task_name):
+    def _set_task_tools(self, task_name: str) -> None:
         agent_tasks.set_task_tools(self, task_name)
 
-    def solve_task(self, task_node, original_prompt):
+    def solve_task(self, task_node: TaskNode, original_prompt: str) -> str:
         return agent_tasks.solve_task(self, task_node, original_prompt)
 
-    def solve_task_stream(self, task_node, original_prompt):
+    def solve_task_stream(self, task_node: TaskNode, original_prompt: str) -> Generator[dict[str, Any], None, None]:
         yield from agent_tasks.solve_task_stream(self, task_node, original_prompt)
 
-    def execute_tree(self, node=None):
+    def execute_tree(self, node: TaskNode | None = None) -> dict[str, Any]:
         if node is None:
             if not self.task_tree:
                 return {"error": "No task tree"}
@@ -610,7 +612,7 @@ class Agent:
         results[node.name] = self.solve_task(node, self.original_prompt)
         return results
 
-    def get_agent_status(self):
+    def get_agent_status(self) -> dict[str, Any]:
         return {
             "action_history": self.action_history,
             "total_actions": len(self.action_history),
@@ -618,5 +620,5 @@ class Agent:
             "has_task_tree": self.task_tree is not None
         }
 
-    def suggest_new_module(self):
+    def suggest_new_module(self) -> dict[str, Any]:
         return {"message": t(K.LOG_MODULE_READY, self.lang)}
