@@ -23,7 +23,8 @@ class TestTemplateTools:
     def test_programmering_tools(self):
         from agent_skills import TEMPLATE_TOOLS
         assert "locate" in TEMPLATE_TOOLS["programmering"]
-        assert "read_chunk" in TEMPLATE_TOOLS["programmering"]
+        assert "read_location" in TEMPLATE_TOOLS["programmering"]
+        assert "read_chunk" not in TEMPLATE_TOOLS["programmering"]
 
 
 class TestTemplateTaskTools:
