@@ -1487,7 +1487,7 @@ async function readFiles() {
     preview.style.display = 'block';
     preview.innerHTML = '';
     
-    if (loadedFilesContent.length > 0) {
+    if (loadedFilesContent.length > 0 && selectedFiles.length === 0) {
         let filesDisplay = `<div style="color:#10b981; margin-bottom:8px;"><strong>${_('files_for_llm')}</strong><br>`;
         for (let i = 0; i < loadedFilesContent.length; i++) {
             const fc = loadedFilesContent[i];
@@ -1522,9 +1522,24 @@ async function readFiles() {
         return;
     }
     
-    loadedFilesContent = [];
+    const hadExistingFiles = loadedFilesContent.length > 0;
+    if (loadedFilesContent.length === 0) {
+        loadedFilesContent = [];
+    }
     
     let filesDisplay = `<div style="color:var(--success); margin-bottom:8px;">📎 <strong>${_('files_included')}</strong><br>`;
+    
+    for (let i = 0; i < loadedFilesContent.length; i++) {
+        const fc = loadedFilesContent[i];
+        const ext = fc.filename.split('.').pop().toLowerCase();
+        const langMap = { 'py': 'python', 'js': 'javascript', 'json': 'json', 'html': 'html', 'css': 'css', 'md': 'markdown' };
+        const langClass = langMap[ext] || 'plaintext';
+        const checked = fc.included ? 'checked' : '';
+        preview.innerHTML += `<label style="display:flex; align-items:center; gap:8px; margin:8px 0;"><input type="checkbox" ${checked} onchange="toggleFileIncluded(${i}, this.checked)"> <strong>📄 ${fc.filename}</strong></label><pre class="language-${langClass}" style="max-height:150px;overflow-y:auto;margin:8px 0;${fc.included?'':'opacity:0.4'}"><code>${escapeHtml(fc.content.slice(0,3000))}${fc.content.length>3000?'...':''}</code></pre>`;
+        try { Prism.highlightElement(preview.querySelectorAll('pre')[i].querySelector('code')); } catch(e) {}
+        const s = fc.included ? '✓' : '✗';
+        filesDisplay += `<label style="display:flex; align-items:center; gap:4px;"><input type="checkbox" ${checked} onchange="toggleFileIncluded(${i}, this.checked)"> <span style="${fc.included?'color:var(--success)':'color:var(--danger)'}">${s}</span> ${fc.filename}</label>`;
+    }
     
     const IMG_EXT = {png:1,jpg:1,jpeg:1,gif:1,webp:1,bmp:1};
     
@@ -1598,18 +1613,20 @@ async function readFiles() {
     filesDisplay += '</div>';
     document.getElementById('selectedFilesDisplay').innerHTML = filesDisplay;
     
-    const imgCount = loadedFilesContent.filter(f => f.isImage).length;
-    const textCount = loadedFilesContent.filter(f => !f.isImage).length;
-    if (imgCount > 0 && textCount === 0) {
-        const imgName = loadedFilesContent.find(f => f.isImage)?.filename || 'billedet';
-        document.getElementById('promptInput').value = `Analyser billedet "${imgName}"`;
-        document.getElementById('templateSelect').value = 'billedanalyse';
-    } else if (selectedFiles.length === 1) {
-        document.getElementById('promptInput').value = _('prompt_auto_analyze_singular');
-    } else if (selectedFiles.length > 1) {
-        document.getElementById('promptInput').value = _('prompt_auto_analyze_plural').replace('{n}', selectedFiles.length);
-    } else if (imgCount > 0 && textCount > 0) {
-        document.getElementById('promptInput').value = `Analyser ${textCount} fil(er) og ${imgCount} billede(r)`;
+    if (!hadExistingFiles) {
+        const imgCount = loadedFilesContent.filter(f => f.isImage).length;
+        const textCount = loadedFilesContent.filter(f => !f.isImage).length;
+        if (imgCount > 0 && textCount === 0) {
+            const imgName = loadedFilesContent.find(f => f.isImage)?.filename || 'billedet';
+            document.getElementById('promptInput').value = `Analyser billedet "${imgName}"`;
+            document.getElementById('templateSelect').value = 'billedanalyse';
+        } else if (selectedFiles.length === 1) {
+            document.getElementById('promptInput').value = _('prompt_auto_analyze_singular');
+        } else if (selectedFiles.length > 1) {
+            document.getElementById('promptInput').value = _('prompt_auto_analyze_plural').replace('{n}', selectedFiles.length);
+        } else if (imgCount > 0 && textCount > 0) {
+            document.getElementById('promptInput').value = `Analyser ${textCount} fil(er) og ${imgCount} billede(r)`;
+        }
     }
 }
 
@@ -2410,13 +2427,14 @@ async function executeWithStream() {
                 const taskElem = document.getElementById('currentTask');
                 if (taskElem) taskElem.innerHTML = `<span style="color:var(--success);">✓ ${escapeHtml(data.task)} færdig</span>`;
                 
-                if (!showThinking && llmBox) {
+                if (llmBox) {
                     const output = stripHarmony(currentOutputs[data.task] || data.result || '');
                     const existing = llmBox.querySelector(`[data-task="${data.task}"]`);
+                    const resultDiv = `<div style="white-space:pre-wrap;margin-top:5px;padding:8px;background:var(--input-bg);border-radius:6px;border-left:3px solid var(--success);">${escapeHtml(output)}</div>`;
                     if (existing) {
-                        existing.innerHTML = `<strong style="color:var(--success);">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div>`;
+                        existing.innerHTML += `<div style="margin-top:8px;"><strong style="color:var(--success);">✅ Resultat</strong>${resultDiv}</div>`;
                     } else {
-                        llmBox.innerHTML += `<div data-task="${data.task}" style="margin-bottom:15px;"><strong style="color:var(--success);">✅ ${escapeHtml(data.task)}</strong><div style="white-space:pre-wrap;margin-top:5px;">${escapeHtml(output)}</div></div>`;
+                        llmBox.innerHTML += `<div data-task="${data.task}" style="margin-bottom:15px;"><strong style="color:var(--success);">✅ ${escapeHtml(data.task)}</strong>${resultDiv}</div>`;
                     }
                 }
                 
@@ -2877,6 +2895,12 @@ async function useIssueAsTask(encoded) {
     const tplMap = { 'architecture': 'refactor', 'bug': 'bugfix' };
     template.value = tplMap[issue.type] || 'issue_handler';
     addLogEntry('INFO', `${_('prompt_filled_from')} ${issue.id}`, issue.title);
+
+    selectedFiles = [];
+    loadedFilesContent = [];
+    document.getElementById('selectedFilesDisplay').innerHTML = '';
+    document.getElementById('fileContentPreview').innerHTML = '';
+    document.getElementById('fileContentPreview').style.display = 'none';
 
     const fileMatches = issue.location ? [...issue.location.matchAll(/([\w./-]+\.\w+)/g)] : [];
     let firstLoaded = false;
