@@ -76,8 +76,11 @@ def _build_chunk_hint(agent):
         base_dir = os.path.abspath('.')
         hint = f"\n\n## TILG\u00c6NGELIGE FILER (projektmappe: {base_dir})"
         hint += "".join(parts)
-        hint += "\n\n  Brug locate(filepath='fil.py', name='funktionsnavn') for at l\u00e6se en bestemt funktion/metode."
-        hint += "\n  Brug read_chunk(file_key='fil.py', index=N) kun for at gennemse r\u00e5t filindhold."
+        hint += "\n\n  Brug locate(name='funktionsnavn') for at finde en funktion p\u00e5 tv\u00e6rs af ALLE .py-filer (filepath er valgfri)."
+        hint += "\n  locate returnerer ogs\u00e5 en 'also_in_file'-liste over andre symboler i filen — brug locate til hver enkelt."
+        hint += "\n  Brug read_location(filepath='fil.py', name='funktionsnavn') for at l\u00e6se KUN en bestemt funktion/metode/klasse — IKKE hele filen."
+        hint += "\n  Brug IKKE read_chunk til .py-filer — read_location er altid at foretr\u00e6kke og returnerer kun det relevante kode."
+        hint += "\n  Read_chunk m\u00e5 KUN bruges til IKKE-PYTHON filer (JSON, HTML, TXT, osv.)."
     delegation_lines = []
     for key, chunks in agent.file_chunks.items():
         content = chunks[0] if chunks else ''
@@ -218,7 +221,10 @@ def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_no
     dup_count = called_tools.get(tool_key, 0)
     called_tools[tool_key] = dup_count + 1
     if dup_count >= 1:
-        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. G\u00e5 videre eller brug <<<DONE>>>.")
+        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. Gå videre eller brug <<<DONE>>>.")
+        return None
+    if parsed["tool"] in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False):
+        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redigér IKKE filer. Brug <<<DONE>>> for at afslutte, eller genåbn issuet med update_issue_status('<id>', 'open') først.")
         return None
 
     agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=parsed['tool']), str(parsed.get("args", {})))
@@ -238,6 +244,17 @@ def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_no
             agent._tests_failed = True
         else:
             agent._tests_failed = False
+
+    if parsed["tool"] == "locate":
+        if isinstance(result, dict) and result.get("success"):
+            agent._located_files.add(os.path.abspath(result.get("file", "")))
+
+    if parsed["tool"] == "read_chunk":
+        file_key = parsed.get("args", {}).get("file_key", "")
+        if file_key.startswith("file_"):
+            file_path = os.path.abspath(file_key[5:])
+            if file_path in agent._located_files:
+                result_str += "\n\n📌 OBS: Du har allerede læst funktion(er) i denne fil med locate. Brug locate(filepath='...', name='andet_navn') i stedet for read_chunk — det er hurtigere."
 
     if parsed["tool"] == "read_issue":
         if isinstance(result, dict) and result.get("success"):
@@ -348,6 +365,7 @@ def solve_task_stream(agent, task_node, original_prompt):
     consecutive_errors = 0
     agent._write_failed = False
     agent._tests_failed = False
+    agent._located_files = set()
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -405,6 +423,15 @@ def solve_task_stream(agent, task_node, original_prompt):
                 if dup_count >= 1:
                     _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. G\u00e5 videre eller brug <<<DONE>>>.")
                     continue
+                if tool_name in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False):
+                    result_str = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redig\u00e9r IKKE filer. Brug <<<DONE>>> for at afslutte, eller gen\u00e5bn issuet f\u00f8rst."
+                    result = {"success": False, "error": "Issue already resolved"}
+                    agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                    agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                    messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                    yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                    yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                    continue
                 agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                 result = agent.tool_registry.execute(tool_name, args_val)
                 result_str = json.dumps(result, ensure_ascii=False)
@@ -417,6 +444,15 @@ def solve_task_stream(agent, task_node, original_prompt):
                         agent._tests_failed = True
                     else:
                         agent._tests_failed = False
+                if tool_name == "locate":
+                    if isinstance(result, dict) and result.get("success"):
+                        agent._located_files.add(os.path.abspath(result.get("file", "")))
+                if tool_name == "read_chunk":
+                    file_key = args_val.get("file_key", "")
+                    if file_key.startswith("file_"):
+                        file_path = os.path.abspath(file_key[5:])
+                        if file_path in agent._located_files:
+                            result_str += "\n\n📌 OBS: Du har allerede læst funktion(er) i denne fil med locate. Brug locate(filepath='...', name='andet_navn') i stedet for read_chunk — det er hurtigere."
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
