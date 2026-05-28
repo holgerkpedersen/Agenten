@@ -35,8 +35,10 @@ def is_safe_location(target_path):
     """Checks if target_path is within any known-safe directory (project root, exports, uploads, temp)."""
     try:
         real = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
+        real = os.path.normcase(real)
         for safe in _SAFE_DIRS:
-            if real.startswith(safe + os.sep) or real == safe:
+            safe_norm = os.path.normcase(safe)
+            if real.startswith(safe_norm + os.sep) or real == safe_norm:
                 return True
         return False
     except Exception:
@@ -262,6 +264,26 @@ def get_folder_context(agent, prompt):
     return found_files
 
 
+def read_location(filepath, name=None, line_no=None):
+    """Read ONLY the function/class/method at a specific location via AST.
+    Returns just the relevant code body, not the entire file.
+    Use this instead of read_chunk when you need to see specific code.
+    """
+    result = locate_code(filepath=filepath, name=name, line_no=line_no)
+    if not result.get("success"):
+        return result
+    return {
+        "success": True,
+        "file": result["file"],
+        "name": result["name"],
+        "type": result["type"],
+        "line": result["line"],
+        "end_line": result["end_line"],
+        "content": result["body"],
+        "also_in_file": result.get("also_in_file", ""),
+    }
+
+
 def list_chunks(agent):
     if not agent.file_chunks:
         return {"success": True, "chunks": [], "message": "Ingen filer indl\u00e6st. Brug 'list_chunks' igen efter at have specificeret filer eller en mappe i din prompt."}
@@ -311,8 +333,53 @@ def _find_enclosing_symbol(tree, target_line):
     return best
 
 
-def locate_code(filepath, name=None, line_no=None):
-    if not os.path.exists(filepath):
+def _list_top_level_symbols(tree):
+    symbols = []
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.FunctionDef):
+            symbols.append((node.name, "function", node.lineno))
+        elif isinstance(node, ast.AsyncFunctionDef):
+            symbols.append((node.name, "async_function", node.lineno))
+        elif isinstance(node, ast.ClassDef):
+            symbols.append((node.name, "class", node.lineno))
+    return symbols
+
+
+def _build_global_symbol_index():
+    index = {}
+    for fname in os.listdir('.'):
+        if not fname.endswith('.py'):
+            continue
+        try:
+            with open(fname, 'r', encoding='utf-8') as f:
+                tree = ast.parse(f.read())
+        except Exception:
+            continue
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                index.setdefault(node.name, []).append((fname, node.lineno))
+            elif isinstance(node, ast.ClassDef):
+                index.setdefault(node.name, []).append((fname, node.lineno, "class"))
+                for child in node.body:
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        dotted = f"{node.name}.{child.name}"
+                        index.setdefault(dotted, []).append((fname, child.lineno))
+                        index.setdefault(child.name, []).append((fname, child.lineno))
+    return index
+
+_GLOBAL_SYMBOL_INDEX = _build_global_symbol_index()
+
+
+def locate_code(filepath=None, name=None, line_no=None):
+    if not filepath and name:
+        matches = _GLOBAL_SYMBOL_INDEX.get(name, [])
+        if not matches:
+            return {"success": False, "error": f"Symbol '{name}' not found in any file"}
+        if len(matches) > 1:
+            files = ", ".join(m[0] for m in matches)
+            return {"success": False, "error": f"Symbol '{name}' found in multiple files: {files}. Specify filepath='fil.py' to disambiguate."}
+        filepath = matches[0][0]
+    if not filepath or not os.path.exists(filepath):
         return {"success": False, "error": f"File not found: {filepath}"}
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -322,6 +389,9 @@ def locate_code(filepath, name=None, line_no=None):
         return {"success": False, "error": f"Syntax error in {os.path.basename(filepath)}: {e}"}
     except Exception as e:
         return {"success": False, "error": f"Could not parse {os.path.basename(filepath)}: {e}"}
+
+    symbols = _list_top_level_symbols(tree)
+    siblings = "\n".join(f"  {s[0]} ({s[1]}, line {s[2]})" for s in symbols) if symbols else "  (none)"
 
     if name:
         parts = name.split(".", 1)
@@ -343,6 +413,7 @@ def locate_code(filepath, name=None, line_no=None):
                                 "line": start,
                                 "end_line": end,
                                 "body": "\n".join(code.splitlines()[start - 1:end]),
+                                "also_in_file": siblings,
                             }
                     return {"success": False, "error": f"Method '{func_name}' not found in class '{class_name}' in {os.path.basename(filepath)}"}
             else:
@@ -357,6 +428,7 @@ def locate_code(filepath, name=None, line_no=None):
                         "line": start,
                         "end_line": end,
                         "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "also_in_file": siblings,
                     }
                 elif isinstance(node, ast.ClassDef) and node.name == func_name:
                     start = node.lineno
@@ -369,6 +441,7 @@ def locate_code(filepath, name=None, line_no=None):
                         "line": start,
                         "end_line": end,
                         "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "also_in_file": siblings,
                     }
                 elif isinstance(node, ast.AsyncFunctionDef) and node.name == func_name:
                     start = node.lineno
@@ -381,6 +454,7 @@ def locate_code(filepath, name=None, line_no=None):
                         "line": start,
                         "end_line": end,
                         "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "also_in_file": siblings,
                     }
         return {"success": False, "error": f"Symbol '{name}' not found in {os.path.basename(filepath)}"}
 
@@ -419,6 +493,7 @@ def locate_code(filepath, name=None, line_no=None):
             "line": start,
             "end_line": end,
             "body": "\n".join(code.splitlines()[start - 1:end]),
+            "also_in_file": siblings,
         }
 
     return {"success": False, "error": "Specify either 'name' or 'line_no'"}
