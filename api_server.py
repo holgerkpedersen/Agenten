@@ -541,33 +541,36 @@ def save_current_session():
             return jsonify({"success": True, "debounced": True})
         _session_save_debounce[session_id] = now
     existing = session_manager.load_session(session_id) or {}
+    with active_streams_lock:
+        stream_agent = active_streams.get(session_id)
+    source = stream_agent if stream_agent else agent
     existing_agent_log = existing.get("agent_log", [])
     existing_timestamps = {e.get("timestamp") for e in existing_agent_log}
     merged_log = existing_agent_log + [
-        e for e in (agent.agent_log or [])
+        e for e in (source.agent_log or [])
         if e.get("timestamp") not in existing_timestamps
     ]
     session_data = {
         "id": session_id,
         "name": data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=session_id[:8])),
-        "tree": data.get("tree") or existing.get("tree") or (agent.task_tree_to_dict() if agent.task_tree else None),
+        "tree": data.get("tree") or existing.get("tree") or (source.task_tree_to_dict() if source.task_tree else None),
         "layout": data.get("layout"),
-        "execution_log": agent.execution_log or existing.get("execution_log", []),
+        "execution_log": source.execution_log or existing.get("execution_log", []),
         "agent_log": merged_log,
-        "original_prompt": data.get("original_prompt") or agent.original_prompt or "",
-        "full_prompt_with_context": getattr(agent, 'full_prompt_with_context', '') or '',
-        "show_thinking": data.get("show_thinking", agent.show_thinking),
-        "template": data.get("template") or getattr(agent, 'active_template', None) or "fri",
-        "lang": data.get("lang") or getattr(agent, 'lang', 'da'),
-        "ui_lang": data.get("ui_lang") or data.get("lang") or getattr(agent, 'lang', 'da'),
+        "original_prompt": data.get("original_prompt") or source.original_prompt or "",
+        "full_prompt_with_context": getattr(source, 'full_prompt_with_context', '') or '',
+        "show_thinking": data.get("show_thinking", source.show_thinking),
+        "template": data.get("template") or getattr(source, 'active_template', None) or "fri",
+        "lang": data.get("lang") or getattr(source, 'lang', 'da'),
+        "ui_lang": data.get("ui_lang") or data.get("lang") or getattr(source, 'lang', 'da'),
         "prompt_history": data.get("prompt_history", []),
         "file_context": data.get("file_context", ""),
-        "file_chunks": getattr(agent, 'file_chunks', None) or existing.get("file_chunks", {}),
-        "images": getattr(agent, 'images', None) or existing.get("images", []),
+        "file_chunks": getattr(source, 'file_chunks', None) or existing.get("file_chunks", {}),
+        "images": getattr(source, 'images', None) or existing.get("images", []),
         "created": existing.get("created", datetime.now().isoformat()),
         "learned_knowledge": existing.get("learned_knowledge", []),
-        "decompose_model": data.get("decompose_model") or existing.get("decompose_model") or getattr(agent.decompose_llm, 'model', ''),
-        "execute_model": data.get("execute_model") or existing.get("execute_model") or getattr(agent.llm, 'model', ''),
+        "decompose_model": data.get("decompose_model") or existing.get("decompose_model") or getattr(source.decompose_llm, 'model', ''),
+        "execute_model": data.get("execute_model") or existing.get("execute_model") or getattr(source.llm, 'model', ''),
     }
     session_manager.save_session(session_id, session_data)
     current_session_id = session_id
@@ -1090,9 +1093,16 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
             return
         if getattr(agent, 'issue_resolved', False):
             child.status = "skipped"
-            child.result = "Skipped — issue was already resolved in an earlier phase"
-            child_results.append(f"- {child.name}: {child.result}")
+            skip_msg = "Skipped — issue was already resolved in an earlier phase"
+            child.result = skip_msg
+            child_results.append(f"- {child.name}: {skip_msg}")
+            yield f"data: {json.dumps({'type': 'task_start', 'task': child.name})}\n\n"
+            yield f"data: {json.dumps({'type': 'task_done', 'task': child.name, 'result': skip_msg})}\n\n"
+            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {child.name}", "detail": skip_msg})
+            yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
             completed[0] += _count_tasks(child)
+            progress = int((completed[0] / total_tasks) * 100)
+            yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
             continue
         yield from _execute_with_stream(child, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id)
         if child.result:
