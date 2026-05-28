@@ -160,8 +160,18 @@ def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_co
 
 class Agent:
     def __init__(self) -> None:
-        self.llm: LMStudioWrapper = LMStudioWrapper(timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL, api_key=os.environ.get('OPENCODE_API_KEY'))
-        self.decompose_llm: LMStudioWrapper = LMStudioWrapper(timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL, api_key=os.environ.get('OPENCODE_API_KEY'))
+        self.llm: LMStudioWrapper = LMStudioWrapper(
+            timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL,
+            api_key=os.environ.get('OPENCODE_API_KEY'),
+            on_request=lambda body: self._log("LLM_REQUEST", f"Anmodning til {body.get('model', '?')}",
+                f"{len(body.get('messages', []))} beskeder, tools={len(body.get('tools', [])) if body.get('tools') else 0}, temperature={body.get('temperature')}, max_tokens={body.get('max_tokens')}")
+        )
+        self.decompose_llm: LMStudioWrapper = LMStudioWrapper(
+            timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL,
+            api_key=os.environ.get('OPENCODE_API_KEY'),
+            on_request=lambda body: self._log("LLM_REQUEST", f"Decompose-anmodning til {body.get('model', '?')}",
+                f"{len(body.get('messages', []))} beskeder, temperature={body.get('temperature')}, max_tokens={body.get('max_tokens')}")
+        )
         self.searcher: WebSearcher = WebSearcher()
         self.task_tree: TaskTree | None = None
         self.action_history: list[str] = []
@@ -198,6 +208,7 @@ class Agent:
         self._rubric_retried: bool = False
         self._write_failed: bool = False
         self._tests_failed: bool = False
+        self._located_files: set[str] = set()
 
     def _register_tools(self) -> None:
         gh = GithubAPI()
@@ -304,8 +315,15 @@ class Agent:
             lambda branch: git_ops.git_checkout(branch=branch)
         ))
         self.tool_registry.register(Tool(
+            "read_location",
+            "Læs KUN en bestemt funktion/metode/klasse vha. AST — IKKE hele filen. Angiv filepath='fil.py' og name='funktionsnavn' (eller name='Klasse.metode'). Returnerer funktionens fulde kode. Brug DENNE i stedet for read_chunk når du skal se specifik kode — meget mere effektivt end at læse hele filen.",
+            ["filepath", "name"],
+            lambda filepath, name=None, line_no=None: agent_files.read_location(filepath=filepath, name=name, line_no=line_no),
+            optional_params=["line_no"]
+        ))
+        self.tool_registry.register(Tool(
             "read_chunk",
-            "Indlæs en chunk af en stor fil. Kræver: file_key (filnavn fra list_chunks), index (1..N). Brug 'list_chunks' først for at se tilgængelige filer og deres chunk-indekser.",
+            "Indlæs en chunk af en stor fil. Kræver: file_key (filnavn fra list_chunks), index (1..N). Brug 'list_chunks' først for at se tilgængelige filer og deres chunk-indekser. Brug kun read_chunk HVIS read_location ikke virker (f.eks. ikke-Python filer).",
             ["file_key", "index"],
             lambda file_key, index=1: self._read_chunk(file_key, int(index))
         ))
@@ -317,9 +335,10 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "locate",
-            "Find en funktion/metode/klasse i en Python-fil via AST. Brug name='ClassName.metode' eller line_no=<linjetal>. Returnerer aktuelt linjenummer, typen (function/class/method), og funktionens fulde kode (body). Brug denne til at finde den aktuelle placering af kode som et issue refererer til.",
-            ["filepath"],
-            lambda filepath, name=None, line_no=None: agent_files.locate_code(filepath=filepath, name=name, line_no=line_no)
+            "Find en funktion/metode/klasse i en Python-fil via AST. Brug name='funktionsnavn' for at søge på tværs af ALLE .py-filer. Brug name='Klassnavn.metode' for metoder. Brug filepath='fil.py' for at begrænse søgningen til én fil. Returnerer linjenummer, typen, funktionens fulde kode (body), og en 'also_in_file'-liste over ANDRE symboler i filen.",
+            ["name", "filepath"],
+            lambda name=None, filepath=None, line_no=None: agent_files.locate_code(filepath=filepath, name=name, line_no=line_no),
+            optional_params=["filepath"]
         ))
         self.tool_registry.register(Tool(
             "write_file",
@@ -329,12 +348,17 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "edit_file",
-            "Rediger en eksisterende fil med search-and-replace. Kræver: path (filsti), old_text (præcis tekst der skal erstattes), new_text (den nye tekst). Søgeteksten skal findes præcis én gang. Syntestjekkes for .py filer. Opretter IKKE nye filer — brug write_file til det.",
+            "Rediger en eksisterende fil. To tilstande:\n"
+            "1) AST-tilstand: Angiv symbol='funktionsnavn' + new_text (hele funktionen). Systemet finder funktionen via AST-linjenumre — old_text ignoreres.\n"
+            "2) Search-and-replace: Angiv old_text (præcis tekst) + new_text. Søgeteksten skal findes præcis én gang.\n"
+            "Syntestjekker .py filer. Opretter IKKE nye filer — brug write_file til det.",
             ["path", "old_text", "new_text"],
-            lambda path, old_text, new_text: git_ops.edit_file(
+            lambda path, old_text="", new_text="", symbol=None: git_ops.edit_file(
                 path=path, old_text=old_text, new_text=new_text,
-                expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path)))
-            )
+                expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path))),
+                symbol=symbol
+            ),
+            optional_params=["symbol"]
         ))
         self.tool_registry.register(Tool(
             "list_files",
@@ -447,8 +471,10 @@ class Agent:
                 depth = 0
                 while depth < 20:
                     cur_abspath = os.path.abspath(cur_file)
-                    if cur_abspath in visited or not os.path.exists(cur_file):
-                        break
+                if cur_abspath in visited or not os.path.exists(cur_file):
+                    # Cycle detected: index current file to prevent unindexed functions and LLM loops
+                    self._delegation_index[func_name] = (cur_abspath, cur_file)
+                    break
                     visited.add(cur_abspath)
                     inner = agent_files.read_file_content(self, cur_file)
                     inner_stubs = agent_files.detect_delegations(inner) if inner else []
