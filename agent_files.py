@@ -66,6 +66,72 @@ def detect_delegations(content):
     return stubs
 
 
+def _format_params(node):
+    args = node.args
+    parts = []
+    # positional args
+    total = len(args.args)
+    defaults = [None] * (total - len(args.defaults)) + list(args.defaults) if args.defaults else [None] * total
+    for i, a in enumerate(args.args):
+        prefix = "self, " if i == 0 and a.arg == "self" else ""
+        if i == 0 and a.arg == "self":
+            continue
+        p = a.arg
+        if defaults[i] is not None:
+            try:
+                p += f"={ast.unparse(defaults[i])}"
+            except Exception:
+                p += "=..."
+        parts.append(p)
+    if args.vararg:
+        parts.append(f"*{args.vararg.arg}")
+    for a in args.kwonlyargs:
+        parts.append(f"{a.arg}=...")
+    if args.kwarg:
+        parts.append(f"**{args.kwarg.arg}")
+    return ", ".join(parts)
+
+
+def build_ast_index(code, filename):
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return None
+    index_lines = [f"### {filename}"]
+    def _sig(n):
+        return _format_params(n)
+
+    def _doc(n):
+        d = ast.get_docstring(n) or ""
+        return (" — " + d.splitlines()[0][:80]) if d else ""
+
+    class _Builder(ast.NodeVisitor):
+        def __init__(self):
+            self.in_class = False
+        def visit_ClassDef(self, node):
+            old = self.in_class
+            self.in_class = True
+            methods = []
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    methods.append(f"    {item.name}({_sig(item)}) [{item.lineno}]{_doc(item)}")
+            index_lines.append(f"  class {node.name} [{node.lineno}]{_doc(node)}")
+            index_lines.extend(methods)
+            self.generic_visit(node)
+            self.in_class = old
+        def visit_FunctionDef(self, node):
+            if not self.in_class:
+                index_lines.append(f"  {node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
+            self.generic_visit(node)
+        def visit_AsyncFunctionDef(self, node):
+            if not self.in_class:
+                index_lines.append(f"  {node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
+            self.generic_visit(node)
+
+    _Builder().visit(tree)
+    return "\n".join(index_lines) if len(index_lines) > 1 else None
+
+
 def file_hash(filepath):
     try:
         size = os.path.getsize(filepath)
@@ -192,7 +258,7 @@ def get_folder_context(agent, prompt):
         return None
 
     for item in found_files:
-        agent._log("INFO", "Fundet fil", item["path"])
+        agent._log("DEBUG", "Scanned", item["path"])
     return found_files
 
 
@@ -216,6 +282,7 @@ def read_chunk(agent, chunk, index):
         return {"success": False, "error": f"Ukendt chunk: '{original}'. Tilg\u00e6ngelige filer: {available}. Brug 'list_chunks' for at se alle."}
     if index < 1 or index > len(chunks):
         return {"success": False, "error": f"Chunk {index} findes ikke (1..{len(chunks)})"}
+    agent._log("READ", f"L\u00e6st chunk {index}/{len(chunks)}: {original}", f"{len(chunks[index - 1])} tegn")
     return {"success": True, "chunk": chunk, "index": index, "total": len(chunks), "content": chunks[index - 1]}
 
 

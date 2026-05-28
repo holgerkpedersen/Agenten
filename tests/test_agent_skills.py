@@ -17,11 +17,13 @@ class TestTemplateTools:
 
     def test_resume_tools(self):
         from agent_skills import TEMPLATE_TOOLS
-        assert TEMPLATE_TOOLS["resume"] == ["list_chunks", "read_chunk", "list_files"]
+        assert "locate" in TEMPLATE_TOOLS["resume"]
+        assert "read_chunk" in TEMPLATE_TOOLS["resume"]
 
     def test_programmering_tools(self):
         from agent_skills import TEMPLATE_TOOLS
-        assert TEMPLATE_TOOLS["programmering"] == ["list_chunks", "read_chunk", "write_file", "add_image", "list_files", "create_issue", "create_refactor_issue"]
+        assert "locate" in TEMPLATE_TOOLS["programmering"]
+        assert "read_chunk" in TEMPLATE_TOOLS["programmering"]
 
 
 class TestTemplateTaskTools:

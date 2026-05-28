@@ -72,12 +72,12 @@ def _build_chunk_hint(agent):
         for key in available_keys:
             total = len(agent.file_chunks[key])
             display = key.replace("file_", "", 1)
-            if total > 1:
-                parts.append(f"\n  read_chunk(file_key='{display}', index=1..{total})")
-            else:
-                parts.append(f"\n  read_chunk(file_key='{display}', index=1)")
+            parts.append(f"\n  {display} ({total} chunk{'s' if total > 1 else ''})")
         base_dir = os.path.abspath('.')
-        hint = f"\n\n## TILG\u00c6NGELIGE FILER (projektmappe: {base_dir}){''.join(parts)}\n"
+        hint = f"\n\n## TILG\u00c6NGELIGE FILER (projektmappe: {base_dir})"
+        hint += "".join(parts)
+        hint += "\n\n  Brug locate(filepath='fil.py', name='funktionsnavn') for at l\u00e6se en bestemt funktion/metode."
+        hint += "\n  Brug read_chunk(file_key='fil.py', index=N) kun for at gennemse r\u00e5t filindhold."
     delegation_lines = []
     for key, chunks in agent.file_chunks.items():
         content = chunks[0] if chunks else ''
@@ -227,10 +227,17 @@ def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_no
     agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=parsed['tool']), result_str)
 
     if parsed["tool"] in ("write_file", "edit_file"):
+        if isinstance(result, dict) and result.get("success") is False:
+            agent._write_failed = True
         unread_hints = agent._hints_available - agent._hints_requested
         if unread_hints:
             ids = ", ".join(sorted(unread_hints)[:3])
             _add_user_msg(messages, f"\u26a0\ufe0f {t(K.ANTI_LEAKAGE_WARNING, agent.lang)} ({ids})")
+    if parsed["tool"] == "run_tests":
+        if isinstance(result, dict) and result.get("success") is False:
+            agent._tests_failed = True
+        else:
+            agent._tests_failed = False
 
     if parsed["tool"] == "read_issue":
         if isinstance(result, dict) and result.get("success"):
@@ -249,7 +256,10 @@ def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_no
         return {"type": "checkpoint", "tool": parsed["tool"], "args": parsed.get("args", {}), "result": result, "checkpoint_msg": checkpoint_msg}
     else:
         agent._checkpoint_tools.add(parsed["tool"] + str(parsed.get("args", {})))
-        _add_user_msg(messages, f"{t(K.TOOL_RESULT_PREFIX, agent.lang).format(tool=parsed['tool'])}\n{result_str}\n\n{_cont_hint(agent, tools_list)}")
+        msg = f"{t(K.TOOL_RESULT_PREFIX, agent.lang).format(tool=parsed['tool'])}\n{result_str}\n\n{_cont_hint(agent, tools_list)}"
+        if agent._write_failed:
+            msg += f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: edit_file MISLYKKEDES. DU M\u00c5 IKKE bruge <<<DONE>>> f\u00f8r edit_file lykkes. Ret din anmodning og pr\u00f8v igen."
+        _add_user_msg(messages, msg)
         return {"type": "tool_result", "tool": parsed["tool"], "args": parsed.get("args", {}), "result": result}
 
 
@@ -336,6 +346,8 @@ def solve_task_stream(agent, task_node, original_prompt):
     max_iterations = config.MAX_PR_TASK_ITERATIONS if agent_git.is_pr_workflow(task_node.name) else config.MAX_TASK_ITERATIONS
     called_tools = {}
     consecutive_errors = 0
+    agent._write_failed = False
+    agent._tests_failed = False
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -397,6 +409,14 @@ def solve_task_stream(agent, task_node, original_prompt):
                 result = agent.tool_registry.execute(tool_name, args_val)
                 result_str = json.dumps(result, ensure_ascii=False)
                 agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success") is False:
+                    agent._write_failed = True
+                    result_str += f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: edit_file MISLYKKEDES. DU M\u00c5 IKKE bruge <<<DONE>>> f\u00f8r edit_file lykkes. Ret din anmodning og pr\u00f8v igen."
+                if tool_name == "run_tests":
+                    if isinstance(result, dict) and result.get("success") is False:
+                        agent._tests_failed = True
+                    else:
+                        agent._tests_failed = False
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
@@ -444,6 +464,14 @@ def solve_task_stream(agent, task_node, original_prompt):
             continue
 
         if parsed["type"] == "done":
+            if agent._write_failed:
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med <<<DONE>>> n\u00e5r edit_file har fejlet. Ret din anmodning og kald edit_file igen.")
+                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                continue
+            if agent._tests_failed:
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med <<<DONE>>> n\u00e5r tests fejler. Ret koden med edit_file og k\u00f8r run_tests() igen indtil ALLE tests best\u00e5r.")
+                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                continue
             if not _check_done_pr_requirements(agent, messages, called_tools, original_prompt, task_node.name):
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 if agent_git.is_pr_workflow(task_node.name):
