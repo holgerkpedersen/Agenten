@@ -158,6 +158,8 @@ class LMStudioWrapper:
 
         compressed = self._compress_messages(msgs)
         log.info(f"Sending to LLM (chat, timeout: {self.timeout}s)")
+        if len(compressed) > 3:
+            compressed = self._truncate_messages(compressed)
 
         try:
             response = requests.post(
@@ -192,6 +194,17 @@ class LMStudioWrapper:
             log.error("Error: %s", e)
             return f"ERROR:{str(e)}"
 
+    def _truncate_messages(self, messages):
+        total = sum(len(m.get("content", "")) if isinstance(m.get("content"), str) else 0 for m in messages)
+        if total <= config.MAX_MESSAGE_CHARS:
+            return messages
+        system_msgs = [m for m in messages if m["role"] == "system"]
+        other_msgs = [m for m in messages if m["role"] != "system"]
+        mid = "\n[... tidligere kontekst afkortet ...]"
+        if len(other_msgs) > 2:
+            other_msgs = [other_msgs[0], {"role": "user", "content": mid}] + other_msgs[-1:]
+        return system_msgs + other_msgs
+
     def generate_stream(self, prompt=None, messages=None, temperature=0.7, max_tokens=None, images=None, tools=None):
         if max_tokens is None:
             max_tokens = config.MAX_TOKENS
@@ -212,6 +225,8 @@ class LMStudioWrapper:
                 elif isinstance(c, str):
                     log.info("  msg[%s] type=text len=%s", i, len(c))
         log.info("Streaming chat request to LLM")
+        if len(compressed) > 3:
+            compressed = self._truncate_messages(compressed)
         stream_timeout = config.LLM_STREAM_TIMEOUT
         body = {
             "model": self.model,

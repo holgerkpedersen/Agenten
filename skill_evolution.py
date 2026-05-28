@@ -194,25 +194,9 @@ def _extract_common_patterns(tasks: list) -> list:
     return [bg for bg, count in bigrams.most_common(5) if count > 1][:3]
 
 
-def analyze():
-    """
-    Analyse all tracked outcomes and produce a list of evolution actions.
-    Returns a dict with skill-level recommendations and potential new skill gaps.
-    """
-    try:
-        outcomes = tracker.get_outcomes()
-    except (ImportError, NameError):
-        return {"status": "error", "message": "skill_tracker not available"}
-
-    outcomes = tracker.get_outcomes()
-    total = len(outcomes)
-    if total < 5:
-        return {"status": "not_enough_data", "total": total, "actions": []}
-
-    stats = tracker.get_all_skill_stats(recent=100)
+def _analyze_skills(stats: dict) -> list:
+    """Analyse per-skill success rates and produce retain/refine/prune action recommendations."""
     actions = []
-    evolved = set()
-
     for skill_name, s in stats.items():
         if not skill_name or skill_name == "__none__":
             continue
@@ -227,8 +211,6 @@ def analyze():
                 "success_rate": round(rate, 3),
                 "count": count,
             })
-            evolved.add(skill_name)
-
         elif rate >= REFINE_MIN_RATE:
             recent_failures = [
                 o for o in tracker.get_outcomes(skill_name, 20)
@@ -245,8 +227,6 @@ def analyze():
                 "count": count,
                 "failure_patterns": [p for p, _ in common_patterns],
             })
-            evolved.add(skill_name)
-
         elif rate < PRUNE_MAX_RATE and count >= PRUNE_MIN_COUNT:
             actions.append({
                 "action": "prune",
@@ -255,10 +235,12 @@ def analyze():
                 "success_rate": round(rate, 3),
                 "count": count,
             })
-            evolved.add(skill_name)
+    return actions
 
-    # Generate: detect clusters of repeated unmatched tasks
-    unmatched_outcomes = tracker.get_unmatched_outcomes(100)
+
+def _detect_clusters(unmatched_outcomes: list) -> list:
+    """Detect clusters of repeated unmatched tasks and produce generate action recommendations."""
+    actions = []
     clusters = _cluster_unmatched(unmatched_outcomes)
     for cluster in sorted(clusters, key=len, reverse=True)[:5]:
         suggested_name = _extract_cluster_name(cluster)
@@ -273,6 +255,30 @@ def analyze():
             "suggested_action_types": action_types,
             "suggested_keywords": keywords,
         })
+    return actions
+
+
+def analyze():
+    """
+    Analyse all tracked outcomes and produce a list of evolution actions.
+
+    Returns a dict with skill-level recommendations and potential new skill gaps.
+    Orchestrates data validation, skill analysis, and cluster detection.
+    """
+    try:
+        outcomes = tracker.get_outcomes()
+    except (ImportError, NameError):
+        return {"status": "error", "message": "skill_tracker not available"}
+
+    total = len(outcomes)
+    if total < 5:
+        return {"status": "not_enough_data", "total": total, "actions": []}
+
+    stats = tracker.get_all_skill_stats(recent=100)
+    actions = _analyze_skills(stats)
+
+    unmatched_outcomes = tracker.get_unmatched_outcomes(100)
+    actions.extend(_detect_clusters(unmatched_outcomes))
 
     _save_json(ACTIONS_LOG, {
         "analyzed_at": datetime.now().isoformat(),

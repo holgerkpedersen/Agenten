@@ -1098,9 +1098,9 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
         if child.result:
             child_results.append(f"- {child.name}: {child.result}")
 
-    if child_results:
+    if node.children and all(c.status in ("done", "skipped") for c in node.children):
         node.status = "done"
-        node.result = "\n".join(child_results)
+        node.result = "\n".join(child_results) if child_results else "All subtasks completed"
         completed[0] += 1
         progress = int((completed[0] / total_tasks) * 100)
         yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
