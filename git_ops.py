@@ -6,7 +6,7 @@ import subprocess
 import threading
 from i18n import K
 from lang import t
-from agent_files import is_safe_location
+from agent_files import is_safe_location, locate_code
 
 _file_lock = threading.Lock()
 _BASE_DIR = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
@@ -329,7 +329,7 @@ def _build_fuzzy_pattern(text):
     return r'[ \t]*\n(?:[ \t]*\n)*[ \t]*'.join(parts), len(parts)
 
 
-def edit_file(path, old_text, new_text, expected_hash=None):
+def edit_file(path, old_text="", new_text="", expected_hash=None, symbol=None):
     if not os.path.isabs(path):
         path = os.path.abspath(path)
     if not is_safe_location(path):
@@ -355,26 +355,46 @@ def edit_file(path, old_text, new_text, expected_hash=None):
 
         # Normalize to \n-only for consistent byte positions (BUG-076 fix)
         content = content.replace('\r\n', '\n').replace('\r', '\n')
-        search = old_text.replace('\r\n', '\n').replace('\r', '\n')
-        count = content.count(search)
-        if count == 0:
-            pattern, nlines = _build_flexible_pattern(search)
-            m = re.search(pattern, content)
-            if not m:
-                pattern, nlines = _build_fuzzy_pattern(search)
-                m = re.search(pattern, content)
-            if not m:
-                return {"success": False, "error": f"Teksten blev ikke fundet i {path}"}
-            matches = list(re.finditer(pattern, content))
-            if len(matches) > 1:
-                return {"success": False, "error": f"Teksten fundet {len(matches)} gange — brug en mere specifik søgestreng"}
-            idx = m.start()
-            search_len = len(m.group())
-        else:
-            if count > 1:
-                return {"success": False, "error": f"Teksten fundet {count} gange — brug en mere specifik søgestreng"}
+
+        if symbol:
+            if not new_text:
+                return {"success": False, "error": "new_text is required when using symbol."}
+            loc = locate_code(filepath=path, name=symbol)
+            if not loc.get("success"):
+                return {"success": False, "error": f"Symbol '{symbol}' not found in {path}. Use old_text/new_text instead."}
+            start = loc["line"]
+            end = loc["end_line"]
+            lines_list = content.split('\n')
+            if start < 1 or end > len(lines_list):
+                return {"success": False, "error": f"Symbol '{symbol}' line range {start}-{end} outside file"}
+            search = '\n'.join(lines_list[start - 1:end])
+            if content.count(search) != 1:
+                return {"success": False, "error": f"Symbol body for '{symbol}' matched {content.count(search)} times (expected 1)"}
             idx = content.index(search)
             search_len = len(search)
+        elif old_text:
+            search = old_text.replace('\r\n', '\n').replace('\r', '\n')
+            count = content.count(search)
+            if count == 0:
+                pattern, nlines = _build_flexible_pattern(search)
+                m = re.search(pattern, content)
+                if not m:
+                    pattern, nlines = _build_fuzzy_pattern(search)
+                    m = re.search(pattern, content)
+                if not m:
+                    return {"success": False, "error": f"Teksten blev ikke fundet i {path}"}
+                matches = list(re.finditer(pattern, content))
+                if len(matches) > 1:
+                    return {"success": False, "error": f"Teksten fundet {len(matches)} gange — brug en mere specifik søgestreng"}
+                idx = m.start()
+                search_len = len(m.group())
+            else:
+                if count > 1:
+                    return {"success": False, "error": f"Teksten fundet {count} gange — brug en mere specifik søgestreng"}
+                idx = content.index(search)
+                search_len = len(search)
+        else:
+            return {"success": False, "error": "Provide either symbol (AST-based) or old_text+new_text (search-and-replace)."}
 
         exact_old = content[idx:idx + search_len]
         if exact_old.count('\n') != search.count('\n'):
