@@ -11,7 +11,7 @@ log = get_logger(__name__)
 
 
 class LMStudioWrapper:
-    def __init__(self, base_url=None, timeout=120, model=None, api_key=None):
+    def __init__(self, base_url=None, timeout=120, model=None, api_key=None, on_request=None):
         self.base_url = self._resolve_base_url(base_url)
         self.api_key = api_key or os.environ.get('OPENCODE_API_KEY', '')
         self.cache = {}
@@ -23,6 +23,7 @@ class LMStudioWrapper:
         self.model = model or os.environ.get('LM_MODEL') or config.LLM_MODEL
         self._pending_tool_calls = []
         self._pending_reasoning = None
+        self.on_request = on_request
 
     def _headers(self):
         h = {}
@@ -161,15 +162,18 @@ class LMStudioWrapper:
         if len(compressed) > 3:
             compressed = self._truncate_messages(compressed)
 
+        body = {
+            "model": self.model,
+            "messages": compressed,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        if self.on_request:
+            self.on_request(body)
         try:
             response = requests.post(
                 f"{self.base_url}/chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": compressed,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens
-                },
+                json=body,
                 headers=self._headers(),
                 timeout=(30, self.timeout)
             )
@@ -237,6 +241,8 @@ class LMStudioWrapper:
         }
         if tools:
             body["tools"] = tools
+        if self.on_request:
+            self.on_request(body)
         try:
             response = requests.post(
                 f"{self.base_url}/chat/completions",
