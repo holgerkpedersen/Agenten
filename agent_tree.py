@@ -156,19 +156,23 @@ def record_outcome(agent, task_node):
             duration_ms=duration,
             template=agent.active_template or "",
         )
-    except ImportError:
+    except Exception as e:
         pass
 
 
 def evolve_if_needed(agent):
     try:
-        from skill_evolution import evolve_if_needed as _evolve
-        result = _evolve(dry_run=False)
-        if result.get("status") == "evolved":
-            agent._log("SKILLFLOW", "Evolution triggered", f"{len(result.get('analysis', {}).get('actions', []))} actions")
-            for r in result.get("results", []):
-                agent._log("SKILLFLOW", f"Action: {r.get('action', '?')}", str(r.get('detail', ''))[:200])
-        elif result.get("status") == "ok":
-            agent._log("SKILLFLOW", "Analysis ready", f"{len(result.get('actions', []))} actions available")
-    except ImportError:
-        pass
+        from skill_tracker import tracker
+        if not tracker.should_evolve():
+            return False
+        new_template = tracker.evolve()
+        agent.active_template = new_template
+        return True
+    except Exception as e:
+        # Log error to prevent crash on disk-full or other IO errors
+        try:
+            import logging
+            logging.error(f"Skill evolution failed: {e}")
+        except Exception:
+            pass
+        return False

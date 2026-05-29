@@ -322,13 +322,40 @@ When extracting methods from `agent_core.py` into module files:
 | `billedanalyse` | add_image, write_file, list_chunks, read_chunk | Image analysis → .md export |
 | `agenten` | git tools + read_chunk | Git/GitHub PR workflow |
 
-### 39. deepseek-v4-pro refuses to write/edit files — model training bias (`agent_tasks.py:132-134`)
+### 39. `locate_code` missed global variables (`agent_files.py:348-368,396-458`)
+**Symptom:** LLM calls `locate(name='current_session_id')` — returns `"Symbol not found"`. LLM can't find the variable, gets stuck.
+**Root cause:** `_build_global_symbol_index`, `_list_top_level_symbols`, and the name-search loop in `locate_code` only indexed/searched `FunctionDef`, `AsyncFunctionDef`, and `ClassDef` nodes. `ast.Assign` and `ast.AnnAssign` at module level were ignored.
+**Fix:** Added `_list_top_level_vars(tree)` helper and integrated it into all three locations. `locate_code` now returns `"type": "variable"` with the full assignment line as body.
+
+### 40. `_finalize_task_stream` auto-completes phases without required tools (`agent_tasks.py:306-345`)
+**Symptom:** Session `3caff59c` — all 5 phases marked "done" but LLM never called `edit_file`/`write_file`/`update_issue_status`. Implementation phase "completed 6 tool calls (auto-completed)" with zero code written.
+**Root cause:** No enforcement that required action tools were actually called. The `WRITE_REQUIRED` advisory in the prompt was ignored by the LLM. Three escape paths: (1) explicit `<<<DONE>>>` without checks, (2) `MAX_TOOL_CALLS` reached with only read tools, (3) text fallback on first iteration.
+**Fix:** Added `_check_required_tools(agent, called_tools)` — checks if `{edit_file, write_file, update_issue_status}` are in `active_tools` but never called. Applied in both `_finalize_task_stream` (overrides status → failed) and the `<<<DONE>>>` handler (rejects with error message + retry). Added `K.LOG_REQUIRED_TOOLS_MISSING` i18n key in all 4 languages.
+
+### 41. `create_issue` didn't validate function-name locations (`agent_issues.py:190-191`)
+**Symptom:** Issue `BUG-063` had `location: api_server.py:_normalize_images` — but `_normalize_images` is a base64 converter that has nothing to do with `current_session_id`. The wrong location confused the LLM for 50%+ of its tokens.
+**Root cause:** The location validation regex only matched `file.py:123` (line numbers). `file.py:FunctionName` format fell through to `resolved_parts.append(part)` without calling `locate_code` to verify the function exists.
+**Fix:** Added a second regex match for `file.py:FunctionName` format, validates via `locate_code(filepath, name=sym_name)`, logs a warning if the function doesn't exist.
+
+### 42. deepseek-v4-pro refuses to write/edit files — model training bias (`agent_tasks.py:132-134`)
 
 **Symptom:** Session f502154d — 5 phases (Analysis, Plan, Extract, Update, Test). LLM called `list_files`, `read_chunk`, `list_chunks` extensively but NEVER called `write_file` or `edit_file`. Even with "⛔ YOU MUST write/edit code" warning + `write_file` in active tools, model reads and says Done.  
 **Root cause:** `deepseek-v4-pro` is trained for analysis/reasoning, not code editing. It produces text analysis (in Done markers) but refuses to call write/edit tools. This is a model capability limitation, not a prompt issue.  
 **Native tools verified:** DeepSeek API docs confirm function calling support. Agenten now properly sends `role:"tool"` messages with `tool_call_id` matching assistant `tool_calls`. No HTTP 400 errors. Model uses native tool calls for read tools but still refuses write_file/edit_file.  
 **Fix:** Use `minimax-m2.5` for code-editing tasks (issue_handler, programming, refactoring). `deepseek-v4-pro` is fine for read-only analysis (kodeanalyse, resume). Other tested models: `minimax-m2.5` ✓ (edits code), `glm-5.1` ✓ (native tools).  
 **Warning hardcoded fix:** Line 134 was hardcoded Danish "⚠️ DU SKAL redigere kode" — replaced with i18n key `K.WRITE_REQUIRED` in all 4 languages.
+
+### 43. Auto-resolution missed already-fixed bugs when LLM hit tool call limit (`agent_tasks.py:472-491`)
+
+**Symptom:** Session `88a11e66` — all 5 phases executed (all failed/done) despite the bug already being fixed. Analysis phase correctly identified "already fixed" but wasted all 6 tool calls re-reading the same code, hit tool call limit, and got the generic "Gennemførte 6 værktøjskald" message as `full_response` — which doesn't match `AUTO_RESOLVE_PATTERNS`.
+
+**Root cause:** `_finalize_task_stream` only checked `full_response` text for auto-resolve patterns. When the tool call limit was reached, `full_response` was overwritten with the generic auto-done message, losing the LLM's actual analysis conclusion. The auto-resolution was in `elif task_node.status == "done":` block — but `_check_required_tools` (before phase-aware fix) ran first and set status to "failed".
+
+**Fix (2 parts):**
+1. Phase-aware `_check_required_tools()` — `update_issue_status` removed from required tools for Analyse/Læs/Afklar phases (already done in prior fix).
+2. `_finalize_task_stream` now also scans ALL assistant messages' text content for `AUTO_RESOLVE_PATTERNS`, not just `full_response`. If a match is found in assistant messages, auto-resolution triggers.
+
+**Files:** `agent_tasks.py:472-491`
 
 ## Model Knowledge
 

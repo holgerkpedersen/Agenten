@@ -80,9 +80,12 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB max per image file
 # Task execution
 EXECUTION_TIMEOUT = 1800  # 30 min wall-clock per task
 SUBPROCESS_TIMEOUT = 120  # seconds per subprocess call (pytest, git, etc.)
-MAX_TOOL_CALLS = 4  # max LLM tool calls per task step
-MAX_TASK_ITERATIONS = 6  # max LLM conversation turns per task
-MAX_PR_TASK_ITERATIONS = 10  # max turns for PR/git workflow tasks
+MAX_TOOL_CALLS_ANALYSE = 6   # Analyse/Læs/Afklar faser (læs issue + kode + kør tests)
+MAX_TOOL_CALLS_FIX = 12       # Implementering/Fix/Test-faser med edit→test loop
+MAX_TOOL_CALLS_CLOSE = 4      # Opdatering/Luk/Verifikation faser
+MAX_FIX_ATTEMPTS = 3          # Max edit+test forsøg før opgivet
+MAX_TASK_ITERATIONS = 6       # max LLM conversation turns per task
+MAX_PR_TASK_ITERATIONS = 10   # max turns for PR/git workflow tasks
 NATIVE_TOOLS = False  # Use OpenAI native function calling when available
 
 # Message size limits (chars) — prevents "too much context" errors to LM Studio

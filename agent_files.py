@@ -333,6 +333,19 @@ def _find_enclosing_symbol(tree, target_line):
     return best
 
 
+def _list_top_level_vars(tree):
+    vars = []
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    vars.append((target.id, "variable", node.lineno))
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name):
+                vars.append((node.target.id, "variable", node.lineno))
+    return vars
+
+
 def _list_top_level_symbols(tree):
     symbols = []
     for node in ast.iter_child_nodes(tree):
@@ -342,6 +355,7 @@ def _list_top_level_symbols(tree):
             symbols.append((node.name, "async_function", node.lineno))
         elif isinstance(node, ast.ClassDef):
             symbols.append((node.name, "class", node.lineno))
+    symbols.extend(_list_top_level_vars(tree))
     return symbols
 
 
@@ -365,6 +379,13 @@ def _build_global_symbol_index():
                         dotted = f"{node.name}.{child.name}"
                         index.setdefault(dotted, []).append((fname, child.lineno))
                         index.setdefault(child.name, []).append((fname, child.lineno))
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        index.setdefault(target.id, []).append((fname, node.lineno))
+            elif isinstance(node, ast.AnnAssign):
+                if isinstance(node.target, ast.Name):
+                    index.setdefault(node.target.id, []).append((fname, node.lineno))
     return index
 
 _GLOBAL_SYMBOL_INDEX = _build_global_symbol_index()
@@ -451,6 +472,32 @@ def locate_code(filepath=None, name=None, line_no=None):
                         "file": filepath,
                         "name": name,
                         "type": "async_function",
+                        "line": start,
+                        "end_line": end,
+                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "also_in_file": siblings,
+                    }
+                elif isinstance(node, ast.Assign) and func_name in (t.id for t in node.targets if isinstance(t, ast.Name)):
+                    start = node.lineno
+                    end = getattr(node, 'end_lineno', start) or start
+                    return {
+                        "success": True,
+                        "file": filepath,
+                        "name": name,
+                        "type": "variable",
+                        "line": start,
+                        "end_line": end,
+                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "also_in_file": siblings,
+                    }
+                elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == func_name:
+                    start = node.lineno
+                    end = getattr(node, 'end_lineno', start) or start
+                    return {
+                        "success": True,
+                        "file": filepath,
+                        "name": name,
+                        "type": "variable",
                         "line": start,
                         "end_line": end,
                         "body": "\n".join(code.splitlines()[start - 1:end]),

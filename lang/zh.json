@@ -162,6 +162,8 @@
   "sys_example_prefix": "示例",
   "sys_marker_warning": "仅使用 '{TOOL}' 和 '{DONE}' 标记",
   "sys_error_prefix": "错误",
+  "strict_tool_rule": "严格规则：`args` 对象的键必须与参数名称完全匹配。不要重命名、省略或添加额外的键。每次工具调用必须以 {END_MARKER} 结束。",
+  "tool_param_desc": "工具 '{tool}' 的参数 '{param}'。{desc}",
   "sys_fallback_tool": "无工具",
   "file_context_header": "## 分析文件内容：\n",
   "file_context_python": "以下是需要分析的文件内容：\n\n```python\n{content}\n```\n\n使用此内容进行具体分析。识别：\n- 文件的目的是什么？\n- 使用了哪些导入？\n- 存在哪些端点/路由？\n- 任何问题或改进机会\n\n",
@@ -205,7 +207,9 @@
     "iteration": "迭代 {n}",
     "type": "类型：{type}",
     "decomposed": "已分解为树",
-    "read_only": "已读取 {tools} 但未采取进一步操作。考虑使用更具体的提示重新运行，或选择其他模型。"
+    "read_only": "已读取 {tools} 但未采取进一步操作。考虑使用更具体的提示重新运行，或选择其他模型。",
+    "required_tools_missing": "缺少必需工具：{tools}。不使用这些工具无法完成任务。",
+    "tests_passed_no_resolve": "✅ 测试通过 —— 请记得调用 update_issue_status() 将问题标记为已解决。"
   },
   "errors": {
     "no_prompt": "未提供任务",

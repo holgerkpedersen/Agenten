@@ -53,6 +53,12 @@ class ToolRegistry:
             if self.active_tools is not None and name not in self.active_tools:
                 continue
             required = [p for p in tool.parameters if p not in tool.optional_params]
+            param_descs = {}
+            for p in tool.parameters:
+                param_descs[p] = {
+                    "type": "string",
+                    "description": t(K.TOOL_PARAM_DESC, self.lang).format(param=p, tool=tool.name, desc=tool.description)
+                }
             tools.append({
                 "type": "function",
                 "function": {
@@ -60,7 +66,7 @@ class ToolRegistry:
                     "description": tool.description,
                     "parameters": {
                         "type": "object",
-                        "properties": {p: {"type": "string", "description": p} for p in tool.parameters},
+                        "properties": param_descs,
                         "required": required,
                     }
                 }
@@ -92,6 +98,9 @@ class ToolRegistry:
             tools_desc=tools_desc,
             task=task,
         )
+        strict_rule = t(K.STRICT_TOOL_RULE, self.lang).format(
+            TOOL_MARKER=self.TOOL_MARKER, END_MARKER=self.END_MARKER)
+        prompt += f"\n\n**{strict_rule}**"
         example_prefix = t(K.SYS_EXAMPLE_PREFIX, self.lang)
         real_example = active_names[0]
         first_params = [p for p in self.tools[real_example].parameters][:2] if real_example in self.tools else []

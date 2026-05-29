@@ -126,6 +126,8 @@ class K(StrEnum):
     SYS_FALLBACK_TOOL   = "sys_fallback_tool"
     SYS_FILE_CONTEXT    = "sys_file_context"
     TOOL_SYSTEM_PROMPT_NATIVE = "tool_system_prompt_native"
+    STRICT_TOOL_RULE    = "strict_tool_rule"
+    TOOL_PARAM_DESC     = "tool_param_desc"
 
     # === File context ===
     FILE_CONTEXT_HEADER  = "file_context_header"
@@ -165,6 +167,8 @@ class K(StrEnum):
     LOG_TASK_FAILED         = "log.task_failed"
     LOG_AUTO_DONE           = "log.auto_done"
     LOG_READ_ONLY           = "log.read_only"
+    LOG_REQUIRED_TOOLS_MISSING = "log.required_tools_missing"
+    LOG_TESTS_PASSED_NO_RESOLVE = "log.tests_passed_no_resolve"
     LOG_TREE_EXECUTION      = "log.tree_execution_start"
     LOG_READING_FILE        = "log.reading_file"
     LOG_FILE_FOUND          = "log.file_found"

@@ -7,7 +7,22 @@ from lang import t
 import agent_skills
 import agent_git
 import agent_files
+import agent_issues
 import config
+
+
+def _parse_test_summary(result):
+    ud = result.get("stdout", "") or ""
+    if not ud:
+        return ""
+    last_short = ""
+    for line in ud.splitlines():
+        if "==" in line and ("passed" in line or "failed" in line or "error" in line):
+            if "short test summary" not in line.lower():
+                last_short = line.strip().lstrip("=").rstrip("=").strip()
+    if last_short:
+        return last_short
+    return ""
 
 EXECUTION_TIMEOUT = config.EXECUTION_TIMEOUT
 
@@ -34,6 +49,61 @@ def _normalize_phase(name):
     lower = name.lower().split("(")[0].strip()
     lower = re.sub(r'^[\d.]+[\)\s]*', '', lower).strip()
     return PHASE_ALIASES.get(lower, lower)
+
+
+def _get_max_tool_calls(task_name):
+    phase = _normalize_phase(task_name).lower()
+    if any(k in phase for k in ["analyse", "læs", "afklar"]):
+        return config.MAX_TOOL_CALLS_ANALYSE
+    if any(k in phase for k in ["implementering", "fix", "test", "ekstraher", "opdatér",
+                                  "kravanalyse", "arkitekturdesign", "kodeimplementering"]):
+        return config.MAX_TOOL_CALLS_FIX
+    if any(k in phase for k in ["luk", "close", "opdatering", "verifikation"]):
+        return config.MAX_TOOL_CALLS_CLOSE
+    return config.MAX_TOOL_CALLS_ANALYSE
+
+
+def _validate_done_output(agent, result_text, task_name):
+    if isinstance(result_text, dict):
+        result_text = result_text.get("result", str(result_text))
+    if not isinstance(result_text, str) or len(result_text.strip()) < 50:
+        return t(K.VALIDATION_DONE_TOO_SHORT, agent.lang).format(len(result_text) if result_text else 0)
+    phase = _normalize_phase(task_name).lower()
+    template = getattr(agent, 'active_template', '') or ''
+    bugfix_templates = {"bugfix", "refactor", "testgenerering", "issue_handler"}
+    if template not in bugfix_templates:
+        return None
+    rt = result_text.lower()
+    if any(k in phase for k in ["analyse", "læs", "afklar"]):
+        has_issue_id = bool(re.search(r'(BUG|SEC|TST|ARC|PRF|MNT|REFAC)-\d+', result_text))
+        has_keyword = any(w in rt for w in ["bug", "confirmed", "already fixed", "location", "fejl", "bekræftet"])
+        if not (has_issue_id and has_keyword):
+            return t(K.VALIDATION_DONE_MISSING_KEYWORDS, agent.lang).format(
+                phase, "issue-id + bug/location status")
+    elif any(k in phase for k in ["implementering", "fix", "test", "ekstraher", "opdatér"]):
+        has_keyword = any(w in rt for w in ["changed", "fixed", "edited", "implemented",
+                                             "rettede", "implementerede", "skrevet", "fil"])
+        if not has_keyword:
+            return t(K.VALIDATION_DONE_MISSING_KEYWORDS, agent.lang).format(
+                phase, "what was changed/implemented")
+    elif any(k in phase for k in ["luk", "close", "opdatering", "verifikation"]):
+        has_keyword = any(w in rt for w in ["resolved", "resolution", "lukket", "afsluttet",
+                                             "tests pass", "består"])
+        if not has_keyword:
+            return t(K.VALIDATION_DONE_MISSING_KEYWORDS, agent.lang).format(
+                phase, "resolution_note + test status")
+    return None
+
+
+def _count_fix_attempts(agent, called_tools):
+    edit_count = 0
+    for k in called_tools:
+        if k.startswith("edit_file"):
+            edit_count += 1
+    if edit_count > config.MAX_FIX_ATTEMPTS:
+        return t(K.VALIDATION_FIX_ATTEMPTS_EXHAUSTED, agent.lang).format(
+            config.MAX_FIX_ATTEMPTS, edit_count)
+    return None
 
 
 def set_task_tools(agent, task_name):
@@ -244,6 +314,21 @@ def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_no
             agent._tests_failed = True
         else:
             agent._tests_failed = False
+        test_summary = _parse_test_summary(result)
+        exit_code = result.get("exit_code")
+        if test_summary:
+            if exit_code == 0:
+                agent._log("INFO", f"✅ Tests PASSED: {test_summary}",
+                           json.dumps({"exit_code": exit_code, "summary": test_summary}, ensure_ascii=False))
+            else:
+                agent._log("ERROR", f"❌ Tests FAILED: {test_summary}",
+                           json.dumps({"exit_code": exit_code, "summary": test_summary}, ensure_ascii=False))
+        elif exit_code == 0:
+            agent._log("INFO", "✅ Tests passed",
+                       json.dumps({"exit_code": 0}))
+        elif exit_code:
+            agent._log("ERROR", f"❌ Tests failed (exit code: {exit_code})",
+                       json.dumps({"exit_code": exit_code}))
 
     if parsed["tool"] == "locate":
         if isinstance(result, dict) and result.get("success"):
@@ -303,7 +388,52 @@ def _check_done_pr_requirements(agent, messages, called_tools, original_prompt, 
     return True
 
 
-def _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools):
+REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "update_issue_status"}
+
+CLOSE_PHASE_ALIASES = {"opdatering", "luk", "close", "verifikation"}
+
+def _check_required_tools(agent, called_tools, task_name=""):
+    available = set(agent.tool_registry.active_tools or [])
+    required = available & REQUIRED_ACTION_TOOLS
+    if not required:
+        return None
+    if "update_issue_status" in required:
+        phase = _normalize_phase(task_name).lower() if task_name else ""
+        if phase not in CLOSE_PHASE_ALIASES:
+            required.discard("update_issue_status")
+    if not required:
+        return None
+    called_names = set()
+    for k in called_tools:
+        name = k.split("{")[0]
+        called_names.add(name)
+    uncalled = required - called_names
+    if uncalled:
+        return t(K.LOG_REQUIRED_TOOLS_MISSING, agent.lang).format(tools=", ".join(sorted(uncalled)))
+    return None
+
+
+ISSUE_ID_PATTERN = re.compile(r'(BUG|SEC|ARC|MNT|PRF|TST|REFAC)-\d+', re.IGNORECASE)
+
+
+def _extract_issue_id(text):
+    m = ISSUE_ID_PATTERN.search(text)
+    return m.group(0).upper() if m else None
+
+
+AUTO_RESOLVE_PATTERNS = [
+    r'allerede (?:løst|rettet|fikset|fixet)',
+    r'(?:fejlen|buggen|problemet) (?:findes ikke|eksisterer ikke|er væk)',
+    r'koden er allerede (?:korrekt|rettet|fikset)',
+    r'allerede (?:implementeret|udført)',
+    r'already (?:fixed|resolved|solved|correct)',
+    r'(?:bug|issue|problem) no longer (?:exists|reproducible|applicable)',
+    r'(?:no change|nothing to fix)',
+    r'intet at (?:rette|fikse|gøre)',
+]
+
+
+def _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools, _report_logs=0, original_prompt="", messages=None):
     if not full_response or "ERROR" in full_response:
         if called_tools:
             called_names = {k.split("{")[0] for k in called_tools}
@@ -326,6 +456,40 @@ def _finalize_task_stream(agent, task_node, full_response, text_fallback, called
     else:
         task_node.status = "done"
 
+    missing_msg = _check_required_tools(agent, called_tools, task_node.name)
+    if missing_msg:
+        task_node.status = "failed"
+        full_response = missing_msg
+    elif task_node.status == "done":
+        called_names = {k.split("{")[0] for k in called_tools}
+        if "run_tests" in called_names and "update_issue_status" not in called_names:
+            available = set(agent.tool_registry.active_tools or [])
+            if "update_issue_status" in available and not agent._tests_failed:
+                hint = t(K.LOG_TESTS_PASSED_NO_RESOLVE, agent.lang)
+                full_response = full_response.rstrip() + "\n\n" + hint
+                agent._log("INFO", hint, "")
+
+        phase = _normalize_phase(task_node.name).lower()
+        if phase in ("analyse", "l\u00e6s", "afklar") and not getattr(agent, 'issue_resolved', False):
+            text_sources = [(full_response or ""), (original_prompt or "")]
+            assistant_texts = []
+            if messages:
+                assistant_texts = [
+                    m.get("content", "") for m in messages
+                    if m["role"] == "assistant" and isinstance(m.get("content"), str) and len(m["content"]) > 50
+                ]
+                text_sources.extend(assistant_texts)
+            combined = " ".join(text_sources)
+            text_lower = combined.lower()
+            if any(re.search(p, text_lower) for p in AUTO_RESOLVE_PATTERNS):
+                source_text = assistant_texts[-1] if messages and assistant_texts else (full_response or "")
+                issue_id = _extract_issue_id(combined)
+                if issue_id:
+                    agent._log("INFO", f"Auto-resolving {issue_id} \u2014 bug already fixed per analysis", source_text[:200])
+                    agent_issues.update_issue_status(agent, issue_id, "resolved",
+                        f"Auto-resolved: Analyse konkluderede at fejlen allerede er l\u00f8st. {source_text[:200]}")
+                    agent._log("INFO", f"Auto-resolved {issue_id}", "Remaining phases will be skipped")
+
     task_node.result = full_response
     if task_node.status == "done":
         bad_patterns = ["angiv venligst", "hvilken fil", "hvilket filnavn", "which file", "what file",
@@ -342,6 +506,8 @@ def _finalize_task_stream(agent, task_node, full_response, text_fallback, called
     else:
         agent._log("INFO", t(K.LOG_TASK_DONE, agent.lang), task_node.name)
     agent._evolve_if_needed()
+    for entry in agent.agent_log[_report_logs:]:
+        yield {"type": "log", "log": entry}
     yield {"type": "done", "result": full_response}
 
 
@@ -357,6 +523,8 @@ def solve_task_stream(agent, task_node, original_prompt):
 
     chunk_hint = _build_chunk_hint(agent)
     messages, tools_list, has_file_ctx = _build_initial_messages(agent, task_node, original_prompt, chunk_hint)
+
+    _report_logs = len(agent.agent_log)
 
     full_response = ""
     text_fallback = ""
@@ -382,10 +550,21 @@ def solve_task_stream(agent, task_node, original_prompt):
             agent._log("USER", "Bruger svarer", agent.pending_reply[:100])
             agent.pending_reply = None
 
+        for entry in agent.agent_log[_report_logs:]:
+            yield {"type": "log", "log": entry}
+        _report_logs = len(agent.agent_log)
+
         response = ""
         tool_defs = agent.tool_registry.get_openai_tools_for_active() if config.NATIVE_TOOLS else []
         tools_param = tool_defs if tool_defs else None
         try:
+            msg_count = len(messages)
+            total_chars = sum(_msg_content_len(m) for m in messages)
+            agent._log("INFO", f"📤 Sending to LLM ({msg_count} messages, {total_chars} chars)",
+                       f"tools: {tools_list[:200] if tools_list else 'none'}")
+            for entry in agent.agent_log[_report_logs:]:
+                yield {"type": "log", "log": entry}
+            _report_logs = len(agent.agent_log)
             for chunk in agent.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=agent.max_tokens, images=agent.images, tools=tools_param):
                 if agent.stop_requested:
                     break
@@ -444,6 +623,21 @@ def solve_task_stream(agent, task_node, original_prompt):
                         agent._tests_failed = True
                     else:
                         agent._tests_failed = False
+                    test_summary = _parse_test_summary(result)
+                    exit_code = result.get("exit_code")
+                    if test_summary:
+                        if exit_code == 0:
+                            agent._log("INFO", f"✅ Tests PASSED: {test_summary}",
+                                       json.dumps({"exit_code": exit_code, "summary": test_summary}, ensure_ascii=False))
+                        else:
+                            agent._log("ERROR", f"❌ Tests FAILED: {test_summary}",
+                                       json.dumps({"exit_code": exit_code, "summary": test_summary}, ensure_ascii=False))
+                    elif exit_code == 0:
+                        agent._log("INFO", "✅ Tests passed",
+                                   json.dumps({"exit_code": 0}))
+                    elif exit_code:
+                        agent._log("ERROR", f"❌ Tests failed (exit code: {exit_code})",
+                                   json.dumps({"exit_code": exit_code}))
                 if tool_name == "locate":
                     if isinstance(result, dict) and result.get("success"):
                         agent._located_files.add(os.path.abspath(result.get("file", "")))
@@ -458,11 +652,14 @@ def solve_task_stream(agent, task_node, original_prompt):
                     "tool_call_id": tc.get("id", ""),
                     "content": result_str
                 })
+                for entry in agent.agent_log[_report_logs:]:
+                    yield {"type": "log", "log": entry}
+                _report_logs = len(agent.agent_log)
                 yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                 yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 total_calls = sum(called_tools.values())
-                if total_calls >= config.MAX_TOOL_CALLS:
+                if total_calls >= _get_max_tool_calls(task_node.name):
                     full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
                     break
             if full_response:
@@ -488,13 +685,16 @@ def solve_task_stream(agent, task_node, original_prompt):
             if tool_result is None:
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 continue
+            for entry in agent.agent_log[_report_logs:]:
+                yield {"type": "log", "log": entry}
+            _report_logs = len(agent.agent_log)
             yield {"type": "tool_call", "tool": tool_result["tool"], "args": tool_result["args"]}
             yield {"type": "tool_result", "tool": tool_result["tool"], "result": tool_result["result"]}
             if tool_result.get("checkpoint_msg"):
                 yield {"type": "checkpoint", "message": tool_result["checkpoint_msg"], "tool": parsed["tool"]}
             messages = _truncate_messages(messages, agent.max_conversation_chars)
             total_calls = sum(called_tools.values())
-            if total_calls >= config.MAX_TOOL_CALLS:
+            if total_calls >= _get_max_tool_calls(task_node.name):
                 full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
                 break
             continue
@@ -520,6 +720,21 @@ def solve_task_stream(agent, task_node, original_prompt):
                 for r in failed:
                     feedback += "\n" + t(K.RUBRIC_FAILED_DETAIL, agent.lang).format(desc=r["desc"])
                 _add_user_msg(messages, feedback)
+                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                continue
+            missing_msg = _check_required_tools(agent, called_tools, task_node.name)
+            if missing_msg:
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {missing_msg}")
+                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                continue
+            validation_err = _validate_done_output(agent, parsed.get("result", ""), task_node.name)
+            if validation_err:
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {validation_err}")
+                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                continue
+            fix_err = _count_fix_attempts(agent, called_tools)
+            if fix_err:
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {fix_err}")
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 continue
             full_response = parsed["result"]
@@ -572,4 +787,4 @@ def solve_task_stream(agent, task_node, original_prompt):
         if i >= 3 and not called_tools:
             break
 
-    yield from _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools)
+    yield from _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools, _report_logs, original_prompt, messages)

@@ -37,7 +37,7 @@ def _load_issues():
     try:
         with open(path, encoding="utf-8") as f:
             return _json.load(f)
-    except (json.JSONDecodeError, IOError, OSError) as e:
+    except (_json.JSONDecodeError, IOError, OSError) as e:
         log.warning("Failed to load issues.json: %s", e)
         return {"meta": {"generated": "2026-05-20", "source": "Agenten", "total": 0}, "issues": []}
 
@@ -124,9 +124,6 @@ def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
 
 
 def update_issue_status(agent, issue_id, status, resolution_note=""):
-    phase = getattr(agent, 'current_phase', None)
-    if status == "resolved" and phase == "afklar":
-        return {"success": False, "error": "Afklar-fasen kan ikke sætte status til 'resolved'. Brug update_issue_status til at tilføje detaljer, og fortsæt til Verificer-fasen for at bekræfte om fejlen er løst."}
     data = _load_issues()
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
@@ -191,7 +188,23 @@ def create_issue(agent, title, type="bug", severity="medium", description="", lo
                 else:
                     resolved_parts.append(part)
             else:
-                resolved_parts.append(part)
+                m2 = re.match(r'([\w./\\-]+\.\w+):([\w.]+)$', part.strip())
+                if m2:
+                    fname = m2.group(1)
+                    sym_name = m2.group(2)
+                    for candidate in [fname, os.path.join(os.path.dirname(os.path.abspath(__file__)), fname)]:
+                        if os.path.exists(candidate):
+                            vr = agent_files.locate_code(filepath=candidate, name=sym_name)
+                            if vr.get("success"):
+                                resolved_parts.append(part)
+                            else:
+                                agent._log("WARNING", f"Location '{sym_name}' not found in {fname}", part)
+                                resolved_parts.append(part)
+                            break
+                    else:
+                        resolved_parts.append(part)
+                else:
+                    resolved_parts.append(part)
         location = ", ".join(resolved_parts)
 
     title_lower = title.lower()

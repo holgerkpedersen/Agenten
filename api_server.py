@@ -1097,7 +1097,7 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
             child.result = skip_msg
             child_results.append(f"- {child.name}: {skip_msg}")
             yield f"data: {json.dumps({'type': 'task_start', 'task': child.name})}\n\n"
-            yield f"data: {json.dumps({'type': 'task_done', 'task': child.name, 'result': skip_msg})}\n\n"
+            yield f"data: {json.dumps({'type': 'task_done', 'task': child.name, 'status': child.status, 'result': skip_msg})}\n\n"
             agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {child.name}", "detail": skip_msg})
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
             completed[0] += _count_tasks(child)
@@ -1130,20 +1130,30 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
             yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
         elif event["type"] == "tool_result":
             yield f"data: {json.dumps({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']})}\n\n"
+        elif event["type"] == "log":
+            yield f"data: {json.dumps({'type': 'log', 'log': event['log']})}\n\n"
         elif event["type"] == "done":
             full_response = event["result"]
     if not full_response:
         full_response = t(K.UI_TASK_RESULT_PREFIX, ui_lang) + ": " + node.name
-    node.status = "done"
+    if node.status == "running":
+        node.status = "done"
     node.result = full_response
     if _check_client(agent):
         return
     completed[0] += 1
     progress = int((completed[0] / total_tasks) * 100)
     yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-    yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': full_response[:500]})}\n\n"
+    yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': full_response[:500]})}\n\n"
     agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, ui_lang) + ": " + node.name, "detail": full_response})
-    agent.execution_log.append({"timestamp": time.time(), "task": node.name, "status": "done", "result_length": len(full_response)})
+    tests_failed = getattr(agent, '_tests_failed', None)
+    agent.execution_log.append({
+        "timestamp": time.time(),
+        "task": node.name,
+        "status": "done",
+        "result_length": len(full_response),
+        "tests_failed": tests_failed,
+    })
     yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
     if current_session_id:
         session_manager.add_prompt_result(current_session_id, node.name, full_response, None)

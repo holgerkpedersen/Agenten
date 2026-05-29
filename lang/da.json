@@ -162,6 +162,8 @@
   "sys_example_prefix": "Eksempel",
   "sys_marker_warning": "Brug KUN '{TOOL}' og '{DONE}' markører",
   "sys_error_prefix": "FEJL",
+  "strict_tool_rule": "STRENG REGEL: `args` objektets nøgle-navne SKAL matche parameter-navnene præcist. Omdøb IKKE parametre, udelad IKKE parametre, og tilføj IKKE ekstra nøgler. Du SKAL afslutte hvert værktøjskald med {END_MARKER}.",
+  "tool_param_desc": "Parameter '{param}' i værktøjet '{tool}'. {desc}",
   "sys_fallback_tool": "ingen_tools",
   "file_context_header": "## FILINHOLD TIL ANALYSE:\n",
   "file_context_python": "Her er indholdet af filen, du skal analysere:\n\n```python\n{content}\n```\n\nBrug dette filindhold til at lave en konkret analyse. Identificér:\n- Hvad er filens formål?\n- Hvilke imports bruges?\n- Hvilke endpoints/routes findes?\n- Eventuelle problemer eller forbedringsmuligheder\n\n",
@@ -205,7 +207,9 @@
     "iteration": "Iteration {n}",
     "type": "Type: {type}",
     "decomposed": "Nedbrudt til træ",
-    "read_only": "Læste {tools} men tog ingen yderligere handling. Overvej at genkøre med en mere specifik prompt eller vælg en anden model."
+    "read_only": "Læste {tools} men tog ingen yderligere handling. Overvej at genkøre med en mere specifik prompt eller vælg en anden model.",
+    "required_tools_missing": "Manglende påkrævede værktøjer: {tools}. Opgaven kan ikke afsluttes uden at bruge disse.",
+    "tests_passed_no_resolve": "✅ Tests bestået — husk at kalde update_issue_status() for at markere issuet som løst."
   },
   "errors": {
     "no_prompt": "Ingen prompt angivet",

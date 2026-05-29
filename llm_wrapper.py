@@ -190,7 +190,9 @@ class LMStudioWrapper:
                 log.info("LLM response received (%s chars)", len(result))
                 return result
             else:
-                return f"ERROR:HTTP {response.status_code}"
+                err_body = response.text[:500]
+                log.error("LLM API error (Status %s): %s", response.status_code, err_body)
+                return f"ERROR:HTTP {response.status_code}: {err_body}"
         except requests.exceptions.Timeout:
             log.error("Timeout after %ss", self.timeout)
             return f"ERROR:Timeout after {self.timeout}s"

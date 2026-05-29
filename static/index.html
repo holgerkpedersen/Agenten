@@ -379,6 +379,7 @@
         .status-pending { background: var(--warning); color: #0f172a; }
         .status-running { background: var(--accent); color: white; }
         .status-done { background: var(--success); color: white; }
+        .status-failed { background: #ef4444; color: white; }
         
         .loading {
             display: inline-block;
@@ -1160,8 +1161,8 @@ function addLogEntry(level, message, detail) {
 
 function renderTree(node, path = []) {
     if (!node) return '';
-    const statusClass = node.status === 'done' ? 'status-done' : (node.status === 'running' ? 'status-running' : 'status-pending');
-    const statusText = node.status === 'done' ? '✓' : (node.status === 'running' ? '⏳' : '○');
+    const statusClass = node.status === 'done' ? 'status-done' : (node.status === 'running' ? 'status-running' : (node.status === 'failed' ? 'status-failed' : 'status-pending'));
+    const statusText = node.status === 'done' ? '✓' : (node.status === 'running' ? '⏳' : (node.status === 'failed' ? '✗' : '○'));
     const pathStr = path.join('.');
     let html = `<div data-path="${pathStr}"><div class="tree-node-content">`;
     if (treeEditMode) {
@@ -2425,28 +2426,34 @@ async function executeWithStream() {
                 
             case 'task_done':
                 const taskElem = document.getElementById('currentTask');
-                if (taskElem) taskElem.innerHTML = `<span style="color:var(--success);">✓ ${escapeHtml(data.task)} færdig</span>`;
+                const isFail = data.status === 'failed';
+                const doneColor = isFail ? 'var(--error, #ef4444)' : 'var(--success)';
+                const doneIcon = isFail ? '✗' : '✓';
+                const doneEmoji = isFail ? '❌' : '✅';
+                const msgLabel = isFail ? _('task_failed_label') || 'Opgaver fejlede' : _('task_done_label');
+                if (taskElem) taskElem.innerHTML = `<span style="color:${doneColor};">${doneIcon} ${escapeHtml(data.task)} ${isFail ? 'fejlede' : 'færdig'}</span>`;
                 
                 if (llmBox) {
                     const output = stripHarmony(currentOutputs[data.task] || data.result || '');
                     const existing = llmBox.querySelector(`[data-task="${data.task}"]`);
-                    const resultDiv = `<div style="white-space:pre-wrap;margin-top:5px;padding:8px;background:var(--input-bg);border-radius:6px;border-left:3px solid var(--success);">${escapeHtml(output)}</div>`;
+                    const borderColor = isFail ? 'var(--error, #ef4444)' : 'var(--success)';
+                    const resultDiv = `<div style="white-space:pre-wrap;margin-top:5px;padding:8px;background:var(--input-bg);border-radius:6px;border-left:3px solid ${borderColor};">${escapeHtml(output)}</div>`;
                     if (existing) {
-                        existing.innerHTML += `<div style="margin-top:8px;"><strong style="color:var(--success);">✅ Resultat</strong>${resultDiv}</div>`;
+                        existing.innerHTML += `<div style="margin-top:8px;"><strong style="color:${doneColor};">${doneEmoji} ${isFail ? 'Fejl' : 'Resultat'}</strong>${resultDiv}</div>`;
                     } else {
-                        llmBox.innerHTML += `<div data-task="${data.task}" style="margin-bottom:15px;"><strong style="color:var(--success);">✅ ${escapeHtml(data.task)}</strong>${resultDiv}</div>`;
+                        llmBox.innerHTML += `<div data-task="${data.task}" style="margin-bottom:15px;"><strong style="color:${doneColor};">${doneEmoji} ${escapeHtml(data.task)}</strong>${resultDiv}</div>`;
                     }
                 }
                 
                 function markDone(node) {
-                    if (node.name === data.task) node.status = 'done';
+                    if (node.name === data.task) node.status = isFail ? 'failed' : 'done';
                     if (node.children) node.children.forEach(markDone);
                 }
                 if (currentTree) {
                     markDone(currentTree);
                     updateTreeDisplay();
                 }
-                addLogEntry('INFO', _('task_done_label'), data.task);
+                addLogEntry(isFail ? 'ERROR' : 'INFO', msgLabel, data.task);
                 saveCurrentSession();
                 break;
                 

@@ -329,6 +329,57 @@ def _build_fuzzy_pattern(text):
     return r'[ \t]*\n(?:[ \t]*\n)*[ \t]*'.join(parts), len(parts)
 
 
+_PLACEHOLDER_PATTERNS = [
+    re.compile(r'^\s*\.\.\.+\s*$', re.MULTILINE),
+    re.compile(r"'?\s*\.\.\.\s*(?:full\s+.*?)?(?:body|code|implementation|function)?\s*\.\.\.\s*'?", re.IGNORECASE),
+    re.compile(r'#\s*\.\.\.\s*(?:full\s+.*?)?(?:body|code|implementation|function)?\s*\.\.\.', re.IGNORECASE),
+    re.compile(r'/\*\s*\.\.\.\s*(?:full\s+.*?)?(?:body|code|implementation|function)?\s*\.\.\.\s*\*/', re.IGNORECASE),
+    re.compile(r'<!--\s*\.\.\.\s*(?:full\s+.*?)?(?:body|code|implementation|function)?\s*\.\.\.\s*-->', re.IGNORECASE),
+]
+
+
+def _has_placeholders(text):
+    for pat in _PLACEHOLDER_PATTERNS:
+        if pat.search(text):
+            return True
+    return False
+
+
+def _detect_base_indentation(text):
+    lines = text.split('\n')
+    indent_levels = []
+    for line in lines:
+        if line.strip() and not line.strip().startswith('#'):
+            stripped = line.lstrip()
+            if stripped:
+                indent = len(line) - len(stripped)
+                indent_levels.append(indent)
+    if not indent_levels:
+        return 0
+    return min(indent_levels)
+
+
+def _normalize_indentation(new_text, search_text):
+    target_indent = _detect_base_indentation(search_text)
+    source_indent = _detect_base_indentation(new_text)
+    if target_indent == source_indent:
+        return new_text
+    lines = new_text.split('\n')
+    result = []
+    for line in lines:
+        stripped = line.lstrip()
+        if stripped:
+            leading = len(line) - len(stripped)
+            if leading >= source_indent:
+                new_leading = leading - source_indent + target_indent
+                result.append(' ' * new_leading + stripped)
+            else:
+                result.append(line)
+        else:
+            result.append(line)
+    return '\n'.join(result)
+
+
 def edit_file(path, old_text="", new_text="", expected_hash=None, symbol=None):
     if not os.path.isabs(path):
         path = os.path.abspath(path)
@@ -370,6 +421,8 @@ def edit_file(path, old_text="", new_text="", expected_hash=None, symbol=None):
             search = '\n'.join(lines_list[start - 1:end])
             if content.count(search) != 1:
                 return {"success": False, "error": f"Symbol body for '{symbol}' matched {content.count(search)} times (expected 1)"}
+            if _has_placeholders(new_text):
+                return {"success": False, "error": f"new_text for symbol '{symbol}' indeholder pladsholdere (..., 'full new function body', osv.). Erstat med den faktiske kode."}
             idx = content.index(search)
             search_len = len(search)
         elif old_text:
@@ -415,12 +468,35 @@ def edit_file(path, old_text="", new_text="", expected_hash=None, symbol=None):
             try:
                 ast.parse(new_content)
             except SyntaxError as e:
-                return {
-                    "success": False,
-                    "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
-                    "line": e.lineno,
-                    "msg": e.msg
-                }
+                if symbol:
+                    normalized_new = _normalize_indentation(new_text, search)
+                    if normalized_new != new_text:
+                        normalized_content = content.replace(exact_old, normalized_new, 1)
+                        try:
+                            ast.parse(normalized_content)
+                            new_text = normalized_new
+                            new_content = normalized_content
+                        except SyntaxError as e2:
+                            return {
+                                "success": False,
+                                "error": f"Syntaksfejl på linje {e2.lineno}: {e2.msg}",
+                                "line": e2.lineno,
+                                "msg": e2.msg
+                            }
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
+                            "line": e.lineno,
+                            "msg": e.msg
+                        }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
+                        "line": e.lineno,
+                        "msg": e.msg
+                    }
 
         with _file_lock:
             with open(path, 'w', encoding='utf-8') as f:

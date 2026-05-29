@@ -162,6 +162,8 @@
   "sys_example_prefix": "Ejemplo",
   "sys_marker_warning": "Usa SOLO los marcadores '{TOOL}' y '{DONE}'",
   "sys_error_prefix": "ERROR",
+  "strict_tool_rule": "REGLAS ESTRICTA: Las claves del objeto `args` DEBEN coincidir exactamente con los nombres de los parámetros. NO renombres, omits ni agregues claves adicionales. DEBES finalizar cada llamada de herramienta con {END_MARKER}.",
+  "tool_param_desc": "Parámetro '{param}' de la herramienta '{tool}'. {desc}",
   "sys_fallback_tool": "sin_herramientas",
   "file_context_header": "## CONTENIDO DEL ARCHIVO PARA ANÁLISIS:\n",
   "file_context_python": "Aquí está el contenido del archivo para analizar:\n\n```python\n{content}\n```\n\nUsa este contenido para un análisis concreto. Identifica:\n- ¿Cuál es el propósito del archivo?\n- ¿Qué imports se usan?\n- ¿Qué endpoints/rutas existen?\n- ¿Algún problema u oportunidad de mejora?\n\n",
@@ -205,7 +207,9 @@
     "iteration": "Iteración {n}",
     "type": "Tipo: {type}",
     "decomposed": "Descompuesto en árbol",
-    "read_only": "Leyó {tools} pero no tomó más acciones. Considere volver a ejecutar con una instrucción más específica o elija otro modelo."
+    "read_only": "Leyó {tools} pero no tomó más acciones. Considere volver a ejecutar con una instrucción más específica o elija otro modelo.",
+    "required_tools_missing": "Faltan herramientas obligatorias: {tools}. La tarea no se puede completar sin usarlas.",
+    "tests_passed_no_resolve": "✅ Pruebas aprobadas — recuerda llamar a update_issue_status() para marcar el issue como resuelto."
   },
   "errors": {
     "no_prompt": "No se proporcionó ninguna tarea",
