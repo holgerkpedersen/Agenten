@@ -357,6 +357,52 @@ When extracting methods from `agent_core.py` into module files:
 
 **Files:** `agent_tasks.py:472-491`
 
+### 44. Stale/placeholder test files from failed sessions must be cleaned up
+
+**Symptom:** Session `ab48039c` — BUG-095 task `create_test_file` phase wrote `tests/test_execution_status_sse.py` with empty `pytest.raises` stubs (no real assertions). After the session failed, the file remained and caused 4 test failures (`pytest.raises(None)` — no actual exception raised).
+
+**Root cause:** The LLM wrote placeholder test stubs because it couldn't complete the real implementation (wrong issue location, empty `old_text`, missing tools in phase). The file was never validated as a real test — just accepted if it looked like a test file.
+
+**Fix (2 parts):**
+1. Temp tests go in `tests/temp/` — automatically excluded from the default `run_tests()` suite via `--ignore=tests/temp`. Run them explicitly with `run_tests(test_path='tests/temp/test_...')`.
+2. After any failed session, scan `tests/` (not `tests/temp/`) for leftover placeholder files.
+
+**Rule:** Do not keep test files written by the LLM unless verified they pass correctly. Placeholder tests are worse than no tests. Temp tests in `tests/temp/` are for experimentation — once validated, they can be moved to `tests/`.
+
+### 45. Auto-load location-file into file_chunks (`agent_core.py`)
+
+**Symptom:** Session `feba9e32` — `file_chunks` is empty when prompt contains `Location: git_ops.py:edit_file`. LLM wastes 6+ iterations calling `list_chunks`/`list_files` trying to find the file, eventually fails with "Manglende påkrævede værktøjer: edit_file".
+
+**Root cause:** No mechanism to auto-load the file specified in `Location:` field. `_auto_load_issue_files()` only handles issue IDs (BUG-xxx), not general location references. `_build_file_context()` scans folders but doesn't parse `Location:` from prompt.
+
+**Fix:** Added `_auto_load_location_file(agent, prompt)` in `agent_core.py`:
+- Parses `Location: filename.py:symbol` from prompt using regex
+- Extracts filename using `_extract_filenames()`
+- Loads file content via `agent._read_file_content()`
+- Stores in `agent.file_chunks` as `file_{filename}` with chunks
+- Called after `_auto_load_issue_files()` in `decompose()` method
+- Early exit if `file_chunks` already populated (e.g., from session restore)
+
+**Pattern:** Always include `Location: file.py:function` in prompts — agent now auto-loads it.
+
+**Files:** `agent_core.py:82-103` (new function), `agent_core.py:632` (call site)
+
+### 46. Full LLM response logging to separate files (`agent_tasks.py`)
+
+**Symptom:** Session JSON `agent_log` entries have truncated `detail` fields (500 chars for tool calls, 400 for done, 600 for errors). Full LLM output is lost.
+
+**Root cause:** `solve_task_stream()` truncated LLM responses before logging to save memory/session file size.
+
+**Fix (4 files):**
+1. `agent_tasks.py`: Added `_save_llm_log_file(agent, task_name, iteration, content)` — saves full LLM output to `logs/llm_responses/{session_id}/{task}_iter{N}.txt`
+2. `agent_tasks.py`: Removed all `[:500]`, `[:400]`, `[:600]` truncations in `solve_task_stream()` logging. Added `log_file` parameter to `agent._log()` calls.
+3. `agent_core.py`: Updated `_log()` to accept optional `log_file` parameter — includes it in `agent_log` entry when provided.
+4. `api_server.py`: Set `stream_agent._session_id = current_session_id` so log files are organized by session.
+
+**Result:** `agent_log.detail` contains full untruncated text. `agent_log.log_file` points to the separate text file with complete content including newlines.
+
+**Files:** `agent_tasks.py:29-43` (helper), `agent_tasks.py:768-787` (logging), `agent_core.py:470-485` (_log), `api_server.py:1200` (_session_id)
+
 ## Model Knowledge
 
 See `skills/vision_models.md` for full vision model compatibility matrix.  

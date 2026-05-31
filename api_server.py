@@ -1197,6 +1197,7 @@ def execute_stream():
     stream_agent.llm = agent.llm
     stream_agent.decompose_llm = agent.decompose_llm
     stream_agent.searcher = agent.searcher
+    stream_agent._session_id = current_session_id or "unknown"
 
     log.info("Execute stream - session: %s", current_session_id)
     if current_session_id:
@@ -1489,7 +1490,15 @@ def skillflow_report():
                 md += f"### {entry['timestamp']}\n\n"
                 md += "| Action | Skill | Details |\n|--------|-------|----------|\n"
                 for act in entry.get("actions", []):
-                    md += f"| {act.get('action','?')} | `{act.get('skill','?')}` | {act.get('result','')[:120]} |\n"
+                    if isinstance(act, dict):
+                        act_action = act.get('action', '?')
+                        act_skill = f"`{act.get('skill','?')}`"
+                        act_result = act.get('result', '')[:120]
+                    else:
+                        act_action = str(act)
+                        act_skill = "—"
+                        act_result = ""
+                    md += f"| {act_action} | {act_skill} | {act_result} |\n"
                 md += "\n"
 
     md += "\n\n[Apply pending actions](/api/skillflow/apply)"

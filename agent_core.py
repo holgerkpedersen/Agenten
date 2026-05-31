@@ -4,7 +4,7 @@ from llm_wrapper import LMStudioWrapper
 from web_searcher import WebSearcher
 from task_tree import TaskTree, TaskNode
 from module_builder import ModuleBuilder
-from tools import Tool, ToolRegistry
+from tools import Tool, ToolRegistry, _strip_llm_tags
 from github_wrapper import GithubAPI
 from skill_loader import SkillLoader
 from lang import t
@@ -16,6 +16,7 @@ import agent_tree
 import agent_skills
 import agent_git
 import agent_tasks
+import edit_file2
 import config
 from config import get_logger
 log = get_logger(__name__)
@@ -77,6 +78,31 @@ def _auto_load_issue_files(agent: Agent, prompt: str, template: str | None, file
                         break
     except Exception as e:
         agent._log("WARNING", "Kunne ikke auto-loade issue-fil", str(e))
+
+
+def _auto_load_location_file(agent: Agent, prompt: str) -> None:
+    if agent.file_chunks:
+        return
+    location_match = re.search(r'Location:\s*([^\n]+)', prompt, re.IGNORECASE)
+    if not location_match:
+        return
+    location = location_match.group(1).strip()
+    filenames = _extract_filenames(location)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    for filename in filenames:
+        if not filename.endswith('.py'):
+            continue
+        for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
+            if os.path.exists(path):
+                try:
+                    content = agent._read_file_content(path)
+                    if content:
+                        chunk_key = f"file_{filename}"
+                        agent.file_chunks[chunk_key] = agent_files.chunk_text(content)
+                        agent._log("INFO", f"Auto-loaded location-fil", f"{filename} ({len(agent.file_chunks[chunk_key])} chunks)")
+                except Exception as e:
+                    agent._log("WARNING", f"Kunne ikke auto-loade {filename}", str(e))
+                return
 
 
 def _add_file_entry(file_context, agent, filename, content):
@@ -141,9 +167,7 @@ def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_co
     response = agent.decompose_llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)
     agent._log("LLM", t(K.LOG_RECEIVED_LLM, agent.lang), t(K.LOG_N_CHARS, agent.lang).format(n=len(response)))
 
-    response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-    response = re.sub(r'<\|channel>thought\s*<channel\|>.*?(?=<\|channel>|\Z)', '', response, flags=re.DOTALL)
-    response = re.sub(r'<\|?channel\|?>.*$', '', response, flags=re.MULTILINE)
+    response = _strip_llm_tags(response)
 
     agent.task_tree = agent._parse_tree_from_llm(prompt, response)
     task_count = agent._count_tasks(agent.task_tree.root)
@@ -361,6 +385,19 @@ class Agent:
             optional_params=["symbol"]
         ))
         self.tool_registry.register(Tool(
+            "edit_file2",
+            "AST-bevidst symbol-redigering med LLM-forbedring og automatisk retry. "
+            "Trin: (0) backup, (1) find symbol via AST, (2) send til LLM med krav, "
+            "(3) erstat symbol, (4) kør test — hvis fejl: gendan backup + tilføj fejl til prompt + gentag, "
+            "(5) slet backup. Meget smartere end edit_file — LLM'en ser hele funktionen og forbedrer den.",
+            ["filepath", "name", "requirements"],
+            lambda filepath, name, requirements, test_path="": edit_file2.edit_file2(
+                filepath=filepath, name=name, requirements=requirements,
+                llm=self.llm, test_path=test_path or None,
+            ),
+            optional_params=["test_path"]
+        ))
+        self.tool_registry.register(Tool(
             "list_files",
             "List filer i en mappe. Kræver: path (mappesti, default '.'). Valgfri: pattern (filtype f.eks. '.py'). Valgfri: max_depth (max dybde, default 2). Returnerer filnavne og størrelser.",
             ["path"],
@@ -430,13 +467,15 @@ class Agent:
     def _evolve_if_needed(self) -> None:
         agent_tree.evolve_if_needed(self)
 
-    def _log(self, level: str, message: str, detail: str = "") -> None:
+    def _log(self, level: str, message: str, detail: str = "", log_file: str = None) -> None:
         log_entry = {
             "timestamp": time.time(),
             "level": level,
             "message": message,
             "detail": str(detail) if detail else ""
         }
+        if log_file:
+            log_entry["log_file"] = log_file
         self.agent_log.append(log_entry)
         try:
             log_fn = {'INFO': log.info, 'WARNING': log.warning, 'ERROR': log.error}.get(str(level).upper(), log.info)
@@ -568,6 +607,7 @@ class Agent:
         self.file_chunks = {}
 
         _auto_load_issue_files(self, prompt, template, files)
+        _auto_load_location_file(self, prompt)
 
         file_context = _build_file_context(self, files, prompt)
 
