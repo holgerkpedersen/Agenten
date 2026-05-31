@@ -135,14 +135,10 @@ def read_issue(issue_id, include_hints=False):
 def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
     """resolve referenced issues.
     
-    Args:
-        agent:
-        data:
-        issue:
-        status:
-        resolution_note:"""
+    Returns list of (ref_id, note) for callers to apply.
+    """
     if status != "resolved":
-        return
+        return []
     ref_pattern = re.compile(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)')
     fields = [issue.get("title", ""), issue.get("description", ""),
               issue.get("location", ""), issue.get("impact", ""), issue.get("proposed_fix", ""),
@@ -151,12 +147,14 @@ def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
     for field in fields:
         refs.update(ref_pattern.findall(field))
     refs.discard(issue.get("id", ""))
+    results = []
     for ref in refs:
         for ref_issue in data.get("issues", []):
             if ref_issue.get("id", "").upper() == ref.upper() and ref_issue.get("status") in ("open", "in_progress"):
-                ref_issue["status"] = "resolved"
-                ref_issue["resolution_note"] = f"Lukket automatisk da {issue['id']} blev resolved: {resolution_note[:100]}"
+                note = f"Lukket automatisk da {issue['id']} blev resolved: {resolution_note[:100]}"
+                results.append((ref, note))
                 agent._log("INFO", f"Med-reference {ref} \u2192 resolved via {issue['id']}", "")
+    return results
 
 
 def update_issue_status(agent, issue_id, status, resolution_note=""):
@@ -173,7 +171,11 @@ def update_issue_status(agent, issue_id, status, resolution_note=""):
             issue["status"] = status
             if resolution_note:
                 issue["resolution_note"] = resolution_note
-            _resolve_referenced_issues(agent, data, issue, status, resolution_note)
+            for ref_id, ref_note in _resolve_referenced_issues(agent, data, issue, status, resolution_note):
+                for ref_issue in data.get("issues", []):
+                    if ref_issue.get("id", "").upper() == ref_id.upper():
+                        ref_issue["status"] = "resolved"
+                        ref_issue["resolution_note"] = ref_note
             _save_issues(data)
             agent._log("INFO", f"Issue {issue_id} \u2192 {status}", resolution_note[:200])
             if status == "resolved":

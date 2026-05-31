@@ -988,7 +988,8 @@
       "action": "Group tool registrations into _register_git_tools(), _register_file_tools(), _register_github_tools(), etc.",
       "symptoms": "Hard to navigate, hard to maintain, high merge conflict risk. Should be decomposed into logical groups or loaded from declarative config..",
       "environment": "Windows, Python 3.12, Git",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Decomposed _register_tools (172 lines) into _register_github_tools, _register_git_tools, _register_file_tools, _register_agent_tools."
     },
     {
       "id": "ARC-013",
@@ -999,7 +1000,8 @@
       "action": "Return modifications instead of mutating in place. Let caller apply changes.",
       "symptoms": "Surprising side effects — caller passes data and it comes back modified. Violates principle of least surprise. Called from update_issue_status but mutation is not transparent to callers..",
       "environment": "Windows, Python 3.12",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "_resolve_referenced_issues now returns list of (ref_id, note) instead of mutating data entries directly. Caller applies changes."
     },
     {
       "id": "ARC-015",
@@ -1010,7 +1012,8 @@
       "action": "Consolidate into a single shared _is_safe_path() in a utility module.",
       "symptoms": "Inconsistent security behavior. A vulnerability in one implementation may not exist in another, giving false sense of security. Each has different logic and edge cases..",
       "environment": "Windows, Python 3.12, Git",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Consolidated path traversal: removed _is_safe_scan_path wrapper, module_builder.py now uses agent_files._is_safe_path instead of inline checks."
     },
     {
       "id": "MNT-009",
@@ -1283,7 +1286,8 @@
       "action": "Add max cache size (100 entries) or LRU eviction. Successkriterie: Cache never exceeds max size.",
       "symptoms": "Memory leak over time. Long-running server consumes gigabytes. No size limit, TTL, or LRU..",
       "environment": "Windows, Python 3.12, LM Studio",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Cache already had LRU eviction with _cache_max=50 — verified in llm_wrapper.py lines 28-32, 245-251."
     },
     {
       "id": "SEC-018",
@@ -1425,7 +1429,8 @@
       "action": "Add version field for compare-and-swap or per-session lock. Successkriterie: 50 concurrent saves — all changes survive.",
       "symptoms": "Silent data loss: logs, images disappear from session files. Between load and save another request can modify same session..",
       "environment": "Windows, Python 3.12, LM Studio",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Added update_session() atomic load-modify-save to SessionManager. Converted all TOCTOU callers (image_upload, save_session, set_model, save_layout, _save_session_data, decompose) to use update_session."
     },
     {
       "id": "BUG-065",

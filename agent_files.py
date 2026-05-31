@@ -45,12 +45,7 @@ def is_safe_location(target_path):
         return False
 
 
-def _is_safe_scan_path(target_path):
-    """is safe scan path.
-    
-    Args:
-        target_path:"""
-    return is_safe_location(target_path)
+
 
 
 def chunk_text(text, size=CHUNK_SIZE):
@@ -286,7 +281,7 @@ def get_folder_context(agent, prompt):
     if not folders:
         return None
 
-    folders = {f for f in folders if _is_safe_scan_path(f)}
+    folders = {f for f in folders if is_safe_location(f)}
     if not folders:
         agent._log("WARNING", "Ingen tilladte mapper at scanne", "Alle fundne stier var udenfor projektet")
         return None

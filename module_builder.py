@@ -1,4 +1,5 @@
 import os
+from agent_files import _is_safe_path
 
 class ModuleBuilder:
     """module builder."""
@@ -32,7 +33,7 @@ class ModuleBuilder:
             action_name:
             action_code_template:"""
         safe_name = action_name.replace(' ', '_')
-        if not safe_name or '..' in safe_name or safe_name.startswith('/') or safe_name.startswith('\\'):
+        if not safe_name:
             return {"error": "Invalid module name"}
         allowed_ext = '.py'
         if not safe_name.endswith(allowed_ext):
@@ -40,7 +41,7 @@ class ModuleBuilder:
         os.makedirs("custom_modules", exist_ok=True)
         custom_dir = os.path.realpath("custom_modules")
         module_path = os.path.join(custom_dir, safe_name)
-        if not module_path.startswith(custom_dir + os.sep):
+        if not _is_safe_path(custom_dir, module_path):
             return {"error": "Path traversal detected"}
         with open(module_path, "w", encoding="utf-8") as f:
             f.write(action_code_template)

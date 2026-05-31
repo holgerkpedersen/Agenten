@@ -113,6 +113,30 @@ class SessionManager:
         self.save_session(session_id, session_data)
         return session_id, session_data
     
+    def update_session(self, session_id, update_fn):
+        """Atomically load, modify via update_fn, and save session.
+        
+        update_fn receives session_data dict and returns modified session_data.
+        Prevents TOCTOU races between separate load+save calls.
+        """
+        if not _valid_session_id(session_id):
+            return None
+        filepath = os.path.join(self.storage_dir, f"{session_id}.json")
+        with SessionManager._lock:
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    session_data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
+                session_data = {}
+            session_data = update_fn(session_data)
+            if session_data is not None:
+                session_data["last_modified"] = datetime.now().isoformat()
+                tmppath = filepath + ".tmp"
+                with open(tmppath, 'w', encoding='utf-8') as f:
+                    json.dump(session_data, f, ensure_ascii=False, indent=2)
+                os.replace(tmppath, filepath)
+            return session_id
+
     def rename_session(self, session_id, new_name):
         """rename session.
         

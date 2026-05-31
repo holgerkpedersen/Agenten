@@ -275,10 +275,13 @@ class Agent:
         self._located_files: set[str] = set()
 
     def _register_tools(self) -> None:
-        """register tools.
-        
-        Returns:
-            None"""
+        """register tools."""
+        self._register_github_tools()
+        self._register_git_tools()
+        self._register_file_tools()
+        self._register_agent_tools()
+
+    def _register_github_tools(self) -> None:
         gh = GithubAPI()
         self.tool_registry.register(Tool(
             "github_create_repo",
@@ -304,6 +307,8 @@ class Agent:
             ["owner", "repo", "title", "branch"],
             lambda owner, repo, title, branch, base="main": gh.create_pr(owner=owner, repo=repo, title=title, head=branch, base=base)
         ))
+
+    def _register_git_tools(self) -> None:
         self.tool_registry.register(Tool(
             "git_status",
             t(K.TOOL_GIT_STATUS, self.lang),
@@ -382,6 +387,8 @@ class Agent:
             ["branch"],
             lambda branch: git_ops.git_checkout(branch=branch)
         ))
+
+    def _register_file_tools(self) -> None:
         self.tool_registry.register(Tool(
             "read_location",
             "Læs KUN en bestemt funktion/metode/klasse vha. AST — IKKE hele filen. Angiv filepath='fil.py' og name='funktionsnavn' (eller name='Klasse.metode'). Returnerer funktionens fulde kode. Brug DENNE i stedet for read_chunk når du skal se specifik kode — meget mere effektivt end at læse hele filen.",
@@ -453,6 +460,8 @@ class Agent:
             ["path"],
             lambda path: self._add_image(path)
         ))
+
+    def _register_agent_tools(self) -> None:
         self.tool_registry.register(Tool(
             "run_tests",
             "Kør pytest og returner resultat. Args: test_path (valgfri). Eksempel: run_tests(test_path='tests/test_tools.py::TestToolExecution')",

@@ -503,29 +503,19 @@ class TestIsSafeLocation:
         assert len(bases) == 2, f"Expected exports/ and uploads/ in _SAFE_DIRS, got: {bases}"
 
 
-class TestIsSafeScanPath:
-    def _is_safe_scan_path(self, target_path):
-        from agent_files import _is_safe_scan_path
-        return _is_safe_scan_path(target_path)
-
-    def test_delegates_to_is_safe_location(self, monkeypatch):
+class TestIsSafeLocation:
+    def _call(self, target_path):
         from agent_files import is_safe_location
-        called_with = []
-        def mock_is_safe_location(path):
-            called_with.append(path)
-            return True
-        monkeypatch.setattr('agent_files.is_safe_location', mock_is_safe_location)
-        assert self._is_safe_scan_path("some/path") is True
-        assert called_with == ["some/path"]
+        return is_safe_location(target_path)
 
     @patch('agent_files._SAFE_DIRS', new_callable=set)
     def test_path_in_safe_returns_true(self, mock_safe_dirs, tmp_path):
         mock_safe_dirs.add(os.path.realpath(str(tmp_path)))
         safe = tmp_path / "safe.txt"
         safe.write_text("ok", encoding='utf-8')
-        assert self._is_safe_scan_path(str(safe)) is True
+        assert self._call(str(safe)) is True
 
     @patch('agent_files._SAFE_DIRS', new_callable=set)
     def test_path_outside_returns_false(self, mock_safe_dirs, tmp_path):
         mock_safe_dirs.add(os.path.realpath(str(tmp_path)))
-        assert self._is_safe_scan_path(r"C:\Windows\system32") is False
+        assert self._call(r"C:\Windows\system32") is False

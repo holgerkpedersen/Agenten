@@ -435,20 +435,17 @@ def image_upload():
     local_agent.llm = agent.llm
     local_agent.decompose_llm = agent.decompose_llm
 
-    # Load current session images if available
-    loaded_images = []
+    # Load + update session images atomically to prevent TOCTOU race (BUG-064)
+    new_entry = {"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath}
+    local_agent.images = [new_entry]
     if sid:
-        session_data = session_manager.load_session(sid)
-        if session_data and session_data.get("images"):
-            loaded_images = _normalize_images(session_data["images"])
-
-    local_agent.images = loaded_images + [{"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath}]
-
-    # Save back to session manager to persist changes safely
-    if sid:
-        existing = session_manager.load_session(sid) or {}
-        existing["images"] = local_agent.images
-        session_manager.save_session(sid, existing)
+        def _update_images(data):
+            existing_images = _normalize_images(data.get("images", []))
+            images = existing_images + [new_entry]
+            data["images"] = images
+            local_agent.images = images
+            return data
+        session_manager.update_session(sid, _update_images)
 
     return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(local_agent.images)})
 
@@ -596,39 +593,41 @@ def save_current_session():
         if now - last < 0.5:
             return jsonify({"success": True, "debounced": True})
         _session_save_debounce[session_id] = now
-    existing = session_manager.load_session(session_id) or {}
     with active_streams_lock:
         stream_agent = active_streams.get(session_id)
     source = stream_agent if stream_agent else agent
-    existing_agent_log = existing.get("agent_log", [])
-    existing_timestamps = {e.get("timestamp") for e in existing_agent_log}
-    merged_log = existing_agent_log + [
-        e for e in (source.agent_log or [])
-        if e.get("timestamp") not in existing_timestamps
-    ]
-    session_data = {
-        "id": session_id,
-        "name": data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=session_id[:8])),
-        "tree": data.get("tree") or existing.get("tree") or (source.task_tree_to_dict() if source.task_tree else None),
-        "layout": data.get("layout"),
-        "execution_log": source.execution_log or existing.get("execution_log", []),
-        "agent_log": merged_log,
-        "original_prompt": data.get("original_prompt") or source.original_prompt or "",
-        "full_prompt_with_context": getattr(source, 'full_prompt_with_context', '') or '',
-        "show_thinking": data.get("show_thinking", source.show_thinking),
-        "template": data.get("template") or getattr(source, 'active_template', None) or "fri",
-        "lang": data.get("lang") or getattr(source, 'lang', 'da'),
-        "ui_lang": data.get("ui_lang") or data.get("lang") or getattr(source, 'lang', 'da'),
-        "prompt_history": data.get("prompt_history", []),
-        "file_context": data.get("file_context", ""),
-        "file_chunks": getattr(source, 'file_chunks', None) or existing.get("file_chunks", {}),
-        "images": getattr(source, 'images', None) or existing.get("images", []),
-        "created": existing.get("created", datetime.now().isoformat()),
-        "learned_knowledge": existing.get("learned_knowledge", []),
-        "decompose_model": data.get("decompose_model") or existing.get("decompose_model") or getattr(source.decompose_llm, 'model', ''),
-        "execute_model": data.get("execute_model") or existing.get("execute_model") or getattr(source.llm, 'model', ''),
-    }
-    session_manager.save_session(session_id, session_data)
+
+    def _merge_session(existing):
+        existing_agent_log = existing.get("agent_log", [])
+        existing_timestamps = {e.get("timestamp") for e in existing_agent_log}
+        merged_log = existing_agent_log + [
+            e for e in (source.agent_log or [])
+            if e.get("timestamp") not in existing_timestamps
+        ]
+        existing.update({
+            "id": session_id,
+            "name": data.get("name", existing.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=session_id[:8]))),
+            "tree": data.get("tree") or existing.get("tree") or (source.task_tree_to_dict() if source.task_tree else None),
+            "layout": data.get("layout") or existing.get("layout"),
+            "execution_log": source.execution_log or existing.get("execution_log", []),
+            "agent_log": merged_log,
+            "original_prompt": data.get("original_prompt") or source.original_prompt or "",
+            "full_prompt_with_context": getattr(source, 'full_prompt_with_context', '') or '',
+            "show_thinking": data.get("show_thinking", source.show_thinking),
+            "template": data.get("template") or getattr(source, 'active_template', None) or "fri",
+            "lang": data.get("lang") or getattr(source, 'lang', 'da'),
+            "ui_lang": data.get("ui_lang") or data.get("lang") or getattr(source, 'lang', 'da'),
+            "prompt_history": data.get("prompt_history", []),
+            "file_context": data.get("file_context", ""),
+            "file_chunks": getattr(source, 'file_chunks', None) or existing.get("file_chunks", {}),
+            "images": getattr(source, 'images', None) or existing.get("images", []),
+            "created": existing.get("created", datetime.now().isoformat()),
+            "learned_knowledge": existing.get("learned_knowledge", []),
+            "decompose_model": data.get("decompose_model") or existing.get("decompose_model") or getattr(source.decompose_llm, 'model', ''),
+            "execute_model": data.get("execute_model") or existing.get("execute_model") or getattr(source.llm, 'model', ''),
+        })
+        return existing
+    session_manager.update_session(session_id, _merge_session)
     current_session_id = session_id
     return jsonify({"success": True, "session_id": session_id})
 
@@ -759,10 +758,11 @@ def set_model():
     else:
         agent.llm.set_model(model)
     if current_session_id:
-        existing = session_manager.load_session(current_session_id) or {}
-        existing["decompose_model"] = agent.decompose_llm.model
-        existing["execute_model"] = agent.llm.model
-        session_manager.save_session(current_session_id, existing)
+        def _update_model(data):
+            data["decompose_model"] = agent.decompose_llm.model
+            data["execute_model"] = agent.llm.model
+            return data
+        session_manager.update_session(current_session_id, _update_model)
     return jsonify({"success": True, "model": model, "type": dtype})
 
 @app.route("/api/models/loaded")
@@ -821,10 +821,10 @@ def save_layout():
     layout = data.get("layout")
     if not session_id:
         return jsonify({"success": False, "error": t(K.ERR_NO_SESSION_ID, agent.lang)}), 400
-    session_data = session_manager.load_session(session_id)
-    if session_data:
-        session_data["layout"] = layout
-        session_manager.save_session(session_id, session_data)
+    def _update_layout(data):
+        data["layout"] = layout
+        return data
+    if session_manager.update_session(session_id, _update_layout):
         return jsonify({"success": True})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
@@ -1137,23 +1137,24 @@ def decompose():
     try:
         tree = agent.decompose_prompt(prompt, files=files, template=template)
 
-        existing = session_manager.load_session(current_session_id) or {}
-        existing.update({
-            "id": current_session_id,
-            "name": prompt[:30],
-            "tree": tree,
-        "execution_log": agent.execution_log or existing.get("execution_log", []),
-            "agent_log": agent.agent_log,
-            "original_prompt": agent.original_prompt,
-            "full_prompt_with_context": agent.full_prompt_with_context,
-            "show_thinking": agent.show_thinking,
-            "template": template,
-            "lang": agent.lang,
-            "ui_lang": ui_lang,
-            "file_context": files,
-            "file_chunks": agent.file_chunks
-        })
-        session_manager.save_session(current_session_id, existing)
+        def _update(data):
+            data.update({
+                "id": current_session_id,
+                "name": prompt[:30],
+                "tree": tree,
+                "execution_log": agent.execution_log or data.get("execution_log", []),
+                "agent_log": agent.agent_log,
+                "original_prompt": agent.original_prompt,
+                "full_prompt_with_context": agent.full_prompt_with_context,
+                "show_thinking": agent.show_thinking,
+                "template": template,
+                "lang": agent.lang,
+                "ui_lang": ui_lang,
+                "file_context": files,
+                "file_chunks": agent.file_chunks
+            })
+            return data
+        session_manager.update_session(current_session_id, _update)
         session_manager.add_prompt_result(current_session_id, prompt, t(K.LOG_DECOMPOSED, agent.lang), tree)
         
         return jsonify({
@@ -1306,26 +1307,27 @@ def _save_session_data(current_session_id, stream_agent, ui_lang):
         ui_lang:"""
     if not current_session_id:
         return
-    existing = session_manager.load_session(current_session_id) or {}
-    existing_agent_log = existing.get("agent_log", [])
-    existing_timestamps = {e.get("timestamp") for e in existing_agent_log}
-    merged_log = existing_agent_log + [
-        e for e in stream_agent.agent_log
-        if e.get("timestamp") not in existing_timestamps
-    ]
-    existing.update({
-        "tree": stream_agent.task_tree_to_dict() if stream_agent.task_tree else existing.get("tree"),
-        "execution_log": stream_agent.execution_log,
-        "agent_log": merged_log,
-        "original_prompt": stream_agent.original_prompt or (stream_agent.task_tree.root.name if stream_agent.task_tree else ""),
-        "prompt_history": existing.get("prompt_history", []),
-        "lang": stream_agent.lang,
-        "ui_lang": ui_lang,
-        "template": stream_agent.active_template,
-        "file_chunks": stream_agent.file_chunks,
-        "images": stream_agent.images,
-    })
-    session_manager.save_session(current_session_id, existing)
+    def _update(data):
+        existing_agent_log = data.get("agent_log", [])
+        existing_timestamps = {e.get("timestamp") for e in existing_agent_log}
+        merged_log = existing_agent_log + [
+            e for e in stream_agent.agent_log
+            if e.get("timestamp") not in existing_timestamps
+        ]
+        data.update({
+            "tree": stream_agent.task_tree_to_dict() if stream_agent.task_tree else data.get("tree"),
+            "execution_log": stream_agent.execution_log,
+            "agent_log": merged_log,
+            "original_prompt": stream_agent.original_prompt or (stream_agent.task_tree.root.name if stream_agent.task_tree else ""),
+            "prompt_history": data.get("prompt_history", []),
+            "lang": stream_agent.lang,
+            "ui_lang": ui_lang,
+            "template": stream_agent.active_template,
+            "file_chunks": stream_agent.file_chunks,
+            "images": stream_agent.images,
+        })
+        return data
+    session_manager.update_session(current_session_id, _update)
 
 
 @app.route("/api/execute-stream", methods=["GET", "POST"])
