@@ -430,24 +430,21 @@ def image_upload():
     f.save(filepath)
     raw_b64 = base64.b64encode(raw_bytes).decode('utf-8')
 
-    # Use local agent to avoid race conditions on global state (BUG-001)
-    local_agent = Agent()
-    local_agent.llm = agent.llm
-    local_agent.decompose_llm = agent.decompose_llm
-
-    # Load + update session images atomically to prevent TOCTOU race (BUG-064)
+    # Use plain list instead of creating Agent() — avoids ToolRegistry/GithubAPI overhead (PRF-005)
     new_entry = {"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath}
-    local_agent.images = [new_entry]
+    uploaded_images = [new_entry]
     if sid:
         def _update_images(data):
             existing_images = _normalize_images(data.get("images", []))
             images = existing_images + [new_entry]
             data["images"] = images
-            local_agent.images = images
             return data
         session_manager.update_session(sid, _update_images)
+        # Reload to get authoritative session image list
+        loaded = session_manager.load_session(sid) or {}
+        uploaded_images = _normalize_images(loaded.get("images", []))
 
-    return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(local_agent.images)})
+    return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(uploaded_images)})
 
 @app.route("/api/image/list", methods=["GET"])
 def image_list():

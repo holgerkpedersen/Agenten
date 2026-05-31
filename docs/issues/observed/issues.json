@@ -1047,7 +1047,8 @@
       "action": "Make channel tag stripping configurable or model-agnostic.",
       "symptoms": "Adding new model families with similar quirks requires hardcoding more model names.",
       "environment": "Windows, Python 3.12, LM Studio",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Gemma channel tag moved to config.CHANNEL_TAG_MODELS. Prior commit 73891cf."
     },
     {
       "id": "MNT-012",
@@ -1418,7 +1419,8 @@
       "action": "Capture to local variable at function top. Successkriterie: 10 parallel image_upload + switch — images in correct session.",
       "symptoms": "Images saved to wrong session under concurrent load. Request switch between lines..",
       "environment": "Windows, Python 3.12",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "current_session_id captured to local sid at function entry. Prior commit 73891cf."
     },
     {
       "id": "BUG-064",
@@ -1489,7 +1491,8 @@
       "action": "Remove traceback from response. Log server-side only. Successkriterie: Tool crash response has error but NOT traceback.",
       "symptoms": "Internal structure leaked to LLM, persisted in logs/sessions. Internal paths, lines exposed..",
       "environment": "Windows, Python 3.12, LM Studio",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Traceback removed from error response, logged server-side only via log.error(). Prior commit 73891cf."
     },
     {
       "id": "BUG-067",
@@ -1893,7 +1896,8 @@
       "action": "Don't create Agent per upload. Use locking on global agent.images instead. Successkriterie: Memory stabilizes after warmup under upload load.",
       "symptoms": "Memory grows unboundedly under heavy concurrent uploads. Each Agent has ToolRegistry, GithubAPI connections. Hundreds of concurrent uploads = memory leak..",
       "environment": "Windows, Python 3.12, Git",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "Replaced Agent() per upload with plain list. image_upload no longer allocates ToolRegistry/GithubAPI/skills."
     },
     {
       "id": "REFAC-001",
@@ -1926,7 +1930,8 @@
       "action": "Fjern filen eller tilføj relevant testkode hvis det er en testfil. Hvis det er et fejl i filnavnet, ret det til file_test.py. Successkriterie: Filens indhold er enten fjernet eller opdateret med relevant kode der matcher filens formål.",
       "symptoms": "Koden er ikke vedligeholdelig og kan forvirre andre udviklere om filens formål. Dette indikerer enten en fejl i filnavnet (test.py vs file_test.py) eller at filen mangler indhold..",
       "environment": "Windows, Python 3.12, pytest",
-      "status": "open"
+      "status": "resolved",
+      "resolution_note": "test.py does not exist in the repo (already removed or never committed)."
     },
     {
       "id": "REFAC-004",
