@@ -1,3 +1,5 @@
+"""Task tree data structures for representing hierarchical task execution."""
+
 class TaskNode:
     def __init__(self, name, parent=None):
         self.name = name

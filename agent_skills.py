@@ -1,3 +1,5 @@
+"""Skill templates and tool mappings for Agent."""
+
 import re
 from lang import t
 from i18n import K

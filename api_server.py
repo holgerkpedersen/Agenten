@@ -1,3 +1,5 @@
+"""Agenten REST API server."""
+
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from flask_cors import CORS
 from agent_core import Agent
@@ -31,7 +33,7 @@ CORS(app, resources={r"/api/*": {"origins": os.environ.get('CORS_ORIGINS', 'http
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB max upload
 
 # ============ SECURITY CONFIGURATION ============
-def _is_development_mode():
+def _is_development_mode() -> bool:
     """Check if server is running in development mode."""
     return os.environ.get('DEV_MODE', 'true').lower() == 'true'
 
@@ -48,11 +50,11 @@ def check_api_key():
 
 # ============ RATE LIMITING ============
 class _RateLimiter:
-    def __init__(self):
-        self._requests = {}
-        self._lock = threading.Lock()
+    def __init__(self) -> None:
+        self._requests: dict = {}
+        self._lock: threading.Lock = threading.Lock()
 
-    def is_allowed(self, key, max_requests=30, window=60):
+    def is_allowed(self, key: str, max_requests: int = 30, window: int = 60) -> bool:
         now = time.time()
         with self._lock:
             bucket = self._requests.get(key, [])

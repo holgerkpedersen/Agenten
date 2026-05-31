@@ -1,3 +1,5 @@
+"""Session persistence and management for Agent."""
+
 import json
 import os
 import re

@@ -1,3 +1,5 @@
+"""Flow builder for generating Logic Apps schemas."""
+
 import json
 from typing import List, Dict
 from urllib.parse import quote

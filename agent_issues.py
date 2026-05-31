@@ -1,3 +1,5 @@
+"""Issue management, creation and status updates."""
+
 import json as _json
 import os
 import re

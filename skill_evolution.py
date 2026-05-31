@@ -27,13 +27,15 @@ GENERATE_MIN_REPEAT = 5
 GENERATE_MIN_TASK_LENGTH = 10
 
 
-def _load_json(path, default):
+def _load_json(path: str, default):
+    """Load JSON file or return default value."""
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
             return default
+    return default
     return default
 
 

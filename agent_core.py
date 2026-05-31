@@ -1,3 +1,5 @@
+"""Agent core module."""
+
 from __future__ import annotations
 
 from llm_wrapper import LMStudioWrapper
@@ -30,6 +32,7 @@ import threading
 from typing import Any, Generator
 
 def _safe_int(val: Any, default: int = 0) -> int:
+    """Convert a value to an integer safely, returning default on failure."""
     try:
         return int(val)
     except (ValueError, TypeError):
@@ -37,6 +40,7 @@ def _safe_int(val: Any, default: int = 0) -> int:
 
 
 def _extract_filenames(location: str) -> list[str]:
+    """Extract file paths from a location string using regex."""
     filenames = []
     if not location:
         return filenames
@@ -48,6 +52,7 @@ def _extract_filenames(location: str) -> list[str]:
 
 
 def _auto_load_issue_files(agent: Agent, prompt: str, template: str | None, files: list[dict[str, Any]]) -> None:
+    """Automatically load issue-related files when a bug/issue ID is present in the prompt."""
     if template not in ("bugfix", "issue_handler") or files:
         return
     issue_match = re.search(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)', prompt)
@@ -81,6 +86,7 @@ def _auto_load_issue_files(agent: Agent, prompt: str, template: str | None, file
 
 
 def _auto_load_location_file(agent: Agent, prompt: str) -> None:
+    """Load file(s) from a Location: field in the prompt."""
     if agent.file_chunks:
         return
     location_match = re.search(r'Location:\s*([^\n]+)', prompt, re.IGNORECASE)

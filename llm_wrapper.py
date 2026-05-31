@@ -1,3 +1,5 @@
+"""LM Studio API wrapper for LLM interaction."""
+
 import requests
 import json
 import hashlib

@@ -1,3 +1,5 @@
+"""Tool registry and execution for Agent."""
+
 import json
 import re
 import inspect

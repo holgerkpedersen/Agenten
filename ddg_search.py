@@ -1,3 +1,5 @@
+"""DuckDuckGo search integration for Agent."""
+
 import re
 import urllib.request
 import urllib.parse

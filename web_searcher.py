@@ -1,3 +1,5 @@
+"""Web search interface using DuckDuckGo."""
+
 from ddg_search import search_ddg
 
 

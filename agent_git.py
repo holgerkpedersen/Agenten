@@ -1,3 +1,5 @@
+"""Git workflow helpers for Agent."""
+
 import re
 import os
 from lang import t

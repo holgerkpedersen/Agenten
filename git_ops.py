@@ -1,3 +1,5 @@
+"""Git operations wrapper for Agent."""
+
 import ast
 import os
 import re

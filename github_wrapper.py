@@ -1,3 +1,5 @@
+"""GitHub API integration for Agent."""
+
 import os
 import json
 import requests

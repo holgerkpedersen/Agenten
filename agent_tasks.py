@@ -1,3 +1,5 @@
+"""Agent tasks execution module."""
+
 import os
 import re
 import time
@@ -11,7 +13,8 @@ import agent_issues
 import config
 
 
-def _parse_test_summary(result):
+def _parse_test_summary(result: dict) -> str:
+    """Parse test output for summary line."""
     ud = result.get("stdout", "") or ""
     if not ud:
         return ""
@@ -27,7 +30,8 @@ def _parse_test_summary(result):
 EXECUTION_TIMEOUT = config.EXECUTION_TIMEOUT
 
 
-def _save_llm_log_file(agent, task_name, iteration, content):
+def _save_llm_log_file(agent: Any, task_name: str, iteration: int, content: str) -> str:
+    """Save LLM response to a file for later inspection."""
     session_id = getattr(agent, '_session_id', 'unknown')
     session_dir = os.path.join("logs", "llm_responses", session_id)
     os.makedirs(session_dir, exist_ok=True)

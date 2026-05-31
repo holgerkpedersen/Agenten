@@ -1,3 +1,5 @@
+"""Model management for LM Studio integration."""
+
 import subprocess
 import shutil
 import os

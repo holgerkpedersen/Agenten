@@ -1,3 +1,5 @@
+"""Task tree operations and cleanup for Agent."""
+
 import re
 import time
 from task_tree import TaskTree, TaskNode
