@@ -209,7 +209,9 @@
     "decomposed": "Nedbrudt til træ",
     "read_only": "Læste {tools} men tog ingen yderligere handling. Overvej at genkøre med en mere specifik prompt eller vælg en anden model.",
     "required_tools_missing": "Manglende påkrævede værktøjer: {tools}. Opgaven kan ikke afsluttes uden at bruge disse.",
-    "tests_passed_no_resolve": "✅ Tests bestået — husk at kalde update_issue_status() for at markere issuet som løst."
+    "tests_passed_no_resolve": "✅ Tests bestået — husk at kalde update_issue_status() for at markere issuet som løst.",
+    "red_test_passed": "✅ Rød test bestået — fejlen er allerede rettet. Afslutter Test (Red) fasen.",
+    "phase_complete": "Fase gennemført automatisk."
   },
   "errors": {
     "no_prompt": "Ingen prompt angivet",
@@ -440,6 +442,8 @@
   "rubric_failed_detail": "  ✗ {desc}",
   "anti_leakage_warning": "⚠️ Dette issue har løsningsforslag du ikke har læst. Kald read_issue med include_hints=true for at læse dem før du skriver/redigerer kode.",
   "write_required": "\n\n⛔ DU SKAL skrive/redigere kode i denne fase. Brug write_file eller edit_file. Hvis du kun læser filer uden at skrive kode, er opgaven mislykket. Læs maksimalt én gang — skriv derefter din løsning.",
+  "write_file_first": "\n\n🚫 BLOCKERET: Test (Red)-fasen kræver at du FØRST skriver testen. Kald write_file NU — du har allerede læst nok i Analyse-fasen.",
+  "validation_done_too_short": "Resultatet er for kort ({0} tegn). Skriv en mere detaljeret analyse med konkrete ændringer, kodeeksempler og begrundelser.",
   "tool_system_prompt_native": "Du har adgang til værktøjer. Kald dem når det er nødvendigt for at fuldføre opgaven.\n\n{tools_desc}\n\n## Opgave\n{task}",
   "tool_continuation_native": "Tilgængelige: {tools_list}. Brug værktøjerne til at fuldføre opgaven."
 }

@@ -43,3 +43,7 @@ docs/**/*.*
 
 # opencode plans
 .opencode/
+
+# Temp test files (unapproved)
+tests/temp/
+!tests/temp/.gitkeep

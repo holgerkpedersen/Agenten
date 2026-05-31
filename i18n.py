@@ -118,6 +118,8 @@ class K(StrEnum):
 
     # === Write/edit guidance ===
     WRITE_REQUIRED        = "write_required"
+    WRITE_FILE_FIRST      = "write_file_first"
+    VALIDATION_DONE_TOO_SHORT = "validation_done_too_short"
 
     # === System prompt fragments ===
     SYS_EXAMPLE_PREFIX  = "sys_example_prefix"
@@ -169,6 +171,8 @@ class K(StrEnum):
     LOG_READ_ONLY           = "log.read_only"
     LOG_REQUIRED_TOOLS_MISSING = "log.required_tools_missing"
     LOG_TESTS_PASSED_NO_RESOLVE = "log.tests_passed_no_resolve"
+    LOG_RED_TEST_PASSED = "log.red_test_passed"
+    LOG_PHASE_COMPLETE  = "log.phase_complete"
     LOG_TREE_EXECUTION      = "log.tree_execution_start"
     LOG_READING_FILE        = "log.reading_file"
     LOG_FILE_FOUND          = "log.file_found"

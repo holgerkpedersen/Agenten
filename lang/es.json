@@ -209,7 +209,9 @@
     "decomposed": "Descompuesto en árbol",
     "read_only": "Leyó {tools} pero no tomó más acciones. Considere volver a ejecutar con una instrucción más específica o elija otro modelo.",
     "required_tools_missing": "Faltan herramientas obligatorias: {tools}. La tarea no se puede completar sin usarlas.",
-    "tests_passed_no_resolve": "✅ Pruebas aprobadas — recuerda llamar a update_issue_status() para marcar el issue como resuelto."
+    "tests_passed_no_resolve": "✅ Pruebas aprobadas — recuerda llamar a update_issue_status() para marcar el issue como resuelto.",
+    "red_test_passed": "✅ Prueba roja pasada — el bug ya está corregido. Finalizando fase Test (Red).",
+    "phase_complete": "Fase completada automáticamente."
   },
   "errors": {
     "no_prompt": "No se proporcionó ninguna tarea",
@@ -440,6 +442,7 @@
   "rubric_failed_detail": "  ✗ {desc}",
   "anti_leakage_warning": "⚠️ Este issue tiene sugerencias de solución que no has leído. Llama a read_issue con include_hints=true para leerlas antes de escribir/editar código.",
   "write_required": "\n\n⛔ DEBES escribir/editar código en esta fase. Usa write_file o edit_file. Solo leer archivos sin escribir código significa que la tarea ha FALLADO. Lee como máximo una vez — luego escribe tu solución.",
+  "write_file_first": "\n\n🚫 BLOQUEADO: La fase Test (Red) requiere que PRIMERO escribas la prueba. ¡Llama a write_file AHORA — ya has leído suficiente en la fase de Análisis.",
   "tool_system_prompt_native": "Tienes acceso a herramientas. Llámalas cuando sea necesario para completar la tarea.\n\n{tools_desc}\n\n## Tarea\n{task}",
   "tool_continuation_native": "Disponible: {tools_list}. Usa las herramientas para completar la tarea."
 }

@@ -318,6 +318,110 @@ def _load_skill_file(name: str):
     return None, None
 
 
+def _apply_retain(skill_name, dry_run, log):
+    if not dry_run:
+        log.append({
+            "timestamp": datetime.now().isoformat(),
+            "action": "retain",
+            "skill": skill_name,
+        })
+    return {"action": "retain", "skill": skill_name, "dry_run": dry_run,
+            "message": f"Kept '{skill_name}' unchanged"}
+
+
+def _apply_refine(skill_name, action, dry_run, log):
+    path, content = _load_skill_file(skill_name)
+    if path and content:
+        if not dry_run:
+            improved = _add_refinement_note(content, action)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(improved)
+            log.append({
+                "timestamp": datetime.now().isoformat(),
+                "action": "refine",
+                "skill": skill_name,
+                "failure_patterns": action.get("failure_patterns", []),
+            })
+        msg = f"Refined '{skill_name}' with failure analysis"
+    else:
+        msg = f"Cannot refine '{skill_name}' — file not found"
+    return {"action": "refine", "skill": skill_name, "dry_run": dry_run,
+            "message": msg}
+
+
+def _apply_prune(skill_name, dry_run, log):
+    path, _content = _load_skill_file(skill_name)
+    if path:
+        if not dry_run:
+            backup = path + ".pruned"
+            os.replace(path, backup)
+            log.append({
+                "timestamp": datetime.now().isoformat(),
+                "action": "prune",
+                "skill": skill_name,
+                "backup": backup,
+            })
+            msg = f"Pruned '{skill_name}' (backup: {backup})"
+        else:
+            msg = f"Would prune '{skill_name}'"
+    else:
+        msg = f"Cannot prune '{skill_name}' — file not found"
+    return {"action": "prune", "skill": skill_name, "dry_run": dry_run,
+            "message": msg}
+
+
+def _apply_generate(skill_name, action, dry_run, log):
+    cluster = action.get("cluster", [])
+    action_types = action.get("suggested_action_types", ["general"])
+    keywords = action.get("suggested_keywords", skill_name.split("_")[:3])
+
+    if len(cluster) < 1:
+        msg = "Skipped: no task cluster for skill generation"
+    elif not dry_run:
+        instructions = _generate_instructions(cluster, action_types)
+        example = cluster[0][:80]
+        kw_str = ", ".join(k for k in keywords if k)
+        frontmatter = (
+            f"---\n"
+            f"name: {skill_name}\n"
+            f"keywords: [{kw_str}]\n"
+            f"action_types: [{', '.join(action_types)}]\n"
+            f"description: SkillFlow-generated — {len(cluster)} tasks: {example}...\n"
+            f"base: true\n"
+            f"min_score: 1\n"
+            f"---\n"
+            f"\n"
+            f"## {skill_name.replace('_', ' ').title()}\n"
+            f"\n"
+            f"Auto-generated skill based on {len(cluster)} similar unmatched tasks.\n"
+            f"\n"
+            f"**Example tasks:**\n" +
+            "".join(f"- {t[:100]}\n" for t in cluster[:5]) +
+            f"\n"
+            f"### Instructions\n"
+            f"\n"
+            f"{instructions}\n"
+        )
+        gen_path = os.path.join("skills", f"{skill_name}.md")
+        with open(gen_path, "w", encoding="utf-8") as f:
+            f.write(frontmatter)
+        log.append({
+            "timestamp": datetime.now().isoformat(),
+            "action": "generate",
+            "skill": skill_name,
+            "path": gen_path,
+            "cluster_size": len(cluster),
+            "keywords": keywords,
+        })
+        msg = f"Generated skill '{skill_name}' from {len(cluster)} tasks"
+    else:
+        msg = (f"Would generate skill '{skill_name}' "
+               f"(action_types: {action.get('suggested_action_types', ['general'])}, "
+               f"cluster: {len(cluster)} tasks)")
+    return {"action": "generate", "skill": skill_name, "dry_run": dry_run,
+            "message": msg}
+
+
 def apply_evolution_actions(actions: list, dry_run: bool = True) -> list:
     """
     Apply Retain/Refine/Prune/Generate actions to skill files.
@@ -329,104 +433,17 @@ def apply_evolution_actions(actions: list, dry_run: bool = True) -> list:
     for action in actions:
         act = action["action"]
         skill_name = action["skill"]
-        result = {"action": act, "skill": skill_name, "dry_run": dry_run}
 
         if act == "retain":
-            result["message"] = f"Kept '{skill_name}' unchanged"
-            if not dry_run:
-                log.append({
-                    "timestamp": datetime.now().isoformat(),
-                    "action": "retain",
-                    "skill": skill_name,
-                })
-
+            result = _apply_retain(skill_name, dry_run, log)
         elif act == "refine":
-            path, content = _load_skill_file(skill_name)
-            if path and content:
-                if not dry_run:
-                    improved = _add_refinement_note(content, action)
-                    with open(path, "w", encoding="utf-8") as f:
-                        f.write(improved)
-                    log.append({
-                        "timestamp": datetime.now().isoformat(),
-                        "action": "refine",
-                        "skill": skill_name,
-                        "failure_patterns": action.get("failure_patterns", []),
-                    })
-                result["message"] = f"Refined '{skill_name}' with failure analysis"
-            else:
-                result["message"] = f"Cannot refine '{skill_name}' — file not found"
-
+            result = _apply_refine(skill_name, action, dry_run, log)
         elif act == "prune":
-            path, _content = _load_skill_file(skill_name)
-            if path and not dry_run:
-                backup = path + ".pruned"
-                os.replace(path, backup)
-                log.append({
-                    "timestamp": datetime.now().isoformat(),
-                    "action": "prune",
-                    "skill": skill_name,
-                    "backup": backup,
-                })
-                result["message"] = f"Pruned '{skill_name}' (backup: {backup})"
-            elif path:
-                result["message"] = f"Would prune '{skill_name}'"
-            else:
-                result["message"] = f"Cannot prune '{skill_name}' — file not found"
-
+            result = _apply_prune(skill_name, dry_run, log)
         elif act == "generate":
-            cluster = action.get("cluster", [])
-            suggested_name = skill_name
-            action_types = action.get("suggested_action_types", ["general"])
-            keywords = action.get("suggested_keywords", suggested_name.split("_")[:3])
-
-            if len(cluster) < 1:
-                result["message"] = (
-                    f"Skipped: no task cluster for skill generation"
-                )
-            elif not dry_run:
-                instructions = _generate_instructions(cluster, action_types)
-                example = cluster[0][:80]
-                kw_str = ", ".join(k for k in keywords if k)
-                frontmatter = (
-                    f"---\n"
-                    f"name: {suggested_name}\n"
-                    f"keywords: [{kw_str}]\n"
-                    f"action_types: [{', '.join(action_types)}]\n"
-                    f"description: SkillFlow-generated — {len(cluster)} tasks: {example}...\n"
-                    f"base: true\n"
-                    f"min_score: 1\n"
-                    f"---\n"
-                    f"\n"
-                    f"## {suggested_name.replace('_', ' ').title()}\n"
-                    f"\n"
-                    f"Auto-generated skill based on {len(cluster)} similar unmatched tasks.\n"
-                    f"\n"
-                    f"**Example tasks:**\n" +
-                    "".join(f"- {t[:100]}\n" for t in cluster[:5]) +
-                    f"\n"
-                    f"### Instructions\n"
-                    f"\n"
-                    f"{instructions}\n"
-                )
-                gen_path = os.path.join("skills", f"{suggested_name}.md")
-                with open(gen_path, "w", encoding="utf-8") as f:
-                    f.write(frontmatter)
-                log.append({
-                    "timestamp": datetime.now().isoformat(),
-                    "action": "generate",
-                    "skill": suggested_name,
-                    "path": gen_path,
-                    "cluster_size": len(cluster),
-                    "keywords": keywords,
-                })
-                result["message"] = f"Generated skill '{suggested_name}' from {len(cluster)} tasks"
-            else:
-                result["message"] = (
-                    f"Would generate skill '{skill_name}' "
-                    f"(action_types: {action.get('suggested_action_types', ['general'])}, "
-                    f"cluster: {len(cluster)} tasks)"
-                )
+            result = _apply_generate(skill_name, action, dry_run, log)
+        else:
+            result = {"action": act, "skill": skill_name, "dry_run": dry_run}
 
         results.append(result)
 

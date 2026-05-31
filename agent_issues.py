@@ -77,6 +77,8 @@ def run_pytest(test_path=""):
         cmd = [sys.executable, "-m", "pytest", "-v"]
         if test_path:
             cmd.append(test_path)
+        else:
+            cmd.append("--ignore=tests/temp")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=config.SUBPROCESS_TIMEOUT)
         return {"success": result.returncode == 0, "stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode}
     except subprocess.TimeoutExpired:

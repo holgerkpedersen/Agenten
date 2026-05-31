@@ -9,6 +9,19 @@ from config import get_logger
 log = get_logger(__name__)
 
 
+def _strip_llm_tags(text):
+    """Strip thought tags and channel markers from LLM output.
+    Shared between ToolRegistry.parse_response() and decompose path."""
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    text = re.sub(r'<\|channel\|>.*?<\|end\|>', '', text, flags=re.DOTALL)
+    text = re.sub(r'<\|channel>.*?<\|end>', '', text, flags=re.DOTALL)
+    text = re.sub(r'<\|channel>thought\s*<channel\|>.*?(?=<\|channel>|\Z)', '', text, flags=re.DOTALL)
+    text = re.sub(r'<\|[^|]*\|>', '', text)
+    text = re.sub(r'<\|[^|]*>', '', text)
+    text = re.sub(r'<\|?channel\|?>.*$', '', text, flags=re.MULTILINE)
+    return text
+
+
 class Tool:
     def __init__(self, name, description, parameters, function, optional_params=None):
         self.name = name
@@ -113,11 +126,7 @@ class ToolRegistry:
         return re.sub(r'<<<TOOL>>>|<<<DONE>>>|<<<END>>>', '', text)
 
     def parse_response(self, response):
-        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|channel\|>.*?<\|end\|>', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|channel>.*?<\|end>', '', response, flags=re.DOTALL)
-        response = re.sub(r'<\|[^|]*\|>', '', response)
-        response = re.sub(r'<\|[^|]*>', '', response)
+        response = _strip_llm_tags(response)
         response = re.sub(r'\bfinal\s*(?=<<<)', '', response)
         response = re.sub(r'```\w*\n?', '', response)
         response = re.sub(r'```', '', response)

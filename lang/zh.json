@@ -209,7 +209,9 @@
     "decomposed": "已分解为树",
     "read_only": "已读取 {tools} 但未采取进一步操作。考虑使用更具体的提示重新运行，或选择其他模型。",
     "required_tools_missing": "缺少必需工具：{tools}。不使用这些工具无法完成任务。",
-    "tests_passed_no_resolve": "✅ 测试通过 —— 请记得调用 update_issue_status() 将问题标记为已解决。"
+    "tests_passed_no_resolve": "✅ 测试通过 —— 请记得调用 update_issue_status() 将问题标记为已解决。",
+    "red_test_passed": "✅ 红测试通过 —— 错误已修复。正在结束测试（红）阶段。",
+    "phase_complete": "阶段已自动完成。"
   },
   "errors": {
     "no_prompt": "未提供任务",
@@ -440,6 +442,7 @@
   "rubric_failed_detail": "  ✗ {desc}",
   "anti_leakage_warning": "⚠️ 此问题有解决方案建议，你尚未阅读。在编写/编辑代码之前，调用 read_issue 并设置 include_hints=true 来阅读它们。",
   "write_required": "\n\n⛔ 你必须在此阶段编写/编辑代码。使用 write_file 或 edit_file。只读取文件而不编写代码意味着任务已失败。最多读取一次 — 然后编写你的解决方案。",
+  "write_file_first": "\n\n🚫 已阻止：测试（红）阶段要求你首先编写测试。立即调用 write_file — 你已在分析阶段读取了足够的信息。",
   "tool_system_prompt_native": "你可以使用工具。在需要时调用它们以完成任务。\n\n{tools_desc}\n\n## 任务\n{task}",
   "tool_continuation_native": "可用: {tools_list}。使用工具完成任务。"
 }

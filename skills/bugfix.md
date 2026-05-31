@@ -41,3 +41,8 @@ For a NoneType crash at agent_core.py:985:
 6. run_tests() → all pass
 7. update_issue_status("BUG-003", "resolved", "Added None-guard before list comprehension")
 ```
+
+<!-- SkillFlow Refinement: 2026-05-30 -->
+<!-- Failure patterns to address:
+     - 
+-->
