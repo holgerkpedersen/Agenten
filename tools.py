@@ -25,7 +25,16 @@ def _strip_llm_tags(text):
 
 
 class Tool:
+    """tool."""
     def __init__(self, name, description, parameters, function, optional_params=None):
+        """Initialize the instance.
+        
+        Args:
+            name:
+            description:
+            parameters:
+            function:
+            optional_params:"""
         self.name = name
         self.description = description
         self.parameters = parameters
@@ -33,6 +42,7 @@ class Tool:
         self.optional_params = set(optional_params or [])
 
     def to_prompt_desc(self):
+        """to prompt desc."""
         parts = []
         for p in self.parameters:
             parts.append(f"[{p}]" if p in self.optional_params else p)
@@ -40,22 +50,33 @@ class Tool:
 
 
 class ToolRegistry:
+    """tool registry."""
     TOOL_MARKER = "<<<TOOL>>>"
     DONE_MARKER = "<<<DONE>>>"
     END_MARKER = "<<<END>>>"
 
     def __init__(self):
+        """Initialize the instance."""
         self.tools = {}
         self.lang = "da"
         self.active_tools = None
 
     def set_active_tools(self, names):
+        """set active tools.
+        
+        Args:
+            names:"""
         self.active_tools = names
 
     def register(self, tool):
+        """register.
+        
+        Args:
+            tool:"""
         self.tools[tool.name] = tool
 
     def get_tool_descriptions(self):
+        """get tool descriptions."""
         lines = []
         for name, tool in self.tools.items():
             if self.active_tools is None or name in self.active_tools:
@@ -63,6 +84,7 @@ class ToolRegistry:
         return "\n".join(lines)
 
     def get_openai_tools_for_active(self):
+        """get openai tools for active."""
         tools = []
         for name, tool in self.tools.items():
             if self.active_tools is not None and name not in self.active_tools:
@@ -89,6 +111,10 @@ class ToolRegistry:
         return tools
 
     def build_system_prompt(self, task):
+        """build system prompt.
+        
+        Args:
+            task:"""
         tools_desc = self.get_tool_descriptions()
         active_names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
         if not active_names:
@@ -125,9 +151,17 @@ class ToolRegistry:
 
     @staticmethod
     def strip_markers(text):
+        """strip markers.
+        
+        Args:
+            text:"""
         return re.sub(r'<<<TOOL>>>|<<<DONE>>>|<<<END>>>', '', text)
 
     def parse_response(self, response):
+        """parse response.
+        
+        Args:
+            response:"""
         response = _strip_llm_tags(response)
         response = re.sub(r'\bfinal\s*(?=<<<)', '', response)
         response = re.sub(r'```\w*\n?', '', response)
@@ -205,6 +239,11 @@ class ToolRegistry:
         return {"type": "text", "text": response}
 
     def execute(self, tool_name, args):
+        """execute.
+        
+        Args:
+            tool_name:
+            args:"""
         if tool_name.lower() in ("navn", "name", "nombre", "\u540d\u79f0"):
             names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
             tools_hint = ', '.join(names)

@@ -4,6 +4,9 @@ from enum import StrEnum
 
 class K(StrEnum):
     # === Templates ===
+    """k.
+    
+    Extends: StrEnum"""
     T_RESUME           = "templates.resume"
     T_KODEANALYSE      = "templates.kodeanalyse"
     T_DIFFANALYSE      = "templates.diffanalyse"

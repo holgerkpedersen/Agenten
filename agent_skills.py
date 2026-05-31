@@ -150,10 +150,19 @@ SECTION_INSTRUCTIONS = {
 
 
 def refresh_skills(agent):
+    """refresh skills.
+    
+    Args:
+        agent:"""
     agent._skills = SkillLoader.load_all(lang=agent.lang)
 
 
 def match_skills(agent, prompt):
+    """match skills.
+    
+    Args:
+        agent:
+        prompt:"""
     scored = SkillLoader.find_all_for_task(prompt, agent._skills, top=3)
     agent._active_skills = [s for s in scored if s.get("base") or has_matching_intent(agent, s)]
     template_match = [s for s in agent._skills if s.get("template") and s["template"] == agent.active_template and s not in agent._active_skills]
@@ -167,11 +176,20 @@ def match_skills(agent, prompt):
 
 
 def has_matching_intent(agent, skill):
+    """has matching intent.
+    
+    Args:
+        agent:
+        skill:"""
     intent = skill.get("template") or skill.get("intent")
     return not agent.active_template or intent == agent.active_template or skill.get("base")
 
 
 def format_skills_for_prompt(agent):
+    """format skills for prompt.
+    
+    Args:
+        agent:"""
     if not agent._active_skills:
         return ""
     lines = ["\n## \U0001f4cb Retningslinjer (ikke v\u00e6rkt\u00f8jer)\n"]
@@ -182,6 +200,10 @@ def format_skills_for_prompt(agent):
 
 
 def get_templates(agent):
+    """get templates.
+    
+    Args:
+        agent:"""
     lang_instr = t(K.ANSWER_IN, agent.lang)
     return {
         "resume": {

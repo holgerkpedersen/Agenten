@@ -8,6 +8,10 @@ from i18n import K
 
 
 def _clean_task_name(name):
+    """clean task name.
+    
+    Args:
+        name:"""
     name = re.sub(r'^[\*\-+]\s+', '', name.strip())
     name = re.sub(r'^\d+\.\s+', '', name)
     name = re.sub(r'<think>.*?</think>', '', name, flags=re.DOTALL)
@@ -37,6 +41,11 @@ def _clean_task_name(name):
 
 
 def create_fallback_tree(agent, prompt):
+    """create fallback tree.
+    
+    Args:
+        agent:
+        prompt:"""
     tree = TaskTree(prompt)
     prompt_lower = prompt.lower()
 
@@ -64,6 +73,12 @@ def create_fallback_tree(agent, prompt):
 
 
 def parse_tree_from_llm(agent, prompt, llm_response):
+    """parse tree from llm.
+    
+    Args:
+        agent:
+        prompt:
+        llm_response:"""
     tree = TaskTree(prompt)
     if llm_response.startswith("ERROR") or not llm_response.strip():
         agent._log("ERROR", t(K.LOG_LLM_ERROR_FALLBACK, agent.lang), llm_response[:100] if llm_response else t(K.LOG_EMPTY_RESPONSE, agent.lang))
@@ -108,6 +123,10 @@ def parse_tree_from_llm(agent, prompt, llm_response):
 
 
 def count_tasks(node):
+    """count tasks.
+    
+    Args:
+        node:"""
     count = 1
     for child in node.children:
         count += count_tasks(child)
@@ -115,10 +134,18 @@ def count_tasks(node):
 
 
 def task_tree_to_dict(agent):
+    """task tree to dict.
+    
+    Args:
+        agent:"""
     if not agent.task_tree or not agent.task_tree.root:
         return None
 
     def node_to_dict(node):
+        """node to dict.
+        
+        Args:
+            node:"""
         return {
             "name": node.name,
             "status": node.status,
@@ -130,7 +157,16 @@ def task_tree_to_dict(agent):
 
 
 def task_tree_from_dict(agent, d):
+    """task tree from dict.
+    
+    Args:
+        agent:
+        d:"""
     def dict_to_node(item):
+        """dict to node.
+        
+        Args:
+            item:"""
         node = TaskNode(item["name"])
         node.status = item.get("status", "pending")
         node.result = item.get("result")
@@ -142,6 +178,11 @@ def task_tree_from_dict(agent, d):
 
 
 def record_outcome(agent, task_node):
+    """record outcome.
+    
+    Args:
+        agent:
+        task_node:"""
     try:
         from skill_tracker import tracker
         skill_name = "__none__"
@@ -163,6 +204,10 @@ def record_outcome(agent, task_node):
 
 
 def evolve_if_needed(agent):
+    """evolve if needed.
+    
+    Args:
+        agent:"""
     try:
         from skill_tracker import tracker
         if not tracker.should_evolve():

@@ -13,16 +13,30 @@ SESSION_ID_PATTERN = re.compile(r'^[a-f0-9-]{8,36}$')
 MAX_SESSION_FILE_SIZE = 10 * 1024 * 1024
 
 def _valid_session_id(session_id):
+    """valid session id.
+    
+    Args:
+        session_id:"""
     return bool(session_id and SESSION_ID_PATTERN.match(session_id))
 
 class SessionManager:
+    """session manager."""
     _lock = threading.RLock()
 
     def __init__(self, storage_dir="sessions"):
+        """Initialize the instance.
+        
+        Args:
+            storage_dir:"""
         self.storage_dir = storage_dir
         os.makedirs(storage_dir, exist_ok=True)
         
     def save_session(self, session_id, session_data):
+        """save session.
+        
+        Args:
+            session_id:
+            session_data:"""
         if not _valid_session_id(session_id):
             return None
         session_data["last_modified"] = datetime.now().isoformat()
@@ -35,6 +49,10 @@ class SessionManager:
         return session_id
     
     def load_session(self, session_id):
+        """load session.
+        
+        Args:
+            session_id:"""
         if not _valid_session_id(session_id):
             return None
         filepath = os.path.join(self.storage_dir, f"{session_id}.json")
@@ -51,6 +69,7 @@ class SessionManager:
             return None
     
     def list_sessions(self):
+        """list sessions."""
         sessions = []
         with SessionManager._lock:
             for filename in os.listdir(self.storage_dir):
@@ -74,6 +93,10 @@ class SessionManager:
         return sorted(sessions, key=lambda x: x["last_modified"], reverse=True)
     
     def create_session(self, name):
+        """create session.
+        
+        Args:
+            name:"""
         session_id = str(uuid.uuid4())
         session_data = {
             "id": session_id,
@@ -91,6 +114,11 @@ class SessionManager:
         return session_id, session_data
     
     def rename_session(self, session_id, new_name):
+        """rename session.
+        
+        Args:
+            session_id:
+            new_name:"""
         if not _valid_session_id(session_id):
             return False
         with SessionManager._lock:
@@ -102,6 +130,10 @@ class SessionManager:
             return True
 
     def delete_session(self, session_id):
+        """delete session.
+        
+        Args:
+            session_id:"""
         if not _valid_session_id(session_id):
             return False
         filepath = os.path.join(self.storage_dir, f"{session_id}.json")
@@ -113,6 +145,13 @@ class SessionManager:
                 return False
 
     def add_prompt_result(self, session_id, prompt, result, tree=None):
+        """add prompt result.
+        
+        Args:
+            session_id:
+            prompt:
+            result:
+            tree:"""
         if not _valid_session_id(session_id):
             return False
         with SessionManager._lock:
@@ -136,6 +175,10 @@ class SessionManager:
             return False
     
     def get_prompt_history(self, session_id):
+        """get prompt history.
+        
+        Args:
+            session_id:"""
         if not _valid_session_id(session_id):
             return []
         session_data = self.load_session(session_id)
@@ -144,6 +187,12 @@ class SessionManager:
         return []
     
     def _extract_knowledge(self, session_data, prompt, result):
+        """extract knowledge.
+        
+        Args:
+            session_data:
+            prompt:
+            result:"""
         if not isinstance(prompt, str) or not prompt:
             return
         knowledge = session_data.get("learned_knowledge", [])
@@ -162,6 +211,12 @@ class SessionManager:
         session_data["learned_knowledge"] = knowledge[-20:]
     
     def get_knowledge_for_context(self, session_id, current_prompt, lang="da"):
+        """get knowledge for context.
+        
+        Args:
+            session_id:
+            current_prompt:
+            lang:"""
         if not _valid_session_id(session_id):
             return ""
         session_data = self.load_session(session_id)

@@ -40,6 +40,11 @@ def _load_json(path: str, default):
 
 
 def _save_json(path, data):
+    """save json.
+    
+    Args:
+        path:
+        data:"""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -48,6 +53,13 @@ def _save_json(path, data):
 
 
 def _deduce_action_type(task: str) -> list:
+    """deduce action type.
+    
+    Args:
+        task (str):
+    
+    Returns:
+        list"""
     task_lower = task.lower()
     types = []
     if any(w in task_lower for w in ["read", "læs", "hent", "fetch", "get", "vis"]):
@@ -82,11 +94,26 @@ STOPWORDS = {
 
 
 def _normalize_task(text: str) -> set:
+    """normalize task.
+    
+    Args:
+        text (str):
+    
+    Returns:
+        set"""
     words = re.findall(r"[a-z0-9]+", text.lower())
     return {w for w in words if len(w) > 2 and w not in STOPWORDS}
 
 
 def _task_similarity(t1: str, t2: str) -> float:
+    """task similarity.
+    
+    Args:
+        t1 (str):
+        t2 (str):
+    
+    Returns:
+        float"""
     a = _normalize_task(t1)
     b = _normalize_task(t2)
     if not a or not b:
@@ -95,6 +122,13 @@ def _task_similarity(t1: str, t2: str) -> float:
 
 
 def _cluster_unmatched(outcomes: list) -> list:
+    """cluster unmatched.
+    
+    Args:
+        outcomes (list):
+    
+    Returns:
+        list"""
     clusters = []
     SIMILARITY_THRESHOLD = 0.25
     for o in outcomes:
@@ -117,6 +151,13 @@ def _cluster_unmatched(outcomes: list) -> list:
 
 
 def _extract_cluster_name(tasks: list) -> str:
+    """extract cluster name.
+    
+    Args:
+        tasks (list):
+    
+    Returns:
+        str"""
     counter = Counter()
     for t in tasks:
         counter.update(_normalize_task(t))
@@ -127,6 +168,13 @@ def _extract_cluster_name(tasks: list) -> str:
 
 
 def _extract_cluster_keywords(tasks: list) -> list:
+    """extract cluster keywords.
+    
+    Args:
+        tasks (list):
+    
+    Returns:
+        list"""
     counter = Counter()
     for t in tasks:
         counter.update(_normalize_task(t))
@@ -134,6 +182,13 @@ def _extract_cluster_keywords(tasks: list) -> list:
 
 
 def _aggregate_action_types(tasks: list) -> list:
+    """aggregate action types.
+    
+    Args:
+        tasks (list):
+    
+    Returns:
+        list"""
     merged = set()
     for t in tasks:
         merged.update(_deduce_action_type(t))
@@ -141,6 +196,14 @@ def _aggregate_action_types(tasks: list) -> list:
 
 
 def _generate_instructions(tasks: list, action_types: list) -> str:
+    """generate instructions.
+    
+    Args:
+        tasks (list):
+        action_types (list):
+    
+    Returns:
+        str"""
     action_type = action_types[0] if action_types else "general"
     merged_words = Counter()
     for t in tasks:
@@ -187,6 +250,13 @@ def _generate_instructions(tasks: list, action_types: list) -> str:
 
 
 def _extract_common_patterns(tasks: list) -> list:
+    """extract common patterns.
+    
+    Args:
+        tasks (list):
+    
+    Returns:
+        list"""
     bigrams = Counter()
     for t in tasks:
         words = re.findall(r"[a-z0-9]+", t.lower())
@@ -297,6 +367,13 @@ def analyze():
 
 
 def _suggest_skill_name(task: str) -> str:
+    """suggest skill name.
+    
+    Args:
+        task (str):
+    
+    Returns:
+        str"""
     words = re.findall(r"[A-Za-z0-9]+", task)
     keywords = [w for w in words if len(w) > 3 and w.lower() not in
                 {"the", "this", "that", "with", "from", "what", "which",
@@ -310,6 +387,10 @@ def _suggest_skill_name(task: str) -> str:
 
 
 def _load_skill_file(name: str):
+    """load skill file.
+    
+    Args:
+        name (str):"""
     skills_dir = "skills"
     for root, _dirs, files in os.walk(skills_dir):
         for f in files:
@@ -321,6 +402,12 @@ def _load_skill_file(name: str):
 
 
 def _apply_retain(skill_name, dry_run, log):
+    """apply retain.
+    
+    Args:
+        skill_name:
+        dry_run:
+        log:"""
     if not dry_run:
         log.append({
             "timestamp": datetime.now().isoformat(),
@@ -332,6 +419,13 @@ def _apply_retain(skill_name, dry_run, log):
 
 
 def _apply_refine(skill_name, action, dry_run, log):
+    """apply refine.
+    
+    Args:
+        skill_name:
+        action:
+        dry_run:
+        log:"""
     path, content = _load_skill_file(skill_name)
     if path and content:
         if not dry_run:
@@ -352,6 +446,12 @@ def _apply_refine(skill_name, action, dry_run, log):
 
 
 def _apply_prune(skill_name, dry_run, log):
+    """apply prune.
+    
+    Args:
+        skill_name:
+        dry_run:
+        log:"""
     path, _content = _load_skill_file(skill_name)
     if path:
         if not dry_run:
@@ -373,6 +473,13 @@ def _apply_prune(skill_name, dry_run, log):
 
 
 def _apply_generate(skill_name, action, dry_run, log):
+    """apply generate.
+    
+    Args:
+        skill_name:
+        action:
+        dry_run:
+        log:"""
     cluster = action.get("cluster", [])
     action_types = action.get("suggested_action_types", ["general"])
     keywords = action.get("suggested_keywords", skill_name.split("_")[:3])
@@ -456,6 +563,14 @@ def apply_evolution_actions(actions: list, dry_run: bool = True) -> list:
 
 
 def _add_refinement_note(content: str, action: dict) -> str:
+    """add refinement note.
+    
+    Args:
+        content (str):
+        action (dict):
+    
+    Returns:
+        str"""
     patterns = action.get("failure_patterns", [])
     note = f"\n<!-- SkillFlow Refinement: {datetime.now().strftime('%Y-%m-%d')} -->\n"
     note += "<!-- Failure patterns to address:\n"
@@ -476,10 +591,15 @@ def _add_refinement_note(content: str, action: dict) -> str:
 _last_evolved_at = 0
 
 def _reset_evolve_counter():
+    """reset evolve counter."""
     global _last_evolved_at
     _last_evolved_at = 0
 
 def should_evolve() -> bool:
+    """should evolve.
+    
+    Returns:
+        bool"""
     global _last_evolved_at
     try:
         total = tracker.total_outcomes
@@ -494,6 +614,13 @@ def should_evolve() -> bool:
 
 
 def evolve_if_needed(dry_run: bool = True) -> dict:
+    """evolve if needed.
+    
+    Args:
+        dry_run (bool):
+    
+    Returns:
+        dict"""
     if not should_evolve():
         return {"status": "skipped", "reason": "not_yet", "total": tracker.total_outcomes}
     analysis = analyze()
@@ -510,6 +637,10 @@ def evolve_if_needed(dry_run: bool = True) -> dict:
 
 
 def _log_applied(results: list):
+    """log applied.
+    
+    Args:
+        results (list):"""
     log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".agent_storage", "evolution_log.json")
     try:
         os.makedirs(os.path.dirname(log_path), exist_ok=True)

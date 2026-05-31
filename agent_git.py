@@ -15,6 +15,10 @@ PR_GIT_TOOLS = {"git_diff", "git_log", "git_status", "git_current_branch", "git_
 
 
 def is_pr_workflow(task_name):
+    """is pr workflow.
+    
+    Args:
+        task_name:"""
     if not task_name:
         return False
     if re.search(r'\bpr\b', task_name, re.IGNORECASE):
@@ -24,6 +28,11 @@ def is_pr_workflow(task_name):
 
 
 def extract_branch_name(task_name, original_prompt):
+    """extract branch name.
+    
+    Args:
+        task_name:
+        original_prompt:"""
     m = re.search(r"branch\s*['\"]?([\w\-\/]+)['\"]?", original_prompt, re.IGNORECASE)
     if m:
         return m.group(1)
@@ -34,6 +43,14 @@ def extract_branch_name(task_name, original_prompt):
 
 
 def verify_pr_step(agent, tool_name, result, task_name, original_prompt):
+    """verify pr step.
+    
+    Args:
+        agent:
+        tool_name:
+        result:
+        task_name:
+        original_prompt:"""
     if not is_pr_workflow(task_name):
         return None
 

@@ -14,6 +14,7 @@ _LMS_CACHE = None
 
 
 def _get_lms_path():
+    """get lms path."""
     global _LMS_CACHE
     if _LMS_CACHE is None:
         _LMS_CACHE = shutil.which('lms') or shutil.which('lms.exe') or os.path.join(

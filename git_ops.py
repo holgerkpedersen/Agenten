@@ -46,6 +46,11 @@ _STDLIB_MODULES = {
 
 
 def _check_missing_deps(py_content, req_path):
+    """check missing deps.
+    
+    Args:
+        py_content:
+        req_path:"""
     try:
         tree = ast.parse(py_content)
     except SyntaxError:
@@ -81,6 +86,11 @@ def _check_missing_deps(py_content, req_path):
 
 
 def _extract_urls(content, source_path):
+    """extract urls.
+    
+    Args:
+        content:
+        source_path:"""
     urls = set()
     if source_path.endswith('.html'):
         for m in re.finditer(r"fetch\s*\(\s*['\"]([^'\"]+)['\"]", content):
@@ -94,6 +104,11 @@ def _extract_urls(content, source_path):
 
 
 def _find_partner_files(path, other_ext):
+    """find partner files.
+    
+    Args:
+        path:
+        other_ext:"""
     dirname = os.path.dirname(path)
     basename = os.path.splitext(os.path.basename(path))[0]
     candidates = []
@@ -131,6 +146,11 @@ def _find_partner_files(path, other_ext):
 
 
 def _check_route_mismatch(path, other_ext):
+    """check route mismatch.
+    
+    Args:
+        path:
+        other_ext:"""
     other = _find_partner_files(path, other_ext)
     if not other:
         return []
@@ -171,6 +191,11 @@ def _check_route_mismatch(path, other_ext):
 
 
 def _run_git(args, cwd=None):
+    """run git.
+    
+    Args:
+        args:
+        cwd:"""
     if cwd is None:
         cwd = os.getcwd()
 
@@ -184,10 +209,18 @@ def _run_git(args, cwd=None):
 
 
 def git_status(path="."):
+    """git status.
+    
+    Args:
+        path:"""
     return _run_git(["status", "--short"], cwd=path)
 
 
 def git_remote_exists(path="."):
+    """git remote exists.
+    
+    Args:
+        path:"""
     r = _run_git(["remote", "get-url", "origin"], cwd=path)
     if r["success"]:
         return {"success": True, "url": r["output"]}
@@ -195,14 +228,28 @@ def git_remote_exists(path="."):
 
 
 def git_add_all(path="."):
+    """git add all.
+    
+    Args:
+        path:"""
     return _run_git(["add", "-A"], cwd=path)
 
 
 def git_commit(message, path="."):
+    """git commit.
+    
+    Args:
+        message:
+        path:"""
     return _run_git(["commit", "-m", message], cwd=path)
 
 
 def git_push(branch="main", path="."):
+    """git push.
+    
+    Args:
+        branch:
+        path:"""
     remote = git_remote_exists(path)
     if not remote["success"]:
         return remote
@@ -210,6 +257,11 @@ def git_push(branch="main", path="."):
 
 
 def git_set_remote(url, path="."):
+    """git set remote.
+    
+    Args:
+        url:
+        path:"""
     existing = git_remote_exists(path)
     if existing["success"]:
         _run_git(["remote", "remove", "origin"], cwd=path)
@@ -217,6 +269,12 @@ def git_set_remote(url, path="."):
 
 
 def git_diff(older="HEAD~1", newer="HEAD", max_chars=8000):
+    """git diff.
+    
+    Args:
+        older:
+        newer:
+        max_chars:"""
     r = _run_git(["diff", "--unified=3", older, newer])
     if r["success"] and len(r["output"]) > max_chars:
         files = _run_git(["diff", "--name-only", older, newer])
@@ -226,30 +284,64 @@ def git_diff(older="HEAD~1", newer="HEAD", max_chars=8000):
 
 
 def git_log(count=10):
+    """git log.
+    
+    Args:
+        count:"""
     return _run_git(["log", f"-{count}", "--oneline", "--decorate"])
 
 
 def git_create_branch(name, path="."):
+    """git create branch.
+    
+    Args:
+        name:
+        path:"""
     return _run_git(["checkout", "-b", name], cwd=path)
 
 
 def git_current_branch(path="."):
+    """git current branch.
+    
+    Args:
+        path:"""
     return _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=path)
 
 
 def git_branch_list(path="."):
+    """git branch list.
+    
+    Args:
+        path:"""
     return _run_git(["branch"], cwd=path)
 
 
 def git_pull(remote="origin", branch="main", path="."):
+    """git pull.
+    
+    Args:
+        remote:
+        branch:
+        path:"""
     return _run_git(["pull", remote, branch], cwd=path)
 
 
 def git_checkout(branch, path="."):
+    """git checkout.
+    
+    Args:
+        branch:
+        path:"""
     return _run_git(["checkout", branch], cwd=path)
 
 
 def _check_post_write(path, content, result):
+    """check post write.
+    
+    Args:
+        path:
+        content:
+        result:"""
     dirname = os.path.dirname(path)
     if path.endswith('.py'):
         req_path = os.path.join(dirname or os.getcwd(), 'requirements.txt')
@@ -274,6 +366,11 @@ def _check_post_write(path, content, result):
 
 
 def write_file(path, content):
+    """write file.
+    
+    Args:
+        path:
+        content:"""
     if not os.path.isabs(path):
         path = os.path.abspath(path)
     if not is_safe_location(path):
@@ -308,6 +405,10 @@ def write_file(path, content):
 
 
 def _build_flexible_pattern(text):
+    """build flexible pattern.
+    
+    Args:
+        text:"""
     lines = text.split('\n')
     parts = []
     for line in lines:
@@ -320,6 +421,10 @@ def _build_flexible_pattern(text):
 
 
 def _build_fuzzy_pattern(text):
+    """build fuzzy pattern.
+    
+    Args:
+        text:"""
     lines = text.split('\n')
     parts = []
     for line in lines:
@@ -341,6 +446,10 @@ _PLACEHOLDER_PATTERNS = [
 
 
 def _has_placeholders(text):
+    """has placeholders.
+    
+    Args:
+        text:"""
     for pat in _PLACEHOLDER_PATTERNS:
         if pat.search(text):
             return True
@@ -348,6 +457,10 @@ def _has_placeholders(text):
 
 
 def _detect_base_indentation(text):
+    """detect base indentation.
+    
+    Args:
+        text:"""
     lines = text.split('\n')
     indent_levels = []
     for line in lines:
@@ -362,6 +475,11 @@ def _detect_base_indentation(text):
 
 
 def _normalize_indentation(new_text, search_text):
+    """normalize indentation.
+    
+    Args:
+        new_text:
+        search_text:"""
     target_indent = _detect_base_indentation(search_text)
     source_indent = _detect_base_indentation(new_text)
     if target_indent == source_indent:
@@ -383,6 +501,14 @@ def _normalize_indentation(new_text, search_text):
 
 
 def edit_file(path, old_text="", new_text="", expected_hash=None, symbol=None):
+    """edit file.
+    
+    Args:
+        path:
+        old_text:
+        new_text:
+        expected_hash:
+        symbol:"""
     if not os.path.isabs(path):
         path = os.path.abspath(path)
     if not is_safe_location(path):
@@ -522,6 +648,12 @@ def edit_file(path, old_text="", new_text="", expected_hash=None, symbol=None):
 EXCLUDE_LIST_FILES = {'.env', '.env.example', 'credentials.json', 'secrets.json', '.gitconfig', 'id_rsa', 'id_rsa.pub', 'known_hosts', 'config.json'}
 
 def list_files(path=".", pattern=None, max_depth=2):
+    """list files.
+    
+    Args:
+        path:
+        pattern:
+        max_depth:"""
     try:
         if not os.path.isabs(path):
             path = os.path.abspath(path)

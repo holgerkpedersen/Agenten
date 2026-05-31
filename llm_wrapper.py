@@ -13,7 +13,16 @@ log = get_logger(__name__)
 
 
 class LMStudioWrapper:
+    """lmstudio wrapper."""
     def __init__(self, base_url=None, timeout=120, model=None, api_key=None, on_request=None):
+        """Initialize the instance.
+        
+        Args:
+            base_url:
+            timeout:
+            model:
+            api_key:
+            on_request:"""
         self.base_url = self._resolve_base_url(base_url)
         self.api_key = api_key or os.environ.get('OPENCODE_API_KEY', '')
         self.cache = {}
@@ -28,6 +37,7 @@ class LMStudioWrapper:
         self.on_request = on_request
 
     def _headers(self):
+        """headers."""
         h = {}
         if self.api_key:
             h["Authorization"] = f"Bearer {self.api_key}"
@@ -35,6 +45,10 @@ class LMStudioWrapper:
 
     @staticmethod
     def _resolve_base_url(base_url):
+        """resolve base url.
+        
+        Args:
+            base_url:"""
         if base_url:
             return base_url.rstrip('/')
         if os.environ.get('LM_BASE_URL'):
@@ -44,6 +58,7 @@ class LMStudioWrapper:
         return f'http://{host}:{port}/v1'
 
     def list_models(self):
+        """list models."""
         try:
             r = requests.get(f"{self.base_url}/models", headers=self._headers(), timeout=5)
             if r.status_code == 200:
@@ -53,14 +68,26 @@ class LMStudioWrapper:
         return [self.model]
 
     def set_model(self, model):
+        """set model.
+        
+        Args:
+            model:"""
         with self._model_lock:
             self.model = model
 
     def _get_cache_key(self, messages):
+        """get cache key.
+        
+        Args:
+            messages:"""
         return hashlib.md5(json.dumps(messages, sort_keys=True).encode()).hexdigest()
 
     @staticmethod
     def encode_image(path):
+        """encode image.
+        
+        Args:
+            path:"""
         size = os.path.getsize(path)
         if size > config.MAX_IMAGE_SIZE:
             raise ValueError(f"Image too large: {size} bytes (max {config.MAX_IMAGE_SIZE})")
@@ -77,12 +104,21 @@ class LMStudioWrapper:
 
     @classmethod
     def _supports_vision(cls, model):
+        """supports vision.
+        
+        Args:
+            model:"""
         if not model:
             return False
         return any(kw in model.lower() for kw in cls.VISION_KEYWORDS)
 
     @classmethod
     def _image_url(cls, img, model=None):
+        """image url.
+        
+        Args:
+            img:
+            model:"""
         b64 = img.get("b64", img) if isinstance(img, dict) else img
         mime = img.get("mime", "png") if isinstance(img, dict) else "png"
         if mime == "webp":
@@ -91,10 +127,21 @@ class LMStudioWrapper:
 
     @classmethod
     def _image_part(cls, img, model):
+        """image part.
+        
+        Args:
+            img:
+            model:"""
         url = cls._image_url(img, model)
         return {"type": "image_url", "image_url": {"url": url}}
 
     def _to_messages(self, prompt=None, messages=None, images=None):
+        """to messages.
+        
+        Args:
+            prompt:
+            messages:
+            images:"""
         model = self.model
         if images and not self._supports_vision(model):
             images = None
@@ -130,6 +177,10 @@ class LMStudioWrapper:
         return [{"role": "user", "content": prompt}] if prompt else []
 
     def _compress_messages(self, messages):
+        """compress messages.
+        
+        Args:
+            messages:"""
         compressed = []
         for m in messages:
             content = m["content"]
@@ -148,6 +199,15 @@ class LMStudioWrapper:
         return compressed
 
     def generate(self, prompt=None, messages=None, temperature=0.7, max_tokens=None, use_cache=True, images=None):
+        """generate.
+        
+        Args:
+            prompt:
+            messages:
+            temperature:
+            max_tokens:
+            use_cache:
+            images:"""
         if max_tokens is None:
             max_tokens = config.MAX_TOKENS
         msgs = self._to_messages(prompt, messages, images)
@@ -203,6 +263,10 @@ class LMStudioWrapper:
             return f"ERROR:{str(e)}"
 
     def _truncate_messages(self, messages):
+        """truncate messages.
+        
+        Args:
+            messages:"""
         total = sum(len(m.get("content", "")) if isinstance(m.get("content"), str) else 0 for m in messages)
         if total <= config.MAX_MESSAGE_CHARS:
             return messages
@@ -214,6 +278,18 @@ class LMStudioWrapper:
         return system_msgs + other_msgs
 
     def generate_stream(self, prompt=None, messages=None, temperature=0.7, max_tokens=None, images=None, tools=None):
+        """generate stream.
+        
+        Args:
+            prompt:
+            messages:
+            temperature:
+            max_tokens:
+            images:
+            tools:
+        
+        Yields:
+            ..."""
         if max_tokens is None:
             max_tokens = config.MAX_TOKENS
         msgs = self._to_messages(prompt, messages, images)

@@ -30,7 +30,7 @@ def _parse_test_summary(result: dict) -> str:
 EXECUTION_TIMEOUT = config.EXECUTION_TIMEOUT
 
 
-def _save_llm_log_file(agent: Any, task_name: str, iteration: int, content: str) -> str:
+def _save_llm_log_file(agent, task_name: str, iteration: int, content: str) -> str:
     """Save LLM response to a file for later inspection."""
     session_id = getattr(agent, '_session_id', 'unknown')
     session_dir = os.path.join("logs", "llm_responses", session_id)
@@ -66,12 +66,20 @@ PHASE_ALIASES = {
 
 
 def _normalize_phase(name):
+    """normalize phase.
+    
+    Args:
+        name:"""
     lower = name.lower().split("(")[0].strip()
     lower = re.sub(r'^[\d.]+[\)\s]*', '', lower).strip()
     return PHASE_ALIASES.get(lower, lower)
 
 
 def _get_max_tool_calls(task_name):
+    """get max tool calls.
+    
+    Args:
+        task_name:"""
     phase = _normalize_phase(task_name).lower()
     if any(k in phase for k in ["analyse", "læs", "afklar"]):
         return config.MAX_TOOL_CALLS_ANALYSE
@@ -84,6 +92,12 @@ def _get_max_tool_calls(task_name):
 
 
 def _validate_done_output(agent, result_text, task_name):
+    """validate done output.
+    
+    Args:
+        agent:
+        result_text:
+        task_name:"""
     if isinstance(result_text, dict):
         result_text = result_text.get("result", str(result_text))
     if not isinstance(result_text, str) or len(result_text.strip()) < 50:
@@ -116,6 +130,11 @@ def _validate_done_output(agent, result_text, task_name):
 
 
 def _count_fix_attempts(agent, called_tools):
+    """count fix attempts.
+    
+    Args:
+        agent:
+        called_tools:"""
     edit_count = 0
     for k in called_tools:
         if k.startswith("edit_file"):
@@ -127,6 +146,11 @@ def _count_fix_attempts(agent, called_tools):
 
 
 def set_task_tools(agent, task_name):
+    """set task tools.
+    
+    Args:
+        agent:
+        task_name:"""
     if not agent.active_template or agent.active_template not in agent_skills.TEMPLATE_TASK_TOOLS:
         return
     template_tools = agent_skills.TEMPLATE_TASK_TOOLS[agent.active_template]
@@ -146,6 +170,12 @@ def set_task_tools(agent, task_name):
 
 
 def solve_task(agent, task_node, original_prompt):
+    """solve task.
+    
+    Args:
+        agent:
+        task_node:
+        original_prompt:"""
     agent._log("INFO", f"Starting task: {task_node.name}")
     full_response = ""
     for event in solve_task_stream(agent, task_node, original_prompt):
@@ -155,6 +185,10 @@ def solve_task(agent, task_node, original_prompt):
 
 
 def _build_chunk_hint(agent):
+    """build chunk hint.
+    
+    Args:
+        agent:"""
     available_keys = list(agent.file_chunks.keys())
     hint = ""
     if available_keys:
@@ -188,6 +222,13 @@ def _build_chunk_hint(agent):
 
 
 def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
+    """build initial messages.
+    
+    Args:
+        agent:
+        task_node:
+        original_prompt:
+        chunk_hint:"""
     clean_prompt = getattr(agent, 'prompt', original_prompt)
     file_ctx = getattr(agent, '_file_context_str', '')
 
@@ -244,6 +285,10 @@ def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
 
 
 def _msg_content_len(m):
+    """msg content len.
+    
+    Args:
+        m:"""
     c = m.get("content", "")
     if isinstance(c, str):
         return len(c)
@@ -253,6 +298,11 @@ def _msg_content_len(m):
 
 
 def _validate_rubrics(agent, called_tools):
+    """validate rubrics.
+    
+    Args:
+        agent:
+        called_tools:"""
     skill = agent._active_skills[0] if agent._active_skills else None
     if not skill:
         return [], []
@@ -272,6 +322,11 @@ def _validate_rubrics(agent, called_tools):
 
 
 def _evaluate_rubric_check(check_str, called_tools):
+    """evaluate rubric check.
+    
+    Args:
+        check_str:
+        called_tools:"""
     if not check_str:
         return True
     for part in check_str.split(" or "):
@@ -284,6 +339,11 @@ def _evaluate_rubric_check(check_str, called_tools):
 
 
 def _truncate_messages(messages, max_chars):
+    """truncate messages.
+    
+    Args:
+        messages:
+        max_chars:"""
     total = sum(_msg_content_len(m) for m in messages)
     if total <= max_chars or len(messages) <= 3:
         return messages
@@ -297,16 +357,36 @@ def _truncate_messages(messages, max_chars):
 
 
 def _cont_hint(agent, tools_list):
+    """cont hint.
+    
+    Args:
+        agent:
+        tools_list:"""
     if config.NATIVE_TOOLS:
         return t(K.TOOL_CONTINUATION_NATIVE, agent.lang).format(tools_list=tools_list)
     return t(K.TOOL_CONTINUATION, agent.lang).format(tools_list=tools_list, TOOL_MARKER=agent.tool_registry.TOOL_MARKER, DONE_MARKER=agent.tool_registry.DONE_MARKER)
 
 
 def _add_user_msg(messages, content):
+    """add user msg.
+    
+    Args:
+        messages:
+        content:"""
     messages.append({"role": "user", "content": content})
 
 
 def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_node, original_prompt):
+    """handle tool call.
+    
+    Args:
+        agent:
+        parsed:
+        messages:
+        called_tools:
+        tools_list:
+        task_node:
+        original_prompt:"""
     tool_key = parsed['tool'] + str(parsed.get('args', {}))
     dup_count = called_tools.get(tool_key, 0)
     called_tools[tool_key] = dup_count + 1
@@ -394,6 +474,14 @@ def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_no
 
 
 def _check_done_pr_requirements(agent, messages, called_tools, original_prompt, task_name):
+    """check done pr requirements.
+    
+    Args:
+        agent:
+        messages:
+        called_tools:
+        original_prompt:
+        task_name:"""
     if not agent_git.is_pr_workflow(task_name):
         return True
     if not called_tools:
@@ -421,6 +509,12 @@ REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "update_issue_status"}
 CLOSE_PHASE_ALIASES = {"opdatering", "luk", "close"}
 
 def _check_required_tools(agent, called_tools, task_name=""):
+    """check required tools.
+    
+    Args:
+        agent:
+        called_tools:
+        task_name:"""
     available = set(agent.tool_registry.active_tools or [])
     required = available & REQUIRED_ACTION_TOOLS
     if not required:
@@ -453,6 +547,10 @@ ISSUE_ID_PATTERN = re.compile(r'(BUG|SEC|ARC|MNT|PRF|TST|REFAC)-\d+', re.IGNOREC
 
 
 def _extract_issue_id(text):
+    """extract issue id.
+    
+    Args:
+        text:"""
     m = ISSUE_ID_PATTERN.search(text)
     return m.group(0).upper() if m else None
 
@@ -495,6 +593,20 @@ def _get_phase_auto_complete_msg(task_name, tool_name, tool_result, agent):
 
 
 def _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools, _report_logs=0, original_prompt="", messages=None):
+    """finalize task stream.
+    
+    Args:
+        agent:
+        task_node:
+        full_response:
+        text_fallback:
+        called_tools:
+        _report_logs:
+        original_prompt:
+        messages:
+    
+    Yields:
+        ..."""
     if not full_response or "ERROR" in full_response:
         if called_tools:
             called_names = {k.split("{")[0] for k in called_tools}
@@ -581,6 +693,15 @@ def _finalize_task_stream(agent, task_node, full_response, text_fallback, called
 
 
 def solve_task_stream(agent, task_node, original_prompt):
+    """solve task stream.
+    
+    Args:
+        agent:
+        task_node:
+        original_prompt:
+    
+    Yields:
+        ..."""
     task_node.status = "running"
     agent._task_start_time = time.time()
     agent.current_phase = _normalize_phase(task_node.name)

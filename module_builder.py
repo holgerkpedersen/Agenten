@@ -1,18 +1,36 @@
 import os
 
 class ModuleBuilder:
+    """module builder."""
     def __init__(self, action_history):
+        """Initialize the instance.
+        
+        Args:
+            action_history:"""
         self.action_history = action_history
 
     def get_repeated_actions(self, threshold=2):
+        """get repeated actions.
+        
+        Args:
+            threshold:"""
         from collections import Counter
         counter = Counter(self.action_history)
         return [action for action, count in counter.items() if count >= threshold]
 
     def should_build_module(self, threshold=2):
+        """should build module.
+        
+        Args:
+            threshold:"""
         return len(self.get_repeated_actions(threshold)) > 0
 
     def build_module(self, action_name, action_code_template):
+        """build module.
+        
+        Args:
+            action_name:
+            action_code_template:"""
         safe_name = action_name.replace(' ', '_')
         if not safe_name or '..' in safe_name or safe_name.startswith('/') or safe_name.startswith('\\'):
             return {"error": "Invalid module name"}

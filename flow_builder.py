@@ -8,6 +8,10 @@ FLOW_SCHEMA = "https://schema.management.azure.com/providers/Microsoft.Logic/sch
 
 
 def get_flow_template() -> dict:
+    """get flow template.
+    
+    Returns:
+        dict"""
     return {
         "definition": {
             "$schema": FLOW_SCHEMA,
@@ -58,6 +62,14 @@ def get_flow_template() -> dict:
 
 
 def generate_research_flow(topic: str, results: List[Dict]) -> dict:
+    """generate research flow.
+    
+    Args:
+        topic (str):
+        results (List[Dict]):
+    
+    Returns:
+        dict"""
     flow = get_flow_template()
     flow["definition"]["triggers"]["manual"]["inputs"]["schema"]["properties"]["query"]["default"] = topic
 
@@ -89,6 +101,13 @@ def generate_research_flow(topic: str, results: List[Dict]) -> dict:
 
 
 def flow_to_mermaid(flow: dict) -> str:
+    """flow to mermaid.
+    
+    Args:
+        flow (dict):
+    
+    Returns:
+        str"""
     actions = flow.get("definition", {}).get("actions", {})
     if not actions:
         return "graph LR\n  Start[No actions]"
@@ -116,6 +135,13 @@ def flow_to_mermaid(flow: dict) -> str:
 
 
 def flow_to_mermaid_full(flow: dict) -> str:
+    """flow to mermaid full.
+    
+    Args:
+        flow (dict):
+    
+    Returns:
+        str"""
     actions = flow.get("definition", {}).get("actions", {})
 
     lines = ["graph TB"]
@@ -150,4 +176,11 @@ def flow_to_mermaid_full(flow: dict) -> str:
 
 
 def format_flow_json(flow: dict) -> str:
+    """format flow json.
+    
+    Args:
+        flow (dict):
+    
+    Returns:
+        str"""
     return json.dumps(flow, indent=2, ensure_ascii=False)

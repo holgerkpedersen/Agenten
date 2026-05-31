@@ -29,10 +29,12 @@ OVERSIZE_LINE_LIMIT = 1000
 
 
 def _get_issues_path():
+    """get issues path."""
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
 
 
 def _load_issues():
+    """load issues."""
     path = _get_issues_path()
     if not os.path.exists(path):
         return {"meta": {"generated": "2026-05-20", "source": "Agenten", "total": 0}, "issues": []}
@@ -45,12 +47,20 @@ def _load_issues():
 
 
 def _save_issues(data):
+    """save issues.
+    
+    Args:
+        data:"""
     path = _get_issues_path()
     with open(path, "w", encoding="utf-8") as f:
         _json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def _next_refac_id(data):
+    """next refac id.
+    
+    Args:
+        data:"""
     existing = [i["id"] for i in data.get("issues", []) if i["id"].startswith("REFAC-")]
     nums = [int(i.split("-")[1]) for i in existing if i.split("-")[1].isdigit()]
     return f"REFAC-{max(nums) + 1:03d}" if nums else "REFAC-001"
@@ -68,6 +78,11 @@ ISSUE_TYPE_PREFIXES = {
 
 
 def _next_issue_id(data, issue_type):
+    """next issue id.
+    
+    Args:
+        data:
+        issue_type:"""
     prefix = ISSUE_TYPE_PREFIXES.get(issue_type, "BUG")
     existing = [i["id"] for i in data.get("issues", []) if i["id"].startswith(f"{prefix}-")]
     nums = [int(i.split("-")[1]) for i in existing if i.split("-")[1].isdigit()]
@@ -75,6 +90,10 @@ def _next_issue_id(data, issue_type):
 
 
 def run_pytest(test_path=""):
+    """run pytest.
+    
+    Args:
+        test_path:"""
     try:
         cmd = [sys.executable, "-m", "pytest", "-v"]
         if test_path:
@@ -90,6 +109,11 @@ def run_pytest(test_path=""):
 
 
 def read_issue(issue_id, include_hints=False):
+    """read issue.
+    
+    Args:
+        issue_id:
+        include_hints:"""
     data = _load_issues()
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
@@ -109,6 +133,14 @@ def read_issue(issue_id, include_hints=False):
 
 
 def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
+    """resolve referenced issues.
+    
+    Args:
+        agent:
+        data:
+        issue:
+        status:
+        resolution_note:"""
     if status != "resolved":
         return
     ref_pattern = re.compile(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)')
@@ -128,6 +160,13 @@ def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
 
 
 def update_issue_status(agent, issue_id, status, resolution_note=""):
+    """update issue status.
+    
+    Args:
+        agent:
+        issue_id:
+        status:
+        resolution_note:"""
     data = _load_issues()
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
@@ -144,6 +183,13 @@ def update_issue_status(agent, issue_id, status, resolution_note=""):
 
 
 def create_refactor_issue(agent, filepath, line_count, related_issues=None):
+    """create refactor issue.
+    
+    Args:
+        agent:
+        filepath:
+        line_count:
+        related_issues:"""
     data = _load_issues()
     existing = [i for i in data.get("issues", []) if i.get("location", "").startswith(filepath) and i.get("type") == "refactor"]
     if existing:
@@ -171,6 +217,18 @@ def create_refactor_issue(agent, filepath, line_count, related_issues=None):
 
 
 def create_issue(agent, title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="", acceptance_criteria=""):
+    """create issue.
+    
+    Args:
+        agent:
+        title:
+        type:
+        severity:
+        description:
+        location:
+        impact:
+        proposed_fix:
+        acceptance_criteria:"""
     data = _load_issues()
     if location:
         parts = re.split(r'\s*[,;]\s*', location)
@@ -248,6 +306,13 @@ def create_issue(agent, title, type="bug", severity="medium", description="", lo
 
 
 def detect_oversize_file(agent, filename, content, related_bugs=None):
+    """detect oversize file.
+    
+    Args:
+        agent:
+        filename:
+        content:
+        related_bugs:"""
     line_count = content.count("\n")
     if line_count < OVERSIZE_LINE_LIMIT:
         return None

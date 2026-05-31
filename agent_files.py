@@ -46,10 +46,19 @@ def is_safe_location(target_path):
 
 
 def _is_safe_scan_path(target_path):
+    """is safe scan path.
+    
+    Args:
+        target_path:"""
     return is_safe_location(target_path)
 
 
 def chunk_text(text, size=CHUNK_SIZE):
+    """chunk text.
+    
+    Args:
+        text:
+        size:"""
     chunks = []
     for i in range(0, len(text), size):
         chunks.append(text[i:i + size])
@@ -62,6 +71,10 @@ STUB_PATTERN = re.compile(
 
 
 def detect_delegations(content):
+    """detect delegations.
+    
+    Args:
+        content:"""
     stubs = []
     for m in STUB_PATTERN.finditer(content):
         stubs.append((m.group(1), m.group(2)))
@@ -69,6 +82,10 @@ def detect_delegations(content):
 
 
 def _format_params(node):
+    """format params.
+    
+    Args:
+        node:"""
     args = node.args
     parts = []
     # positional args
@@ -95,22 +112,43 @@ def _format_params(node):
 
 
 def build_ast_index(code, filename):
+    """build ast index.
+    
+    Args:
+        code:
+        filename:"""
     try:
         tree = ast.parse(code)
     except SyntaxError:
         return None
     index_lines = [f"### {filename}"]
     def _sig(n):
+        """sig.
+        
+        Args:
+            n:"""
         return _format_params(n)
 
     def _doc(n):
+        """doc.
+        
+        Args:
+            n:"""
         d = ast.get_docstring(n) or ""
         return (" — " + d.splitlines()[0][:80]) if d else ""
 
     class _Builder(ast.NodeVisitor):
+        """builder.
+        
+        Extends: ast.NodeVisitor"""
         def __init__(self):
+            """Initialize the instance."""
             self.in_class = False
         def visit_ClassDef(self, node):
+            """visit class def.
+            
+            Args:
+                node:"""
             old = self.in_class
             self.in_class = True
             methods = []
@@ -122,10 +160,18 @@ def build_ast_index(code, filename):
             self.generic_visit(node)
             self.in_class = old
         def visit_FunctionDef(self, node):
+            """visit function def.
+            
+            Args:
+                node:"""
             if not self.in_class:
                 index_lines.append(f"  {node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
             self.generic_visit(node)
         def visit_AsyncFunctionDef(self, node):
+            """visit async function def.
+            
+            Args:
+                node:"""
             if not self.in_class:
                 index_lines.append(f"  {node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
             self.generic_visit(node)
@@ -135,6 +181,10 @@ def build_ast_index(code, filename):
 
 
 def file_hash(filepath):
+    """file hash.
+    
+    Args:
+        filepath:"""
     try:
         size = os.path.getsize(filepath)
         if size > config.MAX_IMAGE_SIZE * 2:
@@ -149,6 +199,11 @@ def file_hash(filepath):
 
 
 def read_file_content(agent, filepath):
+    """read file content.
+    
+    Args:
+        agent:
+        filepath:"""
     basename = os.path.basename(filepath)
     if basename in {'.env'}:
         return None
@@ -174,6 +229,11 @@ FOLDER_SCAN_EXTENSIONS = {'.py', '.js', '.json', '.html', '.css', '.yml', '.yaml
 
 
 def get_single_file_context(agent, prompt):
+    """get single file context.
+    
+    Args:
+        agent:
+        prompt:"""
     file_match = re.search(r'analyser\s+([^\s]+\.py)', prompt, re.IGNORECASE)
     if not file_match:
         return None, None
@@ -206,6 +266,11 @@ def get_single_file_context(agent, prompt):
 
 
 def get_folder_context(agent, prompt):
+    """get folder context.
+    
+    Args:
+        agent:
+        prompt:"""
     folder_pattern = re.compile(r'(?:[A-Za-z]:[\\/][^\s,;"\']+|/[^\s,;"\']+)')
     folders = set()
     for match in folder_pattern.finditer(prompt):
@@ -285,6 +350,10 @@ def read_location(filepath, name=None, line_no=None):
 
 
 def list_chunks(agent):
+    """list chunks.
+    
+    Args:
+        agent:"""
     if not agent.file_chunks:
         return {"success": True, "chunks": [], "message": "Ingen filer indl\u00e6st. Brug 'list_chunks' igen efter at have specificeret filer eller en mappe i din prompt."}
     result = []
@@ -295,6 +364,12 @@ def list_chunks(agent):
 
 
 def read_chunk(agent, chunk, index):
+    """read chunk.
+    
+    Args:
+        agent:
+        chunk:
+        index:"""
     original = chunk
     if not chunk.startswith("file_"):
         chunk = "file_" + chunk
@@ -309,21 +384,41 @@ def read_chunk(agent, chunk, index):
 
 
 def _find_enclosing_symbol(tree, target_line):
+    """find enclosing symbol.
+    
+    Args:
+        tree:
+        target_line:"""
     best = None
     class NodeVisitor(ast.NodeVisitor):
+        """node visitor.
+        
+        Extends: ast.NodeVisitor"""
         def visit_FunctionDef(self, node):
+            """visit function def.
+            
+            Args:
+                node:"""
             nonlocal best
             if node.lineno <= target_line <= (getattr(node, 'end_lineno', node.lineno) or node.lineno):
                 best = node
             self.generic_visit(node)
 
         def visit_AsyncFunctionDef(self, node):
+            """visit async function def.
+            
+            Args:
+                node:"""
             nonlocal best
             if node.lineno <= target_line <= (getattr(node, 'end_lineno', node.lineno) or node.lineno):
                 best = node
             self.generic_visit(node)
 
         def visit_ClassDef(self, node):
+            """visit class def.
+            
+            Args:
+                node:"""
             nonlocal best
             if node.lineno <= target_line <= (getattr(node, 'end_lineno', node.lineno) or node.lineno):
                 best = node
@@ -334,6 +429,10 @@ def _find_enclosing_symbol(tree, target_line):
 
 
 def _list_top_level_vars(tree):
+    """list top level vars.
+    
+    Args:
+        tree:"""
     vars = []
     for node in ast.iter_child_nodes(tree):
         if isinstance(node, ast.Assign):
@@ -347,6 +446,10 @@ def _list_top_level_vars(tree):
 
 
 def _list_top_level_symbols(tree):
+    """list top level symbols.
+    
+    Args:
+        tree:"""
     symbols = []
     for node in ast.iter_child_nodes(tree):
         if isinstance(node, ast.FunctionDef):
@@ -360,6 +463,7 @@ def _list_top_level_symbols(tree):
 
 
 def _build_global_symbol_index():
+    """build global symbol index."""
     index = {}
     for fname in os.listdir('.'):
         if not fname.endswith('.py'):
@@ -392,6 +496,12 @@ _GLOBAL_SYMBOL_INDEX = _build_global_symbol_index()
 
 
 def locate_code(filepath=None, name=None, line_no=None):
+    """locate code.
+    
+    Args:
+        filepath:
+        name:
+        line_no:"""
     if not filepath and name:
         matches = _GLOBAL_SYMBOL_INDEX.get(name, [])
         if not matches:

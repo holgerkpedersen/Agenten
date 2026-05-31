@@ -50,11 +50,25 @@ def check_api_key():
 
 # ============ RATE LIMITING ============
 class _RateLimiter:
+    """rate limiter."""
     def __init__(self) -> None:
+        """Initialize the instance.
+        
+        Returns:
+            None"""
         self._requests: dict = {}
         self._lock: threading.Lock = threading.Lock()
 
     def is_allowed(self, key: str, max_requests: int = 30, window: int = 60) -> bool:
+        """is allowed.
+        
+        Args:
+            key (str):
+            max_requests (int):
+            window (int):
+        
+        Returns:
+            bool"""
         now = time.time()
         with self._lock:
             bucket = self._requests.get(key, [])
@@ -69,6 +83,7 @@ rate_limiter = _RateLimiter()
 
 @app.before_request
 def _rate_limit():
+    """rate limit."""
     if not request.path.startswith('/api/'):
         return None
     if request.method == 'GET':
@@ -82,6 +97,7 @@ def _rate_limit():
 
 @app.before_request
 def _guard_json_body():
+    """guard json body."""
     if request.method in ('POST', 'PUT', 'PATCH') and request.path.startswith('/api/'):
         if request.path in ('/api/upload', '/api/image/upload', '/api/file/upload', '/api/stop'):
             return None
@@ -101,6 +117,10 @@ current_session_lock = threading.Lock()
 
 # ============ VERSION ============
 def _file_mtime(path):
+    """file mtime.
+    
+    Args:
+        path:"""
     try: return datetime.fromtimestamp(os.path.getmtime(os.path.join(BASE_DIR, path))).strftime("%H:%M:%S")
     except OSError: return "?"
 
@@ -113,6 +133,10 @@ log.info("Startet: %s | api_server=%s | llm=%s", BUILD_INFO['started'], BUILD_IN
 # ============ STATIC ROUTES ============
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
+    """serve upload.
+    
+    Args:
+        filename:"""
     filepath = os.path.join(UPLOAD_DIR, filename)
     if not _is_safe_path(UPLOAD_DIR, filepath):
         return "<h2>Access denied</h2>", 403
@@ -120,6 +144,10 @@ def serve_upload(filename):
 
 @app.route("/preview-exports/<path:filename>")
 def preview_export(filename):
+    """preview export.
+    
+    Args:
+        filename:"""
     import re
     base = export_folder or os.path.join(BASE_DIR, "exports")
     filepath = os.path.join(base, filename)
@@ -163,6 +191,7 @@ def preview_export(filename):
 
 @app.route("/")
 def index():
+    """index."""
     index_path = os.path.join(STATIC_DIR, 'index.html')
     if os.path.exists(index_path):
         return send_from_directory(STATIC_DIR, 'index.html')
@@ -181,15 +210,21 @@ def index():
 
 @app.route('/flow')
 def flow_page():
+    """flow page."""
     return send_from_directory(STATIC_DIR, 'flow.html')
 
 @app.route('/static/<path:path>')
 def serve_static(path):
+    """serve static.
+    
+    Args:
+        path:"""
     return send_from_directory(STATIC_DIR, path)
 
 # ============ FILHÅNDTERING ENDPOINTS ============
 @app.route("/api/folder/set", methods=["POST"])
 def set_folder():
+    """set folder."""
     global export_folder
     data = request.json
     folder = data.get("folder", "")
@@ -208,6 +243,7 @@ def set_folder():
 
 @app.route("/api/folder/status", methods=["GET"])
 def folder_status():
+    """folder status."""
     global export_folder
     if export_folder and os.path.exists(export_folder):
         return jsonify({"success": True, "folder": export_folder})
@@ -215,6 +251,7 @@ def folder_status():
 
 @app.route("/api/folder/save", methods=["POST"])
 def save_to_folder():
+    """save to folder."""
     global export_folder
     data = request.json
     filename = data.get("filename", "export.md")
@@ -238,6 +275,7 @@ def save_to_folder():
 
 @app.route("/api/folder/list", methods=["POST"])
 def list_folder_contents():
+    """list folder contents."""
     data = request.json
     folder_path = data.get("path", export_folder)
     if not folder_path or not os.path.exists(folder_path):
@@ -371,6 +409,7 @@ def _normalize_images(images):
 
 @app.route("/api/image/upload", methods=["POST"])
 def image_upload():
+    """image upload."""
     if 'image' not in request.files:
         return jsonify({"success": False, "error": "Ingen billedfil modtaget"}), 400
     f = request.files['image']
@@ -414,6 +453,7 @@ def image_upload():
 
 @app.route("/api/image/list", methods=["GET"])
 def image_list():
+    """image list."""
     with agent.images_lock:
         images_copy = list(agent.images)
         total = len(images_copy)
@@ -429,6 +469,7 @@ def image_list():
 
 @app.route("/api/image/clear", methods=["POST"])
 def image_clear():
+    """image clear."""
     with agent.images_lock:
         count = len(agent.images)
         agent.images = []
@@ -438,6 +479,10 @@ def image_clear():
 
 @app.route("/api/image/remove/<int:index>", methods=["POST"])
 def image_remove(index):
+    """image remove.
+    
+    Args:
+        index:"""
     with agent.images_lock:
         if 0 <= index < len(agent.images):
             img = agent.images.pop(index)
@@ -483,11 +528,13 @@ def list_python_files():
 # ============ SESSION ENDPOINTS ============
 @app.route("/api/sessions", methods=["GET"])
 def list_sessions():
+    """list sessions."""
     sessions = session_manager.list_sessions()
     return jsonify({"success": True, "sessions": sessions})
 
 @app.route("/api/sessions/current", methods=["GET"])
 def get_current_session():
+    """get current session."""
     global current_session_id
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
@@ -496,6 +543,7 @@ def get_current_session():
 
 @app.route("/api/sessions/create", methods=["POST"])
 def create_session():
+    """create session."""
     data = request.json
     name = data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=len(session_manager.list_sessions())+1))
     session_id, session_data = session_manager.create_session(name)
@@ -507,6 +555,10 @@ def create_session():
 
 @app.route("/api/sessions/load/<session_id>", methods=["GET"])
 def load_session(session_id):
+    """load session.
+    
+    Args:
+        session_id:"""
     global current_session_id
     agent.agent_log = []
     agent.execution_log = []
@@ -530,6 +582,7 @@ def load_session(session_id):
 
 @app.route("/api/sessions/save", methods=["POST"])
 def save_current_session():
+    """save current session."""
     global current_session_id
     data = request.json
     session_id = data.get("session_id", current_session_id)
@@ -580,6 +633,7 @@ def save_current_session():
 
 @app.route("/api/sessions/rename", methods=["POST"])
 def rename_session():
+    """rename session."""
     data = request.json
     session_id = data.get("session_id")
     new_name = data.get("name", "")
@@ -591,6 +645,10 @@ def rename_session():
 
 @app.route("/api/sessions/<session_id>", methods=["DELETE"])
 def delete_session(session_id):
+    """delete session.
+    
+    Args:
+        session_id:"""
     global current_session_id
     if not session_id:
         return jsonify({"success": False, "error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
@@ -602,6 +660,7 @@ def delete_session(session_id):
 
 @app.route("/api/tools/token", methods=["GET", "POST"])
 def manage_token():
+    """manage token."""
     env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     if request.method == "GET":
         has_token = False
@@ -644,12 +703,17 @@ def manage_token():
 
 @app.route("/api/lang/<lang>")
 def get_lang(lang):
+    """get lang.
+    
+    Args:
+        lang:"""
     resp = jsonify(get_ui_translations(lang))
     resp.headers['Cache-Control'] = 'public, max-age=3600'
     return resp
 
 @app.route("/api/models")
 def get_models():
+    """get models."""
     openai_models = agent.llm.list_models()
     loaded = None
     rest_models = []
@@ -685,6 +749,7 @@ def get_models():
 
 @app.route("/api/models/set", methods=["POST"])
 def set_model():
+    """set model."""
     data = request.json
     model = data.get("model", agent.llm.model)
     dtype = data.get("type", "execute")
@@ -701,10 +766,12 @@ def set_model():
 
 @app.route("/api/models/loaded")
 def loaded_models():
+    """loaded models."""
     return jsonify(model_manager.get_loaded_models())
 
 @app.route("/api/models/load", methods=["POST"])
 def load_model_route():
+    """load model route."""
     data = request.json
     key = data.get("key", "")
     if not key:
@@ -714,6 +781,7 @@ def load_model_route():
 
 @app.route("/api/models/unload", methods=["POST"])
 def unload_model_route():
+    """unload model route."""
     data = request.json
     identifier = data.get("identifier", "--all")
     ok, msg = model_manager.unload_model(identifier)
@@ -721,6 +789,7 @@ def unload_model_route():
 
 @app.route("/api/stop", methods=["POST"])
 def stop_execution():
+    """stop execution."""
     global current_session_id
     
     if current_session_id:
@@ -734,6 +803,7 @@ def stop_execution():
 
 @app.route("/api/reply", methods=["POST"])
 def user_reply():
+    """user reply."""
     data = request.json
     msg = data.get("message", "")
     if not msg:
@@ -744,6 +814,7 @@ def user_reply():
 
 @app.route("/api/sessions/save-layout", methods=["POST"])
 def save_layout():
+    """save layout."""
     data = request.json
     session_id = data.get("session_id")
     layout = data.get("layout")
@@ -758,6 +829,10 @@ def save_layout():
 
 @app.route("/api/sessions/load-layout/<session_id>", methods=["GET"])
 def load_layout(session_id):
+    """load layout.
+    
+    Args:
+        session_id:"""
     session_data = session_manager.load_session(session_id)
     if session_data and "layout" in session_data:
         return jsonify({"success": True, "layout": session_data["layout"]})
@@ -765,11 +840,16 @@ def load_layout(session_id):
 
 @app.route("/api/sessions/prompts/<session_id>", methods=["GET"])
 def get_session_prompts(session_id):
+    """get session prompts.
+    
+    Args:
+        session_id:"""
     prompts = session_manager.get_prompt_history(session_id)
     return jsonify({"success": True, "prompts": prompts})
 
 @app.route("/api/sessions/context", methods=["POST"])
 def get_context_for_prompt():
+    """get context for prompt."""
     data = request.json
     session_id = data.get("session_id", current_session_id)
     prompt = data.get("prompt", "")
@@ -780,6 +860,7 @@ def get_context_for_prompt():
 
 @app.route("/api/sessions/add-prompt", methods=["POST"])
 def add_prompt_to_session():
+    """add prompt to session."""
     data = request.json
     session_id = data.get("session_id", current_session_id)
     prompt = data.get("prompt", "")
@@ -793,11 +874,13 @@ def add_prompt_to_session():
 # ============ AGENT ENDPOINTS ============
 @app.route("/api/reset-execution", methods=["POST"])
 def reset_execution():
+    """reset execution."""
     agent.reset_execution()
     return jsonify({"success": True, "message": t(K.UI_STREAM_RESET, agent.lang)})
 
 @app.route("/api/execute-without-stream", methods=["POST"])
 def execute_without_stream():
+    """execute without stream."""
     global execution_status
     if agent.task_tree is None:
         return jsonify({"success": False, "error": t(K.ERR_DECOMPOSE_FIRST, agent.lang)}), 400
@@ -808,6 +891,10 @@ def execute_without_stream():
     completed = 0
     
     def execute_with_progress(node):
+        """execute with progress.
+        
+        Args:
+            node:"""
         nonlocal completed
         with execution_status_lock:
             execution_status["current_task"] = node.name
@@ -832,6 +919,10 @@ def execute_without_stream():
         return jsonify({"success": False, "error": str(e)}), 500
 
 def _ensure_model_loaded(model_key):
+    """ensure model loaded.
+    
+    Args:
+        model_key:"""
     if not model_key:
         return
     if app.config.get("TESTING"):
@@ -929,6 +1020,14 @@ TEMPLATE_GUIDANCE = {
 
 
 def _validate_template_prompt(prompt: str, template: str) -> dict:
+    """validate template prompt.
+    
+    Args:
+        prompt (str):
+        template (str):
+    
+    Returns:
+        dict"""
     if not template:
         return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
     
@@ -985,6 +1084,7 @@ def _validate_template_prompt(prompt: str, template: str) -> dict:
 
 @app.route("/api/decompose", methods=["POST"])
 def decompose():
+    """decompose."""
     data = request.json
     prompt = data.get("prompt", "")
     session_id = data.get("session_id")
@@ -1074,6 +1174,10 @@ def decompose():
 # ============ EXECUTE STREAM HELPERS ============
 
 def _count_tasks(node):
+    """count tasks.
+    
+    Args:
+        node:"""
     total = 1
     for child in node.children:
         total += _count_tasks(child)
@@ -1081,10 +1185,28 @@ def _count_tasks(node):
 
 
 def _check_client(agent):
+    """check client.
+    
+    Args:
+        agent:"""
     return agent.stop_requested
 
 
 def _execute_with_stream(node, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id):
+    """execute with stream.
+    
+    Args:
+        node:
+        agent:
+        total_tasks:
+        completed:
+        task_context_prompt:
+        show_thinking:
+        ui_lang:
+        current_session_id:
+    
+    Yields:
+        ..."""
     if _check_client(agent):
         return
     yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
@@ -1165,6 +1287,12 @@ _session_save_debounce = {}
 _session_save_lock = threading.Lock()
 
 def _save_session_data(current_session_id, stream_agent, ui_lang):
+    """save session data.
+    
+    Args:
+        current_session_id:
+        stream_agent:
+        ui_lang:"""
     if not current_session_id:
         return
     existing = session_manager.load_session(current_session_id) or {}
@@ -1191,6 +1319,10 @@ def _save_session_data(current_session_id, stream_agent, ui_lang):
 
 @app.route("/api/execute-stream", methods=["GET", "POST"])
 def execute_stream():
+    """execute stream.
+    
+    Yields:
+        ..."""
     global current_session_id
     ui_lang = "da"
 
@@ -1253,6 +1385,13 @@ def execute_stream():
     _ensure_model_loaded(stream_agent.llm.model)
 
     def generate(agent):
+        """generate.
+        
+        Args:
+            agent:
+        
+        Yields:
+            ..."""
         _ui = ui_lang
         if agent.task_tree is None:
             if session_id:
@@ -1304,14 +1443,17 @@ def execute_stream():
 
 @app.route("/api/log", methods=["GET"])
 def get_log():
+    """get log."""
     return jsonify({"log": agent.agent_log})
 
 @app.route("/api/status", methods=["GET"])
 def status():
+    """status."""
     return jsonify(agent.get_agent_status())
 
 @app.route("/api/search", methods=["POST"])
 def search():
+    """search."""
     data = request.json
     query = data.get("query", "")
     if not query:
@@ -1321,6 +1463,7 @@ def search():
 
 @app.route("/api/flow/search", methods=["POST"])
 def flow_search():
+    """flow search."""
     data = request.json
     query = data.get("query", "")
     try:
@@ -1337,6 +1480,7 @@ def flow_search():
 
 @app.route("/api/flow/generate", methods=["POST"])
 def flow_generate():
+    """flow generate."""
     data = request.json
     topic = data.get("topic", "")
     try:
@@ -1367,15 +1511,18 @@ def flow_generate():
 
 @app.route("/api/build-module", methods=["POST"])
 def build_module():
+    """build module."""
     result = agent.suggest_new_module()
     return jsonify({"success": True, "module_result": result})
 
 @app.route("/api/version", methods=["GET"])
 def version():
+    """version."""
     return jsonify({"success": True, "started": BUILD_INFO.get("started", "?"), "version": {k:v for k,v in BUILD_INFO.items() if k != "started"}})
 
 @app.route("/api/issues", methods=["GET"])
 def list_issues():
+    """list issues."""
     issues_path = os.path.join(BASE_DIR, "docs", "issues", "observed", "issues.json")
     if not os.path.exists(issues_path):
         return jsonify({"success": True, "meta": {"total": 0}, "issues": []})
@@ -1385,6 +1532,10 @@ def list_issues():
 
 @app.route("/api/issues/<issue_id>", methods=["DELETE"])
 def delete_issue(issue_id):
+    """delete issue.
+    
+    Args:
+        issue_id:"""
     issues_path = os.path.join(BASE_DIR, "docs", "issues", "observed", "issues.json")
     if not os.path.exists(issues_path):
         return jsonify({"success": False, "error": "Issues-fil findes ikke"}), 404
@@ -1401,10 +1552,12 @@ def delete_issue(issue_id):
 
 @app.route("/api/test", methods=["GET"])
 def test():
+    """test."""
     return jsonify({"success": True, "status": "ok", "message": t(K.UI_API_RUNNING, agent.lang), "static_folder": STATIC_DIR, "has_agent": agent is not None})
 
 @app.route("/skillflow")
 def skillflow_report():
+    """skillflow report."""
     if not _is_development_mode():
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         expected_key = os.environ.get('AGENT_API_KEY', '')
@@ -1527,6 +1680,7 @@ def skillflow_report():
 
 @app.route("/api/skillflow/apply")
 def skillflow_apply():
+    """skillflow apply."""
     from skill_evolution import analyze, apply_evolution_actions, _log_applied
     analysis = analyze()
     if analysis.get("status") != "ok":
@@ -1538,6 +1692,7 @@ def skillflow_apply():
 
 @app.route("/api/skillflow/status")
 def skillflow_status():
+    """skillflow status."""
     import json as _json
     outcomes_path = os.path.join(BASE_DIR, ".agent_storage", "skill_outcomes.json")
     evolution_path = os.path.join(BASE_DIR, ".agent_storage", "evolution_actions.json")

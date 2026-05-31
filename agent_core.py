@@ -112,6 +112,13 @@ def _auto_load_location_file(agent: Agent, prompt: str) -> None:
 
 
 def _add_file_entry(file_context, agent, filename, content):
+    """add file entry.
+    
+    Args:
+        file_context:
+        agent:
+        filename:
+        content:"""
     chunk_key = f"file_{filename}"
     chunks = agent_files.chunk_text(content)
     agent.file_chunks[chunk_key] = chunks
@@ -138,6 +145,15 @@ def _add_file_entry(file_context, agent, filename, content):
 
 
 def _build_file_context(agent: Agent, files: list[dict[str, Any]] | None, prompt: str) -> str:
+    """build file context.
+    
+    Args:
+        agent (Agent):
+        files (list[dict[str, Any]] | None):
+        prompt (str):
+    
+    Returns:
+        str"""
     file_context = ""
     if files and len(files) > 0:
         file_context = t(K.FILE_CONTEXT_HEADER, agent.lang)
@@ -162,6 +178,16 @@ def _build_file_context(agent: Agent, files: list[dict[str, Any]] | None, prompt
 
 
 def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_config: dict[str, Any]) -> dict[str, Any]:
+    """decompose via llm.
+    
+    Args:
+        agent (Agent):
+        prompt (str):
+        file_context (str):
+        template_config (dict[str, Any]):
+    
+    Returns:
+        dict[str, Any]"""
     decomposition_prompt = template_config["prompt"].replace("{prompt}", agent._sanitize_prompt(prompt))
     file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
     decomposition_prompt += file_context_entry
@@ -189,7 +215,12 @@ def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_co
 
 
 class Agent:
+    """agent."""
     def __init__(self) -> None:
+        """Initialize the instance.
+        
+        Returns:
+            None"""
         self.llm: LMStudioWrapper = LMStudioWrapper(
             timeout=600, model=config.LLM_MODEL, base_url=config.LLM_BASE_URL,
             api_key=os.environ.get('OPENCODE_API_KEY'),
@@ -241,6 +272,10 @@ class Agent:
         self._located_files: set[str] = set()
 
     def _register_tools(self) -> None:
+        """register tools.
+        
+        Returns:
+            None"""
         gh = GithubAPI()
         self.tool_registry.register(Tool(
             "github_create_repo",
@@ -447,33 +482,92 @@ class Agent:
         ))
 
     def _add_image(self, path: str) -> dict[str, Any]:
+        """add image.
+        
+        Args:
+            path (str):
+        
+        Returns:
+            dict[str, Any]"""
         return agent_tasks.add_image(self, path)
 
     def _list_chunks(self) -> dict[str, Any]:
+        """list chunks.
+        
+        Returns:
+            dict[str, Any]"""
         return agent_files.list_chunks(self)
 
     def _read_chunk(self, chunk: str, index: int) -> dict[str, Any]:
+        """read chunk.
+        
+        Args:
+            chunk (str):
+            index (int):
+        
+        Returns:
+            dict[str, Any]"""
         return agent_files.read_chunk(self, chunk, int(index))
 
     def _refresh_skills(self) -> None:
+        """refresh skills.
+        
+        Returns:
+            None"""
         agent_skills.refresh_skills(self)
 
     def _match_skills(self, prompt: str) -> list[dict[str, Any]]:
+        """match skills.
+        
+        Args:
+            prompt (str):
+        
+        Returns:
+            list[dict[str, Any]]"""
         return agent_skills.match_skills(self, prompt)
 
     def _format_skills_for_prompt(self) -> str:
+        """format skills for prompt.
+        
+        Returns:
+            str"""
         return agent_skills.format_skills_for_prompt(self)
 
     def _get_templates(self) -> dict[str, Any]:
+        """get templates.
+        
+        Returns:
+            dict[str, Any]"""
         return agent_skills.get_templates(self)
 
     def _record_outcome(self, task_node: TaskNode) -> None:
+        """record outcome.
+        
+        Args:
+            task_node (TaskNode):
+        
+        Returns:
+            None"""
         agent_tree.record_outcome(self, task_node)
 
     def _evolve_if_needed(self) -> None:
+        """evolve if needed.
+        
+        Returns:
+            None"""
         agent_tree.evolve_if_needed(self)
 
     def _log(self, level: str, message: str, detail: str = "", log_file: str = None) -> None:
+        """log.
+        
+        Args:
+            level (str):
+            message (str):
+            detail (str):
+            log_file (str):
+        
+        Returns:
+            None"""
         log_entry = {
             "timestamp": time.time(),
             "level": level,
@@ -490,9 +584,20 @@ class Agent:
             pass
 
     def _clean_task_name(self, name: str) -> str:
+        """clean task name.
+        
+        Args:
+            name (str):
+        
+        Returns:
+            str"""
         return agent_tree._clean_task_name(name)
 
     def _ensure_delegation_index(self) -> None:
+        """ensure delegation index.
+        
+        Returns:
+            None"""
         if self._delegation_index is not None:
             return
         self._delegation_index = {}
@@ -532,6 +637,13 @@ class Agent:
                     depth += 1
 
     def _resolve_delegations_for_context(self, file_context: str) -> str:
+        """resolve delegations for context.
+        
+        Args:
+            file_context (str):
+        
+        Returns:
+            str"""
         self._ensure_delegation_index()
         loaded_files = {os.path.normcase(os.path.abspath(k.replace('file_', '', 1)))
                         for k in self.file_chunks}
@@ -568,28 +680,80 @@ class Agent:
         return file_context
 
     def _read_file_content(self, filepath: str) -> str | None:
+        """read file content.
+        
+        Args:
+            filepath (str):
+        
+        Returns:
+            str | None"""
         return agent_files.read_file_content(self, filepath)
 
     def _get_single_file_context(self, prompt: str) -> tuple[str | None, str | None]:
+        """get single file context.
+        
+        Args:
+            prompt (str):
+        
+        Returns:
+            tuple[str | None, str | None]"""
         return agent_files.get_single_file_context(self, prompt)
 
     def _get_folder_context(self, prompt: str) -> list[dict[str, Any]] | None:
+        """get folder context.
+        
+        Args:
+            prompt (str):
+        
+        Returns:
+            list[dict[str, Any]] | None"""
         return agent_files.get_folder_context(self, prompt)
 
     def _create_fallback_tree(self, prompt: str) -> dict[str, Any]:
+        """create fallback tree.
+        
+        Args:
+            prompt (str):
+        
+        Returns:
+            dict[str, Any]"""
         self.original_prompt = prompt
         return agent_tree.create_fallback_tree(self, prompt)
 
     def _parse_tree_from_llm(self, prompt: str, llm_response: str) -> dict[str, Any]:
+        """parse tree from llm.
+        
+        Args:
+            prompt (str):
+            llm_response (str):
+        
+        Returns:
+            dict[str, Any]"""
         return agent_tree.parse_tree_from_llm(self, prompt, llm_response)
 
     def _sanitize_prompt(self, prompt: str) -> str:
+        """sanitize prompt.
+        
+        Args:
+            prompt (str):
+        
+        Returns:
+            str"""
         safe = str(prompt)[:10000]  # limit length
         safe = ''.join(c for c in safe if ord(c) >= 32 or c in '\n\r\t')
         safe = safe.replace("</user_input>", "<SECURITY_TAG>")
         return f"<user_input>\n{safe}\n<END_USER_INPUT>"
 
     def decompose_prompt(self, prompt: str, files: list[dict[str, Any]] | None = None, template: str | None = None) -> dict[str, Any]:
+        """decompose prompt.
+        
+        Args:
+            prompt (str):
+            files (list[dict[str, Any]] | None):
+            template (str | None):
+        
+        Returns:
+            dict[str, Any]"""
         self.agent_log = []
         self.original_prompt = prompt
         self.tool_registry.lang = self.lang
@@ -642,9 +806,20 @@ class Agent:
         return _decompose_via_llm(self, prompt, file_context, template_config)
 
     def reset_execution(self) -> None:
+        """reset execution.
+        
+        Returns:
+            None"""
         if not self.task_tree:
             return
         def reset_node(node: TaskNode) -> None:
+            """reset node.
+            
+            Args:
+                node (TaskNode):
+            
+            Returns:
+                None"""
             node.status = "pending"
             node.result = None
             for child in node.children:
@@ -654,24 +829,72 @@ class Agent:
         self._log("INFO", t(K.LOG_EXECUTION_RESET, self.lang), "")
 
     def _count_tasks(self, node: TaskNode) -> int:
+        """count tasks.
+        
+        Args:
+            node (TaskNode):
+        
+        Returns:
+            int"""
         return agent_tree.count_tasks(node)
 
     def task_tree_to_dict(self) -> dict[str, Any] | None:
+        """task tree to dict.
+        
+        Returns:
+            dict[str, Any] | None"""
         return agent_tree.task_tree_to_dict(self)
 
     def task_tree_from_dict(self, d: dict[str, Any]) -> None:
+        """task tree from dict.
+        
+        Args:
+            d (dict[str, Any]):
+        
+        Returns:
+            None"""
         agent_tree.task_tree_from_dict(self, d)
 
     def _set_task_tools(self, task_name: str) -> None:
+        """set task tools.
+        
+        Args:
+            task_name (str):
+        
+        Returns:
+            None"""
         agent_tasks.set_task_tools(self, task_name)
 
     def solve_task(self, task_node: TaskNode, original_prompt: str) -> str:
+        """solve task.
+        
+        Args:
+            task_node (TaskNode):
+            original_prompt (str):
+        
+        Returns:
+            str"""
         return agent_tasks.solve_task(self, task_node, original_prompt)
 
     def solve_task_stream(self, task_node: TaskNode, original_prompt: str) -> Generator[dict[str, Any], None, None]:
+        """solve task stream.
+        
+        Args:
+            task_node (TaskNode):
+            original_prompt (str):
+        
+        Returns:
+            Generator[dict[str, Any], None, None]"""
         yield from agent_tasks.solve_task_stream(self, task_node, original_prompt)
 
     def execute_tree(self, node: TaskNode | None = None) -> dict[str, Any]:
+        """execute tree.
+        
+        Args:
+            node (TaskNode | None):
+        
+        Returns:
+            dict[str, Any]"""
         if node is None:
             if not self.task_tree:
                 return {"error": "No task tree"}
@@ -685,6 +908,10 @@ class Agent:
         return results
 
     def get_agent_status(self) -> dict[str, Any]:
+        """get agent status.
+        
+        Returns:
+            dict[str, Any]"""
         return {
             "action_history": self.action_history,
             "total_actions": len(self.action_history),
@@ -693,4 +920,8 @@ class Agent:
         }
 
     def suggest_new_module(self) -> dict[str, Any]:
+        """suggest new module.
+        
+        Returns:
+            dict[str, Any]"""
         return {"message": t(K.LOG_MODULE_READY, self.lang)}

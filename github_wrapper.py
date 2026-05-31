@@ -6,7 +6,9 @@ import requests
 from dotenv import load_dotenv
 
 class GithubAPI:
+    """github api."""
     def __init__(self):
+        """Initialize the instance."""
         load_dotenv()
         self.token = os.getenv("GITHUB_TOKEN")
         self.api = "https://api.github.com"
@@ -16,6 +18,12 @@ class GithubAPI:
         }
 
     def _request(self, method, url, **kwargs):
+        """request.
+        
+        Args:
+            method:
+            url:
+            **kwargs:"""
         kwargs.setdefault('timeout', 30)
         try:
             resp = requests.request(method, url, **kwargs)
@@ -24,6 +32,10 @@ class GithubAPI:
             return None
 
     def _safe_json(self, resp):
+        """safe json.
+        
+        Args:
+            resp:"""
         if resp is None:
             return {}
         try:
@@ -32,6 +44,7 @@ class GithubAPI:
             return {}
 
     def _check_auth(self):
+        """check auth."""
         if not self.token:
             return {"success": False, "error": "GITHUB_TOKEN ikke sat i .env fil"}
 
@@ -44,6 +57,12 @@ class GithubAPI:
         return {"success": False, "error": f"GitHub auth fejlede: {resp.status_code}"}
 
     def create_repo(self, name, description="", private=False):
+        """create repo.
+        
+        Args:
+            name:
+            description:
+            private:"""
         auth = self._check_auth()
         if not auth["success"]:
             return auth
@@ -64,6 +83,7 @@ class GithubAPI:
         return {"success": False, "error": f"GitHub API fejl: {resp.status_code} - {err}"}
 
     def list_repos(self):
+        """list repos."""
         auth = self._check_auth()
         if not auth["success"]:
             return auth
@@ -77,6 +97,13 @@ class GithubAPI:
         return {"success": False, "error": str(resp.status_code)}
 
     def create_issue(self, owner, repo, title, body=""):
+        """create issue.
+        
+        Args:
+            owner:
+            repo:
+            title:
+            body:"""
         auth = self._check_auth()
         if not auth["success"]:
             return auth
@@ -91,6 +118,14 @@ class GithubAPI:
         return {"success": False, "error": str(resp.status_code)}
 
     def create_pr(self, owner, repo, title, head, base="main"):
+        """create pr.
+        
+        Args:
+            owner:
+            repo:
+            title:
+            head:
+            base:"""
         auth = self._check_auth()
         if not auth["success"]:
             return auth

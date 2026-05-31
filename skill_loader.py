@@ -12,6 +12,7 @@ log = get_logger(__name__)
 
 
 class SkillLoader:
+    """skill loader."""
     SKILLS_DIR = "skills"
     _rate_cache = {}
 
@@ -31,6 +32,13 @@ class SkillLoader:
 
     @staticmethod
     def _parse_frontmatter(raw: str) -> "tuple[dict, str]":
+        """parse frontmatter.
+        
+        Args:
+            raw (str):
+        
+        Returns:
+            'tuple[dict, str]'"""
         header = {}
         body = raw
         if raw.startswith("---"):
@@ -75,6 +83,13 @@ class SkillLoader:
 
     @staticmethod
     def _deduce_action_types(task: str) -> list:
+        """deduce action types.
+        
+        Args:
+            task (str):
+        
+        Returns:
+            list"""
         task_lower = task.lower()
         matched = []
         for atype, patterns in SkillLoader.ACTION_TYPE_PATTERNS.items():
@@ -86,6 +101,13 @@ class SkillLoader:
 
     @staticmethod
     def _parse_skill(path: str) -> dict:
+        """parse skill.
+        
+        Args:
+            path (str):
+        
+        Returns:
+            dict"""
         try:
             with open(path, "r", encoding="utf-8") as f:
                 raw = f.read()
@@ -124,6 +146,14 @@ class SkillLoader:
 
     @classmethod
     def load_all(cls, skills_dir: str = None, lang: str = None) -> List[dict]:
+        """load all.
+        
+        Args:
+            skills_dir (str):
+            lang (str):
+        
+        Returns:
+            List[dict]"""
         if skills_dir is None:
             skills_dir = cls.SKILLS_DIR
 
@@ -145,6 +175,13 @@ class SkillLoader:
 
     @classmethod
     def _get_success_rate(cls, skill_name: str) -> float:
+        """get success rate.
+        
+        Args:
+            skill_name (str):
+        
+        Returns:
+            float"""
         cached = cls._rate_cache.get(skill_name)
         if cached is not None:
             return cached
@@ -162,6 +199,15 @@ class SkillLoader:
 
     @classmethod
     def _score(cls, text: str, skill: dict, _cached_scores: dict = None) -> float:
+        """score.
+        
+        Args:
+            text (str):
+            skill (dict):
+            _cached_scores (dict):
+        
+        Returns:
+            float"""
         skill_name = skill.get("name", "")
         # Use cached score if available (avoids redundant _get_success_rate calls)
         if _cached_scores is not None and skill_name in _cached_scores:
@@ -207,6 +253,14 @@ class SkillLoader:
 
     @classmethod
     def find_for_task(cls, task: str, skills: List[dict]) -> Optional[dict]:
+        """find for task.
+        
+        Args:
+            task (str):
+            skills (List[dict]):
+        
+        Returns:
+            Optional[dict]"""
         scored = [(cls._score(task, s), s) for s in skills]
         scored = [(sc, s) for sc, s in scored if sc >= s.get("min_score", 1)]
         best_score, best = max(scored, key=lambda x: x[0], default=(0, None))
@@ -214,6 +268,15 @@ class SkillLoader:
 
     @classmethod
     def find_all_for_task(cls, task: str, skills: List[dict], top: int = 3) -> List[dict]:
+        """find all for task.
+        
+        Args:
+            task (str):
+            skills (List[dict]):
+            top (int):
+        
+        Returns:
+            List[dict]"""
         base_skills = [s for s in skills if s.get("base")]
         scored = [(cls._score(task, s), s) for s in skills if not s.get("base")]
         scored = [(sc, s) for sc, s in scored if sc >= max(1, s.get("min_score", 1))]
@@ -222,6 +285,14 @@ class SkillLoader:
 
     @classmethod
     def suggest_template(cls, prompt: str, skills: List[dict]) -> Optional[str]:
+        """suggest template.
+        
+        Args:
+            prompt (str):
+            skills (List[dict]):
+        
+        Returns:
+            Optional[str]"""
         best = cls.find_for_task(prompt, skills)
         if best and best.get("template"):
             return best["template"]

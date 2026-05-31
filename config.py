@@ -43,6 +43,10 @@ def setup_logging():
         pass
 
 def get_logger(name):
+    """get logger.
+    
+    Args:
+        name:"""
     return logging.getLogger(name)
 
 # Chunking

@@ -27,6 +27,13 @@ MAX_RESULTS = int(os.getenv("DDG_MAX", "10"))
 
 
 def _strip_tags(html: str) -> str:
+    """strip tags.
+    
+    Args:
+        html (str):
+    
+    Returns:
+        str"""
     text = re.sub(r'<[^>]+>', ' ', html)
     text = re.sub(r'&amp;', '&', text)
     text = re.sub(r'&lt;', '<', text)
@@ -39,11 +46,26 @@ def _strip_tags(html: str) -> str:
 
 
 def _domain(url: str) -> str:
+    """domain.
+    
+    Args:
+        url (str):
+    
+    Returns:
+        str"""
     m = re.match(r'https?://([^/]+)', url)
     return m.group(1).lstrip('www.') if m else ''
 
 
 def search_ddg(query: str, max_results: int = 5) -> List[Dict]:
+    """search ddg.
+    
+    Args:
+        query (str):
+        max_results (int):
+    
+    Returns:
+        List[Dict]"""
     params = urllib.parse.urlencode({'q': query, 'kl': 'en-us'})
     url = f'https://html.duckduckgo.com/html/?{params}'
     for attempt in range(3):
@@ -86,4 +108,12 @@ def search_ddg(query: str, max_results: int = 5) -> List[Dict]:
 
 
 def websearch(query: str, max_results: Optional[int] = None) -> List[Dict]:
+    """websearch.
+    
+    Args:
+        query (str):
+        max_results (Optional[int]):
+    
+    Returns:
+        List[Dict]"""
     return search_ddg(query, max_results or MAX_RESULTS)
