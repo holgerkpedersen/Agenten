@@ -410,6 +410,7 @@ def _normalize_images(images):
 @app.route("/api/image/upload", methods=["POST"])
 def image_upload():
     """image upload."""
+    sid = current_session_id  # capture locally to avoid race (BUG-063)
     if 'image' not in request.files:
         return jsonify({"success": False, "error": "Ingen billedfil modtaget"}), 400
     f = request.files['image']
@@ -436,18 +437,18 @@ def image_upload():
 
     # Load current session images if available
     loaded_images = []
-    if current_session_id:
-        session_data = session_manager.load_session(current_session_id)
+    if sid:
+        session_data = session_manager.load_session(sid)
         if session_data and session_data.get("images"):
             loaded_images = _normalize_images(session_data["images"])
 
     local_agent.images = loaded_images + [{"b64": raw_b64, "mime": mime, "filename": f.filename, "filepath": filepath}]
 
     # Save back to session manager to persist changes safely
-    if current_session_id:
-        existing = session_manager.load_session(current_session_id) or {}
+    if sid:
+        existing = session_manager.load_session(sid) or {}
         existing["images"] = local_agent.images
-        session_manager.save_session(current_session_id, existing)
+        session_manager.save_session(sid, existing)
 
     return jsonify({"success": True, "filename": f.filename, "filepath": filepath, "size": os.path.getsize(filepath), "count": len(local_agent.images)})
 
@@ -1207,9 +1208,12 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
     
     Yields:
         ..."""
+    global execution_status
     if _check_client(agent):
         return
     yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
+    with execution_status_lock:
+        execution_status["current_task"] = node.name
 
     child_results = []
     for child in node.children:
@@ -1226,6 +1230,8 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
             completed[0] += _count_tasks(child)
             progress = int((completed[0] / total_tasks) * 100)
+            with execution_status_lock:
+                execution_status["progress"] = progress
             yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
             continue
         yield from _execute_with_stream(child, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id)
@@ -1237,6 +1243,8 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
         node.result = "\n".join(child_results) if child_results else "All subtasks completed"
         completed[0] += 1
         progress = int((completed[0] / total_tasks) * 100)
+        with execution_status_lock:
+            execution_status["progress"] = progress
         yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
         yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': node.result[:500]})}\n\n"
         return
@@ -1267,6 +1275,9 @@ def _execute_with_stream(node, agent, total_tasks, completed, task_context_promp
         return
     completed[0] += 1
     progress = int((completed[0] / total_tasks) * 100)
+    with execution_status_lock:
+        execution_status["progress"] = progress
+        execution_status["log"].append({"task": node.name, "status": node.status, "result": full_response[:200]})
     yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
     yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': full_response[:500]})}\n\n"
     agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, ui_lang) + ": " + node.name, "detail": full_response})
@@ -1392,6 +1403,7 @@ def execute_stream():
         
         Yields:
             ..."""
+        global execution_status
         _ui = ui_lang
         if agent.task_tree is None:
             if session_id:
@@ -1423,6 +1435,9 @@ def execute_stream():
         yield f"data: {json.dumps({'type': 'start', 'total_tasks': total_tasks})}\n\n"
 
         saved = False
+        with execution_status_lock:
+            execution_status["running"] = True
+            execution_status["log"] = []
         try:
             if _check_client(agent):
                 yield f"data: {json.dumps({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui)})}\n\n"
@@ -1430,14 +1445,21 @@ def execute_stream():
             yield from _execute_with_stream(agent.task_tree.root, agent, total_tasks, completed, task_context_prompt, show_thinking, _ui, session_id)
             _save_session_data(session_id, agent, _ui)
             saved = True
+            with execution_status_lock:
+                execution_status["running"] = False
+                execution_status["progress"] = 100
             yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, _ui)})}\n\n"
         except Exception as e:
             if not saved:
                 _save_session_data(session_id, agent, _ui)
+            with execution_status_lock:
+                execution_status["running"] = False
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         finally:
             if not saved:
                 _save_session_data(session_id, agent, _ui)
+                with execution_status_lock:
+                    execution_status["running"] = False
 
     return Response(stream_with_context(generate(stream_agent)), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
 

@@ -267,4 +267,5 @@ class ToolRegistry:
             result = fn(**valid_args)
             return {"success": True, "result": result}
         except Exception as e:
-            return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
+            log.error("Tool '%s' failed: %s", tool_name, traceback.format_exc())
+            return {"success": False, "error": f"Værktøjet '{tool_name}' fejlede: {str(e)}"}

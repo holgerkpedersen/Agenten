@@ -192,8 +192,11 @@ def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_co
     file_context_entry = f"\n\nMateriale:{file_context}" if file_context else ""
     decomposition_prompt += file_context_entry
 
-    if "gemma" in agent.decompose_llm.model.lower():
-        decomposition_prompt += "\n<|channel>thought\n<channel|>"
+    model_lower = agent.decompose_llm.model.lower()
+    for model_prefix, channel_tag in config.CHANNEL_TAG_MODELS.items():
+        if model_prefix in model_lower:
+            decomposition_prompt += channel_tag
+            break
 
     agent._log("LLM", t(K.LOG_SENDING_LLM, agent.lang), t(K.LOG_N_FILES, agent.lang).format(n=len(agent.file_context)) if isinstance(agent.file_context, list) and agent.file_context else "")
     response = agent.decompose_llm.generate(decomposition_prompt, temperature=0.3, max_tokens=4096)
@@ -621,10 +624,11 @@ class Agent:
                 depth = 0
                 while depth < 20:
                     cur_abspath = os.path.abspath(cur_file)
-                if cur_abspath in visited or not os.path.exists(cur_file):
-                    # Cycle detected: index current file to prevent unindexed functions and LLM loops
-                    self._delegation_index[func_name] = (cur_abspath, cur_file)
-                    break
+                    if cur_abspath in visited or not os.path.exists(cur_file):
+                        # Cycle detected: index current file to prevent unindexed functions and LLM loops
+                        log.warning("Circular delegation for %s at %s", func_name, cur_file)
+                        self._delegation_index[func_name] = (cur_abspath, cur_file)
+                        break
                     visited.add(cur_abspath)
                     inner = agent_files.read_file_content(self, cur_file)
                     inner_stubs = agent_files.detect_delegations(inner) if inner else []

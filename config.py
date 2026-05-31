@@ -97,3 +97,9 @@ MAX_MESSAGE_CHARS = 20000  # hard cap on total message body sent per LLM call
 
 # File context limits — prevent LM Studio HTTP timeout from large payloads
 MAX_FILE_CONTEXT_CHARS = 3000  # max chars per file in initial system prompt (agent can read_chunk for more)
+
+# Model-specific channel tags for decomposition prompts (e.g., Gemma requires <|channel|> tags)
+# Key: model name substring (lowercase), Value: channel tag string appended to decomposition prompt
+CHANNEL_TAG_MODELS = {
+    "gemma": "\n<|channel>thought\n<channel|>",
+}
