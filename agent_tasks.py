@@ -92,7 +92,7 @@ def _get_max_tool_calls(task_name: str) -> int:
     return config.MAX_TOOL_CALLS_ANALYSE
 
 
-def _validate_done_output(agent: Any, result_text: str | dict, task_name: str) -> str | None:
+def _validate_done_output(agent: Any, result_text: str | dict, task_name: str, task_node: Any = None) -> str | None:
     """validate done output.
     
     Args:
@@ -103,6 +103,15 @@ def _validate_done_output(agent: Any, result_text: str | dict, task_name: str) -
         result_text = result_text.get("result", str(result_text))
     if not isinstance(result_text, str) or len(result_text.strip()) < 50:
         return t(K.VALIDATION_DONE_TOO_SHORT, agent.lang).format(len(result_text) if result_text else 0)
+    
+    # Check success criteria if provided
+    if task_node and task_node.success_criteria:
+        # Basic check: result should mention the task or be substantial when criteria exist
+        if len(result_text.strip()) < 100:  # Increased minimum when criteria exist
+            # More lenient: if we at least mention the task name, it's OK
+            if task_node.name.lower() not in result_text.lower():
+                return t(K.VALIDATION_DONE_TOO_SHORT, agent.lang).format(len(result_text) if result_text else 0) + " (for lidt detaljer når succeskriterier er defineret)"
+    
     phase = _normalize_phase(task_name).lower()
     template = getattr(agent, 'active_template', '') or ''
     bugfix_templates = {"bugfix", "refactor", "testgenerering", "issue_handler"}
@@ -237,10 +246,15 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
                     agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name.lower(), "") or \
                     agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name, "") or \
                     agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(_normalize_phase(task_node.name), "")
+    criteria_block = ""
+    if task_node.success_criteria:
+        header = t(K.CRITERIA_HEADER, agent.lang)
+        items = "\n".join(f"- {c}" for c in task_node.success_criteria)
+        criteria_block = f"\n\n## {header}\n{items}\n"
     if section_instr:
-        task_prompt = f"{section_instr}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{section_instr}{criteria_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
-        task_prompt = f"{task_node.name}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{task_node.name}{criteria_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
     agent._refresh_skills()
     agent._match_skills(clean_prompt)
@@ -593,6 +607,28 @@ def _get_phase_auto_complete_msg(task_name: str, tool_name: str, tool_result: di
     return None
 
 
+def _extract_last_assistant_text(messages: list[dict]) -> str:
+    """Extract the last substantive assistant text from messages, skipping tool-only responses."""
+    if not messages:
+        return ""
+    for m in reversed(messages):
+        if m["role"] != "assistant":
+            continue
+        content = m.get("content")
+        if not content:
+            continue
+        text = content if isinstance(content, str) else ""
+        if isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    text = part.get("text", "")
+                    break
+        text = text.strip()
+        if len(text) > 50:
+            return text
+    return ""
+
+
 def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_fallback: str, called_tools: dict, _report_logs: int = 0, original_prompt: str = "", messages: list[dict] | None = None) -> Generator[dict, None, None]:
     """finalize task stream.
     
@@ -625,8 +661,13 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
             full_response = text_fallback
             task_node.status = "done"
         else:
-            full_response = t(K.LOG_TASK_FAILED, agent.lang)
-            task_node.status = "failed"
+            assistant_text = _extract_last_assistant_text(messages or [])
+            if assistant_text:
+                full_response = assistant_text
+                task_node.status = "done"
+            else:
+                full_response = t(K.LOG_TASK_FAILED, agent.lang)
+                task_node.status = "failed"
     else:
         task_node.status = "done"
 
@@ -949,6 +990,23 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     yield {"type": "checkpoint", "message": t(K.CP_PR_FAILED, agent.lang), "tool": "done"}
                 continue
             passed, failed = _validate_rubrics(agent, called_tools)
+            if failed:
+                try:
+                    from skill_tracker import tracker
+                    skill_name = "__none__"
+                    for s in agent._active_skills:
+                        if not s.get("base"):
+                            skill_name = s["name"]
+                            break
+                    tracker.record(
+                        skill_name=skill_name,
+                        task_summary=f"rubric_failure: {task_node.name}",
+                        success=False,
+                        template=agent.active_template or "",
+                        detail="; ".join(r.get("desc", "?")[:120] for r in failed),
+                    )
+                except Exception:
+                    pass
             if failed and not agent._rubric_retried:
                 agent._rubric_retried = True
                 feedback = t(K.RUBRIC_FAILED, agent.lang)
@@ -962,7 +1020,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {missing_msg}")
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 continue
-            validation_err = _validate_done_output(agent, parsed.get("result", ""), task_node.name)
+            validation_err = _validate_done_output(agent, parsed.get("result", ""), task_node.name, task_node)
             if validation_err:
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {validation_err}")
                 messages = _truncate_messages(messages, agent.max_conversation_chars)

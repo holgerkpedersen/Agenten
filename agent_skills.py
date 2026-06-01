@@ -206,6 +206,7 @@ def get_templates(agent: Any) -> dict[str, dict[str, str | None]]:
     Args:
         agent:"""
     lang_instr = t(K.ANSWER_IN, agent.lang)
+    criteria_instr = t(K.CRITERIA_DECOMPOSE, agent.lang)
     return {
         "resume": {
             "name": t(K.T_RESUME, agent.lang),
@@ -224,7 +225,7 @@ def get_templates(agent: Any) -> dict[str, dict[str, str | None]]:
         },
         "fri": {
             "name": t(K.T_FRI, agent.lang),
-            "prompt": t(K.TP_FRI, agent.lang),
+            "prompt": t(K.TP_FRI, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": None
         },
         "agenten": {
@@ -234,37 +235,37 @@ def get_templates(agent: Any) -> dict[str, dict[str, str | None]]:
         },
         "programmering": {
             "name": t(K.T_PROGRAMMERING, agent.lang),
-            "prompt": t(K.TP_PROGRAMMERING, agent.lang),
+            "prompt": t(K.TP_PROGRAMMERING, agent.lang).replace("{lang_instruction}", lang_instr),
             "fallback": t(K.TF_PROGRAMMERING, agent.lang),
         },
         "python-arkitektur": {
             "name": t(K.T_PYTHON_ARKITEKTUR, agent.lang),
-            "prompt": t(K.TP_PYTHON_ARKITEKTUR, agent.lang),
+            "prompt": t(K.TP_PYTHON_ARKITEKTUR, agent.lang).replace("{lang_instruction}", lang_instr),
             "fallback": t(K.TF_PYTHON_ARKITEKTUR, agent.lang),
         },
         "billedanalyse": {
             "name": t(K.T_BILLEDANALYSE, agent.lang),
-            "prompt": t(K.TP_BILLEDANALYSE, agent.lang),
+            "prompt": t(K.TP_BILLEDANALYSE, agent.lang).replace("{lang_instruction}", lang_instr),
             "fallback": t(K.TF_BILLEDANALYSE, agent.lang),
         },
         "bugfix": {
             "name": t(K.T_BUGFIX, agent.lang),
-            "prompt": t(K.TP_BUGFIX, agent.lang),
+            "prompt": t(K.TP_BUGFIX, agent.lang).replace("{lang_instruction}", lang_instr),
             "fallback": t(K.TF_BUGFIX, agent.lang),
         },
         "refactor": {
             "name": t(K.T_REFACTOR, agent.lang),
-            "prompt": t(K.TP_REFACTOR, agent.lang),
+            "prompt": t(K.TP_REFACTOR, agent.lang).replace("{lang_instruction}", lang_instr),
             "fallback": t(K.TF_REFACTOR, agent.lang),
         },
         "testgenerering": {
             "name": t(K.T_TESTGENERERING, agent.lang),
-            "prompt": t(K.TP_TESTGENERERING, agent.lang),
+            "prompt": t(K.TP_TESTGENERERING, agent.lang).replace("{lang_instruction}", lang_instr),
             "fallback": t(K.TF_TESTGENERERING, agent.lang),
         },
         "issue_handler": {
             "name": t(K.T_ISSUE_HANDLER, agent.lang),
-            "prompt": t(K.TP_ISSUE_HANDLER, agent.lang),
+            "prompt": t(K.TP_ISSUE_HANDLER, agent.lang).replace("{lang_instruction}", lang_instr),
             "fallback": t(K.TF_ISSUE_HANDLER, agent.lang),
         },
     }

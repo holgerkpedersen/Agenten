@@ -25,17 +25,36 @@ def _clean_task_name(name: str) -> str | None:
     if len(name) < 3 or name in ['', '-', '\u2022', '*']:
         return None
     meta_prefix = re.compile(
-        r'^(?:let\'s|check|draft:|no\s+\w+|drop\s+|indentation:|structure:|'
-        r'task to break down:|brainstorming|main task:|level \d+|'
+        r'^(?:'
+        r'let\'s|let\s+me\s|i\s|my\s|we\s|'
+        r'the\s+(?:user|instruction|example|prompt)\s|'
+        r'okay|alright|'
+        r'first[,:]?\s|second[,:]?\s|third[,:]?\s|'
+        r'next[,:]?\s|finally[,:]?\s|lastly[,:]?\s|then\s|'
+        r'now[,:]?\s|so[,:]?\s|but\s|however|'
+        r'perhaps|maybe|probably\s|'
+        r'that\'?s\s|that\s+is\s|'
+        r'in\s+my\s|i\s+(?:recall|think|believe|found|remember|guess|wonder)\s|'
+        r'i\s+(?:can|will|could|would|shall|want|need|should|have|might|must|am)\s|'
+        r'recall\s+that|remember\s+that|'
+        r'for\s+the\s+(?:output|tree|purpose|sake|moment)|'
+        r'to\s+be\s+(?:safe|precise|thorough|consistent|fair|honest)|'
+        r'another\s+(?:way|approach|option)|common\s+approach|looking\s+at|'
+        r'final\s+(?:decision|check|output|answer|thought|tree|version|step|result)|'
+        r'yes\.?\s*$|good\.?\s*$|right\.?\s*$|true\.?\s*$|'
+        r'ready[\.!]?|'
+        r'check|draft:|no\s+\w+|drop\s+|indentation:|structure:|'
+        r'task to break down:|brainstorming|main task:|level\s+\d+|'
         r'here\'s a thinking process|udf\u00f8r opgave|analyze user input|deconstruct|'
         r'-\s*(?:task:|input task:|example provided:|language:|must be|output:)|'
         r'what does it mean|wait, the example|this is a bit linear|'
-        r'final check|i will output|ready\.|'
         r'nedbryd nu|kun tr[æe]|return[ée]r kun|now break down|'
         r'only tree|return only|ahora descomp|solo estructura|'
         r'devuelve solo|\u73b0\u5728\u5206\u89e3|\u4ec5\u6811\u7ed3\u6784|'
         r'thought$|namesearch$|namesekundar)', re.IGNORECASE
     )
+    if re.match(r'^\w+\s*:\s*$', name.strip()):
+        return None
     if meta_prefix.match(name):
         return None
     return name
@@ -88,6 +107,14 @@ def parse_tree_from_llm(agent: Any, prompt: str, llm_response: str) -> TaskTree:
     lines = llm_response.strip().split('\n')
     stack = [(tree.root, 0)]
     added_count = 0
+    skip_words = ['think', 'thinking', 'brainstorm', 'draft', 'constraint',
+                 'repetition', 'politeness', 'indentation', 'compliance',
+                 'thought', 'channel', 'namesekundar', 'namesearch',
+                 'analyze user input', 'deconstruct', 'example provided',
+                 'must be a tree', 'output:', 'language:',
+                 'let me', "let's", "i'll", "i'm", "i've", "i'd"]
+
+    criteria_re = re.compile(r'\s*\(([^)]+)\)\s*$')
 
     for line in lines:
         if not line.strip():
@@ -97,26 +124,43 @@ def parse_tree_from_llm(agent: Any, prompt: str, llm_response: str) -> TaskTree:
         task_name = _clean_task_name(stripped)
         if task_name is None:
             continue
-        skip_words = ['think', 'thinking', 'brainstorm', 'draft', 'constraint',
-                     'repetition', 'politeness', 'indentation', 'compliance',
-                     'thought', 'channel', 'namesekundar', 'namesearch',
-                     'analyze user input', 'deconstruct', 'example provided',
-                     'must be a tree', 'output:', 'language:']
-        if any(word in task_name.lower() for word in skip_words):
+        skip_match = False
+        task_lower = task_name.lower()
+        for sw in skip_words:
+            if sw in task_lower:
+                skip_match = True
+                break
+        if skip_match:
             continue
         if not task_name or len(task_name) < 3:
             continue
+
+        # Extract success criteria from parentheses at end of task name
+        criteria = []
+        crit_match = criteria_re.search(task_name)
+        if crit_match:
+            raw = crit_match.group(1)
+            criteria = [c.strip() for c in raw.split(",") if c.strip()]
+            task_name = task_name[:crit_match.start()].strip()
+
         level = indent // 2
         while len(stack) > level + 1:
             stack.pop()
         parent = stack[-1][0]
-        new_node = TaskNode(task_name[:80])
+        new_node = TaskNode(task_name)
+        new_node.success_criteria = criteria
         parent.add_child(new_node)
         stack.append((new_node, level))
         added_count += 1
 
     if added_count == 0:
         agent._log("WARNING", t(K.LOG_NO_VALID_TASKS, agent.lang), "")
+        return create_fallback_tree(agent, prompt)
+
+    # If >20 level-1 tasks, LLM likely leaked thinking → use fallback
+    flat_tasks = len(tree.root.children)
+    if flat_tasks > 20 and all(len(c.children) == 0 for c in tree.root.children):
+        agent._log("WARNING", f"LLM output indeholder tankeproces ({flat_tasks} flade opgaver). Bruger fallback.", "")
         return create_fallback_tree(agent, prompt)
 
     agent._log("INFO", t(K.LOG_PARSED_TASKS, agent.lang).format(n=added_count), "")
@@ -151,6 +195,7 @@ def task_tree_to_dict(agent: Any) -> dict | None:
             "name": node.name,
             "status": node.status,
             "result": node.result,
+            "success_criteria": node.success_criteria,
             "children": [node_to_dict(child) for child in node.children] if node.children else []
         }
 
@@ -171,6 +216,7 @@ def task_tree_from_dict(agent: Any, d: dict) -> None:
         node = TaskNode(item["name"])
         node.status = item.get("status", "pending")
         node.result = item.get("result")
+        node.success_criteria = item.get("success_criteria", [])
         for child_data in item.get("children", []):
             node.add_child(dict_to_node(child_data))
         return node
@@ -210,14 +256,10 @@ def evolve_if_needed(agent: Any) -> bool:
     Args:
         agent:"""
     try:
-        from skill_tracker import tracker
-        if not tracker.should_evolve():
-            return False
-        new_template = tracker.evolve()
-        agent.active_template = new_template
-        return True
+        from skill_evolution import evolve_if_needed as _evo
+        result = _evo(dry_run=False)
+        return result.get("status") == "evolved"
     except Exception as e:
-        # Log error to prevent crash on disk-full or other IO errors
         try:
             import logging
             logging.error(f"Skill evolution failed: {e}")
