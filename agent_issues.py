@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import subprocess
+from typing import Any
 from lang import t
 from i18n import K
 import config
@@ -28,12 +29,12 @@ REFAC_TEMPLATE = {
 OVERSIZE_LINE_LIMIT = 1000
 
 
-def _get_issues_path():
+def _get_issues_path() -> str:
     """get issues path."""
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
 
 
-def _load_issues():
+def _load_issues() -> dict[str, Any]:
     """load issues."""
     path = _get_issues_path()
     if not os.path.exists(path):
@@ -46,7 +47,7 @@ def _load_issues():
         return {"meta": {"generated": "2026-05-20", "source": "Agenten", "total": 0}, "issues": []}
 
 
-def _save_issues(data):
+def _save_issues(data: dict[str, Any]) -> None:
     """save issues.
     
     Args:
@@ -56,7 +57,7 @@ def _save_issues(data):
         _json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def _next_refac_id(data):
+def _next_refac_id(data: dict[str, Any]) -> str:
     """next refac id.
     
     Args:
@@ -77,7 +78,7 @@ ISSUE_TYPE_PREFIXES = {
 }
 
 
-def _next_issue_id(data, issue_type):
+def _next_issue_id(data: dict[str, Any], issue_type: str) -> str:
     """next issue id.
     
     Args:
@@ -89,7 +90,7 @@ def _next_issue_id(data, issue_type):
     return f"{prefix}-{max(nums) + 1:03d}" if nums else f"{prefix}-001"
 
 
-def run_pytest(test_path=""):
+def run_pytest(test_path: str = "") -> dict[str, Any]:
     """run pytest.
     
     Args:
@@ -108,7 +109,7 @@ def run_pytest(test_path=""):
         return {"success": False, "stdout": "", "stderr": "python -m pytest not found", "exit_code": -1}
 
 
-def read_issue(issue_id, include_hints=False):
+def read_issue(issue_id: str, include_hints: bool = False) -> dict[str, Any]:
     """read issue.
     
     Args:
@@ -132,7 +133,7 @@ def read_issue(issue_id, include_hints=False):
     return {"success": False, "error": f"Issue '{issue_id}' not found. Available: {available}"}
 
 
-def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
+def _resolve_referenced_issues(agent: Any, data: dict[str, Any], issue: dict[str, Any], status: str, resolution_note: str) -> list[tuple[str, str]]:
     """resolve referenced issues.
     
     Returns list of (ref_id, note) for callers to apply.
@@ -157,7 +158,7 @@ def _resolve_referenced_issues(agent, data, issue, status, resolution_note):
     return results
 
 
-def update_issue_status(agent, issue_id, status, resolution_note=""):
+def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note: str = "") -> dict[str, Any]:
     """update issue status.
     
     Args:
@@ -184,7 +185,7 @@ def update_issue_status(agent, issue_id, status, resolution_note=""):
     return {"success": False, "error": f"Issue '{issue_id}' not found."}
 
 
-def create_refactor_issue(agent, filepath, line_count, related_issues=None):
+def create_refactor_issue(agent: Any, filepath: str, line_count: int, related_issues: list | None = None) -> dict[str, Any]:
     """create refactor issue.
     
     Args:
@@ -218,7 +219,7 @@ def create_refactor_issue(agent, filepath, line_count, related_issues=None):
     return {"success": True, "issue": issue, "existing": False}
 
 
-def create_issue(agent, title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="", acceptance_criteria=""):
+def create_issue(agent: Any, title: str, type: str = "bug", severity: str = "medium", description: str = "", location: str = "", impact: str = "", proposed_fix: str = "", acceptance_criteria: str = "") -> dict[str, Any]:
     """create issue.
     
     Args:
@@ -307,7 +308,7 @@ def create_issue(agent, title, type="bug", severity="medium", description="", lo
     return {"success": True, "issue": issue, "existing": False}
 
 
-def detect_oversize_file(agent, filename, content, related_bugs=None):
+def detect_oversize_file(agent: Any, filename: str, content: str, related_bugs: list | None = None) -> dict[str, Any] | None:
     """detect oversize file.
     
     Args:

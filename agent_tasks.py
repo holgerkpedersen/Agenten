@@ -11,6 +11,7 @@ import agent_git
 import agent_files
 import agent_issues
 import config
+from typing import Any, Generator
 
 
 def _parse_test_summary(result: dict) -> str:
@@ -30,7 +31,7 @@ def _parse_test_summary(result: dict) -> str:
 EXECUTION_TIMEOUT = config.EXECUTION_TIMEOUT
 
 
-def _save_llm_log_file(agent, task_name: str, iteration: int, content: str) -> str:
+def _save_llm_log_file(agent: Any, task_name: str, iteration: int, content: str) -> str:
     """Save LLM response to a file for later inspection."""
     session_id = getattr(agent, '_session_id', 'unknown')
     session_dir = os.path.join("logs", "llm_responses", session_id)
@@ -65,7 +66,7 @@ PHASE_ALIASES = {
 }
 
 
-def _normalize_phase(name):
+def _normalize_phase(name: str) -> str:
     """normalize phase.
     
     Args:
@@ -75,7 +76,7 @@ def _normalize_phase(name):
     return PHASE_ALIASES.get(lower, lower)
 
 
-def _get_max_tool_calls(task_name):
+def _get_max_tool_calls(task_name: str) -> int:
     """get max tool calls.
     
     Args:
@@ -91,7 +92,7 @@ def _get_max_tool_calls(task_name):
     return config.MAX_TOOL_CALLS_ANALYSE
 
 
-def _validate_done_output(agent, result_text, task_name):
+def _validate_done_output(agent: Any, result_text: str | dict, task_name: str) -> str | None:
     """validate done output.
     
     Args:
@@ -129,7 +130,7 @@ def _validate_done_output(agent, result_text, task_name):
     return None
 
 
-def _count_fix_attempts(agent, called_tools):
+def _count_fix_attempts(agent: Any, called_tools: dict[str, int]) -> str | None:
     """count fix attempts.
     
     Args:
@@ -145,7 +146,7 @@ def _count_fix_attempts(agent, called_tools):
     return None
 
 
-def set_task_tools(agent, task_name):
+def set_task_tools(agent: Any, task_name: str) -> None:
     """set task tools.
     
     Args:
@@ -169,7 +170,7 @@ def set_task_tools(agent, task_name):
         agent.tool_registry.set_active_tools(allowed)
 
 
-def solve_task(agent, task_node, original_prompt):
+def solve_task(agent: Any, task_node: Any, original_prompt: str) -> str:
     """solve task.
     
     Args:
@@ -184,7 +185,7 @@ def solve_task(agent, task_node, original_prompt):
     return full_response or "Task failed"
 
 
-def _build_chunk_hint(agent):
+def _build_chunk_hint(agent: Any) -> str:
     """build chunk hint.
     
     Args:
@@ -221,7 +222,7 @@ def _build_chunk_hint(agent):
     return hint
 
 
-def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
+def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, chunk_hint: str) -> tuple[list[dict], str, bool]:
     """build initial messages.
     
     Args:
@@ -284,7 +285,7 @@ def _build_initial_messages(agent, task_node, original_prompt, chunk_hint):
     return messages, tools_list, bool(file_ctx)
 
 
-def _msg_content_len(m):
+def _msg_content_len(m: dict) -> int:
     """msg content len.
     
     Args:
@@ -297,7 +298,7 @@ def _msg_content_len(m):
     return 0
 
 
-def _validate_rubrics(agent, called_tools):
+def _validate_rubrics(agent: Any, called_tools: dict[str, int]) -> tuple[list, list]:
     """validate rubrics.
     
     Args:
@@ -321,7 +322,7 @@ def _validate_rubrics(agent, called_tools):
     return passed, failed
 
 
-def _evaluate_rubric_check(check_str, called_tools):
+def _evaluate_rubric_check(check_str: str, called_tools: set[str]) -> bool:
     """evaluate rubric check.
     
     Args:
@@ -338,7 +339,7 @@ def _evaluate_rubric_check(check_str, called_tools):
     return False
 
 
-def _truncate_messages(messages, max_chars):
+def _truncate_messages(messages: list[dict], max_chars: int) -> list[dict]:
     """truncate messages.
     
     Args:
@@ -356,7 +357,7 @@ def _truncate_messages(messages, max_chars):
     return system + insert + tail
 
 
-def _cont_hint(agent, tools_list):
+def _cont_hint(agent: Any, tools_list: str) -> str:
     """cont hint.
     
     Args:
@@ -367,7 +368,7 @@ def _cont_hint(agent, tools_list):
     return t(K.TOOL_CONTINUATION, agent.lang).format(tools_list=tools_list, TOOL_MARKER=agent.tool_registry.TOOL_MARKER, DONE_MARKER=agent.tool_registry.DONE_MARKER)
 
 
-def _add_user_msg(messages, content):
+def _add_user_msg(messages: list[dict], content: str) -> None:
     """add user msg.
     
     Args:
@@ -376,7 +377,7 @@ def _add_user_msg(messages, content):
     messages.append({"role": "user", "content": content})
 
 
-def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_node, original_prompt):
+def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_tools: dict[str, int], tools_list: str, task_node: Any, original_prompt: str) -> dict | None:
     """handle tool call.
     
     Args:
@@ -473,7 +474,7 @@ def _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_no
         return {"type": "tool_result", "tool": parsed["tool"], "args": parsed.get("args", {}), "result": result}
 
 
-def _check_done_pr_requirements(agent, messages, called_tools, original_prompt, task_name):
+def _check_done_pr_requirements(agent: Any, messages: list[dict], called_tools: dict, original_prompt: str, task_name: str) -> bool:
     """check done pr requirements.
     
     Args:
@@ -508,7 +509,7 @@ REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "update_issue_status"}
 
 CLOSE_PHASE_ALIASES = {"opdatering", "luk", "close"}
 
-def _check_required_tools(agent, called_tools, task_name=""):
+def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -> str | None:
     """check required tools.
     
     Args:
@@ -546,7 +547,7 @@ def _check_required_tools(agent, called_tools, task_name=""):
 ISSUE_ID_PATTERN = re.compile(r'(BUG|SEC|ARC|MNT|PRF|TST|REFAC)-\d+', re.IGNORECASE)
 
 
-def _extract_issue_id(text):
+def _extract_issue_id(text: str) -> str | None:
     """extract issue id.
     
     Args:
@@ -567,7 +568,7 @@ AUTO_RESOLVE_PATTERNS = [
 ]
 
 
-def _get_phase_auto_complete_msg(task_name, tool_name, tool_result, agent):
+def _get_phase_auto_complete_msg(task_name: str, tool_name: str, tool_result: dict | Any, agent: Any) -> str | None:
     """Return auto-complete message if the phase goal was just met, else None.
     Checks phase-specific success conditions after each tool call."""
     phase = _normalize_phase(task_name).lower()
@@ -592,7 +593,7 @@ def _get_phase_auto_complete_msg(task_name, tool_name, tool_result, agent):
     return None
 
 
-def _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools, _report_logs=0, original_prompt="", messages=None):
+def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_fallback: str, called_tools: dict, _report_logs: int = 0, original_prompt: str = "", messages: list[dict] | None = None) -> Generator[dict, None, None]:
     """finalize task stream.
     
     Args:
@@ -692,7 +693,7 @@ def _finalize_task_stream(agent, task_node, full_response, text_fallback, called
     yield {"type": "done", "result": full_response}
 
 
-def solve_task_stream(agent, task_node, original_prompt):
+def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Generator[dict, None, None]:
     """solve task stream.
     
     Args:

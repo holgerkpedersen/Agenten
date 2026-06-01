@@ -1,7 +1,7 @@
 """Flow builder for generating Logic Apps schemas."""
 
 import json
-from typing import List, Dict
+from typing import Any
 from urllib.parse import quote
 
 FLOW_SCHEMA = "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#"
@@ -61,7 +61,7 @@ def get_flow_template() -> dict:
     }
 
 
-def generate_research_flow(topic: str, results: List[Dict]) -> dict:
+def generate_research_flow(topic: str, results: list[dict[str, Any]]) -> dict:
     """generate research flow.
     
     Args:

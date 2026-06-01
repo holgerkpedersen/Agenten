@@ -6,7 +6,6 @@ Baseret på ReactAgent skills-arkitektur, tilpasset til Agentens template-basere
 import os
 import re
 import json
-from typing import List, Optional
 from config import get_logger
 log = get_logger(__name__)
 
@@ -31,7 +30,7 @@ class SkillLoader:
     }
 
     @staticmethod
-    def _parse_frontmatter(raw: str) -> "tuple[dict, str]":
+    def _parse_frontmatter(raw: str) -> tuple[dict, str]:
         """parse frontmatter.
         
         Args:
@@ -82,7 +81,7 @@ class SkillLoader:
         return header, body
 
     @staticmethod
-    def _deduce_action_types(task: str) -> list:
+    def _deduce_action_types(task: str) -> list[str]:
         """deduce action types.
         
         Args:
@@ -145,7 +144,7 @@ class SkillLoader:
             return {}
 
     @classmethod
-    def load_all(cls, skills_dir: str = None, lang: str = None) -> List[dict]:
+    def load_all(cls, skills_dir: str | None = None, lang: str | None = None) -> list[dict]:
         """load all.
         
         Args:
@@ -198,7 +197,7 @@ class SkillLoader:
         return rate
 
     @classmethod
-    def _score(cls, text: str, skill: dict, _cached_scores: dict = None) -> float:
+    def _score(cls, text: str, skill: dict, _cached_scores: dict | None = None) -> float:
         """score.
         
         Args:
@@ -252,7 +251,7 @@ class SkillLoader:
         return round(score, 2)
 
     @classmethod
-    def find_for_task(cls, task: str, skills: List[dict]) -> Optional[dict]:
+    def find_for_task(cls, task: str, skills: list[dict]) -> dict | None:
         """find for task.
         
         Args:
@@ -267,7 +266,7 @@ class SkillLoader:
         return best if best_score > 0 else None
 
     @classmethod
-    def find_all_for_task(cls, task: str, skills: List[dict], top: int = 3) -> List[dict]:
+    def find_all_for_task(cls, task: str, skills: list[dict], top: int = 3) -> list[dict]:
         """find all for task.
         
         Args:
@@ -284,7 +283,7 @@ class SkillLoader:
         return [s for _, s in scored[:top]] + base_skills
 
     @classmethod
-    def suggest_template(cls, prompt: str, skills: List[dict]) -> Optional[str]:
+    def suggest_template(cls, prompt: str, skills: list[dict]) -> str | None:
         """suggest template.
         
         Args:

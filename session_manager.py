@@ -6,13 +6,15 @@ import re
 from datetime import datetime
 import uuid
 import threading
+from collections.abc import Callable
+from typing import Any
 from lang import t
 from i18n import K
 
 SESSION_ID_PATTERN = re.compile(r'^[a-f0-9-]{8,36}$')
 MAX_SESSION_FILE_SIZE = 10 * 1024 * 1024
 
-def _valid_session_id(session_id):
+def _valid_session_id(session_id: str) -> bool:
     """valid session id.
     
     Args:
@@ -23,7 +25,7 @@ class SessionManager:
     """session manager."""
     _lock = threading.RLock()
 
-    def __init__(self, storage_dir="sessions"):
+    def __init__(self, storage_dir: str = "sessions") -> None:
         """Initialize the instance.
         
         Args:
@@ -31,7 +33,7 @@ class SessionManager:
         self.storage_dir = storage_dir
         os.makedirs(storage_dir, exist_ok=True)
         
-    def save_session(self, session_id, session_data):
+    def save_session(self, session_id: str, session_data: dict[str, Any]) -> str | None:
         """save session.
         
         Args:
@@ -48,7 +50,7 @@ class SessionManager:
             os.replace(tmppath, filepath)
         return session_id
     
-    def load_session(self, session_id):
+    def load_session(self, session_id: str) -> dict[str, Any] | None:
         """load session.
         
         Args:
@@ -68,7 +70,7 @@ class SessionManager:
         except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
             return None
     
-    def list_sessions(self):
+    def list_sessions(self) -> list[dict[str, Any]]:
         """list sessions."""
         sessions = []
         with SessionManager._lock:
@@ -92,7 +94,7 @@ class SessionManager:
                         pass
         return sorted(sessions, key=lambda x: x["last_modified"], reverse=True)
     
-    def create_session(self, name):
+    def create_session(self, name: str) -> tuple[str, dict[str, Any]]:
         """create session.
         
         Args:
@@ -113,7 +115,7 @@ class SessionManager:
         self.save_session(session_id, session_data)
         return session_id, session_data
     
-    def update_session(self, session_id, update_fn):
+    def update_session(self, session_id: str, update_fn: Callable[[dict[str, Any]], dict[str, Any] | None]) -> str | None:
         """Atomically load, modify via update_fn, and save session.
         
         update_fn receives session_data dict and returns modified session_data.
@@ -137,7 +139,7 @@ class SessionManager:
                 os.replace(tmppath, filepath)
             return session_id
 
-    def rename_session(self, session_id, new_name):
+    def rename_session(self, session_id: str, new_name: str) -> bool:
         """rename session.
         
         Args:
@@ -153,7 +155,7 @@ class SessionManager:
             self.save_session(session_id, session)
             return True
 
-    def delete_session(self, session_id):
+    def delete_session(self, session_id: str) -> bool:
         """delete session.
         
         Args:
@@ -168,7 +170,7 @@ class SessionManager:
             except FileNotFoundError:
                 return False
 
-    def add_prompt_result(self, session_id, prompt, result, tree=None):
+    def add_prompt_result(self, session_id: str, prompt: str, result: str | None, tree: Any = None) -> bool:
         """add prompt result.
         
         Args:
@@ -198,7 +200,7 @@ class SessionManager:
                 return True
             return False
     
-    def get_prompt_history(self, session_id):
+    def get_prompt_history(self, session_id: str) -> list[dict[str, Any]]:
         """get prompt history.
         
         Args:
@@ -210,7 +212,7 @@ class SessionManager:
             return session_data.get("prompt_history", [])
         return []
     
-    def _extract_knowledge(self, session_data, prompt, result):
+    def _extract_knowledge(self, session_data: dict[str, Any], prompt: str, result: Any) -> None:
         """extract knowledge.
         
         Args:
@@ -234,7 +236,7 @@ class SessionManager:
             })
         session_data["learned_knowledge"] = knowledge[-20:]
     
-    def get_knowledge_for_context(self, session_id, current_prompt, lang="da"):
+    def get_knowledge_for_context(self, session_id: str, current_prompt: str, lang: str = "da") -> str:
         """get knowledge for context.
         
         Args:

@@ -16,21 +16,21 @@ class SkillTracker:
     DATA_FILE = "skill_outcomes.json"
     _lock = threading.Lock()
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self._ensure_dir()
         self._outcomes = self._load()
         self._session_id = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    def _ensure_dir(self):
+    def _ensure_dir(self) -> None:
         """ensure dir."""
         os.makedirs(self.DATA_DIR, exist_ok=True)
 
-    def _path(self):
+    def _path(self) -> str:
         """path."""
         return os.path.join(self.DATA_DIR, self.DATA_FILE)
 
-    def _load(self):
+    def _load(self) -> list[dict]:
         """load."""
         path = self._path()
         if os.path.exists(path):
@@ -41,7 +41,7 @@ class SkillTracker:
                 return []
         return []
 
-    def _save(self):
+    def _save(self) -> None:
         """save."""
         path = self._path()
         with self._lock:
@@ -51,7 +51,7 @@ class SkillTracker:
             os.replace(tmp, path)
 
     def record(self, skill_name: str, task_summary: str, success: bool,
-               duration_ms: int = 0, tokens_used: int = 0, detail: str = "", template: str = ""):
+               duration_ms: int = 0, tokens_used: int = 0, detail: str = "", template: str = "") -> None:
         """record.
         
         Args:
@@ -79,7 +79,7 @@ class SkillTracker:
                 self._outcomes = self._outcomes[-5000:]
         self._save()
 
-    def get_outcomes(self, skill_name: str = None, limit: int = None):
+    def get_outcomes(self, skill_name: str | None = None, limit: int | None = None) -> list[dict]:
         """get outcomes.
         
         Args:
@@ -94,7 +94,7 @@ class SkillTracker:
             filtered = filtered[-limit:]
         return filtered
 
-    def get_stats(self, skill_name: str = None, recent: int = 50):
+    def get_stats(self, skill_name: str | None = None, recent: int = 50) -> dict:
         """get stats.
         
         Args:
@@ -111,7 +111,7 @@ class SkillTracker:
             "failures": len(outcomes) - successes,
         }
 
-    def get_all_skill_stats(self, recent: int = 50):
+    def get_all_skill_stats(self, recent: int = 50) -> dict:
         """get all skill stats.
         
         Args:
@@ -120,7 +120,7 @@ class SkillTracker:
             names = set(o.get("skill") for o in self._outcomes)
         return {n: self.get_stats(n, recent) for n in sorted(names)}
 
-    def get_unmatched_tasks(self, limit: int = 20):
+    def get_unmatched_tasks(self, limit: int = 20) -> list[str]:
         """get unmatched tasks.
         
         Args:
@@ -132,7 +132,7 @@ class SkillTracker:
             ]
         return result[-limit:]
 
-    def get_unmatched_outcomes(self, limit: int = 100):
+    def get_unmatched_outcomes(self, limit: int = 100) -> list[dict]:
         """get unmatched outcomes.
         
         Args:
@@ -144,14 +144,14 @@ class SkillTracker:
             ]
         return result[-limit:]
 
-    def clear(self):
+    def clear(self) -> None:
         """clear."""
         with self._lock:
             self._outcomes = []
         self._save()
 
     @property
-    def total_outcomes(self):
+    def total_outcomes(self) -> int:
         """total outcomes."""
         with self._lock:
             return len(self._outcomes)

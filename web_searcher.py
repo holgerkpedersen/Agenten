@@ -6,7 +6,7 @@ from ddg_search import search_ddg
 class WebSearcher:
     """web searcher."""
     @staticmethod
-    def search(query, num_results=3):
+    def search(query: str, num_results: int = 3) -> list[dict]:
         """search.
         
         Args:

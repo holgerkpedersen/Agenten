@@ -10,7 +10,7 @@ for _stream in (sys.stdout, sys.stderr):
     except Exception:
         pass
 
-def setup_logging():
+def setup_logging() -> None:
     """Configure logging with console + file handlers. Call once at startup."""
     import sys
     for stream in (sys.stdout, sys.stderr):
@@ -42,7 +42,7 @@ def setup_logging():
     except OSError:
         pass
 
-def get_logger(name):
+def get_logger(name: str) -> logging.Logger:
     """get logger.
     
     Args:

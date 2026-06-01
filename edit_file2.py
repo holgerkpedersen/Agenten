@@ -19,6 +19,7 @@ import time
 
 import config
 from config import get_logger
+from typing import Any
 
 log = get_logger(__name__)
 
@@ -38,7 +39,7 @@ class EditFile2Error(Exception):
 # 1. AST symbol extraction
 # ---------------------------------------------------------------------------
 
-def extract_symbol(filepath, name):
+def extract_symbol(filepath: str, name: str) -> dict:
     """Extract a full symbol (function/class/method) from a Python file using AST.
 
     Returns dict with:
@@ -93,7 +94,7 @@ def extract_symbol(filepath, name):
     }
 
 
-def _find_node(tree, func_name, class_name=None):
+def _find_node(tree: ast.AST, func_name: str, class_name: str | None = None) -> ast.AST | None:
     """Walk AST to find a FunctionDef / AsyncFunctionDef / ClassDef node."""
     for node in ast.walk(tree):
         if class_name:
@@ -113,7 +114,7 @@ def _find_node(tree, func_name, class_name=None):
     return None
 
 
-def _find_symbol_start(lines, node):
+def _find_symbol_start(lines: list[str], node: ast.AST) -> int:
     """Find the first line of a symbol including decorators and leading comments."""
     start = node.lineno
     # Walk backwards through decorators
@@ -135,7 +136,7 @@ def _find_symbol_start(lines, node):
 # 2. LLM improvement
 # ---------------------------------------------------------------------------
 
-def improve_with_llm(llm, symbol_code, requirements, error_context=None, symbol_name=""):
+def improve_with_llm(llm: Any, symbol_code: str, requirements: str, error_context: str | None = None, symbol_name: str = "") -> tuple[str, str | None]:
     """Send symbol code to LLM for improvement.
 
     Args:
@@ -205,7 +206,7 @@ def improve_with_llm(llm, symbol_code, requirements, error_context=None, symbol_
 # 3. Symbol replacement
 # ---------------------------------------------------------------------------
 
-def replace_symbol(filepath, symbol_info, new_code):
+def replace_symbol(filepath: str, symbol_info: dict, new_code: str) -> None:
     """Replace a symbol in the file with new code.
 
     Args:
@@ -233,7 +234,7 @@ def replace_symbol(filepath, symbol_info, new_code):
 # 4. Testing
 # ---------------------------------------------------------------------------
 
-def run_test(test_path):
+def run_test(test_path: str) -> tuple[bool, str]:
     """Run pytest and return (success, output)."""
     try:
         from agent_issues import run_pytest
@@ -250,7 +251,7 @@ def run_test(test_path):
 # 5. Main orchestrator
 # ---------------------------------------------------------------------------
 
-def edit_file2(filepath, name, requirements, llm, test_path=None, max_retries=None):
+def edit_file2(filepath: str, name: str, requirements: str, llm: Any, test_path: str | None = None, max_retries: int | None = None) -> dict:
     """AST-aware symbol editing with LLM improvement and retry loop.
 
     Args:

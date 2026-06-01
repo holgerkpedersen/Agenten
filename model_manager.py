@@ -5,6 +5,7 @@ import shutil
 import os
 import requests
 import difflib
+from typing import Any
 import config
 from urllib.parse import urlparse
 from config import get_logger
@@ -13,7 +14,7 @@ log = get_logger(__name__)
 _LMS_CACHE = None
 
 
-def _get_lms_path():
+def _get_lms_path() -> str | None:
     """get lms path."""
     global _LMS_CACHE
     if _LMS_CACHE is None:
@@ -23,7 +24,7 @@ def _get_lms_path():
     return _LMS_CACHE
 
 
-def _rest_api_base():
+def _rest_api_base() -> str:
     """Derive LM Studio REST API base (no /v1 path suffix) from config LLM_BASE_URL."""
     parsed = urlparse(config.LLM_BASE_URL)
     base = f"{parsed.scheme}://{parsed.hostname}"
@@ -34,7 +35,7 @@ def _rest_api_base():
     return base + '/api/v1'
 
 
-def get_loaded_models():
+def get_loaded_models() -> dict[str, Any] | None:
     """Fetch currently loaded models from LM Studio REST API."""
     if os.environ.get('OPENCODE_BASE_URL'):
         return None
@@ -60,7 +61,7 @@ def get_loaded_models():
         return None
 
 
-def is_model_loaded(model_key):
+def is_model_loaded(model_key: str) -> tuple[bool, str | None]:
     """Check if a model (by any identifier) is currently loaded in LM Studio."""
     loaded = get_loaded_models()
     if not loaded:
@@ -78,7 +79,7 @@ def is_model_loaded(model_key):
     return False, None
 
 
-def get_available_models():
+def get_available_models() -> list[str]:
     """Fetch all known models from LM Studio (OpenAI-compatible endpoint)."""
     if os.environ.get('OPENCODE_BASE_URL'):
         return []
@@ -91,7 +92,7 @@ def get_available_models():
     return []
 
 
-def get_all_rest_models():
+def get_all_rest_models() -> list[dict[str, Any]]:
     """Fetch ALL models (local + remote/LM Link) from LM Studio v1 REST API.
     LM Link is transparent — remote models appear with same key as local ones.
     Requests to localhost:1234 are automatically routed to the right device."""
@@ -125,7 +126,7 @@ def get_all_rest_models():
     return []
 
 
-def resolve_model_key(partial_name):
+def resolve_model_key(partial_name: str) -> str:
     """Fuzzy match a partial model name to a full key."""
     available = get_available_models()
     if not available:
@@ -141,7 +142,7 @@ def resolve_model_key(partial_name):
     return partial_name
 
 
-def load_model(model_key, parallel=4, identifier=None, callback=None):
+def load_model(model_key: str, parallel: int = 4, identifier: str | None = None, callback: Any = None) -> tuple[bool, str]:
     """Load a model into LM Studio using lms CLI.
     Returns (success: bool, message: str)."""
     lms_path = _get_lms_path()
@@ -177,7 +178,7 @@ def load_model(model_key, parallel=4, identifier=None, callback=None):
         return False, str(e)
 
 
-def unload_model(identifier, callback=None):
+def unload_model(identifier: str, callback: Any = None) -> tuple[bool, str]:
     """Unload a model from LM Studio using lms CLI.
     Use identifier='--all' to unload all models.
     Returns (success: bool, message: str)."""

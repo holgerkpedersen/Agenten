@@ -2,12 +2,13 @@
 
 import re
 import time
+from typing import Any
 from task_tree import TaskTree, TaskNode
 from lang import t
 from i18n import K
 
 
-def _clean_task_name(name):
+def _clean_task_name(name: str) -> str | None:
     """clean task name.
     
     Args:
@@ -40,7 +41,7 @@ def _clean_task_name(name):
     return name
 
 
-def create_fallback_tree(agent, prompt):
+def create_fallback_tree(agent: Any, prompt: str) -> TaskTree:
     """create fallback tree.
     
     Args:
@@ -72,7 +73,7 @@ def create_fallback_tree(agent, prompt):
     return tree
 
 
-def parse_tree_from_llm(agent, prompt, llm_response):
+def parse_tree_from_llm(agent: Any, prompt: str, llm_response: str) -> TaskTree:
     """parse tree from llm.
     
     Args:
@@ -122,7 +123,7 @@ def parse_tree_from_llm(agent, prompt, llm_response):
     return tree
 
 
-def count_tasks(node):
+def count_tasks(node: TaskNode) -> int:
     """count tasks.
     
     Args:
@@ -133,7 +134,7 @@ def count_tasks(node):
     return count
 
 
-def task_tree_to_dict(agent):
+def task_tree_to_dict(agent: Any) -> dict | None:
     """task tree to dict.
     
     Args:
@@ -156,7 +157,7 @@ def task_tree_to_dict(agent):
     return node_to_dict(agent.task_tree.root)
 
 
-def task_tree_from_dict(agent, d):
+def task_tree_from_dict(agent: Any, d: dict) -> None:
     """task tree from dict.
     
     Args:
@@ -177,7 +178,7 @@ def task_tree_from_dict(agent, d):
     agent.task_tree.root = dict_to_node(d)
 
 
-def record_outcome(agent, task_node):
+def record_outcome(agent: Any, task_node: TaskNode) -> None:
     """record outcome.
     
     Args:
@@ -203,7 +204,7 @@ def record_outcome(agent, task_node):
         pass
 
 
-def evolve_if_needed(agent):
+def evolve_if_needed(agent: Any) -> bool:
     """evolve if needed.
     
     Args:

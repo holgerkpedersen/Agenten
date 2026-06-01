@@ -4,10 +4,11 @@ import os
 import json
 import requests
 from dotenv import load_dotenv
+from typing import Any
 
 class GithubAPI:
     """github api."""
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         load_dotenv()
         self.token = os.getenv("GITHUB_TOKEN")
@@ -17,7 +18,7 @@ class GithubAPI:
             "Accept": "application/vnd.github.v3+json"
         }
 
-    def _request(self, method, url, **kwargs):
+    def _request(self, method: str, url: str, **kwargs: Any) -> requests.Response | None:
         """request.
         
         Args:
@@ -31,7 +32,7 @@ class GithubAPI:
         except requests.exceptions.RequestException as e:
             return None
 
-    def _safe_json(self, resp):
+    def _safe_json(self, resp: requests.Response | None) -> dict:
         """safe json.
         
         Args:
@@ -43,7 +44,7 @@ class GithubAPI:
         except (json.JSONDecodeError, ValueError):
             return {}
 
-    def _check_auth(self):
+    def _check_auth(self) -> dict:
         """check auth."""
         if not self.token:
             return {"success": False, "error": "GITHUB_TOKEN ikke sat i .env fil"}
@@ -56,7 +57,7 @@ class GithubAPI:
             return {"success": True, "login": user.get("login"), "email": user.get("email")}
         return {"success": False, "error": f"GitHub auth fejlede: {resp.status_code}"}
 
-    def create_repo(self, name, description="", private=False):
+    def create_repo(self, name: str, description: str = "", private: bool = False) -> dict:
         """create repo.
         
         Args:
@@ -82,7 +83,7 @@ class GithubAPI:
         err = self._safe_json(resp).get('message', str(resp.status_code))
         return {"success": False, "error": f"GitHub API fejl: {resp.status_code} - {err}"}
 
-    def list_repos(self):
+    def list_repos(self) -> dict:
         """list repos."""
         auth = self._check_auth()
         if not auth["success"]:
@@ -96,7 +97,7 @@ class GithubAPI:
             return {"success": True, "repos": [{"name": r["name"], "url": r["html_url"], "private": r["private"]} for r in repos]}
         return {"success": False, "error": str(resp.status_code)}
 
-    def create_issue(self, owner, repo, title, body=""):
+    def create_issue(self, owner: str, repo: str, title: str, body: str = "") -> dict:
         """create issue.
         
         Args:
@@ -117,7 +118,7 @@ class GithubAPI:
             return {"success": True, "url": issue.get("html_url"), "number": issue.get("number")}
         return {"success": False, "error": str(resp.status_code)}
 
-    def create_pr(self, owner, repo, title, head, base="main"):
+    def create_pr(self, owner: str, repo: str, title: str, head: str, base: str = "main") -> dict:
         """create pr.
         
         Args:

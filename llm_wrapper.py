@@ -9,12 +9,13 @@ import time
 import threading
 import config
 from config import get_logger
+from typing import Any, Generator
 log = get_logger(__name__)
 
 
 class LMStudioWrapper:
     """lmstudio wrapper."""
-    def __init__(self, base_url=None, timeout=120, model=None, api_key=None, on_request=None):
+    def __init__(self, base_url: str | None = None, timeout: int = 120, model: str | None = None, api_key: str | None = None, on_request: Any = None) -> None:
         """Initialize the instance.
         
         Args:
@@ -36,7 +37,7 @@ class LMStudioWrapper:
         self._pending_reasoning = None
         self.on_request = on_request
 
-    def _headers(self):
+    def _headers(self) -> dict[str, str]:
         """headers."""
         h = {}
         if self.api_key:
@@ -44,7 +45,7 @@ class LMStudioWrapper:
         return h
 
     @staticmethod
-    def _resolve_base_url(base_url):
+    def _resolve_base_url(base_url: str | None) -> str:
         """resolve base url.
         
         Args:
@@ -57,7 +58,7 @@ class LMStudioWrapper:
         port = os.environ.get('LM_PORT', '1234')
         return f'http://{host}:{port}/v1'
 
-    def list_models(self):
+    def list_models(self) -> list[str]:
         """list models."""
         try:
             r = requests.get(f"{self.base_url}/models", headers=self._headers(), timeout=5)
@@ -67,7 +68,7 @@ class LMStudioWrapper:
             log.warning("list_models error: %s", e)
         return [self.model]
 
-    def set_model(self, model):
+    def set_model(self, model: str) -> None:
         """set model.
         
         Args:
@@ -75,7 +76,7 @@ class LMStudioWrapper:
         with self._model_lock:
             self.model = model
 
-    def _get_cache_key(self, messages):
+    def _get_cache_key(self, messages: list[dict]) -> str:
         """get cache key.
         
         Args:
@@ -83,7 +84,7 @@ class LMStudioWrapper:
         return hashlib.md5(json.dumps(messages, sort_keys=True).encode()).hexdigest()
 
     @staticmethod
-    def encode_image(path):
+    def encode_image(path: str) -> str:
         """encode image.
         
         Args:
@@ -103,7 +104,7 @@ class LMStudioWrapper:
     }
 
     @classmethod
-    def _supports_vision(cls, model):
+    def _supports_vision(cls, model: str | None) -> bool:
         """supports vision.
         
         Args:
@@ -113,7 +114,7 @@ class LMStudioWrapper:
         return any(kw in model.lower() for kw in cls.VISION_KEYWORDS)
 
     @classmethod
-    def _image_url(cls, img, model=None):
+    def _image_url(cls, img: str | dict[str, str], model: str | None = None) -> str:
         """image url.
         
         Args:
@@ -126,7 +127,7 @@ class LMStudioWrapper:
         return f"data:image/{mime};base64,{b64}"
 
     @classmethod
-    def _image_part(cls, img, model):
+    def _image_part(cls, img: str | dict[str, str], model: str) -> dict:
         """image part.
         
         Args:
@@ -135,7 +136,7 @@ class LMStudioWrapper:
         url = cls._image_url(img, model)
         return {"type": "image_url", "image_url": {"url": url}}
 
-    def _to_messages(self, prompt=None, messages=None, images=None):
+    def _to_messages(self, prompt: str | None = None, messages: list[dict] | None = None, images: list | None = None) -> list[dict]:
         """to messages.
         
         Args:
@@ -176,7 +177,7 @@ class LMStudioWrapper:
             return [{"role": "user", "content": content}]
         return [{"role": "user", "content": prompt}] if prompt else []
 
-    def _compress_messages(self, messages):
+    def _compress_messages(self, messages: list[dict]) -> list[dict]:
         """compress messages.
         
         Args:
@@ -198,7 +199,7 @@ class LMStudioWrapper:
                 compressed.append(m)
         return compressed
 
-    def generate(self, prompt=None, messages=None, temperature=0.7, max_tokens=None, use_cache=True, images=None):
+    def generate(self, prompt: str | None = None, messages: list[dict] | None = None, temperature: float = 0.7, max_tokens: int | None = None, use_cache: bool = True, images: list | None = None) -> str:
         """generate.
         
         Args:
@@ -262,7 +263,7 @@ class LMStudioWrapper:
             log.error("Error: %s", e)
             return f"ERROR:{str(e)}"
 
-    def _truncate_messages(self, messages):
+    def _truncate_messages(self, messages: list[dict]) -> list[dict]:
         """truncate messages.
         
         Args:
@@ -277,7 +278,7 @@ class LMStudioWrapper:
             other_msgs = [other_msgs[0], {"role": "user", "content": mid}] + other_msgs[-1:]
         return system_msgs + other_msgs
 
-    def generate_stream(self, prompt=None, messages=None, temperature=0.7, max_tokens=None, images=None, tools=None):
+    def generate_stream(self, prompt: str | None = None, messages: list[dict] | None = None, temperature: float = 0.7, max_tokens: int | None = None, images: list | None = None, tools: list | None = None) -> Generator[str, None, None]:
         """generate stream.
         
         Args:

@@ -1,6 +1,7 @@
 """Skill templates and tool mappings for Agent."""
 
 import re
+from typing import Any
 from lang import t
 from i18n import K
 from skill_loader import SkillLoader
@@ -149,7 +150,7 @@ SECTION_INSTRUCTIONS = {
 }
 
 
-def refresh_skills(agent):
+def refresh_skills(agent: Any) -> None:
     """refresh skills.
     
     Args:
@@ -157,7 +158,7 @@ def refresh_skills(agent):
     agent._skills = SkillLoader.load_all(lang=agent.lang)
 
 
-def match_skills(agent, prompt):
+def match_skills(agent: Any, prompt: str) -> list[dict[str, Any]]:
     """match skills.
     
     Args:
@@ -175,7 +176,7 @@ def match_skills(agent, prompt):
     return agent._active_skills
 
 
-def has_matching_intent(agent, skill):
+def has_matching_intent(agent: Any, skill: dict[str, Any]) -> bool:
     """has matching intent.
     
     Args:
@@ -185,7 +186,7 @@ def has_matching_intent(agent, skill):
     return not agent.active_template or intent == agent.active_template or skill.get("base")
 
 
-def format_skills_for_prompt(agent):
+def format_skills_for_prompt(agent: Any) -> str:
     """format skills for prompt.
     
     Args:
@@ -199,7 +200,7 @@ def format_skills_for_prompt(agent):
     return "\n".join(lines)
 
 
-def get_templates(agent):
+def get_templates(agent: Any) -> dict[str, dict[str, str | None]]:
     """get templates.
     
     Args:

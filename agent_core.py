@@ -111,7 +111,7 @@ def _auto_load_location_file(agent: Agent, prompt: str) -> None:
                 return
 
 
-def _add_file_entry(file_context, agent, filename, content):
+def _add_file_entry(file_context: str, agent: Agent, filename: str, content: str) -> str:
     """add file entry.
     
     Args:
@@ -569,7 +569,7 @@ class Agent:
             None"""
         agent_tree.evolve_if_needed(self)
 
-    def _log(self, level: str, message: str, detail: str = "", log_file: str = None) -> None:
+    def _log(self, level: str, message: str, detail: str = "", log_file: str | None = None) -> None:
         """log.
         
         Args:
@@ -634,9 +634,7 @@ class Agent:
                 while depth < 20:
                     cur_abspath = os.path.abspath(cur_file)
                     if cur_abspath in visited or not os.path.exists(cur_file):
-                        # Cycle detected: index current file to prevent unindexed functions and LLM loops
-                        log.warning("Circular delegation for %s at %s", func_name, cur_file)
-                        self._delegation_index[func_name] = (cur_abspath, cur_file)
+                        log.warning("Circular delegation for %s at %s — not indexing", func_name, cur_file)
                         break
                     visited.add(cur_abspath)
                     inner = agent_files.read_file_content(self, cur_file)

@@ -8,6 +8,7 @@ import json
 import re
 from datetime import datetime
 from collections import defaultdict, Counter
+from typing import Any
 
 from skill_tracker import tracker
 from config import get_logger
@@ -27,7 +28,7 @@ GENERATE_MIN_REPEAT = 5
 GENERATE_MIN_TASK_LENGTH = 10
 
 
-def _load_json(path: str, default):
+def _load_json(path: str, default: Any) -> Any:
     """Load JSON file or return default value."""
     if os.path.exists(path):
         try:
@@ -39,7 +40,7 @@ def _load_json(path: str, default):
     return default
 
 
-def _save_json(path, data):
+def _save_json(path: str, data: Any) -> None:
     """save json.
     
     Args:
@@ -52,7 +53,7 @@ def _save_json(path, data):
     os.replace(tmp, path)
 
 
-def _deduce_action_type(task: str) -> list:
+def _deduce_action_type(task: str) -> list[str]:
     """deduce action type.
     
     Args:
@@ -93,7 +94,7 @@ STOPWORDS = {
 }
 
 
-def _normalize_task(text: str) -> set:
+def _normalize_task(text: str) -> set[str]:
     """normalize task.
     
     Args:
@@ -121,7 +122,7 @@ def _task_similarity(t1: str, t2: str) -> float:
     return len(a & b) / len(a | b)
 
 
-def _cluster_unmatched(outcomes: list) -> list:
+def _cluster_unmatched(outcomes: list[dict[str, Any]]) -> list[list[str]]:
     """cluster unmatched.
     
     Args:
@@ -150,7 +151,7 @@ def _cluster_unmatched(outcomes: list) -> list:
     return [c for c in clusters if len(c) >= GENERATE_MIN_REPEAT]
 
 
-def _extract_cluster_name(tasks: list) -> str:
+def _extract_cluster_name(tasks: list[str]) -> str:
     """extract cluster name.
     
     Args:
@@ -167,7 +168,7 @@ def _extract_cluster_name(tasks: list) -> str:
     return "_".join(top).lower()[:60]
 
 
-def _extract_cluster_keywords(tasks: list) -> list:
+def _extract_cluster_keywords(tasks: list[str]) -> list[str]:
     """extract cluster keywords.
     
     Args:
@@ -181,7 +182,7 @@ def _extract_cluster_keywords(tasks: list) -> list:
     return [w for w, _ in counter.most_common(8) if len(w) > 2][:8]
 
 
-def _aggregate_action_types(tasks: list) -> list:
+def _aggregate_action_types(tasks: list[str]) -> list[str]:
     """aggregate action types.
     
     Args:
@@ -195,7 +196,7 @@ def _aggregate_action_types(tasks: list) -> list:
     return sorted(merged) if merged else ["general"]
 
 
-def _generate_instructions(tasks: list, action_types: list) -> str:
+def _generate_instructions(tasks: list[str], action_types: list[str]) -> str:
     """generate instructions.
     
     Args:
@@ -249,7 +250,7 @@ def _generate_instructions(tasks: list, action_types: list) -> str:
     )
 
 
-def _extract_common_patterns(tasks: list) -> list:
+def _extract_common_patterns(tasks: list[str]) -> list[str]:
     """extract common patterns.
     
     Args:
@@ -266,7 +267,7 @@ def _extract_common_patterns(tasks: list) -> list:
     return [bg for bg, count in bigrams.most_common(5) if count > 1][:3]
 
 
-def _analyze_skills(stats: dict) -> list:
+def _analyze_skills(stats: dict[str, Any]) -> list[dict[str, Any]]:
     """Analyse per-skill success rates and produce retain/refine/prune action recommendations."""
     actions = []
     for skill_name, s in stats.items():
@@ -310,7 +311,7 @@ def _analyze_skills(stats: dict) -> list:
     return actions
 
 
-def _detect_clusters(unmatched_outcomes: list) -> list:
+def _detect_clusters(unmatched_outcomes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Detect clusters of repeated unmatched tasks and produce generate action recommendations."""
     actions = []
     clusters = _cluster_unmatched(unmatched_outcomes)
@@ -330,7 +331,7 @@ def _detect_clusters(unmatched_outcomes: list) -> list:
     return actions
 
 
-def analyze():
+def analyze() -> dict[str, Any]:
     """
     Analyse all tracked outcomes and produce a list of evolution actions.
 
@@ -386,7 +387,7 @@ def _suggest_skill_name(task: str) -> str:
     return base[:60]
 
 
-def _load_skill_file(name: str):
+def _load_skill_file(name: str) -> tuple[str | None, str | None]:
     """load skill file.
     
     Args:
@@ -401,7 +402,7 @@ def _load_skill_file(name: str):
     return None, None
 
 
-def _apply_retain(skill_name, dry_run, log):
+def _apply_retain(skill_name: str, dry_run: bool, log: list[dict[str, Any]]) -> dict[str, Any]:
     """apply retain.
     
     Args:
@@ -418,7 +419,7 @@ def _apply_retain(skill_name, dry_run, log):
             "message": f"Kept '{skill_name}' unchanged"}
 
 
-def _apply_refine(skill_name, action, dry_run, log):
+def _apply_refine(skill_name: str, action: dict[str, Any], dry_run: bool, log: list[dict[str, Any]]) -> dict[str, Any]:
     """apply refine.
     
     Args:
@@ -445,7 +446,7 @@ def _apply_refine(skill_name, action, dry_run, log):
             "message": msg}
 
 
-def _apply_prune(skill_name, dry_run, log):
+def _apply_prune(skill_name: str, dry_run: bool, log: list[dict[str, Any]]) -> dict[str, Any]:
     """apply prune.
     
     Args:
@@ -472,7 +473,7 @@ def _apply_prune(skill_name, dry_run, log):
             "message": msg}
 
 
-def _apply_generate(skill_name, action, dry_run, log):
+def _apply_generate(skill_name: str, action: dict[str, Any], dry_run: bool, log: list[dict[str, Any]]) -> dict[str, Any]:
     """apply generate.
     
     Args:
@@ -531,7 +532,7 @@ def _apply_generate(skill_name, action, dry_run, log):
             "message": msg}
 
 
-def apply_evolution_actions(actions: list, dry_run: bool = True) -> list:
+def apply_evolution_actions(actions: list[dict[str, Any]], dry_run: bool = True) -> list[dict[str, Any]]:
     """
     Apply Retain/Refine/Prune/Generate actions to skill files.
     In dry_run mode, only return what would be done without touching files.
@@ -562,7 +563,7 @@ def apply_evolution_actions(actions: list, dry_run: bool = True) -> list:
     return results
 
 
-def _add_refinement_note(content: str, action: dict) -> str:
+def _add_refinement_note(content: str, action: dict[str, Any]) -> str:
     """add refinement note.
     
     Args:
@@ -590,7 +591,7 @@ def _add_refinement_note(content: str, action: dict) -> str:
 
 _last_evolved_at = 0
 
-def _reset_evolve_counter():
+def _reset_evolve_counter() -> None:
     """reset evolve counter."""
     global _last_evolved_at
     _last_evolved_at = 0
@@ -613,7 +614,7 @@ def should_evolve() -> bool:
     return False
 
 
-def evolve_if_needed(dry_run: bool = True) -> dict:
+def evolve_if_needed(dry_run: bool = True) -> dict[str, Any]:
     """evolve if needed.
     
     Args:
@@ -636,7 +637,7 @@ def evolve_if_needed(dry_run: bool = True) -> dict:
     }
 
 
-def _log_applied(results: list):
+def _log_applied(results: list[dict[str, Any]]) -> None:
     """log applied.
     
     Args:

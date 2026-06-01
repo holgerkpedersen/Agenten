@@ -4,6 +4,7 @@ import json
 import re
 import inspect
 import traceback
+from typing import Any
 import config
 from lang import t
 from i18n import K
@@ -11,7 +12,7 @@ from config import get_logger
 log = get_logger(__name__)
 
 
-def _strip_llm_tags(text):
+def _strip_llm_tags(text: str) -> str:
     """Strip thought tags and channel markers from LLM output.
     Shared between ToolRegistry.parse_response() and decompose path."""
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
@@ -26,7 +27,7 @@ def _strip_llm_tags(text):
 
 class Tool:
     """tool."""
-    def __init__(self, name, description, parameters, function, optional_params=None):
+    def __init__(self, name: str, description: str, parameters: list[str], function: Any, optional_params: list[str] | None = None) -> None:
         """Initialize the instance.
         
         Args:
@@ -41,7 +42,7 @@ class Tool:
         self.function = function
         self.optional_params = set(optional_params or [])
 
-    def to_prompt_desc(self):
+    def to_prompt_desc(self) -> str:
         """to prompt desc."""
         parts = []
         for p in self.parameters:
@@ -55,27 +56,27 @@ class ToolRegistry:
     DONE_MARKER = "<<<DONE>>>"
     END_MARKER = "<<<END>>>"
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the instance."""
         self.tools = {}
         self.lang = "da"
         self.active_tools = None
 
-    def set_active_tools(self, names):
+    def set_active_tools(self, names: list[str]) -> None:
         """set active tools.
         
         Args:
             names:"""
         self.active_tools = names
 
-    def register(self, tool):
+    def register(self, tool: Tool) -> None:
         """register.
         
         Args:
             tool:"""
         self.tools[tool.name] = tool
 
-    def get_tool_descriptions(self):
+    def get_tool_descriptions(self) -> str:
         """get tool descriptions."""
         lines = []
         for name, tool in self.tools.items():
@@ -83,7 +84,7 @@ class ToolRegistry:
                 lines.append(tool.to_prompt_desc())
         return "\n".join(lines)
 
-    def get_openai_tools_for_active(self):
+    def get_openai_tools_for_active(self) -> list[dict]:
         """get openai tools for active."""
         tools = []
         for name, tool in self.tools.items():
@@ -110,7 +111,7 @@ class ToolRegistry:
             })
         return tools
 
-    def build_system_prompt(self, task):
+    def build_system_prompt(self, task: str) -> str:
         """build system prompt.
         
         Args:
@@ -150,14 +151,14 @@ class ToolRegistry:
         return prompt
 
     @staticmethod
-    def strip_markers(text):
+    def strip_markers(text: str) -> str:
         """strip markers.
         
         Args:
             text:"""
         return re.sub(r'<<<TOOL>>>|<<<DONE>>>|<<<END>>>', '', text)
 
-    def parse_response(self, response):
+    def parse_response(self, response: str) -> dict:
         """parse response.
         
         Args:
@@ -238,7 +239,7 @@ class ToolRegistry:
 
         return {"type": "text", "text": response}
 
-    def execute(self, tool_name, args):
+    def execute(self, tool_name: str, args: dict) -> dict:
         """execute.
         
         Args:

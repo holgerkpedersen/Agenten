@@ -3,6 +3,7 @@ import os
 import re
 import hashlib
 import tempfile
+from typing import Any
 from lang import t
 from i18n import K
 import config
@@ -21,7 +22,7 @@ for _sub in ('exports', 'uploads'):
     _SAFE_DIRS.add(_p)
 
 
-def _is_safe_path(base_dir, target_path):
+def _is_safe_path(base_dir: str, target_path: str) -> bool:
     """Ensures that target_path resolves within base_dir to prevent path traversal."""
     try:
         real_base = os.path.realpath(base_dir)
@@ -31,7 +32,7 @@ def _is_safe_path(base_dir, target_path):
         return False
 
 
-def is_safe_location(target_path):
+def is_safe_location(target_path: str) -> bool:
     """Checks if target_path is within any known-safe directory (project root, exports, uploads, temp)."""
     try:
         real = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
@@ -48,7 +49,7 @@ def is_safe_location(target_path):
 
 
 
-def chunk_text(text, size=CHUNK_SIZE):
+def chunk_text(text: str, size: int = CHUNK_SIZE) -> list[str]:
     """chunk text.
     
     Args:
@@ -65,7 +66,7 @@ STUB_PATTERN = re.compile(
 )
 
 
-def detect_delegations(content):
+def detect_delegations(content: str) -> list[tuple[str, str]]:
     """detect delegations.
     
     Args:
@@ -76,7 +77,7 @@ def detect_delegations(content):
     return stubs
 
 
-def _format_params(node):
+def _format_params(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     """format params.
     
     Args:
@@ -106,7 +107,7 @@ def _format_params(node):
     return ", ".join(parts)
 
 
-def build_ast_index(code, filename):
+def build_ast_index(code: str, filename: str) -> str | None:
     """build ast index.
     
     Args:
@@ -136,10 +137,10 @@ def build_ast_index(code, filename):
         """builder.
         
         Extends: ast.NodeVisitor"""
-        def __init__(self):
+        def __init__(self) -> None:
             """Initialize the instance."""
             self.in_class = False
-        def visit_ClassDef(self, node):
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
             """visit class def.
             
             Args:
@@ -154,7 +155,7 @@ def build_ast_index(code, filename):
             index_lines.extend(methods)
             self.generic_visit(node)
             self.in_class = old
-        def visit_FunctionDef(self, node):
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
             """visit function def.
             
             Args:
@@ -162,7 +163,7 @@ def build_ast_index(code, filename):
             if not self.in_class:
                 index_lines.append(f"  {node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
             self.generic_visit(node)
-        def visit_AsyncFunctionDef(self, node):
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
             """visit async function def.
             
             Args:
@@ -175,7 +176,7 @@ def build_ast_index(code, filename):
     return "\n".join(index_lines) if len(index_lines) > 1 else None
 
 
-def file_hash(filepath):
+def file_hash(filepath: str) -> str | None:
     """file hash.
     
     Args:
@@ -193,7 +194,7 @@ def file_hash(filepath):
         return None
 
 
-def read_file_content(agent, filepath):
+def read_file_content(agent: Any, filepath: str) -> str | None:
     """read file content.
     
     Args:
@@ -223,7 +224,7 @@ FOLDER_SCAN_EXCLUDE_FILES = {'.env'}
 FOLDER_SCAN_EXTENSIONS = {'.py', '.js', '.json', '.html', '.css', '.yml', '.yaml', '.toml', '.md', '.txt', '.bat', '.cfg', '.ini', '.sh', '.jsx', '.ts', '.tsx', '.vue', '.svelte'}
 
 
-def get_single_file_context(agent, prompt):
+def get_single_file_context(agent: Any, prompt: str) -> tuple[str | None, str | None]:
     """get single file context.
     
     Args:
@@ -260,7 +261,7 @@ def get_single_file_context(agent, prompt):
     return None, None
 
 
-def get_folder_context(agent, prompt):
+def get_folder_context(agent: Any, prompt: str) -> list[dict[str, str]] | None:
     """get folder context.
     
     Args:
@@ -324,7 +325,7 @@ def get_folder_context(agent, prompt):
     return found_files
 
 
-def read_location(filepath, name=None, line_no=None):
+def read_location(filepath: str, name: str | None = None, line_no: int | None = None) -> dict[str, Any]:
     """Read ONLY the function/class/method at a specific location via AST.
     Returns just the relevant code body, not the entire file.
     Use this instead of read_chunk when you need to see specific code.
@@ -344,7 +345,7 @@ def read_location(filepath, name=None, line_no=None):
     }
 
 
-def list_chunks(agent):
+def list_chunks(agent: Any) -> dict[str, Any]:
     """list chunks.
     
     Args:
@@ -358,7 +359,7 @@ def list_chunks(agent):
     return {"success": True, "chunks": result, "count": len(result)}
 
 
-def read_chunk(agent, chunk, index):
+def read_chunk(agent: Any, chunk: str, index: int) -> dict[str, Any]:
     """read chunk.
     
     Args:
@@ -378,7 +379,7 @@ def read_chunk(agent, chunk, index):
     return {"success": True, "chunk": chunk, "index": index, "total": len(chunks), "content": chunks[index - 1]}
 
 
-def _find_enclosing_symbol(tree, target_line):
+def _find_enclosing_symbol(tree: ast.Module, target_line: int) -> ast.AST | None:
     """find enclosing symbol.
     
     Args:
@@ -389,7 +390,7 @@ def _find_enclosing_symbol(tree, target_line):
         """node visitor.
         
         Extends: ast.NodeVisitor"""
-        def visit_FunctionDef(self, node):
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
             """visit function def.
             
             Args:
@@ -399,7 +400,7 @@ def _find_enclosing_symbol(tree, target_line):
                 best = node
             self.generic_visit(node)
 
-        def visit_AsyncFunctionDef(self, node):
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
             """visit async function def.
             
             Args:
@@ -409,7 +410,7 @@ def _find_enclosing_symbol(tree, target_line):
                 best = node
             self.generic_visit(node)
 
-        def visit_ClassDef(self, node):
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
             """visit class def.
             
             Args:
@@ -423,7 +424,7 @@ def _find_enclosing_symbol(tree, target_line):
     return best
 
 
-def _list_top_level_vars(tree):
+def _list_top_level_vars(tree: ast.Module) -> list[tuple[str, str, int]]:
     """list top level vars.
     
     Args:
@@ -440,7 +441,7 @@ def _list_top_level_vars(tree):
     return vars
 
 
-def _list_top_level_symbols(tree):
+def _list_top_level_symbols(tree: ast.Module) -> list[tuple[str, str, int]]:
     """list top level symbols.
     
     Args:
@@ -457,7 +458,7 @@ def _list_top_level_symbols(tree):
     return symbols
 
 
-def _build_global_symbol_index():
+def _build_global_symbol_index() -> dict[str, list[Any]]:
     """build global symbol index."""
     index = {}
     for fname in os.listdir('.'):
@@ -490,7 +491,7 @@ def _build_global_symbol_index():
 _GLOBAL_SYMBOL_INDEX = _build_global_symbol_index()
 
 
-def locate_code(filepath=None, name=None, line_no=None):
+def locate_code(filepath: str | None = None, name: str | None = None, line_no: int | None = None) -> dict[str, Any]:
     """locate code.
     
     Args:

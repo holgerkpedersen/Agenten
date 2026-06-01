@@ -6,6 +6,7 @@ import re
 import subprocess
 
 import threading
+from typing import Any
 from i18n import K
 from lang import t
 from agent_files import is_safe_location, locate_code
@@ -45,7 +46,7 @@ _STDLIB_MODULES = {
 }
 
 
-def _check_missing_deps(py_content, req_path):
+def _check_missing_deps(py_content: str, req_path: str) -> list[str]:
     """check missing deps.
     
     Args:
@@ -85,7 +86,7 @@ def _check_missing_deps(py_content, req_path):
     return sorted(name for name in imports if name.lower() not in req_pkgs)
 
 
-def _extract_urls(content, source_path):
+def _extract_urls(content: str, source_path: str) -> set[str]:
     """extract urls.
     
     Args:
@@ -103,7 +104,7 @@ def _extract_urls(content, source_path):
     return urls
 
 
-def _find_partner_files(path, other_ext):
+def _find_partner_files(path: str, other_ext: str) -> str | None:
     """find partner files.
     
     Args:
@@ -145,7 +146,7 @@ def _find_partner_files(path, other_ext):
     return None
 
 
-def _check_route_mismatch(path, other_ext):
+def _check_route_mismatch(path: str, other_ext: str) -> list[str]:
     """check route mismatch.
     
     Args:
@@ -190,7 +191,7 @@ def _check_route_mismatch(path, other_ext):
     return mismatched
 
 
-def _run_git(args, cwd=None):
+def _run_git(args: list[str], cwd: str | None = None) -> dict[str, Any]:
     """run git.
     
     Args:
@@ -208,7 +209,7 @@ def _run_git(args, cwd=None):
     return {"success": False, "output": result.stdout.strip(), "error": result.stderr.strip() or f"exit code {result.returncode}"}
 
 
-def git_status(path="."):
+def git_status(path: str = ".") -> dict[str, Any]:
     """git status.
     
     Args:
@@ -216,7 +217,7 @@ def git_status(path="."):
     return _run_git(["status", "--short"], cwd=path)
 
 
-def git_remote_exists(path="."):
+def git_remote_exists(path: str = ".") -> dict[str, Any]:
     """git remote exists.
     
     Args:
@@ -227,7 +228,7 @@ def git_remote_exists(path="."):
     return {"success": False, "error": "Intet remote 'origin' konfigureret"}
 
 
-def git_add_all(path="."):
+def git_add_all(path: str = ".") -> dict[str, Any]:
     """git add all.
     
     Args:
@@ -235,7 +236,7 @@ def git_add_all(path="."):
     return _run_git(["add", "-A"], cwd=path)
 
 
-def git_commit(message, path="."):
+def git_commit(message: str, path: str = ".") -> dict[str, Any]:
     """git commit.
     
     Args:
@@ -244,7 +245,7 @@ def git_commit(message, path="."):
     return _run_git(["commit", "-m", message], cwd=path)
 
 
-def git_push(branch="main", path="."):
+def git_push(branch: str = "main", path: str = ".") -> dict[str, Any]:
     """git push.
     
     Args:
@@ -256,7 +257,7 @@ def git_push(branch="main", path="."):
     return _run_git(["push", "-u", "origin", branch], cwd=path)
 
 
-def git_set_remote(url, path="."):
+def git_set_remote(url: str, path: str = ".") -> dict[str, Any]:
     """git set remote.
     
     Args:
@@ -268,7 +269,7 @@ def git_set_remote(url, path="."):
     return _run_git(["remote", "add", "origin", url], cwd=path)
 
 
-def git_diff(older="HEAD~1", newer="HEAD", max_chars=8000):
+def git_diff(older: str = "HEAD~1", newer: str = "HEAD", max_chars: int = 8000) -> dict[str, Any]:
     """git diff.
     
     Args:
@@ -283,7 +284,7 @@ def git_diff(older="HEAD~1", newer="HEAD", max_chars=8000):
     return r
 
 
-def git_log(count=10):
+def git_log(count: int = 10) -> dict[str, Any]:
     """git log.
     
     Args:
@@ -291,7 +292,7 @@ def git_log(count=10):
     return _run_git(["log", f"-{count}", "--oneline", "--decorate"])
 
 
-def git_create_branch(name, path="."):
+def git_create_branch(name: str, path: str = ".") -> dict[str, Any]:
     """git create branch.
     
     Args:
@@ -300,7 +301,7 @@ def git_create_branch(name, path="."):
     return _run_git(["checkout", "-b", name], cwd=path)
 
 
-def git_current_branch(path="."):
+def git_current_branch(path: str = ".") -> dict[str, Any]:
     """git current branch.
     
     Args:
@@ -308,7 +309,7 @@ def git_current_branch(path="."):
     return _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=path)
 
 
-def git_branch_list(path="."):
+def git_branch_list(path: str = ".") -> dict[str, Any]:
     """git branch list.
     
     Args:
@@ -316,7 +317,7 @@ def git_branch_list(path="."):
     return _run_git(["branch"], cwd=path)
 
 
-def git_pull(remote="origin", branch="main", path="."):
+def git_pull(remote: str = "origin", branch: str = "main", path: str = ".") -> dict[str, Any]:
     """git pull.
     
     Args:
@@ -326,7 +327,7 @@ def git_pull(remote="origin", branch="main", path="."):
     return _run_git(["pull", remote, branch], cwd=path)
 
 
-def git_checkout(branch, path="."):
+def git_checkout(branch: str, path: str = ".") -> dict[str, Any]:
     """git checkout.
     
     Args:
@@ -335,7 +336,7 @@ def git_checkout(branch, path="."):
     return _run_git(["checkout", branch], cwd=path)
 
 
-def _check_post_write(path, content, result):
+def _check_post_write(path: str, content: str, result: dict[str, Any]) -> dict[str, Any]:
     """check post write.
     
     Args:
@@ -365,7 +366,7 @@ def _check_post_write(path, content, result):
     return result
 
 
-def write_file(path, content):
+def write_file(path: str, content: str) -> dict[str, Any]:
     """write file.
     
     Args:
@@ -404,7 +405,7 @@ def write_file(path, content):
         return {"success": False, "error": str(e)}
 
 
-def _build_flexible_pattern(text):
+def _build_flexible_pattern(text: str) -> tuple[str, int]:
     """build flexible pattern.
     
     Args:
@@ -420,7 +421,7 @@ def _build_flexible_pattern(text):
     return r'\n'.join(parts), len(lines)
 
 
-def _build_fuzzy_pattern(text):
+def _build_fuzzy_pattern(text: str) -> tuple[str, int]:
     """build fuzzy pattern.
     
     Args:
@@ -445,7 +446,7 @@ _PLACEHOLDER_PATTERNS = [
 ]
 
 
-def _has_placeholders(text):
+def _has_placeholders(text: str) -> bool:
     """has placeholders.
     
     Args:
@@ -456,7 +457,7 @@ def _has_placeholders(text):
     return False
 
 
-def _detect_base_indentation(text):
+def _detect_base_indentation(text: str) -> int:
     """detect base indentation.
     
     Args:
@@ -474,7 +475,7 @@ def _detect_base_indentation(text):
     return min(indent_levels)
 
 
-def _normalize_indentation(new_text, search_text):
+def _normalize_indentation(new_text: str, search_text: str) -> str:
     """normalize indentation.
     
     Args:
@@ -500,7 +501,7 @@ def _normalize_indentation(new_text, search_text):
     return '\n'.join(result)
 
 
-def edit_file(path, old_text="", new_text="", expected_hash=None, symbol=None):
+def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: str | None = None, symbol: str | None = None) -> dict[str, Any]:
     """edit file.
     
     Args:
@@ -647,7 +648,7 @@ def edit_file(path, old_text="", new_text="", expected_hash=None, symbol=None):
 
 EXCLUDE_LIST_FILES = {'.env', '.env.example', 'credentials.json', 'secrets.json', '.gitconfig', 'id_rsa', 'id_rsa.pub', 'known_hosts', 'config.json'}
 
-def list_files(path=".", pattern=None, max_depth=2):
+def list_files(path: str = ".", pattern: str | None = None, max_depth: int = 2) -> dict[str, Any]:
     """list files.
     
     Args:

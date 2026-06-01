@@ -1,16 +1,17 @@
 import os
+from typing import Any
 from agent_files import _is_safe_path
 
 class ModuleBuilder:
     """module builder."""
-    def __init__(self, action_history):
+    def __init__(self, action_history: Any) -> None:
         """Initialize the instance.
         
         Args:
             action_history:"""
         self.action_history = action_history
 
-    def get_repeated_actions(self, threshold=2):
+    def get_repeated_actions(self, threshold: int = 2) -> list[str]:
         """get repeated actions.
         
         Args:
@@ -19,14 +20,14 @@ class ModuleBuilder:
         counter = Counter(self.action_history)
         return [action for action, count in counter.items() if count >= threshold]
 
-    def should_build_module(self, threshold=2):
+    def should_build_module(self, threshold: int = 2) -> bool:
         """should build module.
         
         Args:
             threshold:"""
         return len(self.get_repeated_actions(threshold)) > 0
 
-    def build_module(self, action_name, action_code_template):
+    def build_module(self, action_name: str, action_code_template: str) -> dict:
         """build module.
         
         Args:

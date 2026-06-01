@@ -2,6 +2,7 @@
 
 import re
 import os
+from typing import Any
 from lang import t
 from i18n import K
 
@@ -14,7 +15,7 @@ PR_REMOTE_TOOLS = {"git_remote_status"}
 PR_GIT_TOOLS = {"git_diff", "git_log", "git_status", "git_current_branch", "git_branch_list", "git_pull", "git_checkout"}
 
 
-def is_pr_workflow(task_name):
+def is_pr_workflow(task_name: str | None) -> bool:
     """is pr workflow.
     
     Args:
@@ -27,7 +28,7 @@ def is_pr_workflow(task_name):
     return any(k in task_name.lower() for k in keywords)
 
 
-def extract_branch_name(task_name, original_prompt):
+def extract_branch_name(task_name: str, original_prompt: str) -> str:
     """extract branch name.
     
     Args:
@@ -42,7 +43,7 @@ def extract_branch_name(task_name, original_prompt):
     return ""
 
 
-def verify_pr_step(agent, tool_name, result, task_name, original_prompt):
+def verify_pr_step(agent: Any, tool_name: str, result: dict, task_name: str, original_prompt: str) -> str | None:
     """verify pr step.
     
     Args:
