@@ -92,7 +92,15 @@
         .rendered-markdown a { color: var(--accent); }
         .rendered-markdown hr { border-color: var(--border); }
         .rendered-markdown img { max-width: 100%; border-radius: 8px; }
-
+        
+        .task-criteria {
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-top: 2px;
+            padding-left: 20px;
+            color: var(--text-muted);
+        }
+        
         * { box-sizing: border-box; }
         button, input, select, label, .reuse-btn, .tools-toggle, .panel-controls { user-select: none; }
         .tree-container, .llm-box, .log-box, .history-box, .file-preview,
@@ -1165,10 +1173,17 @@ function renderTree(node, path = []) {
     const statusText = node.status === 'done' ? '✓' : (node.status === 'running' ? '⏳' : (node.status === 'failed' ? '✗' : '○'));
     const pathStr = path.join('.');
     let html = `<div data-path="${pathStr}"><div class="tree-node-content">`;
+    
+    // Show success criteria if they exist
+    let criteriaHtml = '';
+    if (node.success_criteria && node.success_criteria.length > 0) {
+        const criteriaList = node.success_criteria.map(c => `• ${escapeHtml(c)}`).join(' ');
+        criteriaHtml = `<div class="task-criteria" style="font-size: 0.8em; opacity: 0.8; margin-top: 2px; padding-left: 20px;">${criteriaList}</div>`;
+    }
     if (treeEditMode) {
         html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="${_('btn_edit')}" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="${_('btn_delete')}" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="${_('btn_add_child')}" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
     }
-    html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>`;
+    html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>${criteriaHtml}`;
     if (node.children && node.children.length > 0) { 
         html += `<div class="tree-children">`; 
         for (let i = 0; i < node.children.length; i++) { 
@@ -2380,19 +2395,25 @@ async function executeWithStream() {
                 break;
                 
             case 'task_start':
-                const currentTask = document.getElementById('currentTask');
-                if (currentTask) currentTask.innerHTML = `📌 ${escapeHtml(data.task)} <span class="loading"></span>`;
-                
-                function markRunning(node) {
-                    if (node.name === data.task) node.status = 'running';
-                    if (node.children) node.children.forEach(markRunning);
-                }
-                if (currentTree) {
-                    markRunning(currentTree);
-                    updateTreeDisplay();
-                }
-                addLogEntry('INFO', _('task_started'), data.task);
-                break;
+                 const currentTask = document.getElementById('currentTask');
+                 let taskHtml = `📌 ${escapeHtml(data.task)}`;
+                 if (data.success_criteria && data.success_criteria.length > 0) {
+                     const criteriaList = data.success_criteria.map(c => `• ${escapeHtml(c)}`).join(' ');
+                     taskHtml += `<div class="task-criteria" style="font-size: 0.8em; opacity: 0.7; margin-top: 2px;">${criteriaList}</div>`;
+                 }
+                 taskHtml += ` <span class="loading"></span>`;
+                 if (currentTask) currentTask.innerHTML = taskHtml;
+                 
+                 function markRunning(node) {
+                     if (node.name === data.task) node.status = 'running';
+                     if (node.children) node.children.forEach(markRunning);
+                 }
+                 if (currentTree) {
+                     markRunning(currentTree);
+                     updateTreeDisplay();
+                 }
+                 addLogEntry('INFO', _('task_started'), data.task);
+                 break;
                 
             case 'progress_chunk':
             case 'llm_chunk':
