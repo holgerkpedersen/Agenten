@@ -13,6 +13,7 @@ class TaskNode:
         self.children = []
         self.status = "pending"
         self.result = None
+        self.success_criteria = []
 
     def add_child(self, child_node):
         """add child.
@@ -35,6 +36,7 @@ class TaskNode:
         """to dict."""
         return {
             "name": self.name,
+            "success_criteria": self.success_criteria,
             "status": self.status,
             "result": self.result,
             "children": [c.to_dict() for c in self.children]
