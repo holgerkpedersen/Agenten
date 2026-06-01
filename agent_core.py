@@ -103,7 +103,7 @@ def _auto_load_location_file(agent: Agent, prompt: str) -> None:
                 try:
                     content = agent._read_file_content(path)
                     if content:
-                        chunk_key = f"file_{filename}"
+                        chunk_key = f"file_{os.path.basename(filename)}"
                         agent.file_chunks[chunk_key] = agent_files.chunk_text(content)
                         agent._log("INFO", f"Auto-loaded location-fil", f"{filename} ({len(agent.file_chunks[chunk_key])} chunks)")
                 except Exception as e:
