@@ -22,10 +22,12 @@ ACTIONS_LOG = ".agent_storage/evolution_actions.json"
 RETAIN_MIN_RATE = 0.80
 REFINE_MIN_RATE = 0.50
 PRUNE_MAX_RATE = 0.50
-PRUNE_MIN_COUNT = 5
-EVOLVE_EVERY_N = 5
-GENERATE_MIN_REPEAT = 5
+PRUNE_MIN_COUNT = 10
+EVOLVE_EVERY_N = 10
+GENERATE_MIN_REPEAT = 8
 GENERATE_MIN_TASK_LENGTH = 10
+
+SIMILARITY_THRESHOLD = 0.35
 
 
 def _load_json(path: str, default: Any) -> Any:
@@ -131,7 +133,6 @@ def _cluster_unmatched(outcomes: list[dict[str, Any]]) -> list[list[str]]:
     Returns:
         list"""
     clusters = []
-    SIMILARITY_THRESHOLD = 0.25
     for o in outcomes:
         task = o.get("task", "")
         if not task or len(task.strip()) < GENERATE_MIN_TASK_LENGTH:
@@ -491,14 +492,25 @@ def _apply_generate(skill_name: str, action: dict[str, Any], dry_run: bool, log:
         instructions = _generate_instructions(cluster, action_types)
         example = cluster[0][:80]
         kw_str = ", ".join(k for k in keywords if k)
+        rubric_checks = []
+        if any(a in action_types for a in ("read", "analyze")):
+            rubric_checks.append('{"id":"context_read","desc":"L\u00e6ste relevant kontekst f\u00f8r udf\u00f8relse","check":"tool_used:read_chunk or tool_used:list_chunks or tool_used:list_files or tool_used:locate"}')
+        if "write" in action_types:
+            rubric_checks.append('{"id":"code_written","desc":"Implementerede med write_file eller edit_file","check":"tool_used:write_file or tool_used:edit_file"}')
+        if "git" in action_types:
+            rubric_checks.append('{"id":"git_used","desc":"Brugte git-v\u00e6rkt\u00f8jer","check":"tool_used:git_status or tool_used:git_commit or tool_used:git_push or tool_used:git_diff"}')
+        if "github" in action_types:
+            rubric_checks.append('{"id":"github_used","desc":"Brugte GitHub-v\u00e6rkt\u00f8jer","check":"tool_used:github_create_pr or tool_used:github_create_issue or tool_used:github_list_repos"}')
+        rubrics_str = ", ".join(rubric_checks) if rubric_checks else ""
         frontmatter = (
             f"---\n"
             f"name: {skill_name}\n"
             f"keywords: [{kw_str}]\n"
             f"action_types: [{', '.join(action_types)}]\n"
-            f"description: SkillFlow-generated — {len(cluster)} tasks: {example}...\n"
-            f"base: true\n"
-            f"min_score: 1\n"
+            f"description: SkillFlow-generated \u2014 {len(cluster)} tasks: {example}...\n"
+            f"base: false\n"
+            f"min_score: 1\n" +
+            (f"rubrics: [{rubrics_str}]\n" if rubrics_str else "") +
             f"---\n"
             f"\n"
             f"## {skill_name.replace('_', ' ').title()}\n"
@@ -573,19 +585,34 @@ def _add_refinement_note(content: str, action: dict[str, Any]) -> str:
     Returns:
         str"""
     patterns = action.get("failure_patterns", [])
-    note = f"\n<!-- SkillFlow Refinement: {datetime.now().strftime('%Y-%m-%d')} -->\n"
-    note += "<!-- Failure patterns to address:\n"
+    if len(patterns) < 2:
+        return content
+    marker = "<!-- skillflow:known_failures -->"
+    section = (
+        f"\n\n{marker}\n"
+        f"### Kendte Fejlmønstre\n"
+        f"\n"
+        f"Opdateret: {datetime.now().strftime('%Y-%m-%d')}\n"
+        f"\n"
+        f"**Hyppige fejl ved brug af denne skill:**\n"
+    )
     for p in patterns:
-        note += f"     - {p}\n"
-    note += "-->\n"
-    # Insert before last blank line or at end
+        section += f"- {p}\n"
+    section += f"\n{{% end skillflow:known_failures %}}\n"
+    if marker in content:
+        start = content.find(marker)
+        end_marker = "{% end skillflow:known_failures %}"
+        end = content.find(end_marker, start)
+        if end != -1:
+            end += len(end_marker)
+            return content[:start] + section + content[end:]
     lines = content.rstrip().split("\n")
     for i in range(len(lines) - 1, -1, -1):
         if lines[i].strip():
-            lines.insert(i + 1, note)
+            lines.insert(i + 1, section)
             break
     else:
-        lines.append(note)
+        lines.append(section)
     return "\n".join(lines)
 
 
