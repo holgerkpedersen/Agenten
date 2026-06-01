@@ -330,3 +330,12 @@ class K(StrEnum):
     UI_BTN_ADD_CHILD       = "ui.btn_add_child"
     UI_DECOMPOSE_MODEL     = "ui.decompose_model"
     UI_EXECUTE_MODEL       = "ui.execute_model"
+
+    # === Success criteria ===
+    CRITERIA_HEADER       = "criteria.header"
+    CRITERIA_CONCLUDE     = "criteria.conclude"
+    CRITERIA_UNMET        = "criteria.unmet"
+    CRITERIA_LABEL        = "criteria.label"
+    CRITERIA_DECOMPOSE    = "criteria.decompose"
+    THINK_ONLY_TOOLS      = "criteria.think_only_tools"
+    DOC_DEFAULT_FORMAT    = "criteria.doc_default_format"
