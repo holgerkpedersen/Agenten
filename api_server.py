@@ -1210,7 +1210,10 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
     global execution_status
     if _check_client(agent):
         return
-    yield f"data: {json.dumps({'type': 'task_start', 'task': node.name})}\n\n"
+    task_data = {'type': 'task_start', 'task': node.name}
+    if hasattr(node, 'success_criteria') and node.success_criteria:
+        task_data['success_criteria'] = node.success_criteria
+    yield f"data: {json.dumps(task_data)}\n\n"
     with execution_status_lock:
         execution_status["current_task"] = node.name
 
@@ -1223,7 +1226,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
             skip_msg = "Skipped — issue was already resolved in an earlier phase"
             child.result = skip_msg
             child_results.append(f"- {child.name}: {skip_msg}")
-            yield f"data: {json.dumps({'type': 'task_start', 'task': child.name})}\n\n"
+            yield f"data: {json.dumps({'type': 'task_start', 'task': child.name, 'success_criteria': getattr(child, 'success_criteria', [])})}\n\n"
             yield f"data: {json.dumps({'type': 'task_done', 'task': child.name, 'status': child.status, 'result': skip_msg})}\n\n"
             agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {child.name}", "detail": skip_msg})
             yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
