@@ -3,10 +3,72 @@ import os
 import re
 import hashlib
 import tempfile
-from typing import Any
+from typing import Any, Dict, List, Tuple, Optional
 from lang import t
 from i18n import K
 import config
+
+# Cache for file content to prevent repeated reading of the same file
+_FILE_CONTENT_CACHE: Dict[str, Tuple[str, float]] = {}
+_CONTENT_CACHE_MAX_SIZE = 100  # Maximum number of files to cache
+_CONTENT_CACHE_TTL = 60  # Cache time-to-live in seconds
+
+
+def _is_file_cached(filepath: str) -> bool:
+    """Check if file is in cache and not expired."""
+    if filepath not in _FILE_CONTENT_CACHE:
+        return False
+    
+    content, timestamp = _FILE_CONTENT_CACHE[filepath]
+    try:
+        # Check if file has been modified
+        if os.path.getmtime(filepath) != timestamp:
+            # File has been modified, remove from cache
+            del _FILE_CONTENT_CACHE[filepath]
+            return False
+        return True
+    except OSError:
+        # File no longer exists, remove from cache
+        if filepath in _FILE_CONTENT_CACHE:
+            del _FILE_CONTENT_CACHE[filepath]
+        return False
+
+
+def _cache_file_content(filepath: str, content: str) -> None:
+    """Cache file content with LRU eviction when cache is too large."""
+    global _FILE_CONTENT_CACHE
+    
+    # Remove if already exists
+    if filepath in _FILE_CONTENT_CACHE:
+        del _FILE_CONTENT_CACHE[filepath]
+    
+    # Add to cache
+    try:
+        _FILE_CONTENT_CACHE[filepath] = (content, os.path.getmtime(filepath))
+    except OSError:
+        # If we can't get the file's mtime, don't cache it
+        return
+    
+    # Enforce maximum size by removing oldest entries
+    if len(_FILE_CONTENT_CACHE) > _CONTENT_CACHE_MAX_SIZE:
+        # Sort by timestamp (oldest first) and remove excess
+        sorted_items = sorted(_FILE_CONTENT_CACHE.items(), key=lambda x: x[1][1])
+        for key, _ in sorted_items[:-_CONTENT_CACHE_MAX_SIZE]:
+            del _FILE_CONTENT_CACHE[key]
+
+
+def _get_cached_file_content(filepath: str) -> Optional[str]:
+    """Get cached file content if available and not expired."""
+    if _is_file_cached(filepath):
+        return _FILE_CONTENT_CACHE[filepath][0]
+    return None
+
+
+def _clear_file_content_cache() -> None:
+    """Clear the file content cache."""
+    global _FILE_CONTENT_CACHE
+    _FILE_CONTENT_CACHE.clear()
+
 
 CHUNK_SIZE = config.CHUNK_SIZE
 FOLDER_SCAN_MAX_FILES = config.FOLDER_SCAN_MAX_FILES
@@ -200,6 +262,12 @@ def read_file_content(agent: Any, filepath: str) -> str | None:
     Args:
         agent:
         filepath:"""
+    # Check cache first
+    cached_content = _get_cached_file_content(filepath)
+    if cached_content is not None:
+        agent._log("DEBUG", f"Using cached content for", os.path.basename(filepath))
+        return cached_content
+    
     basename = os.path.basename(filepath)
     if basename in {'.env'}:
         return None
@@ -213,6 +281,8 @@ def read_file_content(agent: Any, filepath: str) -> str | None:
             return None
         if len(content) > CHUNK_SIZE:
             content = content[:CHUNK_SIZE] + "\n" + t(K.FILE_TRUNCATED, agent.lang)
+        # Cache the content
+        _cache_file_content(filepath, content)
         return content
     except (UnicodeDecodeError, Exception) as e:
         agent._log("WARNING", f"Kan ikke læse {os.path.basename(filepath)} som tekst", str(e))
@@ -250,7 +320,7 @@ def get_single_file_context(agent: Any, prompt: str) -> tuple[str | None, str | 
     for path in possible_paths:
         if os.path.exists(path):
             resolved = os.path.realpath(path)
-            if not (resolved.startswith(base_dir + os.sep) or resolved == base_dir):
+            if not (os.path.normcase(resolved).startswith(os.path.normcase(base_dir) + os.sep) or os.path.normcase(resolved) == os.path.normcase(base_dir)):
                 continue
             content = read_file_content(agent, path)
             if content:
