@@ -409,6 +409,12 @@ class Agent:
             lambda: self._list_chunks()
         ))
         self.tool_registry.register(Tool(
+            "list_symbols",
+            "List ALLE top-level symboler (funktioner, klasser, variabler) i en Python-fil via AST. Returnerer navn, type, linjenummer og signatur for hvert symbol. Brug DENNE før locate/read_location når du ikke kender symbolnavnene i en fil. Kræver: filepath='fil.py'.",
+            ["filepath"],
+            lambda filepath: agent_files.list_symbols(filepath=filepath)
+        ))
+        self.tool_registry.register(Tool(
             "locate",
             "Find en funktion/metode/klasse i en Python-fil via AST. Brug name='funktionsnavn' for at søge på tværs af ALLE .py-filer. Brug name='Klassnavn.metode' for metoder. Brug filepath='fil.py' for at begrænse søgningen til én fil. Returnerer linjenummer, typen, funktionens fulde kode (body), og en 'also_in_file'-liste over ANDRE symboler i filen.",
             ["name", "filepath"],
