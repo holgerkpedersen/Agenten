@@ -1812,6 +1812,54 @@ def skillflow_status() -> Any:
             data["evolution"] = _json.load(f)
     return jsonify({"success": True, "data": data})
 
+# ============ EXECUTION BACKUP / UNDO ============
+import subprocess as _subprocess
+import uuid as _uuid
+
+
+def create_execution_backup() -> dict:
+    """Stash all uncommitted changes before execution."""
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    tag = f"agent-backup-{ts}-{_uuid.uuid4().hex[:8]}"
+    r = _subprocess.run(
+        ["git", "stash", "push", "-m", tag],
+        capture_output=True, text=True, cwd=BASE_DIR
+    )
+    return {"success": r.returncode == 0, "message": r.stdout or r.stderr, "tag": tag}
+
+
+def restore_execution_backup() -> dict:
+    """Pop the most recent agent-backup stash, restoring pre-execution state."""
+    r = _subprocess.run(
+        ["git", "stash", "list"],
+        capture_output=True, text=True, cwd=BASE_DIR
+    )
+    for line in r.stdout.strip().split("\n"):
+        if "agent-backup-" in line:
+            stash_ref = line.split(":")[0]
+            _subprocess.run(["git", "checkout", "--", "."], capture_output=True, text=True, cwd=BASE_DIR)
+            pop = _subprocess.run(
+                ["git", "stash", "pop", stash_ref],
+                capture_output=True, text=True, cwd=BASE_DIR
+            )
+            return {"success": pop.returncode == 0, "message": pop.stdout or pop.stderr}
+    return {"success": False, "message": "Ingen agent-backup fundet"}
+
+
+@app.route("/api/git/backup", methods=["POST"])
+def git_backup() -> Any:
+    """Create execution backup (git stash)."""
+    result = create_execution_backup()
+    return jsonify(result)
+
+
+@app.route("/api/git/reset", methods=["POST"])
+def git_reset() -> Any:
+    """Restore execution backup (git stash pop)."""
+    result = restore_execution_backup()
+    return jsonify(result)
+
+
 # ============ REGISTER EXTRACTED ROUTES ============
 from routes import upload_file, read_file, get_current_session
 

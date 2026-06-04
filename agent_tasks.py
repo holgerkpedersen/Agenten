@@ -552,13 +552,22 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     result_str = json.dumps(result, ensure_ascii=False)
     agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=parsed['tool']), result_str)
 
-    if parsed["tool"] in ("write_file", "edit_file"):
-        if isinstance(result, dict) and result.get("success") is False:
-            agent._write_failed = True
-        unread_hints = agent._hints_available - agent._hints_requested
-        if unread_hints:
-            ids = ", ".join(sorted(unread_hints)[:3])
-            _add_user_msg(messages, f"\u26a0\ufe0f {t(K.ANTI_LEAKAGE_WARNING, agent.lang)} ({ids})")
+    if parsed["tool"] in ("write_file", "edit_file", "extract_symbol"):
+        if parsed["tool"] == "extract_symbol":
+            if isinstance(result, dict) and not result.get("success"):
+                called_tools.pop(parsed['tool'] + str(parsed.get('args', {})), None)
+            else:
+                agent._current_task_iteration = 0
+                agent._non_productive_reminder_sent = False
+        else:
+            agent._current_task_iteration = 0
+            agent._non_productive_reminder_sent = False
+            if isinstance(result, dict) and result.get("success") is False:
+                agent._write_failed = True
+            unread_hints = agent._hints_available - agent._hints_requested
+            if unread_hints:
+                ids = ", ".join(sorted(unread_hints)[:3])
+                _add_user_msg(messages, f"\u26a0\ufe0f {t(K.ANTI_LEAKAGE_WARNING, agent.lang)} ({ids})")
     if parsed["tool"] == "run_tests":
         inner = result.get("result", {}) if isinstance(result, dict) else {}
         if isinstance(inner, dict) and inner.get("success") is False:
@@ -647,7 +656,7 @@ def _check_done_pr_requirements(agent: Any, messages: list[dict], called_tools: 
     return True
 
 
-REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "update_issue_status"}
+REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "extract_symbol", "update_issue_status"}
 
 
 CLOSE_PHASE_ALIASES = {"opdatering", "opdatér", "luk", "close"}
@@ -667,9 +676,10 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
             if k.startswith("write_file") or k.startswith("edit_file") or k.startswith("extract_symbol") or k.startswith("remove_symbol") or k.startswith("add_import")
         ))):
         iteration = getattr(agent, "_current_task_iteration", 0)
-        if iteration >= 3:
+        if iteration >= 3 and not getattr(agent, "_non_productive_reminder_sent", False):
+            agent._non_productive_reminder_sent = True
             return ("FEJL: Du har ikke kaldt write_file, edit_file, extract_symbol, remove_symbol eller add_import i "
-                    f"{iteration} iterationer. Refactor kr\u00e6ver at du SKRIVER kode. "
+                    f"{iteration} iterationer. Refactor kræver at du SKRIVER kode. "
                     "Brug write_file for nye moduler eller edit_file for at opdatere api_server.py.")
     available = set(agent.tool_registry.active_tools or [])
     required = available & REQUIRED_ACTION_TOOLS
@@ -698,6 +708,11 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     if getattr(agent, "issue_resolved", False) and getattr(agent, 'active_template', '') != 'refactor':
         required -= {"edit_file", "write_file"}
     uncalled = required - called_names
+    # write_file and extract_symbol are alternatives — calling either satisfies the requirement
+    if "write_file" in uncalled and "extract_symbol" in called_names:
+        uncalled.discard("write_file")
+    if "extract_symbol" in uncalled and "write_file" in called_names:
+        uncalled.discard("extract_symbol")
     if uncalled:
         return t(K.LOG_REQUIRED_TOOLS_MISSING, agent.lang).format(tools=", ".join(sorted(uncalled)))
     return None
@@ -974,6 +989,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._tests_failed = False
     agent._located_files = set()
     agent._current_task_iteration = 0
+    agent._non_productive_reminder_sent = False
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -1087,9 +1103,18 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                 result = agent.tool_registry.execute(tool_name, args_val)
                 result_str = json.dumps(result, ensure_ascii=False)
-                if tool_name in ("write_file", "edit_file"):
-                    agent._current_task_iteration = 0
-                    consecutive_dedups = 0
+                if tool_name in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import"):
+                    if tool_name in ("extract_symbol", "remove_symbol", "add_import"):
+                        if isinstance(result, dict) and not result.get("success"):
+                            called_tools.pop(tool_key, None)
+                        else:
+                            agent._current_task_iteration = 0
+                            agent._non_productive_reminder_sent = False
+                            consecutive_dedups = 0
+                    else:
+                        agent._current_task_iteration = 0
+                        agent._non_productive_reminder_sent = False
+                        consecutive_dedups = 0
                 agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
                 if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success") is False:
                     agent._write_failed = True

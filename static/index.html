@@ -699,6 +699,7 @@
             <input type="text" id="replyInput" placeholder="Svar til LLM..." style="display:none;width:120px;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')sendReply()">
             <button onclick="sendReply()" id="replyBtn" style="display:none;background:var(--accent);color:white;">✉</button>
             <button onclick="stopStream()" id="stopBtn" style="background:#ef4444;">⏹ Stop</button>
+            <button onclick="undoBackup()" id="undoBtn" style="display:none;background:#f59e0b;color:white;">↶ Fortryd</button>
         </div>
         <div id="imagePreview" style="display:none; gap:4px; flex-wrap:wrap; margin:2px 0;"></div>
         <div style="display:flex;align-items:center;gap:8px;margin:2px 0;">
@@ -2369,14 +2370,43 @@ async function decompose() {
 }
 
 function stopStream() {
-    fetch('/api/stop', { method: 'POST' });
     if (eventSource) {
         eventSource.close();
         eventSource = null;
     }
+    try { fetch('/api/execute-stop', { method: 'POST' }); } catch(e) {}
     addLogEntry('INFO', _('stream_stopped'), _('stopped_by_user'));
     document.getElementById('replyInput').style.display = 'none';
     document.getElementById('replyBtn').style.display = 'none';
+}
+
+async function undoBackup() {
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        undoBtn.disabled = true;
+        undoBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Fortryder...';
+    }
+    try {
+        const resp = await fetch('/api/git/reset', { method: 'POST' });
+        const result = await resp.json();
+        if (result.success) {
+            addLogEntry('INFO', 'Fortryd', 'Git backup genoprettet — reloader...');
+            if (undoBtn) undoBtn.style.display = 'none';
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            addLogEntry('ERROR', 'Fortryd fejlede', result.message);
+            if (undoBtn) {
+                undoBtn.disabled = false;
+                undoBtn.textContent = '↶ Fortryd';
+            }
+        }
+    } catch(e) {
+        addLogEntry('ERROR', 'Fortryd fejlede', e.message);
+        if (undoBtn) {
+            undoBtn.disabled = false;
+            undoBtn.textContent = '↶ Fortryd';
+        }
+    }
 }
 
 async function sendReply() {
@@ -2439,6 +2469,22 @@ async function executeWithStream() {
     if (!currentTree || (template !== 'fri' && template !== lastDecomposeTemplate)) {
         await decompose();
         if (!currentTree) return;
+    }
+    
+    // Create git backup before execution — show undo button
+    try {
+        const resp = await fetch('/api/git/backup', { method: 'POST' });
+        const backup = await resp.json();
+        if (backup.success) {
+            const undoBtn = document.getElementById('undoBtn');
+            if (undoBtn) {
+                undoBtn.style.display = 'inline-block';
+                undoBtn.disabled = false;
+                undoBtn.textContent = '↶ Fortryd';
+            }
+        }
+    } catch(e) {
+        addLogEntry('WARNING', 'Backup fejlede', e.message);
     }
     
     stopStream();
