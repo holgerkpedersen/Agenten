@@ -94,12 +94,12 @@ class TestAnalyzeActions:
     def test_prune_low_success(self):
         with patch("skill_evolution.tracker") as mock_tracker:
             mock_tracker.get_outcomes.return_value = [
-                {"skill": "bad_skill", "success": False} for _ in range(6)
+                {"skill": "bad_skill", "success": False} for _ in range(12)
             ]
             mock_tracker.get_all_skill_stats.return_value = {
-                "bad_skill": {"count": 6, "success_rate": 0.0}
+                "bad_skill": {"count": 12, "success_rate": 0.0}
             }
-            mock_tracker.total_outcomes = 6
+            mock_tracker.total_outcomes = 12
 
             from skill_evolution import analyze, PRUNE_MAX_RATE, PRUNE_MIN_COUNT
             result = analyze()
@@ -198,6 +198,23 @@ class TestAddRefinementNote:
         content = "# Test Skill\n\nSome instructions here.\n\n"
         action = {"failure_patterns": ["pattern1", "pattern2"]}
         result = _add_refinement_note(content, action)
-        assert "SkillFlow Refinement" in result
+        assert "Kendte Fejlmønstre" in result
         assert "pattern1" in result
         assert "pattern2" in result
+        assert "skillflow:known_failures" in result
+
+    def test_skips_note_with_single_pattern(self, tmp_path):
+        from skill_evolution import _add_refinement_note
+        content = "# Test Skill\n\nSome instructions here.\n\n"
+        action = {"failure_patterns": ["only_one_pattern"]}
+        result = _add_refinement_note(content, action)
+        assert result == content
+
+    def test_replaces_existing_note_inplace(self, tmp_path):
+        from skill_evolution import _add_refinement_note
+        content = "# Test Skill\n\nSome instructions.\n\n<!-- skillflow:known_failures -->\n### Kendte Fejlmønstre\n- old pattern\n{% end skillflow:known_failures %}\n"
+        action = {"failure_patterns": ["new_pattern1", "new_pattern2"]}
+        result = _add_refinement_note(content, action)
+        assert "new_pattern1" in result
+        assert "new_pattern2" in result
+        assert "old pattern" not in result

@@ -10,6 +10,7 @@ import agent_skills
 import agent_git
 import agent_files
 import agent_issues
+import agent_phase_checks
 import config
 from typing import Any, Generator
 
@@ -76,6 +77,53 @@ def _normalize_phase(name: str) -> str:
     return PHASE_ALIASES.get(lower, lower)
 
 
+def _refactor_actually_moved_code(agent: Any) -> bool:
+    """Return True if a real refactor was performed (ALL modules moved + api_server reduced).
+
+    For the refactor template, a passing test suite is NOT proof that the
+    refactor was done — tests pass against the unchanged api_server.py if no
+    code was actually moved. This helper verifies ALL three conditions:
+
+      1. ``refactor_plan.md`` exists and lists at least one module
+      2. EVERY module listed in the plan exists on disk AND has substantive
+         code (functions or classes with >= 20 lines)
+      3. ``api_server.py`` has been reduced to under 1000 lines (the original
+         file was 1521 lines, so any real refactor must shrink it)
+
+    Returns True unconditionally when the active template is not ``refactor``
+    (e.g. bugfix, kodeanalyse) so existing behaviour is preserved.
+    """
+    template = getattr(agent, "active_template", "") or ""
+    if template != "refactor":
+        return True
+    plan_path = os.path.join(os.getcwd(), "refactor_plan.md")
+    if not os.path.exists(plan_path):
+        return False
+    try:
+        import agent_phase_checks as _apc
+        modules = _apc._parse_refactor_plan_modules(plan_path)
+    except Exception:
+        return False
+    if not modules:
+        return False
+    for mod in modules:
+        if not mod or "/" in mod or "\\" in mod:
+            continue
+        path = os.path.join(os.getcwd(), mod)
+        if not _apc._has_real_code(path, min_lines=20):
+            return False
+    api_path = os.path.join(os.getcwd(), "api_server.py")
+    if os.path.exists(api_path):
+        try:
+            with open(api_path, encoding="utf-8") as f:
+                line_count = sum(1 for _ in f)
+            if line_count >= 1000:
+                return False
+        except OSError:
+            return False
+    return True
+
+
 def _get_max_tool_calls(task_name: str) -> int:
     """get max tool calls.
     
@@ -90,6 +138,26 @@ def _get_max_tool_calls(task_name: str) -> int:
     if any(k in phase for k in ["luk", "close", "opdatering", "verifikation"]):
         return config.MAX_TOOL_CALLS_CLOSE
     return config.MAX_TOOL_CALLS_ANALYSE
+
+
+def _get_max_iterations(agent: Any, task_name: str) -> int:
+    """Get the max LLM conversation turns for this phase.
+
+    Looks up per-template override in TEMPLATE_PHASE_ITERATION_LIMITS, then
+    falls back to MAX_TASK_ITERATIONS (or MAX_PR_TASK_ITERATIONS for PR
+    workflows) from config.
+    """
+    template = getattr(agent, "active_template", "") or ""
+    if template and task_name:
+        template_limits = agent_skills.TEMPLATE_PHASE_ITERATION_LIMITS.get(template, {})
+        # Case-insensitive phase match
+        task_lower = (task_name or "").lower()
+        for key, limit in template_limits.items():
+            if key.lower() == task_lower:
+                return limit
+    if agent_git.is_pr_workflow(task_name):
+        return config.MAX_PR_TASK_ITERATIONS
+    return config.MAX_TASK_ITERATIONS
 
 
 def _validate_done_output(agent: Any, result_text: str | dict, task_name: str, task_node: Any = None) -> str | None:
@@ -210,7 +278,8 @@ def _build_chunk_hint(agent: Any) -> str:
         base_dir = os.path.abspath('.')
         hint = f"\n\n## TILG\u00c6NGELIGE FILER (projektmappe: {base_dir})"
         hint += "".join(parts)
-        hint += "\n\n  Brug locate(name='funktionsnavn') for at finde en funktion p\u00e5 tv\u00e6rs af ALLE .py-filer (filepath er valgfri)."
+        hint += "\n\n  Brug list_symbols(filepath='fil.py') for at se ALLE symboler (funktioner, klasser, variabler) i en Python-fil — g\u00f8r det F\u00d8R locate/read_location n\u00e5r du ikke kender symbolnavnene."
+        hint += "\n  Brug locate(name='funktionsnavn') for at finde en funktion p\u00e5 tv\u00e6rs af ALLE .py-filer (filepath er valgfri)."
         hint += "\n  locate returnerer ogs\u00e5 en 'also_in_file'-liste over andre symboler i filen — brug locate til hver enkelt."
         hint += "\n  Brug read_location(filepath='fil.py', name='funktionsnavn') for at l\u00e6se KUN en bestemt funktion/metode/klasse — IKKE hele filen."
         hint += "\n  Brug IKKE read_chunk til .py-filer — read_location er altid at foretr\u00e6kke og returnerer kun det relevante kode."
@@ -251,10 +320,53 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         header = t(K.CRITERIA_HEADER, agent.lang)
         items = "\n".join(f"- {c}" for c in task_node.success_criteria)
         criteria_block = f"\n\n## {header}\n{items}\n"
+
+    # Include results from previous sibling phases
+    sibling_block = ""
+    if task_node.parent and hasattr(task_node.parent, 'children'):
+        siblings = task_node.parent.children
+        my_idx = -1
+        for i, sib in enumerate(siblings):
+            if sib == task_node:
+                my_idx = i
+                break
+        if my_idx > 0:
+            prev_results = []
+            for sib in siblings[:my_idx]:
+                if sib.status == "done" and sib.result and len(sib.result.strip()) > 50:
+                    prev_results.append(f"### {sib.name}\n{sib.result[:2000].strip()}")
+            if prev_results:
+                sibling_block = "\n\n## Resultater fra tidligere faser\n" + "\n\n".join(prev_results)
+
+    # For refactor template's Ekstraher phase, auto-load refactor_plan.md from disk
+    # so the LLM knows which .py files to create (sibling_block only has Plan's text
+    # result, not the actual file content)
+    plan_block = ""
+    if (agent.active_template == "refactor" and
+        task_node.name.lower() == "ekstraher" and
+        not any("refactor_plan.md" in str(c) for c in agent.file_chunks.values())):
+        plan_path = "refactor_plan.md"
+        if os.path.exists(plan_path):
+            try:
+                with open(plan_path, encoding="utf-8") as _pf:
+                    _plan_content = _pf.read()
+                plan_block = "\n\n" + t(K.REFACTOR_PLAN_LOADED, agent.lang).format(
+                    plan_content=_plan_content[:3000]
+                )
+                agent._log("DEBUG", f"Auto-loaded {plan_path} ({len(_plan_content)} chars) for Ekstraher phase", "")
+            except Exception as _e:
+                agent._log("DEBUG", f"Failed to auto-load {plan_path}: {_e}", "")
+
+    # Phase anchor: tell the LLM which phase it's currently in and forbid
+    # cross-phase reasoning (the LLM otherwise tries to re-do Plan/Extract/etc.
+    # because it sees the workflow description in the section instruction).
+    phase_block = "\n\n" + t(K.PHASE_CURRENT, agent.lang).format(phase_name=task_node.name) + \
+                  t(K.PHASE_ONLY, agent.lang).format(phase_name=task_node.name)
+
     if section_instr:
-        task_prompt = f"{section_instr}{criteria_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{section_instr}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
-        task_prompt = f"{task_node.name}{criteria_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{task_node.name}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
     agent._refresh_skills()
     agent._match_skills(clean_prompt)
@@ -287,6 +399,22 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     has_write = any(t in ('write_file', 'edit_file') for t in (agent.tool_registry.active_tools or []))
     if has_write:
         user_guidance += t(K.WRITE_REQUIRED, agent.lang)
+
+    # Tool-specific hints — filtered by active tools to avoid confusing the LLM
+    active_tool_set = set(agent.tool_registry.active_tools or [])
+    tool_hints = {
+        "list_symbols": "\n  Brug list_symbols(filepath='fil.py') for at se ALLE symboler i en Python-fil — gør det FØR locate/read_location når du ikke kender symbolnavnene.",
+        "read_chunk": "\n  Read_chunk må KUN bruges til IKKE-PYTHON filer (JSON, HTML, TXT, osv.). For .py-filer, brug read_location i stedet.",
+        "locate": "\n  Brug locate(name='funktionsnavn') for at finde en funktion på tværs af ALLE .py-filer (filepath er valgfri). locate returnerer også 'also_in_file'.",
+        "read_location": "\n  Brug read_location(filepath='fil.py', name='funktionsnavn') for at læse KUN en bestemt funktion/metode/klasse — IKKE hele filen.",
+        "write_file": "\n  Brug write_file(filepath='ny_fil.py', content='...') for at oprette NYE filer. Skriv HELE modulet på ÉN gang.",
+        "edit_file": "\n  Brug edit_file(filepath='fil.py', old_text='...', new_text='...') for at redigere EKSISTERENDE kode.",
+        "run_tests": "\n  Brug run_tests() for at køre tests og verificere at din kode virker.",
+        "update_issue_status": "\n  Brug update_issue_status(issue_id='...', status='resolved') når et issue er løst.",
+    }
+    filtered_hints = [h for tool_name, h in tool_hints.items() if tool_name in active_tool_set]
+    if filtered_hints:
+        user_guidance += "\n\n## VÆRKTØJSGUIDE" + "".join(filtered_hints)
 
     messages = [{"role": "system", "content": system_prompt}]
     if file_ctx:
@@ -408,7 +536,7 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     if dup_count >= 1:
         _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. Gå videre eller brug <<<DONE>>>.")
         return None
-    if parsed["tool"] in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False):
+    if parsed["tool"] in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
         _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redigér IKKE filer. Brug <<<DONE>>> for at afslutte, eller genåbn issuet med update_issue_status('<id>', 'open') først.")
         return None
 
@@ -521,15 +649,28 @@ def _check_done_pr_requirements(agent: Any, messages: list[dict], called_tools: 
 
 REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "update_issue_status"}
 
-CLOSE_PHASE_ALIASES = {"opdatering", "luk", "close"}
+
+CLOSE_PHASE_ALIASES = {"opdatering", "opdatér", "luk", "close"}
 
 def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -> str | None:
     """check required tools.
-    
+
     Args:
         agent:
         called_tools:
         task_name:"""
+    if (getattr(agent, "active_template", "") == "refactor"
+        and task_name
+        and any(k in _normalize_phase(task_name).lower() for k in ("plan", "ekstraher", "opdat"))
+        and not any(k in (called_tools or {}) for k in (
+            k for k in called_tools
+            if k.startswith("write_file") or k.startswith("edit_file") or k.startswith("extract_symbol") or k.startswith("remove_symbol") or k.startswith("add_import")
+        ))):
+        iteration = getattr(agent, "_current_task_iteration", 0)
+        if iteration >= 3:
+            return ("FEJL: Du har ikke kaldt write_file, edit_file, extract_symbol, remove_symbol eller add_import i "
+                    f"{iteration} iterationer. Refactor kr\u00e6ver at du SKRIVER kode. "
+                    "Brug write_file for nye moduler eller edit_file for at opdatere api_server.py.")
     available = set(agent.tool_registry.active_tools or [])
     required = available & REQUIRED_ACTION_TOOLS
     if not required:
@@ -551,6 +692,10 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     # If update_issue_status was called, the bug is being resolved —
     # edit_file/write_file are no longer needed.
     if "update_issue_status" in called_names:
+        required -= {"edit_file", "write_file"}
+    # If the run_tests auto-complete already marked the issue resolved
+    # (Test phase with passing tests), edit_file/write_file are no longer needed.
+    if getattr(agent, "issue_resolved", False) and getattr(agent, 'active_template', '') != 'refactor':
         required -= {"edit_file", "write_file"}
     uncalled = required - called_names
     if uncalled:
@@ -582,16 +727,37 @@ AUTO_RESOLVE_PATTERNS = [
 ]
 
 
-def _get_phase_auto_complete_msg(task_name: str, tool_name: str, tool_result: dict | Any, agent: Any) -> str | None:
+def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: dict | Any, agent: Any, called_tools: dict | None = None, full_response: str = "") -> str | None:
     """Return auto-complete message if the phase goal was just met, else None.
-    Checks phase-specific success conditions after each tool call."""
+    Checks phase-specific success conditions after each tool call.
+
+    Two layers of auto-complete:
+      1. Tool-result-based (run_tests passed, update_issue_status succeeded)
+      2. Deterministic phase-check (file_exists, files_from_plan, etc.) —
+         runs after any tool call when the template defines a check for
+         this phase
+
+    Args:
+        called_tools: dict of ``"{tool_name}{args_repr}"`` → count. Forwarded
+            to ``check_phase_done`` so ``tool_called`` and ``tests_pass``
+            checks can see the full call history.
+        full_response: accumulated LLM streaming text. Forwarded to
+            ``check_phase_done`` for ``min_text_length``.
+    """
+    task_name = getattr(task_node, "name", "") or ""
     phase = _normalize_phase(task_name).lower()
 
     if tool_name == "run_tests" and not agent._tests_failed:
         if "test" in phase:
-            agent.issue_resolved = True
-            agent._needs_resolve_persist = True
-            return t(K.LOG_RED_TEST_PASSED, agent.lang)
+            if _refactor_actually_moved_code(agent):
+                agent.issue_resolved = True
+                agent._needs_resolve_persist = True
+                return t(K.LOG_RED_TEST_PASSED, agent.lang)
+            return (
+                t(K.LOG_RED_TEST_PASSED, agent.lang)
+                + "\n\n"
+                + t(K.TEST_BUT_NO_REFACTOR, agent.lang)
+            )
         if any(k in phase for k in ["implementering", "fix", "verifikation",
                                      "opdatering", "luk", "close", "green"]):
             return t(K.LOG_PHASE_COMPLETE, agent.lang)
@@ -603,6 +769,46 @@ def _get_phase_auto_complete_msg(task_name: str, tool_name: str, tool_result: di
             # Bug already fixed — auto-complete implementering/fix phases
             if any(k in phase for k in ["implementering", "fix", "verifikation", "green"]):
                 return t(K.LOG_PHASE_COMPLETE, agent.lang)
+
+    # Phase output verification — prevent auto-complete when no output was produced
+    if tool_name in ("write_file",):
+        if "plan" in phase:
+            plan_path = os.path.join(os.getcwd(), "refactor_plan.md")
+            if not os.path.exists(plan_path) or os.path.getsize(plan_path) == 0:
+                agent._log("DEBUG", "Plan output verification", f"{plan_path} mangler eller er tom — afslutter IKKE auto-complete")
+                return None
+        if "ekstraher" in phase:
+            # Check if write_file was actually called with a module name (not refactor_plan.md)
+            wrote_module = False
+            for tool_key in (called_tools or {}):
+                if tool_key.startswith("write_file"):
+                    try:
+                        args_str = tool_key[len("write_file"):]
+                        args = json.loads(args_str) if args_str else {}
+                        fname = args.get("filepath", "") or args.get("file_path", "") or ""
+                        if fname and fname != "refactor_plan.md":
+                            wrote_module = True
+                            break
+                    except (json.JSONDecodeError, ValueError):
+                        wrote_module = True
+                        break
+            if not wrote_module:
+                agent._log("DEBUG", "Ekstraher output verification", "write_file ikke kaldt med et modulnavn — afslutter IKKE auto-complete")
+                return None
+
+    # Deterministic phase check (template-defined file existence criteria).
+    # Only run after a productive tool call to avoid infinite loops on read-only.
+    PRODUCTIVE_TOOLS = {"write_file", "edit_file", "run_tests", "update_issue_status"}
+    if tool_name in PRODUCTIVE_TOOLS:
+        try:
+            passed, reason = agent_phase_checks.check_phase_done(
+                agent, task_node, called_tools=called_tools,
+                tool_name=tool_name, full_response=full_response,
+            )
+            if passed:
+                return t(K.PHASE_AUTO_ADVANCED, agent.lang).format(reason=reason)
+        except Exception as _e:
+            agent._log("DEBUG", f"phase check error: {_e}", "")
 
     return None
 
@@ -760,15 +966,18 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
 
     full_response = ""
     text_fallback = ""
-    max_iterations = config.MAX_PR_TASK_ITERATIONS if agent_git.is_pr_workflow(task_node.name) else config.MAX_TASK_ITERATIONS
+    max_iterations = _get_max_iterations(agent, task_node.name)
     called_tools = {}
     consecutive_errors = 0
+    consecutive_dedups = 0
     agent._write_failed = False
     agent._tests_failed = False
     agent._located_files = set()
+    agent._current_task_iteration = 0
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
+        agent._current_task_iteration = i + 1
         if agent.stop_requested:
             break
 
@@ -850,9 +1059,23 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 dup_count = called_tools.get(tool_key, 0)
                 called_tools[tool_key] = dup_count + 1
                 if dup_count >= 1:
+                    consecutive_dedups += 1
                     _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. G\u00e5 videre eller brug <<<DONE>>>.")
+                    if consecutive_dedups >= 3:
+                        write_tools = [t for t in ("write_file", "edit_file")
+                                       if t in agent.tool_registry.active_tools]
+                        if write_tools:
+                            reminder = (
+                                f"[SYSTEM: Du er i en l\u00f8kke med identiske resultater. "
+                                f"STOP med at l\u00e6se. BRUG et v\u00e6rkt\u00f8j der SKRIVER: "
+                                f"{', '.join(write_tools)}. Hvis du er i tvivl, brug write_file med et NYT filnavn.]"
+                            )
+                            messages.append({"role": "system", "content": reminder})
+                            agent._log("SYSTEM", "Dedup-loop escape", reminder[:120])
+                            consecutive_dedups = 0
                     continue
-                if tool_name in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False):
+                consecutive_dedups = 0
+                if tool_name in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
                     result_str = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redig\u00e9r IKKE filer. Brug <<<DONE>>> for at afslutte, eller gen\u00e5bn issuet f\u00f8rst."
                     result = {"success": False, "error": "Issue already resolved"}
                     agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
@@ -864,6 +1087,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                 result = agent.tool_registry.execute(tool_name, args_val)
                 result_str = json.dumps(result, ensure_ascii=False)
+                if tool_name in ("write_file", "edit_file"):
+                    agent._current_task_iteration = 0
+                    consecutive_dedups = 0
                 agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
                 if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success") is False:
                     agent._write_failed = True
@@ -898,7 +1124,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         file_path = os.path.abspath(file_key[5:])
                         if file_path in agent._located_files:
                             result_str += "\n\n📌 OBS: Du har allerede læst funktion(er) i denne fil med locate. Brug locate(filepath='...', name='andet_navn') i stedet for read_chunk — det er hurtigere."
-                msg = _get_phase_auto_complete_msg(task_node.name, tool_name, result, agent)
+                msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=full_response)
                 if msg:
                     agent._log("INFO", msg, "")
                     full_response = msg
@@ -963,7 +1189,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
             yield {"type": "tool_result", "tool": tool_result["tool"], "result": tool_result["result"]}
             if tool_result.get("checkpoint_msg"):
                 yield {"type": "checkpoint", "message": tool_result["checkpoint_msg"], "tool": parsed["tool"]}
-            msg = _get_phase_auto_complete_msg(task_node.name, tool_result.get("tool"), tool_result.get("result"), agent)
+            msg = _get_phase_auto_complete_msg(task_node, tool_result.get("tool"), tool_result.get("result"), agent, called_tools=called_tools, full_response=full_response)
             if msg:
                 agent._log("INFO", msg, "")
                 full_response = msg

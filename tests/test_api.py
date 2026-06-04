@@ -144,3 +144,55 @@ class TestAPIRoot:
     def test_delete_nonexistent_issue(self, client):
         resp = client.delete("/api/issues/DOESNOTEXIST")
         assert resp.status_code == 404
+
+
+class TestAPIPhaseChecks:
+    """Tests for /api/phase-checks endpoint (deterministic phase auto-advance)."""
+
+    def test_get_all_templates(self, client):
+        resp = client.get("/api/phase-checks")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["success"] is True
+        assert "templates" in data
+        assert "refactor" in data["templates"]
+        assert "Plan" in data["templates"]["refactor"]
+        assert "Ekstraher" in data["templates"]["refactor"]
+
+    def test_get_specific_template(self, client):
+        resp = client.get("/api/phase-checks?template=refactor")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["success"] is True
+        assert data["template"] == "refactor"
+        assert "phases" in data
+        assert "refactor" in data["phases"]
+
+    def test_get_unknown_template_returns_empty(self, client):
+        resp = client.get("/api/phase-checks?template=nonexistent_template")
+        assert resp.status_code == 200
+        data = json.loads(resp.data)
+        assert data["success"] is True
+        assert data["phases"]["nonexistent_template"] == {}
+
+    def test_plan_phase_check_format(self, client):
+        resp = client.get("/api/phase-checks?template=refactor")
+        data = json.loads(resp.data)
+        plan_check = data["phases"]["refactor"]["Plan"]
+        assert plan_check["spec"]["type"] == "files_from_plan"
+        assert plan_check["spec"]["plan_path"] == "refactor_plan.md"
+        assert plan_check["spec"]["min_files"] == 5
+        assert "refactor_plan.md" in plan_check["description"]
+        assert "afsluttes automatisk" in plan_check["description"]
+
+    def test_ekstraher_phase_check_format(self, client):
+        resp = client.get("/api/phase-checks?template=refactor")
+        data = json.loads(resp.data)
+        ekstraher_check = data["phases"]["refactor"]["Ekstraher"]
+        assert ekstraher_check["spec"]["type"] == "all_of"
+        sub_types = [c.get("type") for c in ekstraher_check["spec"]["checks"]]
+        assert "files_from_plan" in sub_types
+        assert "symbols_covered" in sub_types
+        symbols_spec = next(c for c in ekstraher_check["spec"]["checks"] if c["type"] == "symbols_covered")
+        assert symbols_spec["source_file"] == "api_server.py"
+        assert "præcis ét" in ekstraher_check["description"] or "pr\u00e6cis" in ekstraher_check["description"]

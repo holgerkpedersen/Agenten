@@ -345,7 +345,19 @@ When extracting methods from `agent_core.py` into module files:
 **Fix:** Use `minimax-m2.5` for code-editing tasks (issue_handler, programming, refactoring). `deepseek-v4-pro` is fine for read-only analysis (kodeanalyse, resume). Other tested models: `minimax-m2.5` ✓ (edits code), `glm-5.1` ✓ (native tools).  
 **Warning hardcoded fix:** Line 134 was hardcoded Danish "⚠️ DU SKAL redigere kode" — replaced with i18n key `K.WRITE_REQUIRED` in all 4 languages.
 
-### 43. Auto-resolution missed already-fixed bugs when LLM hit tool call limit (`agent_tasks.py:472-491`)
+### 43. LLM task decomposition thinking leakage (`agent_tree.py:11-60`, `agent_tree.py:76-130`, `lang/*.json`)
+
+**Symptom:** Session `8bb7f917` — task tree has 257 flat tasks that are the LLM's internal chain-of-thought ("Okay, the user wants me to...", "First, I need to...", "I should identify..."). Model `nvidia/nemotron-3-super` outputs thinking despite "Return ONLY the tree structure" instruction.
+
+**Root cause:** `_clean_task_name()` meta-prefix regex and `parse_tree_from_llm()` skip-words didn't catch self-referential thinking patterns (I, let me, we, my, but, perhaps, first, so, now, looking at, another way, final decision, etc.).
+
+**Fix (4 parts):**
+1. **Prompts** (`lang/da.json`, `en.json`, `es.json`, `zh.json`): "fri" template now says "INGEN forklaringer, INGEN tankeproces, INGEN forberedelse — KUN selve træet" (stronger anti-thinking emphasis)
+2. **Language instruction** (`agent_skills.py:203-270`, `lang/*.json`): Added `{lang_instruction}` to ALL 12 template prompts (was only in 4). Added `.replace("{lang_instruction}", lang_instr)` for all templates in `get_templates()`. LLM now always told "Svar på dansk" / "Answer in English" etc.
+3. **`_clean_task_name()`** (`agent_tree.py:27-57`): Added ~40 new meta-prefix patterns organized by category (self-referential, meta-commentary, hedging, evaluations, ordinals, transitions). Added single-word-colon filter (`^\w+\s*:\s*$`).
+4. **`parse_tree_from_llm()`** (`agent_tree.py:100-130`): Added flat-task heuristic — if >20 level-1 tasks with no children, LLM leaked thinking → use `create_fallback_tree()`. Added `"i'll", "i'm", "i've", "i'd"` to skip_words.
+
+### 44. Auto-resolution missed already-fixed bugs when LLM hit tool call limit (`agent_tasks.py:472-491`)
 
 **Symptom:** Session `88a11e66` — all 5 phases executed (all failed/done) despite the bug already being fixed. Analysis phase correctly identified "already fixed" but wasted all 6 tool calls re-reading the same code, hit tool call limit, and got the generic "Gennemførte 6 værktøjskald" message as `full_response` — which doesn't match `AUTO_RESOLVE_PATTERNS`.
 
@@ -402,6 +414,187 @@ When extracting methods from `agent_core.py` into module files:
 **Result:** `agent_log.detail` contains full untruncated text. `agent_log.log_file` points to the separate text file with complete content including newlines.
 
 **Files:** `agent_tasks.py:29-43` (helper), `agent_tasks.py:768-787` (logging), `agent_core.py:470-485` (_log), `api_server.py:1200` (_session_id)
+
+### 47. Refactor template: LLM re-does earlier phases because of cross-phase reasoning (`agent_tasks.py:273-301`, `agent_skills.py:124`)
+
+**Symptom:** Session `a07633cc` — Ekstraher phase wrote to `refactor_plan.md` 4 times instead of creating `.py` files. LLM reasoning: *"Planen findes allerede! Det er godt - det betyder at Analyse-fasen er gennemført og planen er lavet. Nu skal jeg gå videre til **Ekstraher-fasen**."* — the LLM was IN Ekstraher but thought it still needed to do Plan.
+
+**Root cause:** The section instruction contains the full workflow description ("Plan → Ekstraher → Opdatér → Test") and the LLM treats it as a sequential guide rather than a per-phase rule. Plus: Ekstraher's section said "Læs INGENTING før du skriver" which prevented it from reading `refactor_plan.md` (where the actual module list lives).
+
+**Fix (3 parts):**
+1. **Phase anchor** (`agent_tasks.py:292-296`): Every phase's system prompt now starts with `🎯 NUVÆRENDE FASE: {phase_name}` + `⛔ Du er KUN i denne fase. Udfør IKKE andre faser`. LLM can no longer reason about "what should I do next phase" because it's told other phases are not its concern.
+2. **Auto-load `refactor_plan.md`** (`agent_tasks.py:273-290`): For `refactor` template's `Ekstraher` phase, reads `refactor_plan.md` from disk and injects it as `plan_block` (capped at 3000 chars) using `K.REFACTOR_PLAN_LOADED` i18n key. LLM now sees the actual module list (routes.py, session_manager.py, etc.) instead of guessing.
+3. **Fixed Ekstraher section instruction** (`agent_skills.py:124`): Removed "Læs INGENTING før du skriver" — replaced with "FØRSTE handling SKAL være write_file med et NYT filnavn (aldrig et filnavn der allerede findes)". LLM can now read context but must still create new files first.
+
+**New i18n keys:** `K.PHASE_CURRENT`, `K.PHASE_ONLY`, `K.REFACTOR_PLAN_LOADED` (all 4 languages).
+
+**Files:** `agent_tasks.py:273-301`, `agent_skills.py:124`, `i18n.py:343-345`, `lang/{da,en,es,zh}.json`
+
+### 48. Deterministic phase auto-advance: `agent_phase_checks.py` (new), `agent_tasks.py:629-680`, `agent_skills.py:122-127`
+
+**Symptom:** Session `a07633cc` (round 2) — LLM made 6+ redundant `write_file(refactor_plan.md)` calls in Ekstraher phase. The phase should have ended as soon as Plan wrote the plan, and as soon as Ekstraher created all the modules the plan listed. But the LLM kept looping because nothing told it "you're done".
+
+**Root cause:** Phases are LLM-driven — the LLM has to declare `<<<DONE>>>` when it thinks the phase is complete. There's no system-level check that says "Plan is complete because refactor_plan.md exists" or "Ekstraher is complete because all .py files from the plan exist on disk".
+
+**Fix (4 parts):**
+
+1. **New module `agent_phase_checks.py`** with two check types:
+   - `file_exists` — one or more files must exist on disk (with `require_all` option)
+   - `files_from_plan` — parses a markdown plan, extracts module names (heading or inline patterns), requires all of them to exist. Handles Windows paths, ignores paths with separators, supports custom extensions.
+2. **Template config `TEMPLATE_PHASE_CHECKS`** (`agent_phase_checks.py:128-141`): Maps `(template, phase_name) → check spec`. Currently only `refactor` template is configured:
+   - `Plan` → `file_exists(refactor_plan.md)`
+   - `Ekstraher` → `files_from_plan(refactor_plan.md, ext=.py)`
+3. **Integration in `_get_phase_auto_complete_msg`** (`agent_tasks.py:629-680`): After the existing `run_tests` and `update_issue_status` checks, runs the template's deterministic phase check. The check fires after any productive tool call (`write_file`, `edit_file`, `run_tests`, `update_issue_status`). On pass, returns `t(K.PHASE_AUTO_ADVANCED, lang).format(reason=...)` which causes `solve_task_stream` to break out of its loop and move to the next sibling phase.
+4. **Section instruction updates** (`agent_skills.py:122-127`): Plan and Ekstraher section instructions now say "Systemet auto-afslutter denne fase så snart [kriterium] er opfyldt — du behøver IKKE lave yderligere kald bagefter". LLM is told explicitly that extra calls are wasted.
+
+**New i18n key:** `K.PHASE_AUTO_ADVANCED` (all 4 languages) — shown in agent log when phase auto-completes.
+
+**Tests:** `tests/test_phase_checks.py` — 23 tests covering: file_exists (require_all True/False), module extraction (heading, inline, paths ignored, custom ext), files_from_plan (all/missing/empty/min_files), check_phase_done (template lookup, phase name case-insensitivity, no-template fallback), TEMPLATE_PHASE_CHECKS config validation.
+
+**Verified via smoke test** (`C:\Dev\Agenten`): With actual `refactor_plan.md` listing 10 modules, creating the 7 missing .py files triggered Ekstraher auto-complete: "✅ Fase auto-afsluttet: files_from_plan: alle 10 moduler fra C:\Dev\Agenten\refactor_plan.md findes". Plan phase auto-completes as soon as `refactor_plan.md` is written.
+
+**Files:** `agent_phase_checks.py` (new, 175 lines), `agent_tasks.py:629-680` (extended `_get_phase_auto_complete_msg` with deterministic checks), `agent_skills.py:122-127` (section instructions mention auto-advance), `i18n.py:347`, `lang/{da,en,es,zh}.json`, `tests/test_phase_checks.py` (new, 23 tests)
+
+### 49. Phase checks visible in UI under each phase (`api_server.py:1549-1606`, `static/index.html:1083-1101,1170-1202,2230-2262,2300-2303`)
+
+**Symptom:** Even though phases have deterministic success criteria, the user can't see them in the tree view. The LLM has them in its prompt but the human operator has no visibility into "what triggers auto-advance?".
+
+**Fix (3 parts):**
+1. **New `/api/phase-checks` endpoint** (`api_server.py:1549-1606`): Returns the `TEMPLATE_PHASE_CHECKS` config for a template, with each phase augmented by a human-readable Danish `description` (e.g. *"Fasen afsluttes automatisk når filen `refactor_plan.md` findes"*). Supports both `?template=refactor` and bare `/api/phase-checks` (all templates).
+2. **Frontend caching + render** (`static/index.html:1083-1101,1170-1202`): New `loadPhaseChecks(template)` async function caches the response. `renderTree` looks up each node's name (case-insensitive) in the cache and renders `✓ <description>` in green below the existing `success_criteria` text.
+3. **Template tracking** (`static/index.html:1095-1101,2096-2110,2300-2303`): New `currentTemplate` global. Updated on `switchTemplate()`, session load, and successful decompose. `loadPhaseChecks` is awaited before `updateTreeDisplay` so the cache is populated when the tree renders.
+
+**Visual example (refactor template, Plan phase):**
+```
+📌 Plan [○]
+  • Modulstørrelse ≤ 300 linjer
+  ✓ Fasen afsluttes automatisk når filen `refactor_plan.md` findes.
+```
+
+**Tests:** `tests/test_api.py:148-191` — 5 new tests for `/api/phase-checks` (all templates, specific template, unknown template, Plan check format, Ekstraher check format).
+
+**Files:** `api_server.py:1549-1606` (endpoint + `_format_phase_check_description` helper), `static/index.html:1083-1101,1170-1202,2230-2262,2300-2303` (caching + render + tracking), `tests/test_api.py:148-191` (5 tests)
+
+### 50. `_check_required_tools` overrides Test-phase auto-completion from `run_tests` (`agent_tasks.py:600-603`)
+
+**Symptom:** Session `a07633cc` — Test phase ran `run_tests()` → all 461 tests passed → log says *"✅ Rød test bestået — fejlen er allerede rettet. Afslutter Test (Red) fasen."* → then immediately the phase is marked **failed** with *"Manglende påkrævede værktøjer: edit_file"*. UI shows: `[02-06-2026 12:16:46] ERROR: task_failed_label Test`.
+
+**Root cause:** Two bugs colluding:
+1. `_check_required_tools` ignores `agent.issue_resolved` — even though the run_tests auto-complete handler at `_get_phase_auto_complete_msg:634-638` sets `agent.issue_resolved = True`, the finalizer at line 737-740 unconditionally calls `_check_required_tools` and overrides `status = "failed"`.
+2. `CLOSE_PHASE_ALIASES = {"opdatering", "luk", "close"}` did NOT include the Danish verb form `"opdatér"` used by the refactor template — so `update_issue_status` was wrongly removed from required for the refactor's Opdatér phase.
+
+**Fix (2 parts):**
+1. `_check_required_tools` (`agent_tasks.py:601-603`): If `agent.issue_resolved` is True, drop `edit_file`/`write_file` from required (the bug is auto-resolved by passing tests).
+2. `CLOSE_PHASE_ALIASES` (`agent_tasks.py:569`): Added `"opdatér"` so the refactor template's close phase correctly requires `update_issue_status`.
+
+**Bonus fixes:**
+- Added missing i18n key `task_failed_label` to all 4 lang files (was previously displayed as the raw key in browser console).
+- Reset REFAC-001 issue status from `resolved` to `open` — was marked resolved with a misleading "Test phase confirmed bug is already fixed" message from a prior failed session, but the refactor was never actually done (7 of 10 modules still missing).
+
+**Tests:** `tests/test_check_required_tools.py` — 7 new tests covering: Test phase respects issue_resolved, Ekstraher still requires write_file, Opdatér still requires update_issue_status, Verifikation phase allows optional edit_file, update_issue_status call clears edit_file requirement.
+
+**Files:** `agent_tasks.py:568-602`, `lang/{da,en,es,zh}.json`, `tests/test_check_required_tools.py`
+
+### 51. Refactor template needs higher iteration budget (91 symbols → 7 modules) (`agent_skills.py:42-66`, `agent_tasks.py:96-114`)
+
+**Symptom:** Session `a07633cc` Ekstraher phase hit `MAX_TASK_ITERATIONS = 6` after only reading the file structure, before creating ANY module. Opdatér hit the same cap before making any meaningful edits. With 91 symbols to move into 7 modules, the LLM needs ~15-25 turns to do the work.
+
+**Root cause:** Hard-coded `MAX_TASK_ITERATIONS = 6` in `config.py` is the bottleneck — `solve_task_stream` loops at most 6 times. This is fine for simple bugfix tasks (read issue + edit + test) but way too low for refactor workflows that need to create many new files.
+
+**Fix (3 parts):**
+1. **New `TEMPLATE_PHASE_ITERATION_LIMITS` dict** (`agent_skills.py:42-66`): Per-template/per-phase overrides. Refactor: `Analyse=4, Plan=4, Ekstraher=15, Opdatér=12, Test=8`. Bugfix: `Analyse=6, Test (Red)=6, Implementering=12, Verifikation (Green)=8, Opdatering=4`.
+2. **New `_get_max_iterations(agent, task_name)`** (`agent_tasks.py:96-114`): Looks up per-template override (case-insensitive phase match), falls back to `MAX_TASK_ITERATIONS` (or `MAX_PR_TASK_ITERATIONS` for PR workflows). Replaces the previous hardcoded config check at `agent_tasks.py:851`.
+3. **Motivating prompts** (`agent_skills.py:124,126`): Ekstraher and Opdatér section instructions now start with 🔥 EFFEKTIVITETSGUIDE that tells the LLM:
+   - "Du har KUN 15 iterations" (explicit budget)
+   - "brug list_symbols FØRST for at se ALLE symboler" (batch reads)
+   - "skriv HELE modulet på ÉN gang" (full modules, not piecemeal)
+   - "skriv hellere et modul med stubs end at bruge alle iterations på research" (don't over-research)
+
+**Why lower limits work despite the workload:** Auto-advance from `agent_phase_checks.py` (entry 48) ends the phase as soon as the criterion is met (all .py files exist). So the LLM just needs to grind through module creation — the system will stop it as soon as work is done. The tight budget + auto-advance combo rewards decisive action.
+
+**Tests:** 9 new tests in `tests/test_check_required_tools.py::TestGetMaxIterations` covering all refactor/bugfix phases, case-insensitive lookup, unknown template/phase fallback, PR workflow override. Total 477 tests pass.
+
+**Files:** `agent_skills.py:42-66` (TEMPLATE_PHASE_ITERATION_LIMITS), `agent_tasks.py:96-114,851` (_get_max_iterations + call site), `tests/test_check_required_tools.py:9-25,140-203`
+
+### 52. Refactor template: false auto-resolve and `.md` read_location crash (`agent_files.py`, `agent_phase_checks.py`, `agent_tasks.py`, `i18n.py`)
+
+**Symptom:** Session `175d41a5` — REFAC-001 reported as `resolved` without any code being moved. Three bugs:
+1. **Plan-fasen auto-advance med stale fil**: `file_exists("refactor_plan.md")` var sandt fordi filen fandtes fra en tidligere session — LLM'ens `write_file` fejlede ("Filen findes allerede"), men auto-complete tjekkede kun eksistens, ikke om planen var opdateret.
+2. **Opdatér-fasen låst i læse-loop**: LLM brugte 12 iterationer på `read_location("refactor_plan.md", "refactor_plan")` som fejlede med `Syntax error: invalid character '←' (U+2190)`. `read_location`/`locate_code` parser ALTID filen som Python AST, og markdown-filens `←`-tegn fra afhængighedsdiagrammet giver en syntaksfejl. LLM forsøgte aldrig `read_chunk` i stedet.
+3. **Test-fasen auto-resolver falskt**: 536 tests bestod fordi `api_server.py` aldrig var ændret. Test-fasen satte `agent.issue_resolved = True` og markerede issuet som løst. Falsk positiv.
+
+**Root cause:** Tre svage checks:
+- `file_exists` for Plan: tjekker kun eksistens, ikke indhold
+- `locate_code` parser ikke-Python filer som AST, fejler forvirrende
+- `tests_pass` for Test-fasen kræver ikke at refactoren reelt er udført
+
+**Fix (3 dele):**
+
+1. **Stærkere Plan-fase check** (`agent_phase_checks.py:527-530`): Skiftet fra `file_exists(refactor_plan.md)` til `files_from_plan(plan_path="refactor_plan.md", min_files=5)`. Kræver nu at planen indeholder mindst 5 `*.py`-modulnavne OG at de findes. Forhindrer stale-plan godkendelse.
+
+2. **Tydelig fejl for ikke-Python filer** (`agent_files.py:572-578, 630-637`): `locate_code`, `read_location`, og `list_symbols` tjekker nu `filepath.lower().endswith('.py')` før AST-parsing. Returnerer `"locate_code understøtter kun Python-filer (.py), fik 'plan.md'. Brug read_chunk eller list_chunks for andre filtyper."` i stedet for `Syntax error: invalid character '←'`.
+
+3. **Forhindret falsk auto-resolve i Test-fase for refactor** (`agent_tasks.py:78-130, 718-728`): Ny helper `_refactor_actually_moved_code(agent)` der for refactor-template tjekker om mindst ét af modulerne nævnt i `refactor_plan.md` faktisk indeholder flyttet kode (def/class med >20 linjer). Hvis ikke, sætter den IKKE `issue_resolved = True` og returnerer advarsel `K.TEST_BUT_NO_REFACTOR` der fortæller LLM at redigere filerne manuelt. For ikke-refactor templates returnerer den `True` som før.
+
+**Ny i18n key:** `K.TEST_BUT_NO_REFACTOR` i alle 4 sprog (da/en/es/zh).
+
+**Tests:** 11 nye tests i `tests/test_session_175d41a5_fixes.py` dækker:
+- `_refactor_actually_moved_code`: 5 tests (bugfix/kodeanalyse altid True, refactor ingen moduler → False, refactor kun stub → False, refactor real kode → True)
+- `read_location`/`locate_code`/`list_symbols` på `.md`/`.txt` filer: 5 tests (alle giver klar fejl)
+- Plan-fase bruger `files_from_plan` med `min_files=5`: 1 test
+
+Opdaterede eksisterende tests i `tests/test_phase_checks.py` (3 tests: `test_plan_phase_passes_when_file_exists`, `test_case_insensitive_phase_match`, `test_refactor_plan_check`) til at matche nyt kriterium.
+
+**Resultat:** 548 tests passerer (537 eksisterende + 11 nye).
+
+**Files:** `agent_files.py:572-578, 630-637`, `agent_phase_checks.py:527-530`, `agent_tasks.py:78-130, 718-728`, `i18n.py:177`, `lang/{da,en,es,zh}.json:213`, `tests/test_session_175d41a5_fixes.py` (ny, 11 tests), `tests/test_phase_checks.py:175-200, 224-227` (opdateret 3 tests)
+
+### 53. 175d41a5: Længere refactor-faser ignorerer write-tools (qwen3.5-122b) (`agent_tasks.py`, `agent_phase_checks.py`)
+
+**Symptom:** Session `175d41a5` — Ekstraher og Opdatér faser begge failede med "Manglende påkrævede værktøjer: write_file" / "edit_file" SELVOM begge var i `active_tools`. LLM brugte 12-15 iterationer i dedup-loop uden at kalde et eneste skrive-værktøj. Test-fasen auto-resolvede REFAC-001 fordi 548 tests passed — men intet var reelt refaktoreret (api_server.py voksede 1521→1857 linjer).
+
+**Root cause:** Tre svagheder i entry 52's fikser:
+1. `_refactor_actually_moved_code` krævede kun ≥1 modul med reel kode — `security.py` havde reel `_RateLimiter` klasse → returnerede True → falsk auto-resolve
+2. Ingen mekanisme til at bryde dedup-loop (LLM ignorerede "Du har allerede dette resultat")
+3. `_check_required_tools` tjekkede kun EFTER hele iteration-budget var brugt
+
+**Fix (3 dele):**
+
+1. **Stærkere refactor-check** (`agent_tasks.py:80-130`, `agent_phase_checks.py:67-110`): Ny `_refactor_actually_moved_code` kræver:
+   - ALLE moduler i `refactor_plan.md` eksisterer
+   - Hver modul har reel kode (`def ` eller `class ` med ≥20 linjer) via ny `_has_real_code(min_lines=20)`
+   - `api_server.py` er reduceret til < 1000 linjer
+   - Nye helpers i `agent_phase_checks.py`: `_parse_refactor_plan_modules()` (regex-baseret), `_has_real_code(min_lines=20)`
+
+2. **Dedup-loop escape** (`agent_tasks.py:915, 1006-1024`): Track `consecutive_dedups` tæller. Ved 3+ "Du har allerede dette resultat" i træk, inject system-reminder: "STOP med at læse. BRUG et værktøj der SKRIVER: write_file, edit_file". Resets efter reminder eller efter write-kald. Ny `agent._current_task_iteration` attribut spores parallelt.
+
+3. **Tidlig write-check i refactor** (`agent_tasks.py:635-655`): `_check_required_tools` trigger tidlig abort hvis:
+   - Template er `refactor`
+   - Task er `Ekstraher`/`Opdatér` (matcher `ekstraher`/`opdat` substrings)
+   - Ingen `write_file`/`edit_file` kaldt
+   - `agent._current_task_iteration >= 3`
+   - Reset counter når ny task starter eller write-tool kaldt
+
+**Ny i18n key:** `K.REFACTOR_INCOMPLETE` (alle 4 sprog) — "Refaktoreringen er ufuldstændig. {missing_count} modul(er) mangler stadig, eller api_server.py er ikke reduceret til under 1000 linjer."
+
+**Tests:** `tests/test_session_175d41a5_phase2.py` (22 nye tests) + 2 opdaterede tests i `test_session_175d41a5_fixes.py`:
+- Parser: finder alle listede moduler, håndterer tom/ingen fil, dedup
+- `_has_real_code`: skelner stub vs reel kode (def/class, min_lines, eksisterende fil)
+- `_check_required_tools`: refactor fejler ved iter 3 uden write, passerer med write; iter 1-2 ikke påvirket; ikke-refactor templates urørt
+- `_refactor_actually_moved_code` integration: alle moduler + lille api → True; manglende modul → False; kun stubs → False; api_server.py > 1000 linjer → False
+- i18n key findes i da/en/es/zh
+
+**Cleanup efter implementation:**
+- Nulstil REFAC-001 i `issues.json`: `status: "resolved"` → `"open"`
+- Slet `routes.py` (707 bytes stub, ingen reel kode)
+- Behold `security.py` (3666 bytes, reel `_RateLimiter` klasse flyttet)
+- Behold `session_manager.py` (10451 bytes, eksisterende kode)
+
+**Verifikation:** Genkør session 175d41a5 → Ekstraher skal fejle med Fix C's besked efter 3 iterationer i stedet for 15. Test-fase skal IKKE auto-resolve (Fix A fanger manglende moduler).
+
+**Resultat:** 572 tests passerer (548 baseline + 24 nye/opdaterede). 0 eksisterende tests brydes.
+
+**Files:** `agent_phase_checks.py:67-110` (2 nye helpers), `agent_tasks.py:80-130` (rewritten check), `agent_tasks.py:635-655` (early-abort logik), `agent_tasks.py:915-924, 1006-1024` (dedup tracking), `i18n.py:179` (ny KEY), `lang/{da,en,es,zh}.json:215` (ny key), `tests/test_session_175d41a5_phase2.py` (ny, 22 tests), `tests/test_session_175d41a5_fixes.py:65-105` (2 opdaterede tests)
 
 ## Model Knowledge
 

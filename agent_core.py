@@ -11,6 +11,7 @@ from github_wrapper import GithubAPI
 from skill_loader import SkillLoader
 from lang import t
 from i18n import K
+from refactoring_engine import RefactoringEngine
 import git_ops
 import agent_issues
 import agent_files
@@ -177,6 +178,34 @@ def _build_file_context(agent: Agent, files: list[dict[str, Any]] | None, prompt
     return file_context
 
 
+def _build_fallback_tree(agent: Agent, prompt: str, fallback_sections: list[str]) -> None:
+    """Build a structured fallback task tree from a template's section list.
+
+    Each section becomes a top-level task node. If the section name contains
+    parentheses, the text inside is extracted as success criteria.
+
+    Args:
+        agent: The Agent instance (``task_tree`` is mutated in-place).
+        prompt: The original user prompt (used as tree root name).
+        fallback_sections: List of phase names, possibly with ``(criteria)``.
+    """
+    tree = TaskTree(prompt)
+    _criteria_re = re.compile(r'^(.+?)\s*\(([^)]+)\)\s*$')
+    for section in fallback_sections:
+        section_str = str(section)
+        m = _criteria_re.match(section_str)
+        if m:
+            name = m.group(1).strip()
+            criteria = [c.strip() for c in m.group(2).split(",")]
+        else:
+            name = section_str
+            criteria = []
+        node = TaskNode(name)
+        node.success_criteria = criteria
+        tree.root.add_child(node)
+    agent.task_tree = tree
+
+
 def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_config: dict[str, Any]) -> dict[str, Any]:
     """decompose via llm.
     
@@ -208,12 +237,24 @@ def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_co
     task_count = agent._count_tasks(agent.task_tree.root)
     agent._log("INFO", t(K.LOG_DECOMPOSE_DONE, agent.lang), t(K.LOG_TASKS_CREATED, agent.lang).format(n=task_count))
 
-    if task_count <= 1 and template_config.get("name") in (None, "", "fri"):
-        agent._log("INFO", "Kun én opgave — bruger generisk nedbrydning", "")
-        agent.task_tree = agent._create_fallback_tree(prompt)
+    if task_count <= 1 and template_config.get("fallback"):
+        agent._log("INFO", "Kun én opgave — bruger skabelonens faldback", "")
+        _build_fallback_tree(agent, prompt, template_config["fallback"])
         task_count = agent._count_tasks(agent.task_tree.root)
-        agent._log("INFO", t(K.LOG_DECOMPOSE_DONE, agent.lang), t(K.LOG_TASKS_CREATED, agent.lang).format(n=task_count))
 
+    if task_count >= 2 and template_config.get("name") in (None, "", "fri"):
+        # Check whether the LLM actually included success criteria. If none of the
+        # top-level tasks have criteria, the decomposition is too vague — use fallback.
+        has_criteria = any(
+            bool(getattr(c, 'success_criteria', None))
+            for c in agent.task_tree.root.children
+        )
+        if not has_criteria and template_config.get("fallback"):
+            agent._log("INFO", "Ingen succeskriterier i træet — bruger skabelonens strukturerede faldback", "")
+            _build_fallback_tree(agent, prompt, template_config["fallback"])
+            task_count = agent._count_tasks(agent.task_tree.root)
+
+    agent._log("INFO", t(K.LOG_DECOMPOSE_DONE, agent.lang), t(K.LOG_TASKS_CREATED, agent.lang).format(n=task_count))
     return agent.task_tree_to_dict()
 
 
@@ -273,6 +314,7 @@ class Agent:
         self._write_failed: bool = False
         self._tests_failed: bool = False
         self._located_files: set[str] = set()
+        self.refactoring_engine: RefactoringEngine = RefactoringEngine()
 
     def _register_tools(self) -> None:
         """register tools."""
@@ -465,6 +507,70 @@ class Agent:
             "Tilføj et billede til konteksten. Kræver: path (sti til billedfil). Returnerer MIME-type og størrelse.",
             ["path"],
             lambda path: self._add_image(path)
+        ))
+        self.tool_registry.register(Tool(
+            "extract_symbol",
+            "Flyt en funktion/klasse/variabel fra én .py-fil til en NY .py-fil. "
+            "Systemet finder symbolet via AST, kopierer det (med imports) til target-filen, "
+            "fjerner det fra source-filen, og tilføjer en import i source der peger på target-modulet. "
+            "Kræver: source (kildefil), symbol_name (f.eks. 'UserHandler'), target (målfil, f.eks. 'routes.py'). "
+            "Dette er DETERMINISTISK — bruger IKKE LLM'en. Returnerer detaljer om hvad der blev flyttet.",
+            ["source", "symbol_name", "target"],
+            lambda source, symbol_name, target: self.refactoring_engine.move_symbol(
+                source=source, symbol_name=symbol_name, target=target
+            )
+        ))
+        self.tool_registry.register(Tool(
+            "remove_symbol",
+            "Fjern en funktion/klasse/variabel fra en .py-fil via AST (deterministisk). "
+            "Bruges af Opdatér-fasen til at fjerne kode der allerede er flyttet til et modul. "
+            "Kræver: source (filsti), symbol_name (f.eks. 'UserHandler'). "
+            "Returnerer symbol, linjer fjernet, og resterende symboler i filen.",
+            ["source", "symbol_name"],
+            lambda source, symbol_name: self.refactoring_engine.remove_symbol(
+                source=source, symbol_name=symbol_name
+            )
+        ))
+        self.tool_registry.register(Tool(
+            "add_import",
+            "Tilføj 'from module import symbol' til en .py-fil (deterministisk). "
+            "Bruges af Opdatér-fasen når en symbol er flyttet til et modul — tilføj importen i den originale fil. "
+            "Kræver: source (filsti), module (modulnavn uden .py), symbol (symbolnavn). "
+            "Kræver IKKE at symbolet findes — systemet tilføjer blot import-linjen hvis den ikke allerede findes.",
+            ["source", "module", "symbol"],
+            lambda source, module, symbol: self.refactoring_engine.add_import(
+                source=source, module=module, symbol=symbol
+            )
+        ))
+        self.tool_registry.register(Tool(
+            "verify_refactor",
+            "Verificér at en .py-fil er syntaktisk gyldig efter refactoring. "
+            "Kræver: source (filsti). Returnerer success, antal linjer og symboler. "
+            "Bruges efter extract_symbol/remove_symbol/add_import for at bekræfte at filen ikke er korrupt.",
+            ["source"],
+            lambda source: self.refactoring_engine.verify_refactor(source=source)
+        ))
+        self.tool_registry.register(Tool(
+            "analyze_dependencies",
+            "Analysér ALLE top-level-symboler i en .py-fil og kortlæg afhængigheder mellem dem. "
+            "For hvert symbol vises: (1) hvilke andre symboler i samme fil det afhænger af, "
+            "(2) hvilke imports det bruger, (3) hvilke decorators det har. "
+            "Giver et komplet afhængighedsgraf over filen — BRUG DET FØRST for at planlægge modulopdeling. "
+            "Kræver: source (filsti).",
+            ["source"],
+            lambda source: self.refactoring_engine.analyze_dependencies(source=source)
+        ))
+        self.tool_registry.register(Tool(
+            "suggest_module_groups",
+            "Foreslå modulopdeling baseret på afhængighedsgrafen. "
+            "Bruger Tarjan's SCC-algoritme til at finde symboler der SKAL være sammen (cirkulære afhængigheder). "
+            "Returnerer grupper af symboler sorteret efter linjenummer, med markering af SCC-grupper. "
+            "Kræver: source (filsti), max_group_size (valgfri, default 5). "
+            "BRUG EFTER analyze_dependencies når du skal beslutte modulgrænser.",
+            ["source"],
+            lambda source, max_group_size=5: self.refactoring_engine.suggest_module_groups(
+                source=source, max_group_size=max_group_size
+            )
         ))
 
     def _register_agent_tools(self) -> None:
@@ -771,6 +877,22 @@ class Agent:
         
         Returns:
             dict[str, Any]"""
+        # Re-decompose loop protection — max 2 re-decomposes after failed execution
+        if hasattr(self, '_redecompose_count'):
+            self._redecompose_count += 1
+        else:
+            self._redecompose_count = 0
+        if self._redecompose_count > 2:
+            self._log("WARNING", "Re-decompose loop stopped",
+                       f"Forsøgte at re-decompose {self._redecompose_count} gange. Stopper for at undgå uendelig loop.")
+            return {
+                "success": False,
+                "error": f"Re-decompose loop stopped after {self._redecompose_count} attempts.",
+                "root": {"name": prompt[:50], "children": [
+                    {"name": prompt[:50], "status": "failed",
+                     "result": "Re-decompose loop stopped — maks 2 genforsøg."}
+                ]}
+            }
         self.agent_log = []
         self.original_prompt = prompt
         self.tool_registry.lang = self.lang

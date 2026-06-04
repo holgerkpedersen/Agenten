@@ -21,15 +21,15 @@
     "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
     "kodeanalyse": "Analyze the following code structurally. Return ONLY the following sections:\n## Purpose\n## Imports and Dependencies\n## Architecture\n## Code Quality\n## Security\n\n{lang_instruction}. Do not use <think> tags.",
     "diffanalyse": "YOU MUST start by calling git_log(5) and git_diff(HEAD~1,HEAD). Do NOT use any other tools. Then analyze the diff structurally. Return ONLY the following sections:\n## Change Overview\n## Risk Assessment (high/medium/low per file)\n## Breaking Changes\n## Code Quality\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",
-    "fri": "Break down the following task into 3-6 main tasks. Each must be a self-contained analysis or action — avoid micro-steps. Use max 2 levels. Return ONLY the tree structure. No explanations, no thought process.\n\nTask: {prompt}",
-    "agenten": "You are a PR workflow specialist. Use the tools to complete a Pull Request. Follow these steps in order:\n1. Create branch\n2. Stage and commit\n3. Push to remote\n4. Create Pull Request\n\nTask: {prompt}\n\n{lang_instruction}",
-    "programmering": "Analyze the following programming task and break it down into architectural phases. Return ONLY the tree structure with 2 spaces per level.\n\nThe phases must be:\n1. Requirements Analysis — understand the requirements\n2. Architecture Design — design components and data flow\n3. Implementation Plan — plan file structure and order\n4. Security Analysis — review security and best practices\n5. Code Implementation — write the code\n\nTask: {prompt}",
-    "python-arkitektur": "Analyze the following project and plan the Python/Flask architecture. Return ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}",
-    "billedanalyse": "Analyze an image structurally in five phases. Return ONLY the tree structure with 2 spaces per level.\n\nThe phases are:\n1. Description — what is seen in the image\n2. Context — what the image represents\n3. Details — specific elements, text, code, UI, numbers\n4. Assessment — quality, errors, improvement suggestions\n5. Export — save analysis to ./exports/billedanalyse_{timestamp}.md with write_file\n\nTask: {prompt}",
-    "bugfix": "You must fix a bug following TDD (Test-Driven Development). Execute phases in order:\n\n1. Analysis — understand the issue and root cause\n2. Test (Red) — write a pytest that catches the bug, run it (must fail)\n3. Implementation — fix the code with minimal change\n4. Verification (Green) — run the test (must pass), run the full suite\n5. Update — update issue status to 'resolved'\n\nReturn ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}",
-    "refactor": "You must refactor a Python file structurally. Execute phases in order:\n\n1. Analysis — read the file with read_chunk, understand functions, classes, imports and their responsibilities\n2. Plan — decide how to split the file into modules (e.g. one module per class/responsibility)\n3. Extract — create new module files with write_file, move relevant code. For large tasks: create ONE phase per file (e.g. \"Extract da.json\", \"Extract en.json\")\n4. Update — update the original file to import from new modules. For large tasks: create ONE phase per edit\n5. Test — run the test suite with run_tests to verify nothing broke\n\nFor large files: split into many small phases so each phase only does one thing at a time.\n\nReturn ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}",
-    "testgenerering": "You must generate tests for a Python file. Execute phases in order:\n\n1. Analysis — read the file with read_chunk, identify classes, functions and methods missing tests\n2. Test (Red) — write pytest tests for missing coverage with write_file (create new test file). Run with run_tests — tests MUST pass (green phase)\n3. Implementation — if code needs changes to be testable, use edit_file\n4. Verification (Green) — run the FULL test suite with run_tests to verify no regressions\n\nReturn ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}",
-    "issue_handler": "You must handle an issue. Follow these phases strictly in order:\n\n1. Read — read the issue with read_issue. Understand the problem. You MUST NOT read source code.\n2. Clarify — analyze the issue, read source with read_chunk, run tests. Update with update_issue_status if details missing. If bug is ALREADY fixed: mark resolved and write 'Already fixed — no changes made' in the resolution_note.\n3. Fix — fix with edit_file, run tests. Do NOT mark resolved — the next phase handles that.\n4. Close Issue — confirm fix and tests pass, update status to 'resolved' with precise resolution_note.\n\nReturn ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}"
+    "fri": "{lang_instruction}. {criteria_instr}\n\nCreate a clear overall plan for the following task. The plan must have 3-7 phases, EACH with visible success criteria in parentheses. If the prompt does not mention specific files or is imprecise, the FIRST phase must be \"Analyse\" that examines project files to find relevant sources. Success criteria are FINAL — they cannot be changed during execution regardless of what is discovered along the way.\n\nFormat: One line per task. Indent 2 spaces per level. Success criteria in parentheses after the task name. Max 2 levels. Return ONLY the tree structure. NO explanations, NO thought process.\n\nExample:\nAnalyse (read all .py files in root, identify responsibilities)\n  Read api_server.py (understand endpoints and middleware)\n  Read agent_core.py (understand agent facade methods)\nPlan (decide which functions to move)\nExtract (create routes.py with all @app.route functions)\nUpdate (remove moved code from api_server.py, add imports)\nTest (run tests, verify no regressions)\n\nTask: {prompt}",
+    "agenten": "{lang_instruction}. {criteria_instr}\n\nYou are a PR workflow specialist. Use the tools to complete a Pull Request. Follow these steps in order:\n1. Create branch\n2. Stage and commit\n3. Push to remote\n4. Create Pull Request\n\nTask: {prompt}",
+    "programmering": "{lang_instruction}. Analyze the following programming task and break it down into architectural phases. Return ONLY the tree structure with 2 spaces per level.\n\nThe phases must be ({criteria_instr}):\n1. Requirements Analysis — understand the requirements\n2. Architecture Design — design components and data flow\n3. Implementation Plan — plan file structure and order\n4. Security Analysis — review security and best practices\n5. Code Implementation — write the code\n\nTask: {prompt}",
+    "python-arkitektur": "{lang_instruction}. {criteria_instr}\n\nAnalyze the following project and plan the Python/Flask architecture. Return ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}",
+    "billedanalyse": "{lang_instruction}. Analyze an image structurally in five phases. Return ONLY the tree structure with 2 spaces per level.\n\nThe phases are ({criteria_instr}):\n1. Description — what is seen in the image\n2. Context — what the image represents\n3. Details — specific elements, text, code, UI, numbers\n4. Assessment — quality, errors, improvement suggestions\n5. Export — save analysis to ./exports/billedanalyse_{timestamp}.md with write_file\n\nTask: {prompt}",
+    "bugfix": "{lang_instruction}. You must fix a bug following TDD (Test-Driven Development). Execute phases in order ({criteria_instr}):\n\n1. Analysis — understand the issue and root cause\n2. Test (Red) — write a pytest that catches the bug, run it (must fail)\n3. Implementation — fix the code with minimal change\n4. Verification (Green) — run the test (must pass), run the full suite\n5. Update — update issue status to 'resolved'\n\nReturn ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}",
+    "refactor": "{lang_instruction}. {criteria_instr}\n\nYOU MUST refactor a Python file following SOLID principles. Execute these phases STRICTLY. Each phase has ONE clear goal — STOP when the goal is reached.\n\n1. Analysis — Use ONLY list_symbols(filepath) + read_location/locate. Do NOT read the whole file with read_chunk. Identify responsibilities and SOLID violations. Do NOT read tool implementation files (agent_files.py, tools.py).\n2. Plan — Decide module structure (routes.py, session.py, files.py, ...). Write the plan to a .md file with write_file. OUTPUT: refactor_plan.md.\n3. Extract — Create NEW module files with write_file. Your FIRST action MUST be write_file. Copy code from the original file. Read NOTHING before you write.\n4. Update — Update the original file with edit_file: remove moved code, add imports. Use read_location to see the exact code that needs editing.\n5. Test — Run run_tests. Fix failures with edit_file. Update issue status to 'resolved'. OUTPUT: passing tests + closed issue.\n\nFor large files: split into many small phases (e.g. ONE phase per module created). Each phase may do only ONE thing.\n\nReturn ONLY the tree structure with 2 spaces per level. NO explanations, NO tool analysis, ONLY the tree.\n\nTask: {prompt}",
+    "testgenerering": "{lang_instruction}. You must generate tests for a Python file. Execute phases in order ({criteria_instr}):\n\n1. Analysis — read the file with read_chunk, identify classes, functions and methods missing tests\n2. Test (Red) — write pytest tests for missing coverage with write_file (create new test file). Run with run_tests — tests MUST pass (green phase)\n3. Implementation — if code needs changes to be testable, use edit_file\n4. Verification (Green) — run the FULL test suite with run_tests to verify no regressions\n\nReturn ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}",
+    "issue_handler": "{lang_instruction}. You must handle an issue. Follow these phases strictly in order ({criteria_instr}):\n\n1. Read — read the issue with read_issue. Understand the problem. You MUST NOT read source code.\n2. Clarify — analyze the issue, read source with read_chunk, run tests. Update with update_issue_status if details missing. If bug is ALREADY fixed: mark resolved and write 'Already fixed — no changes made' in the resolution_note.\n3. Fix — fix with edit_file, run tests. Do NOT mark resolved — the next phase handles that.\n4. Close Issue — confirm fix and tests pass, update status to 'resolved' with precise resolution_note.\n\nReturn ONLY the tree structure with 2 spaces per level.\n\nTask: {prompt}"
   },
   "template_fallback": {
     "resume": [
@@ -100,6 +100,13 @@
       "Clarify",
       "Fix",
       "Close Issue"
+    ],
+    "fri": [
+      "Analyse the task and involved files",
+      "Plan the solution",
+      "Implement the solution",
+      "Test and verify",
+      "Finalize"
     ]
   },
   "fallback_tree": {
@@ -211,6 +218,8 @@
     "required_tools_missing": "Missing required tools: {tools}. Task cannot be completed without using these.",
     "tests_passed_no_resolve": "✅ Tests passed — remember to call update_issue_status() to mark the issue as resolved.",
     "red_test_passed": "✅ Red test passed — bug is already fixed. Completing Test (Red) phase.",
+    "test_but_no_refactor": "⚠️ Tests pass, but the refactor was NOT done: no modules from refactor_plan.md contain real code. Call edit_file to move functions from api_server.py to the modules, then re-run run_tests.",
+    "refactor_incomplete": "Refactoring is incomplete. {missing_count} module(s) still missing, or api_server.py not reduced below 1000 lines.",
     "phase_complete": "Phase auto-completed."
   },
   "errors": {
@@ -435,6 +444,13 @@
     "loading": "Loading...",
     "issues_error": "Error"
   },
+  "criteria.decompose": "Specify success criteria in parentheses after each task name, e.g.: Task (criterion1, criterion2)",
+  "criteria.header": "Success Criteria",
+  "criteria.conclude": "All success criteria have been met.",
+  "criteria.unmet": "The following success criteria are NOT met",
+  "criteria.label": "Success criteria for",
+  "criteria.think_only_tools": "Use thinking/tools only to execute tasks",
+  "criteria.doc_default_format": ".md or .txt",
   "extract_context_first": "Before calling any tools, you MUST first extract relevant information from the context above. Write 2-3 sentences summarizing what you know about the task based ONLY on the given context. Then call the necessary tools.",
   "extract_context_skipped": "You skipped context extraction. First read and summarize relevant information from the context, then call tools.",
   "rubric_passed": "✓",
@@ -445,5 +461,10 @@
   "write_file_first": "\n\n🚫 BLOCKED: Test (Red) phase requires you to write the test FIRST. Call write_file NOW — you already read enough in the Analysis phase.",
   "validation_done_too_short": "Result is too short ({0} chars). Write a more detailed analysis with concrete changes, code examples, and reasoning.",
   "tool_system_prompt_native": "You have access to tools. Call them when needed to complete the task.\n\n{tools_desc}\n\n## Task\n{task}",
-  "tool_continuation_native": "Available: {tools_list}. Use the tools to complete the task."
+  "tool_continuation_native": "Available: {tools_list}. Use the tools to complete the task.",
+  "phase.current": "🎯 CURRENT PHASE: {phase_name}\n\nYou are ONLY in this phase. Do NOT execute other phases — they run automatically in subsequent calls. Focus 100% on the task for **{phase_name}** and end with <<<DONE>>> when complete.",
+  "phase.only": "\n\n⛔ IMPORTANT: You are ONLY in phase '{phase_name}'. You must NOT execute other phases (e.g. if in Extract, do NOT create a plan; if in Plan, do NOT create modules). Focus exclusively on YOUR phase.",
+  "refactor.plan_loaded": "📄 Plan from previous phase (auto-loaded from refactor_plan.md):\n\n```\n{plan_content}\n```\n\n↑ Use this plan as the basis for creating module files. Each module mentioned in the plan must be created as a NEW .py file with write_file.",
+  "phase.auto_advanced": "✅ Phase auto-completed: {reason}\n\nThe system has verified that the success criterion is met. Moving to the next phase.",
+  "task_failed_label": "Tasks failed"
 }

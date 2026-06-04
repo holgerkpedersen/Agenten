@@ -39,3 +39,7 @@ github_wrapper
 module_builder
 tools
 web_searcher
+
+file_handler
+image_handler
+security

@@ -8,15 +8,16 @@ from skill_loader import SkillLoader
 
 
 TEMPLATE_TOOLS = {
-    "resume": ["list_chunks", "read_location", "read_chunk", "list_files", "locate"],
-    "kodeanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "locate", "create_issue", "create_refactor_issue"],
-    "diffanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "locate", "git_diff", "git_log", "create_issue", "create_refactor_issue"],
+    "resume": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate"],
+    "kodeanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "create_issue", "create_refactor_issue"],
+    "diffanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "git_diff", "git_log", "create_issue", "create_refactor_issue"],
     "fri": None,
     "agenten": [
         "list_chunks",
         "read_location",
         "read_chunk",
         "list_files",
+        "list_symbols",
         "locate",
         "github_create_pr",
         "git_status", "git_add_all", "git_commit", "git_push",
@@ -24,19 +25,41 @@ TEMPLATE_TOOLS = {
         "git_create_branch", "git_current_branch", "git_pull", "git_checkout",
         "git_remote_status"
     ],
-    "programmering": ["list_chunks", "read_location", "list_files", "locate", "write_file", "add_image", "create_issue", "create_refactor_issue"],
-    "python-arkitektur": ["list_chunks", "read_location", "list_files", "locate", "write_file", "create_issue", "create_refactor_issue"],
-    "billedanalyse": ["add_image", "write_file", "list_chunks", "read_location", "read_chunk", "list_files", "locate", "create_issue", "create_refactor_issue"],
-    "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_location", "locate", "write_file", "edit_file", "list_files"],
-    "refactor": ["read_issue", "update_issue_status", "list_chunks", "read_location", "list_files", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue"],
-    "testgenerering": ["list_chunks", "read_location", "list_files", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
+    "programmering": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "add_image", "create_issue", "create_refactor_issue"],
+    "python-arkitektur": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "create_issue", "create_refactor_issue"],
+    "billedanalyse": ["add_image", "write_file", "list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "create_issue", "create_refactor_issue"],
+    "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_location", "list_symbols", "locate", "write_file", "edit_file", "list_files"],
+    "refactor": ["read_issue", "update_issue_status", "list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "extract_symbol", "remove_symbol", "add_import", "verify_refactor"],
+    "testgenerering": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
     "issue_handler": [
         "read_issue", "update_issue_status", "run_tests",
-        "read_location", "list_chunks", "list_files", "locate",
+        "read_location", "list_chunks", "list_files", "list_symbols", "locate",
         "edit_file", "write_file",
         "create_issue", "create_refactor_issue",
     ],
 }
+
+# Per-template, per-phase iteration limits (LLM conversation turns).
+# Different templates need different budgets: refactor Ekstraher needs 15+
+# to create 7 modules, but a simple bugfix Analyse only needs 4.
+# Falls back to MAX_TASK_ITERATIONS from config if not specified.
+TEMPLATE_PHASE_ITERATION_LIMITS = {
+    "refactor": {
+        "Analyse": 4,    # Read issue + list_symbols + a few read_location
+        "Plan": 4,       # Read + write refactor_plan.md (auto-advances)
+        "Ekstraher": 6, # extract_symbol does all the work in 1 call per symbol
+        "Opdat\u00e9r": 12,  # ~5-8 edit_file + read_location for imports
+        "Test": 8,       # run_tests + 2-3 fix loops
+    },
+    "bugfix": {
+        "Analyse": 6,
+        "Test (Red)": 6,
+        "Implementering": 12,
+        "Verifikation (Green)": 8,
+        "Opdatering": 4,
+    },
+}
+
 
 TEMPLATE_TASK_TOOLS = {
     "agenten": {
@@ -46,29 +69,29 @@ TEMPLATE_TASK_TOOLS = {
         "pull request": ["github_create_pr", "git_remote_status", "git_diff", "git_log"],
     },
     "bugfix": {
-        "analyse": ["read_issue", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
-        "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_location", "read_chunk", "locate", "create_issue", "create_refactor_issue", "update_issue_status"],
-        "implementering": ["edit_file", "list_chunks", "read_location", "locate", "run_tests", "create_issue", "update_issue_status"],
-        "verifikation": ["run_tests", "edit_file", "list_chunks", "read_location", "locate", "create_issue", "update_issue_status"],
-        "opdatering": ["update_issue_status", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "create_issue"],
+        "analyse": ["read_issue", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
+        "test": ["write_file", "run_tests"],
+        "implementering": ["read_location", "locate", "edit_file", "run_tests"],
+        "verifikation": ["run_tests", "edit_file"],
+        "opdatering": ["update_issue_status"],
     },
     "refactor": {
-        "analyse": ["read_issue", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "create_refactor_issue"],
-        "plan": ["read_issue", "update_issue_status", "write_file", "list_files", "list_chunks", "read_location", "read_chunk", "locate"],
-        "ekstraher": ["write_file", "list_files", "list_chunks", "read_location", "locate"],
-        "opdat\u00e9r": ["update_issue_status", "edit_file", "write_file", "list_chunks", "read_location", "locate"],
-        "test": ["update_issue_status", "run_tests", "write_file", "edit_file", "list_chunks", "read_location", "locate"],
+        "analyse": ["read_issue", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_refactor_issue", "analyze_dependencies"],
+        "plan": ["read_issue", "update_issue_status", "write_file", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "analyze_dependencies", "suggest_module_groups"],
+        "ekstraher": ["list_symbols", "read_location", "locate", "write_file", "extract_symbol", "verify_refactor", "list_chunks", "read_chunk"],
+        "opdat\u00e9r": ["list_symbols", "read_location", "locate", "edit_file", "update_issue_status", "write_file", "remove_symbol", "add_import", "verify_refactor"],
+        "test": ["run_tests", "edit_file", "update_issue_status", "verify_refactor"],
     },
     "testgenerering": {
-        "analyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "run_tests", "create_issue", "create_refactor_issue"],
-        "test": ["write_file", "list_files", "run_tests", "list_chunks", "read_location", "read_chunk", "locate", "create_issue", "create_refactor_issue"],
-        "implementering": ["edit_file", "list_chunks", "read_location", "locate", "run_tests", "create_issue"],
-        "verifikation": ["run_tests", "edit_file", "list_chunks", "read_location", "locate", "create_issue"],
+        "analyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "run_tests", "create_issue", "create_refactor_issue"],
+        "test": ["write_file", "run_tests"],
+        "implementering": ["read_location", "locate", "edit_file", "run_tests"],
+        "verifikation": ["run_tests", "edit_file"],
     },
     "issue_handler": {
-        "analyse": ["read_issue", "update_issue_status", "run_tests", "read_location", "read_chunk", "list_chunks", "list_files", "locate", "create_refactor_issue"],
-        "fix": ["read_location", "write_file", "edit_file", "run_tests", "locate"],
-        "luk": ["update_issue_status", "read_issue", "run_tests"],
+        "analyse": ["read_issue", "update_issue_status", "run_tests", "read_location", "read_chunk", "list_chunks", "list_files", "locate", "list_symbols", "create_refactor_issue"],
+        "fix": ["read_location", "locate", "edit_file", "write_file", "run_tests"],
+        "luk": ["update_issue_status"],
     },
 }
 
@@ -118,11 +141,11 @@ SECTION_INSTRUCTIONS = {
         "Opdatering": "Opdater issue-status til 'resolved' med update_issue_status(). Tilføj en kort resolution_note om hvad der blev fikset.",
     },
     "refactor": {
-        "Analyse": "Læs issue med read_issue(). Læs filen med read_chunk(). Forstå alle funktioner, klasser, imports og deres ansvar. Identificér grænseflader og afhængigheder mellem komponenter. SKRIV IKKE til filer — kun analyse. Hvis refaktoreringen allerede er udført (koden er allerede opdelt), opdater issue-status til 'resolved' og afslut med <<<DONE>>>.",
-        "Plan": "Beslut hvordan filen opdeles i moduler. F.eks.: ét modul per klasse, ét modul per ansvarsområde, fælles imports i en base-modul. Overvej SOLID-principperne. Opdater issue-status til 'in_progress' med update_issue_status().",
-        "Ekstraher": "Opret nye modulfiler med write_file() — disse er NYE filer. Flyt relevant kode til hvert modul. Bevar samme funktionalitet — bare omorganiseret.",
-        "Opdatér": "Opdater den originale fil med edit_file(): fjern den kode der blev flyttet, tilføj import af nye moduler. Brug IKKE write_file — den originale fil findes allerede. Hvis edit_file fejler pga. syntaksfejl, ret din anmodning og prøv igen — brug IKKE <<<DONE>>> før edit_file lykkes.",
-        "Test": "Kør testsuiten med run_tests() for at verificere at intet er gået i stykker. Hvis tests fejler, ret import-stier og genkør. Bliv ved indtil ALLE tests består. Når alle tests består, opdater issue-status til 'resolved' med update_issue_status().",
+        "Analyse": "TRIN 1: Brug list_symbols(filepath='api_server.py') for at se ALLE symboler.\nTRIN 2: Brug read_location() p\u00e5 MINDST 5 funktioner/klasser for at forst\u00e5 struktur, dekoratorer og afh\u00e6ngigheder. Identific\u00e9r hvilke funktioner der har @app.route, @app.before_request osv.\nTRIN 3: Kortl\u00e6g ansvarsomr\u00e5der (routes, sikkerhed, sessioner, filh\u00e5ndtering, billeder, modeller) og afh\u00e6ngigheder mellem dem.\nTRIN 4: Identific\u00e9r SOLID-overtr\u00e6delser (SRP: \u00e9n fil g\u00f8r for meget).\nOutput: Din analyse som <<<DONE>>> tekst. SKRIV IKKE til filer. STOP f\u00f8rst n\u00e5r du har l\u00e6st nok til at forst\u00e5 HELE filens struktur.",
+        "Plan": "Beslut hvordan filen opdeles i moduler (f.eks.: routes.py, session.py, files.py, models.py). Brug write_file() til at skrive planen som en .md fil (f.eks. refactor_plan.md). Planen skal indeholde: hvilke moduler der oprettes, hvilke funktioner/klasser der flyttes til hvert modul, og i hvilken r\u00e6kkef\u00f8lge. Systemet auto-afslutter denne fase s\u00e5 snart refactor_plan.md er skrevet \u2014 du beh\u00f6ver IKKE lave yderligere kald bagefter. <<<DONE>>> f\u00f8rst n\u00e5r planen er skrevet.",
+        "Ekstraher": "Opret NYE .py modulfiler med write_file() eller extract_symbol() i.h.t. planen fra forrige fase. \ud83d\udd25 DETERMINISTISKE V\u00c6RKT\u00d8JER: Brug extract_symbol(source='api_server.py', symbol_name='FunktionsNavn', target='routes.py') for at flytte en funktion/klasse til et nyt modul \u2014 systemet kopierer symbolet inkl. imports, fjerner det fra api_server.py, OG tilf\u00f8jer en import i api_server.py. Du beh\u00f8ver KUN \u00e9t kald per symbol. Brug verify_refactor(source='api_server.py') bagefter for at bekr\u00e6fte syntaks. Du skal oprette FILER som routes.py, session_manager.py, file_handler.py osv. \u2014 IKKE write_file til refactor_plan.md (den findes allerede fra Plan-fasen og er auto-indl\u00e6st i din kontekst ovenfor). \ud83d\udd25 EFFEKTIVITETSGUIDE: Du har KUN 6 iterations. Strategi: (1) brug list_symbols F\u00d8RST for at se ALLE symboler p\u00e5 \u00e9n gang, (2) brug extract_symbol til at flytte \u00e9t symbol ad gangen (det g\u00f8r ALT arbejdet: kopi\u00e9r, fjern, tilf\u00f8j import), (3) brug write_file kun til at oprette tomme modulfiler med stubs, (4) brug verify_refactor hvis du er i tvivl om syntaks. Systemet auto-afslutter denne fase s\u00e5 snart ALLE moduler n\u00e6vnt i planen er oprettet \u2014 du beh\u00f8ver IKKE lave yderligere kald bagefter.",
+        "Opdat\u00e9r": "Opdater api_server.py med remove_symbol() og add_import() \u2014 DETERMINISTISKE v\u00e6rkt\u00f8jer der ikke kr\u00e6ver LLM. Brug remove_symbol(source='api_server.py', symbol_name='FunktionsNavn') for at fjerne et symbol der allerede er flyttet til et modul. Brug add_import(source='api_server.py', module='routes', symbol='FunktionsNavn') for at tilf\u00f8je en import til et modul. Brug verify_refactor(source='api_server.py') til at tjekke syntaks. \ud83d\udd25 EFFEKTIVITETSGUIDE: Du har KUN 12 iterations. Strategi: (1) brug list_symbols F\u00d8RST for at se ALLE resterende symboler, (2) brug remove_symbol til at fjerne \u00e9t symbol ad gangen (fjerner automatisk inkl. decorators), (3) tilf\u00f8j imports med add_import, (4) brug verify_refactor til at bekr\u00e6fte. Brug edit_file KUN hvis remove_symbol/add_import ikke kan klare opgaven (f.eks. ved komplekse sektioner der ikke er rene symboler). <<<DONE>>> f\u00f8rst n\u00e5r api_server.py er syntaktisk gyldig og alle relevante imports er tilf\u00f8jet.",
+        "Test": "K\u00f8r testsuiten med run_tests(). Hvis tests fejler, ret import-stier med edit_file() og genk\u00f8r. Bliv ved indtil ALLE tests best\u00e5r. Opdater issue-status til 'resolved' med update_issue_status() n\u00e5r tests best\u00e5r.",
     },
     "testgenerering": {
         "Analyse": "Læs filen med read_chunk(). Forstå alle klasser, funktioner, metoder og imports. Identificér hvilke der allerede har tests og hvilke der mangler. Opret et issue med create_issue() hvis du finder kode der mangler tests.",
@@ -197,6 +220,10 @@ def format_skills_for_prompt(agent: Any) -> str:
     for s in agent._active_skills:
         tag = "BASE" if s.get("base") else "MATCH"
         lines.append(f"- **{s.get('name', 'unknown')}** [{tag}]: {s.get('description', '')[:120]}")
+        body = s.get("body", "")
+        if body and not s.get("base"):
+            lines.append("")
+            lines.append(body)
     return "\n".join(lines)
 
 
@@ -230,42 +257,42 @@ def get_templates(agent: Any) -> dict[str, dict[str, str | None]]:
         },
         "agenten": {
             "name": t(K.T_AGENTEN, agent.lang),
-            "prompt": t(K.TP_AGENTEN, agent.lang).replace("{lang_instruction}", lang_instr),
+            "prompt": t(K.TP_AGENTEN, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_AGENTEN, agent.lang),
         },
         "programmering": {
             "name": t(K.T_PROGRAMMERING, agent.lang),
-            "prompt": t(K.TP_PROGRAMMERING, agent.lang).replace("{lang_instruction}", lang_instr),
+            "prompt": t(K.TP_PROGRAMMERING, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_PROGRAMMERING, agent.lang),
         },
         "python-arkitektur": {
             "name": t(K.T_PYTHON_ARKITEKTUR, agent.lang),
-            "prompt": t(K.TP_PYTHON_ARKITEKTUR, agent.lang).replace("{lang_instruction}", lang_instr),
+            "prompt": t(K.TP_PYTHON_ARKITEKTUR, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_PYTHON_ARKITEKTUR, agent.lang),
         },
         "billedanalyse": {
             "name": t(K.T_BILLEDANALYSE, agent.lang),
-            "prompt": t(K.TP_BILLEDANALYSE, agent.lang).replace("{lang_instruction}", lang_instr),
+            "prompt": t(K.TP_BILLEDANALYSE, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_BILLEDANALYSE, agent.lang),
         },
         "bugfix": {
             "name": t(K.T_BUGFIX, agent.lang),
-            "prompt": t(K.TP_BUGFIX, agent.lang).replace("{lang_instruction}", lang_instr),
+            "prompt": t(K.TP_BUGFIX, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_BUGFIX, agent.lang),
         },
         "refactor": {
             "name": t(K.T_REFACTOR, agent.lang),
-            "prompt": t(K.TP_REFACTOR, agent.lang).replace("{lang_instruction}", lang_instr),
+            "prompt": t(K.TP_REFACTOR, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_REFACTOR, agent.lang),
         },
         "testgenerering": {
             "name": t(K.T_TESTGENERERING, agent.lang),
-            "prompt": t(K.TP_TESTGENERERING, agent.lang).replace("{lang_instruction}", lang_instr),
+            "prompt": t(K.TP_TESTGENERERING, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_TESTGENERERING, agent.lang),
         },
         "issue_handler": {
             "name": t(K.T_ISSUE_HANDLER, agent.lang),
-            "prompt": t(K.TP_ISSUE_HANDLER, agent.lang).replace("{lang_instruction}", lang_instr),
+            "prompt": t(K.TP_ISSUE_HANDLER, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_ISSUE_HANDLER, agent.lang),
         },
     }

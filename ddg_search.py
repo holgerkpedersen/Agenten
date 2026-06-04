@@ -66,11 +66,14 @@ def search_ddg(query: str, max_results: int = 5) -> List[Dict]:
     
     Returns:
         List[Dict]"""
-    params = urllib.parse.urlencode({'q': query, 'kl': 'en-us'})
-    url = f'https://html.duckduckgo.com/html/?{params}'
+    url = 'https://html.duckduckgo.com/html/'
+    data = urllib.parse.urlencode({'q': query}).encode()
     for attempt in range(3):
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': _UA})
+            req = urllib.request.Request(url, data=data, headers={
+                'User-Agent': _UA,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            })
             with urllib.request.urlopen(req, timeout=10) as resp:
                 html = resp.read().decode('utf-8', errors='replace')
             break

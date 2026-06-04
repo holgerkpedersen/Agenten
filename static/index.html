@@ -135,7 +135,28 @@
             border-radius: 16px;
             text-align: left;
             flex-shrink: 0;
-            transition: background 0.3s;
+            transition: background 0.3s, padding 0.2s;
+        }
+        .header.collapsed {
+            padding: 6px 16px;
+        }
+        .header.collapsed #headerBody {
+            display: none;
+        }
+        .collapse-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 6px;
+            border-radius: 6px;
+            line-height: 1;
+            transition: background 0.2s, transform 0.2s;
+        }
+        .collapse-btn:hover {
+            background: var(--btn-secondary-hover);
+            color: var(--text);
         }
         
         h1 {
@@ -581,7 +602,10 @@
 <div class="app-container">
     <div class="header">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-            <h1>🤖 Agenten</h1>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <h1>🤖 Agenten</h1>
+                <button class="collapse-btn" id="headerCollapseBtn" onclick="toggleHeaderCollapse()" title="Skjul/vis topmenu" style="font-size:12px;">▲</button>
+            </div>
 <div class="tools-wrapper">
                 <button class="tools-toggle" onclick="toggleTools()" id="toolsMenu" title="Flere værktøjer">⚙️</button>
                 <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Skift tema">☀️</button>
@@ -611,6 +635,7 @@
                 </div>
             </div>
         </div>
+        <div id="headerBody">
         <div id="folderStatus" style="font-size: 11px; margin-bottom: 5px;"></div>
         
         <div class="toolbar-row">
@@ -688,6 +713,7 @@
             <div id="fileContentPreview" class="file-preview"></div>
         </div>
         <div id="templateWarning" class="template-warning" style="display:none;"></div>
+        </div>
     </div>
     
     <div class="canvas-container" id="canvasContainer"></div>
@@ -1081,6 +1107,8 @@ let panels = {};
 let showThinking = false;
 let treeEditMode = false;
 let currentTheme = localStorage.getItem('agenten_theme') || 'dark';
+let phaseChecksByTemplate = {};
+let currentTemplate = '';
 
 function toggleTheme() {
     currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -1094,6 +1122,7 @@ function switchTemplate(template) {
     document.getElementById('templateSelect').value = template;
     document.getElementById('templateWarning').style.display = 'none';
     addLogEntry('INFO', 'Skiftede skabelon', `til '${template}' — gentag nedbrydning`);
+    loadPhaseChecks(template);
 }
 
 // Apply saved theme on load
@@ -1164,7 +1193,9 @@ function addLogEntry(level, message, detail) {
         <span style="font-size: 10px; color: #64748b;">${escapeHtml(detail || '')}</span>
     </div>`;
     logBox.innerHTML += logHtml;
-    logBox.scrollTop = logBox.scrollHeight;
+    if (logBox.scrollTop + logBox.clientHeight >= logBox.scrollHeight - 60) {
+        logBox.scrollTop = logBox.scrollHeight;
+    }
 }
 
 function renderTree(node, path = []) {
@@ -1173,17 +1204,31 @@ function renderTree(node, path = []) {
     const statusText = node.status === 'done' ? '✓' : (node.status === 'running' ? '⏳' : (node.status === 'failed' ? '✗' : '○'));
     const pathStr = path.join('.');
     let html = `<div data-path="${pathStr}"><div class="tree-node-content">`;
-    
+
     // Show success criteria if they exist
     let criteriaHtml = '';
     if (node.success_criteria && node.success_criteria.length > 0) {
         const criteriaList = node.success_criteria.map(c => `• ${escapeHtml(c)}`).join(' ');
         criteriaHtml = `<div class="task-criteria" style="font-size: 0.8em; opacity: 0.8; margin-top: 2px; padding-left: 20px;">${criteriaList}</div>`;
     }
+
+    // Show deterministic phase-check description (auto-advance criterion)
+    // Looked up by case-insensitive match against phaseChecksByTemplate[currentTemplate]
+    let phaseCheckHtml = '';
+    if (currentTemplate && phaseChecksByTemplate[currentTemplate]) {
+        const phaseName = (node.name || '').toLowerCase();
+        const phases = phaseChecksByTemplate[currentTemplate];
+        for (const [key, info] of Object.entries(phases)) {
+            if (key.toLowerCase() === phaseName) {
+                phaseCheckHtml = `<div class="task-phase-check" style="font-size: 0.78em; opacity: 0.75; margin-top: 2px; padding-left: 20px; color: #4ade80;">✓ ${escapeHtml(info.description)}</div>`;
+                break;
+            }
+        }
+    }
     if (treeEditMode) {
         html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="${_('btn_edit')}" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="${_('btn_delete')}" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="${_('btn_add_child')}" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
     }
-    html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>${criteriaHtml}`;
+    html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>${criteriaHtml}${phaseCheckHtml}`;
     if (node.children && node.children.length > 0) { 
         html += `<div class="tree-children">`; 
         for (let i = 0; i < node.children.length; i++) { 
@@ -1193,6 +1238,25 @@ function renderTree(node, path = []) {
     }
     html += `</div>`; 
     return html;
+}
+
+async function loadPhaseChecks(template) {
+    if (!template) {
+        phaseChecksByTemplate = {};
+        return;
+    }
+    if (phaseChecksByTemplate[template]) {
+        return;
+    }
+    try {
+        const resp = await fetch(`/api/phase-checks?template=${encodeURIComponent(template)}`);
+        const data = await resp.json();
+        if (data.success && data.phases) {
+            phaseChecksByTemplate[template] = data.phases[template] || {};
+        }
+    } catch (e) {
+        console.warn('Failed to load phase checks:', e);
+    }
 }
 
 function updateTreeDisplay() {
@@ -1365,6 +1429,14 @@ async function onFilePicked(event) {
     document.getElementById('filePathInput').value = nameDisplay;
     addLogEntry('INFO', _('files_selected'), nameDisplay);
     event.target.value = '';
+}
+
+function toggleHeaderCollapse() {
+    const header = document.querySelector('.header');
+    const btn = document.getElementById('headerCollapseBtn');
+    const collapsed = header.classList.toggle('collapsed');
+    btn.textContent = collapsed ? '▼' : '▲';
+    try { localStorage.setItem('agenten_header_collapsed', collapsed ? '1' : '0'); } catch(e) {}
 }
 
 function toggleFileSection() {
@@ -2067,8 +2139,11 @@ async function loadSelectedSession() {
         if (data.session.template) {
             document.getElementById('templateSelect').value = data.session.template;
             lastDecomposeTemplate = data.session.template;
+            currentTemplate = data.session.template;
+            await loadPhaseChecks(data.session.template);
         } else {
             document.getElementById('templateSelect').value = 'fri';
+            currentTemplate = 'fri';
         }
         
         if (data.session.ui_lang) {
@@ -2197,7 +2272,7 @@ async function saveCurrentSession() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
             session_id: currentSessionId,
-            name: currentPrompt.slice(0, 30) || 'Session',
+            name: currentPrompt.slice(0, 100) || 'Session',
             tree: currentTree,
             layout: layout,
             prompt_history: [],
@@ -2259,6 +2334,8 @@ async function decompose() {
         currentTree = data.tree;
         currentSessionId = data.session_id;
         lastDecomposeTemplate = document.getElementById('templateSelect').value;
+        currentTemplate = lastDecomposeTemplate;
+        await loadPhaseChecks(currentTemplate);
         updateTreeDisplay();
         await updatePromptHistory(currentSessionId);
         addLogEntry('INFO', _('decompose_done'), `${data.session_id}`);
@@ -2437,7 +2514,9 @@ async function executeWithStream() {
                         outputDiv.textContent = clean;
                     }
                 }
-                if (llmBox) llmBox.scrollTop = llmBox.scrollHeight;
+                if (llmBox && llmBox.scrollTop + llmBox.clientHeight >= llmBox.scrollHeight - 60) {
+                    llmBox.scrollTop = llmBox.scrollHeight;
+                }
                 break;
                 
             case 'progress':
@@ -2489,7 +2568,9 @@ async function executeWithStream() {
                 addLogEntry(success ? 'TOOL' : 'ERROR', `${icon} ${data.tool}`, rtext.length > 500 ? rtext.slice(0, 500) + '…' : rtext);
                 if (llmBox && success) {
                     llmBox.innerHTML += `<div style="color:var(--success); margin:5px 0; padding:5px; background:var(--panel-bg); border-left:3px solid var(--success); font-size:12px;">${icon} <strong>${escapeHtml(data.tool)}</strong>: ${escapeHtml(data.result.result?.url || data.result.result?.output || 'OK').slice(0, 150)}</div>`;
-                    llmBox.scrollTop = llmBox.scrollHeight;
+                    if (llmBox.scrollTop + llmBox.clientHeight >= llmBox.scrollHeight - 60) {
+                        llmBox.scrollTop = llmBox.scrollHeight;
+                    }
                 }
                 break;
                 
@@ -2980,6 +3061,12 @@ document.addEventListener('DOMContentLoaded', function() {
     createPanels();
     refreshSessions();
     checkFolderStatus();
+    try {
+        if (localStorage.getItem('agenten_header_collapsed') === '1') {
+            document.querySelector('.header').classList.add('collapsed');
+            document.getElementById('headerCollapseBtn').textContent = '▼';
+        }
+    } catch(e) {}
 });
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>

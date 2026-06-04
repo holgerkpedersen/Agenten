@@ -21,15 +21,15 @@
     "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
     "kodeanalyse": "Analyser følgende kode struktureret. Returnér KUN følgende sektioner:\n## Formål\n## Imports og afhængigheder\n## Arkitektur\n## Kodekvalitet\n## Sikkerhed\n\n{lang_instruction}. Brug ikke <think> tags.",
     "diffanalyse": "DU SKAL starte med at kalde git_log(5) og git_diff(HEAD~1,HEAD). Brug IKKE andre værktøjer. Analyser dernæst diff'en struktureret. Returnér KUN følgende sektioner:\n## Oversigt\n## Risikovurdering (høj/middel/lav per fil)\n## Brydende ændringer\n## Kodekvalitet\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
-    "fri": "Nedbryd følgende opgave i 3-6 hovedopgaver. Hver opgave skal være en selvstændig analyse eller handling — undgå mikroskopiske trin. Brug maks 2 niveauer. Returner KUN træstrukturen. Ingen forklaringer, ingen tankeprocess.\n\nOpgave: {prompt}",
-    "agenten": "Du er en PR workflow-specialist. Brug værktøjerne til at gennemføre en Pull Request. Følg disse trin i rækkefølge:\n1. Opret branch\n2. Stage og commit\n3. Push til remote\n4. Opret Pull Request\n\nOpgave: {prompt}\n\n{lang_instruction}",
-    "programmering": "Analyser følgende programmeringsopgave og nedbryd den i arkitektoniske faser. Returnér KUN træstrukturen med 2 mellemrum per niveau.\n\nFaserne skal være:\n1. Kravanalyse — forstå kravene\n2. Arkitekturdesign — design komponenter og dataflow\n3. Implementeringsplan — planlæg filstruktur og rækkefølge\n4. Sikkerhedsanalyse — gennemgå sikkerhed og best practices\n5. Kodeimplementering — skriv koden\n\nOpgave: {prompt}",
-    "python-arkitektur": "Analyser følgende projekt og planlæg Python/Flask-arkitekturen. Returnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}",
-    "billedanalyse": "Analyser et billede struktureret i fem faser. Returnér KUN træstrukturen med 2 mellemrum per niveau.\n\nFaserne skal være:\n1. Beskrivelse — hvad ses på billedet\n2. Kontekst — hvad repræsenterer billedet\n3. Detaljer — specifikke elementer, tekst, kode, UI, tal\n4. Vurdering — kvalitet, fejl, forbedringsforslag\n5. Eksportér — gem analysen i ./exports/billedanalyse_{timestamp}.md med write_file\n\nOpgave: {prompt}",
-    "bugfix": "Du skal rette en bug ved at følge TDD (Test-Driven Development). Udfør faserne i rækkefølge:\n\n1. Analyse — forstå issue og rodårsag\n2. Test (Red) — skriv en pytest der fanger bug'en, kør den (skal fejle)\n3. Implementering — ret koden med minimal ændring\n4. Verifikation (Green) — kør testen (skal bestå), kør hele testsuiten\n5. Opdatering — opdater issue-status til 'resolved'\n\nReturnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}",
-    "refactor": "Du skal refaktorere en Python-fil struktureret. Følg disse faser i rækkefølge:\n\n1. Analyse — læs filen med read_chunk, forstå funktioner, klasser, imports og deres ansvar\n2. Plan — beslut hvordan filen opdeles i moduler (f.eks. ét modul per klasse/ansvar)\n3. Ekstraher — opret nye modulfiler med write_file, flyt relevant kode. For store opgaver: opret ÉN fase per fil (f.eks. \"Ekstraher da.json\", \"Ekstraher en.json\")\n4. Opdatér — opdater den originale fil til at importere fra nye moduler. For store opgaver: opret ÉN fase per redigering\n5. Test — kør testsuiten med run_tests for at verificere intet er gået i stykker\n\nFor store filer: opdel i flere små faser så hver fase kun laver én ting ad gangen.\n\nReturnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}",
-    "testgenerering": "Du skal generere tests for en Python-fil. Følg disse faser i rækkefølge:\n\n1. Analyse — læs filen med read_chunk, identificér klasser, funktioner og metoder der mangler tests\n2. Test (Red) — skriv pytest-tests for den manglende dækning med write_file (opret ny testfil). Kør med run_tests — tests SKAL bestå (grøn fase)\n3. Implementering — hvis koden skal ændres for at gøres testbar, brug edit_file\n4. Verifikation (Green) — kør HELE testsuiten med run_tests for at verificere ingen regressions\n\nReturnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}",
-    "issue_handler": "Du skal håndtere en issue. Følg disse faser slavisk i rækkefølge:\n\n1. Læs — læs issue med read_issue. Forstå problemet. Du må IKKE læse kildekode.\n2. Afklar — analysér issue, læs kildekode med read_chunk, kør tests. Opdater med update_issue_status hvis detaljer mangler. Hvis fejlen ALLEREDE er løst: markér resolved og skriv 'Allerede løst — ingen ændringer foretaget' i resolution_note.\n3. Fix — ret fejlen med edit_file, kør tests. Må IKKE markere resolved — det gøres i næste fase.\n4. Luk Issue — bekræft at fix og tests er OK, opdater status til 'resolved' med præcis resolution_note.\n\nReturnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}"
+    "fri": "{lang_instruction}. {criteria_instr}\n\nOpret en klar overordnet plan for følgende opgave. Planen skal have 3-7 faser, HVER med synlige succeskriterier i parentes. Hvis prompten ikke nævner specifikke filer eller er upræcis, skal FØRSTE fase være \"Analyse\" der undersøger projektets filer for at finde relevante kilder. Succeskriterierne er ENDELIGE — de kan ikke ændres under udførelse, uanset hvad der opdages undervejs.\n\nFormatering: Hver linje er en opgave. Indryk med 2 mellemrum per niveau. Succeskriterier i parentes efter opgavenavnet. Maks 2 niveauer. Returner KUN træstrukturen. INGEN forklaringer, INGEN tankeproces.\n\nEksempel:\nAnalyse (læs alle .py-filer i roden, identificér ansvarsområder)\n  Læs api_server.py (forstå endpoints og middleware)\n  Læs agent_core.py (forstå agent-facadens metoder)\nPlan (beslut hvilke funktioner der flyttes)\nEkstraher (opret routes.py med alle @app.route-funktioner)\nOpdatér (fjern flyttet kode fra api_server.py, tilføj imports)\nTest (kør tests, verificér ingen regressions)\n\nOpgave: {prompt}",
+    "agenten": "{lang_instruction}. {criteria_instr}\n\nDu er en PR workflow-specialist. Brug værktøjerne til at gennemføre en Pull Request. Følg disse trin i rækkefølge:\n1. Opret branch\n2. Stage og commit\n3. Push til remote\n4. Opret Pull Request\n\nOpgave: {prompt}",
+    "programmering": "{lang_instruction}. Analyser følgende programmeringsopgave og nedbryd den i arkitektoniske faser. Returnér KUN træstrukturen med 2 mellemrum per niveau.\n\nFaserne skal være ({criteria_instr}):\n1. Kravanalyse — forstå kravene\n2. Arkitekturdesign — design komponenter og dataflow\n3. Implementeringsplan — planlæg filstruktur og rækkefølge\n4. Sikkerhedsanalyse — gennemgå sikkerhed og best practices\n5. Kodeimplementering — skriv koden\n\nOpgave: {prompt}",
+    "python-arkitektur": "{lang_instruction}. {criteria_instr}\n\nAnalyser følgende projekt og planlæg Python/Flask-arkitekturen. Returnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}",
+    "billedanalyse": "{lang_instruction}. Analyser et billede struktureret i fem faser. Returnér KUN træstrukturen med 2 mellemrum per niveau.\n\nFaserne skal være ({criteria_instr}):\n1. Beskrivelse — hvad ses på billedet\n2. Kontekst — hvad repræsenterer billedet\n3. Detaljer — specifikke elementer, tekst, kode, UI, tal\n4. Vurdering — kvalitet, fejl, forbedringsforslag\n5. Eksportér — gem analysen i ./exports/billedanalyse_{timestamp}.md med write_file\n\nOpgave: {prompt}",
+    "bugfix": "{lang_instruction}. Du skal rette en bug ved at følge TDD (Test-Driven Development). Udfør faserne i rækkefølge ({criteria_instr}):\n\n1. Analyse — forstå issue og rodårsag\n2. Test (Red) — skriv en pytest der fanger bug'en, kør den (skal fejle)\n3. Implementering — ret koden med minimal ændring\n4. Verifikation (Green) — kør testen (skal bestå), kør hele testsuiten\n5. Opdatering — opdater issue-status til 'resolved'\n\nReturnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}",
+    "refactor": "{lang_instruction}. {criteria_instr}\n\nDU SKAL refaktorere en Python-fil efter SOLID-principperne. Følg disse faser SLavisk. Hver fase har ÉT klart mål — STOP når målet er nået.\n\n1. Analyse — Brug KUN list_symbols(filepath) + read_location/locate. Læs IKKE hele filen med read_chunk. Identificér ansvarsområder og SOLID-overtrædelser. Læs IKKE tool-implementering (agent_files.py, tools.py).\n2. Plan — Beslut modulopdeling (routes.py, session.py, files.py, ...). Skriv planen til en .md fil med write_file. OUTPUT: refactor_plan.md.\n3. Ekstraher — Opret NYE modulfiler med write_file. Din FØRSTE handling SKAL være write_file. Kopiér kode fra den originale fil. Læs INTET før du skriver.\n4. Opdatér — Opdater den originale fil med edit_file: fjern flyttet kode, tilføj imports. Brug read_location til at se præcis den kode der skal redigeres.\n5. Test — Kør run_tests. Ret fejl med edit_file. Opdater issue-status til 'resolved'. OUTPUT: beståede tests + lukket issue.\n\nFor store filer: opdel i flere små faser (f.eks. ÉN fase per modul der oprettes). Hver fase má maksimalt lave ÉN ting.\n\nReturnéR KUN træstrukturen med 2 mellemrum per niveau. INGEN forklaringer, INGEN tool-analyse, KUN træet.\n\nOpgave: {prompt}",
+    "testgenerering": "{lang_instruction}. Du skal generere tests for en Python-fil. Følg disse faser i rækkefølge ({criteria_instr}):\n\n1. Analyse — læs filen med read_chunk, identificér klasser, funktioner og metoder der mangler tests\n2. Test (Red) — skriv pytest-tests for den manglende dækning med write_file (opret ny testfil). Kør med run_tests — tests SKAL bestå (grøn fase)\n3. Implementering — hvis koden skal ændres for at gøres testbar, brug edit_file\n4. Verifikation (Green) — kør HELE testsuiten med run_tests for at verificere ingen regressions\n\nReturnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}",
+    "issue_handler": "{lang_instruction}. Du skal håndtere en issue. Følg disse faser slavisk i rækkefølge ({criteria_instr}):\n\n1. Læs — læs issue med read_issue. Forstå problemet. Du må IKKE læse kildekode.\n2. Afklar — analysér issue, læs kildekode med read_chunk, kør tests. Opdater med update_issue_status hvis detaljer mangler. Hvis fejlen ALLEREDE er løst: markér resolved og skriv 'Allerede løst — ingen ændringer foretaget' i resolution_note.\n3. Fix — ret fejlen med edit_file, kør tests. Må IKKE markere resolved — det gøres i næste fase.\n4. Luk Issue — bekræft at fix og tests er OK, opdater status til 'resolved' med præcis resolution_note.\n\nReturnér KUN træstrukturen med 2 mellemrum per niveau.\n\nOpgave: {prompt}"
   },
   "template_fallback": {
     "resume": [
@@ -100,6 +100,13 @@
       "Afklar",
       "Fix",
       "Luk Issue"
+    ],
+    "fri": [
+      "Analyser opgaven og involverede filer",
+      "Planlæg løsning",
+      "Implementér løsning",
+      "Test og verificér",
+      "Afslut"
     ]
   },
   "fallback_tree": {
@@ -211,6 +218,8 @@
     "required_tools_missing": "Manglende påkrævede værktøjer: {tools}. Opgaven kan ikke afsluttes uden at bruge disse.",
     "tests_passed_no_resolve": "✅ Tests bestået — husk at kalde update_issue_status() for at markere issuet som løst.",
     "red_test_passed": "✅ Rød test bestået — fejlen er allerede rettet. Afslutter Test (Red) fasen.",
+    "test_but_no_refactor": "⚠️ Tests består, men refaktoreringen er IKKE udført: ingen moduler fra refactor_plan.md indeholder reel kode. Kald edit_file for at flytte funktioner fra api_server.py til modulerne, og kør derefter run_tests igen.",
+    "refactor_incomplete": "Refaktoreringen er ufuldstændig. {missing_count} modul(er) mangler stadig, eller api_server.py er ikke reduceret til under 1000 linjer.",
     "phase_complete": "Fase gennemført automatisk."
   },
   "errors": {
@@ -435,6 +444,13 @@
     "loading": "Indlæser...",
     "issues_error": "Fejl"
   },
+  "criteria.decompose": "Angiv succeskriterier i parentes efter hvert opgavenavn, f.eks.: Opgave (kriterie1, kriterie2)",
+  "criteria.header": "Success-kriterier",
+  "criteria.conclude": "Alle succeskriterier er opfyldt.",
+  "criteria.unmet": "Følgende succeskriterier er IKKE opfyldt",
+  "criteria.label": "Success-kriterier for",
+  "criteria.think_only_tools": "Brug kun tænkning/tools til at udføre opgaver",
+  "criteria.doc_default_format": ".md eller .txt",
   "extract_context_first": "Før du kalder nogen værktøjer, SKAL du først udtrække relevant information fra konteksten ovenfor. Skriv 2-3 sætninger der opsummerer hvad du ved om opgaven baseret KUN på den givne kontekst. Derefter kald de nødvendige værktøjer.",
   "extract_context_skipped": "Du sprang kontekstudtrækningen over. Læs først og opsummer relevant information fra konteksten, og kald derefter værktøjer.",
   "rubric_passed": "✓",
@@ -445,5 +461,10 @@
   "write_file_first": "\n\n🚫 BLOCKERET: Test (Red)-fasen kræver at du FØRST skriver testen. Kald write_file NU — du har allerede læst nok i Analyse-fasen.",
   "validation_done_too_short": "Resultatet er for kort ({0} tegn). Skriv en mere detaljeret analyse med konkrete ændringer, kodeeksempler og begrundelser.",
   "tool_system_prompt_native": "Du har adgang til værktøjer. Kald dem når det er nødvendigt for at fuldføre opgaven.\n\n{tools_desc}\n\n## Opgave\n{task}",
-  "tool_continuation_native": "Tilgængelige: {tools_list}. Brug værktøjerne til at fuldføre opgaven."
+  "tool_continuation_native": "Tilgængelige: {tools_list}. Brug værktøjerne til at fuldføre opgaven.",
+  "phase.current": "🎯 NUVÆRENDE FASE: {phase_name}\n\nDu er KUN i denne fase. Udfør IKKE andre faser — de udføres automatisk i efterfølgende kald. Fokuser 100% på opgaven for **{phase_name}** og afslut med <<<DONE>>> når den er fuldført.",
+  "phase.only": "\n\n⛔ VIGTIGT: Du er KUN i fasen '{phase_name}'. Du må IKKE udføre andre faser (f.eks. hvis du er i Ekstraher, må du IKKE lave en plan; hvis du er i Plan, må du IKKE oprette moduler). Fokuser udelukkende på DIN fase.",
+  "refactor.plan_loaded": "📄 Plan fra forrige fase (auto-indlæst fra refactor_plan.md):\n\n```\n{plan_content}\n```\n\n↑ Brug denne plan som grundlag for at oprette modulfiler. Hvert modul nævnt i planen skal oprettes som en NY .py fil med write_file.",
+  "phase.auto_advanced": "✅ Fase auto-afsluttet: {reason}\n\nSystemet har verificeret at succeskriteriet er opfyldt. Vi går videre til næste fase.",
+  "task_failed_label": "Opgaver fejlede"
 }

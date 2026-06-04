@@ -35,6 +35,7 @@ class K(StrEnum):
     TP_ISSUE_HANDLER    = "template_prompts.issue_handler"
 
     # === Template fallback sections ===
+    TF_FRI             = "template_fallback.fri"
     TF_RESUME          = "template_fallback.resume"
     TF_KODEANALYSE     = "template_fallback.kodeanalyse"
     TF_DIFFANALYSE     = "template_fallback.diffanalyse"
@@ -175,6 +176,8 @@ class K(StrEnum):
     LOG_REQUIRED_TOOLS_MISSING = "log.required_tools_missing"
     LOG_TESTS_PASSED_NO_RESOLVE = "log.tests_passed_no_resolve"
     LOG_RED_TEST_PASSED = "log.red_test_passed"
+    TEST_BUT_NO_REFACTOR = "log.test_but_no_refactor"
+    REFACTOR_INCOMPLETE = "log.refactor_incomplete"
     LOG_PHASE_COMPLETE  = "log.phase_complete"
     LOG_TREE_EXECUTION      = "log.tree_execution_start"
     LOG_READING_FILE        = "log.reading_file"
@@ -339,3 +342,9 @@ class K(StrEnum):
     CRITERIA_DECOMPOSE    = "criteria.decompose"
     THINK_ONLY_TOOLS      = "criteria.think_only_tools"
     DOC_DEFAULT_FORMAT    = "criteria.doc_default_format"
+
+    # === Phase anchoring (prevent cross-phase reasoning) ===
+    PHASE_CURRENT         = "phase.current"
+    PHASE_ONLY            = "phase.only"
+    REFACTOR_PLAN_LOADED  = "refactor.plan_loaded"
+    PHASE_AUTO_ADVANCED   = "phase.auto_advanced"

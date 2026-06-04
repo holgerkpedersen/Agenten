@@ -380,7 +380,7 @@ def write_file(path: str, content: str) -> dict[str, Any]:
     if dirname:
         os.makedirs(dirname, exist_ok=True)
     try:
-        if path.endswith('.py') and os.path.exists(path):
+        if os.path.exists(path):
             return {
                 "success": False,
                 "error": f"Filen findes allerede: {path}. Brug edit_file til at redigere eksisterende filer."

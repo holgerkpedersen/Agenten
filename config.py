@@ -90,13 +90,13 @@ MAX_TOOL_CALLS_CLOSE = 4      # Opdatering/Luk/Verifikation faser
 MAX_FIX_ATTEMPTS = 3          # Max edit+test forsøg før opgivet
 MAX_TASK_ITERATIONS = 6       # max LLM conversation turns per task
 MAX_PR_TASK_ITERATIONS = 10   # max turns for PR/git workflow tasks
-NATIVE_TOOLS = False  # Use OpenAI native function calling when available
+NATIVE_TOOLS = True  # Use OpenAI native function calling when available
 
 # Message size limits (chars) — prevents "too much context" errors to LM Studio
 MAX_MESSAGE_CHARS = 20000  # hard cap on total message body sent per LLM call
 
 # File context limits — prevent LM Studio HTTP timeout from large payloads
-MAX_FILE_CONTEXT_CHARS = 3000  # max chars per file in initial system prompt (agent can read_chunk for more)
+MAX_FILE_CONTEXT_CHARS = 4000  # max chars per file in initial system prompt (agent can read_chunk for more)
 
 # Model-specific channel tags for decomposition prompts (e.g., Gemma requires <|channel|> tags)
 # Key: model name substring (lowercase), Value: channel tag string appended to decomposition prompt

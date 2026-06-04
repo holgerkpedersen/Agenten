@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Flow Builder – Web Research</title>
     <style>
         * { box-sizing: border-box; }
@@ -255,12 +258,16 @@ function renderResults(results) {
 }
 
 function renderMermaid(diagram) {
-    const container = $('mermaidContainer');
-    container.textContent = diagram || 'graph TB\n  A["No diagram generated"]';
-    // Force re-render by removing and re-adding
-    mermaid.run({ nodes: [container] }).catch(e => {
+    const wrapper = document.querySelector('.mermaid-wrapper');
+    const old = $('mermaidContainer');
+    const pre = document.createElement('pre');
+    pre.className = 'mermaid';
+    pre.id = 'mermaidContainer';
+    pre.textContent = diagram || 'graph TB\n  A["No diagram generated"]';
+    wrapper.replaceChild(pre, old);
+    mermaid.run({ nodes: [pre] }).catch(e => {
         console.error('Mermaid error:', e);
-        container.innerHTML = '<div style="color:#ef4444;">⚠️ Could not render diagram. Check JSON syntax.</div>';
+        pre.outerHTML = '<div style="color:#ef4444;padding:20px;">⚠️ Could not render diagram. Check JSON syntax.</div>';
     });
 }
 

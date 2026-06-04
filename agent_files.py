@@ -561,6 +561,65 @@ def _build_global_symbol_index() -> dict[str, list[Any]]:
 _GLOBAL_SYMBOL_INDEX = _build_global_symbol_index()
 
 
+def list_symbols(filepath: str) -> dict[str, Any]:
+    """List all top-level symbols (functions, classes, variables) in a Python file.
+    
+    Args:
+        filepath: Path to the .py file
+
+    Returns:
+        dict with success flag, filepath, and symbols list"""
+    if not filepath or not os.path.exists(filepath):
+        return {"success": False, "error": f"File not found: {filepath}"}
+    if not filepath.lower().endswith('.py'):
+        return {
+            "success": False,
+            "error": (
+                f"list_symbols understøtter kun Python-filer (.py), fik '{os.path.basename(filepath)}'. "
+                f"Brug read_chunk for andre filtyper."
+            ),
+        }
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            code = f.read()
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return {"success": False, "error": f"Syntax error in {os.path.basename(filepath)}: {e}"}
+    except Exception as e:
+        return {"success": False, "error": f"Could not parse {os.path.basename(filepath)}: {e}"}
+
+    symbols = []
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            sig = "(" + ", ".join(a.arg for a in node.args.args) + ")"
+            symbols.append({"name": node.name, "type": "function", "line": node.lineno, "signature": sig})
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.ClassDef):
+            methods = []
+            for child in node.body:
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    sig = "(" + ", ".join(a.arg for a in child.args.args) + ")"
+                    methods.append({"name": child.name, "type": "method", "line": child.lineno, "signature": sig})
+            symbols.append({"name": node.name, "type": "class", "line": node.lineno, "methods": methods})
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    symbols.append({"name": target.id, "type": "variable", "line": node.lineno})
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name):
+                symbols.append({"name": node.target.id, "type": "variable", "line": node.lineno})
+
+    symbols.sort(key=lambda s: ({"class": 0, "function": 1, "async_function": 1, "method": 2, "variable": 3}.get(s.get("type", "variable"), 9), s.get("line", 0)))
+
+    return {
+        "success": True,
+        "filepath": filepath,
+        "symbols": symbols,
+        "count": len(symbols),
+    }
+
+
 def locate_code(filepath: str | None = None, name: str | None = None, line_no: int | None = None) -> dict[str, Any]:
     """locate code.
     
@@ -578,6 +637,14 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
         filepath = matches[0][0]
     if not filepath or not os.path.exists(filepath):
         return {"success": False, "error": f"File not found: {filepath}"}
+    if not filepath.lower().endswith('.py'):
+        return {
+            "success": False,
+            "error": (
+                f"locate_code understøtter kun Python-filer (.py), fik '{os.path.basename(filepath)}'. "
+                f"Brug list_symbols eller read_chunk for andre filtyper."
+            ),
+        }
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             code = f.read()
@@ -589,6 +656,13 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
 
     symbols = _list_top_level_symbols(tree)
     siblings = "\n".join(f"  {s[0]} ({s[1]}, line {s[2]})" for s in symbols) if symbols else "  (none)"
+
+    _lines = code.splitlines()
+    def _ctx(s: int, e: int, n: int = 5) -> dict:
+        """Build pre/post context dict from line numbers (1-indexed)."""
+        pre = "\n".join(_lines[max(0, s - 1 - n):s - 1])
+        post = "\n".join(_lines[e:min(len(_lines), e + n)])
+        return {"pre_context": pre, "post_context": post}
 
     if name:
         parts = name.split(".", 1)
@@ -609,13 +683,19 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
                                 "type": "method",
                                 "line": start,
                                 "end_line": end,
-                                "body": "\n".join(code.splitlines()[start - 1:end]),
+                                "body": "\n".join(_lines[start - 1:end]),
                                 "also_in_file": siblings,
+                                **_ctx(start, end),
                             }
                     return {"success": False, "error": f"Method '{func_name}' not found in class '{class_name}' in {os.path.basename(filepath)}"}
             else:
                 if isinstance(node, ast.FunctionDef) and node.name == func_name:
                     start = node.lineno
+                    # Include decorators if present
+                    if node.decorator_list:
+                        decorator_lines = [d.lineno for d in node.decorator_list if hasattr(d, 'lineno')]
+                        if decorator_lines:
+                            start = min(decorator_lines)
                     end = getattr(node, 'end_lineno', start) or start
                     return {
                         "success": True,
@@ -624,11 +704,16 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
                         "type": "function",
                         "line": start,
                         "end_line": end,
-                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "body": "\n".join(_lines[start - 1:end]),
                         "also_in_file": siblings,
+                        **_ctx(start, end),
                     }
                 elif isinstance(node, ast.ClassDef) and node.name == func_name:
                     start = node.lineno
+                    if node.decorator_list:
+                        decorator_lines = [d.lineno for d in node.decorator_list if hasattr(d, 'lineno')]
+                        if decorator_lines:
+                            start = min(decorator_lines)
                     end = getattr(node, 'end_lineno', start) or start
                     return {
                         "success": True,
@@ -637,11 +722,17 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
                         "type": "class",
                         "line": start,
                         "end_line": end,
-                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "body": "\n".join(_lines[start - 1:end]),
                         "also_in_file": siblings,
+                        **_ctx(start, end),
                     }
                 elif isinstance(node, ast.AsyncFunctionDef) and node.name == func_name:
                     start = node.lineno
+                    # Include decorators if present
+                    if node.decorator_list:
+                        decorator_lines = [d.lineno for d in node.decorator_list if hasattr(d, 'lineno')]
+                        if decorator_lines:
+                            start = min(decorator_lines)
                     end = getattr(node, 'end_lineno', start) or start
                     return {
                         "success": True,
@@ -650,8 +741,9 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
                         "type": "async_function",
                         "line": start,
                         "end_line": end,
-                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "body": "\n".join(_lines[start - 1:end]),
                         "also_in_file": siblings,
+                        **_ctx(start, end),
                     }
                 elif isinstance(node, ast.Assign) and func_name in (t.id for t in node.targets if isinstance(t, ast.Name)):
                     start = node.lineno
@@ -663,8 +755,9 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
                         "type": "variable",
                         "line": start,
                         "end_line": end,
-                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "body": "\n".join(_lines[start - 1:end]),
                         "also_in_file": siblings,
+                        **_ctx(start, end),
                     }
                 elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == func_name:
                     start = node.lineno
@@ -676,8 +769,9 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
                         "type": "variable",
                         "line": start,
                         "end_line": end,
-                        "body": "\n".join(code.splitlines()[start - 1:end]),
+                        "body": "\n".join(_lines[start - 1:end]),
                         "also_in_file": siblings,
+                        **_ctx(start, end),
                     }
         return {"success": False, "error": f"Symbol '{name}' not found in {os.path.basename(filepath)}"}
 
@@ -691,7 +785,9 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
                 "type": "module",
                 "line": line_no,
                 "end_line": line_no,
-                "body": code.splitlines()[line_no - 1] if 1 <= line_no <= len(code.splitlines()) else "",
+                "body": _lines[line_no - 1] if 1 <= line_no <= len(_lines) else "",
+                "pre_context": "\n".join(_lines[max(0, line_no - 1 - 5):line_no - 1]),
+                "post_context": "\n".join(_lines[line_no:min(len(_lines), line_no + 5)]),
             }
 
         node_type = "class" if isinstance(symbol, ast.ClassDef) else "async_function" if isinstance(symbol, ast.AsyncFunctionDef) else "function"
@@ -715,8 +811,9 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
             "type": node_type,
             "line": start,
             "end_line": end,
-            "body": "\n".join(code.splitlines()[start - 1:end]),
+            "body": "\n".join(_lines[start - 1:end]),
             "also_in_file": siblings,
+            **_ctx(start, end),
         }
 
     return {"success": False, "error": "Specify either 'name' or 'line_no'"}

@@ -18,6 +18,7 @@ from typing import Any, Generator
 from lang import t, get_ui_translations
 from i18n import K
 from agent_files import _is_safe_path
+from agent_phase_checks import TEMPLATE_PHASE_CHECKS
 from config import get_logger
 log = get_logger(__name__)
 
@@ -338,58 +339,8 @@ def _validate_image_content(file_bytes: bytes, ext: str) -> bool:
     return False
 
 
-@app.route("/api/file/upload", methods=["POST"])
-def upload_file() -> Any:
-    """Upload en fil fra browseren og gem den med original navn"""
-    if 'file' not in request.files:
-        return jsonify({"success": False, "error": t(K.ERR_NO_FILE, agent.lang)}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"success": False, "error": t(K.ERR_EMPTY_FILENAME, agent.lang)}), 400
-    ext = os.path.splitext(file.filename)[1].lower()
-    SAFE_UPLOAD_EXTS = {'.py', '.js', '.ts', '.html', '.css', '.md', '.txt', '.json', '.yaml', '.yml', '.toml', '.cfg', '.ini', '.xml', '.csv', '.env.example', '.gitignore'}
-    if ext and ext not in SAFE_UPLOAD_EXTS:
-        return jsonify({"success": False, "error": f"Filtypen '{ext}' er ikke tilladt. Tilladte typer: {', '.join(sorted(SAFE_UPLOAD_EXTS))}"}), 400
-    try:
-        safe_filename = sanitize_filename(file.filename)
-        filepath = os.path.join(UPLOAD_DIR, safe_filename)
-        file.save(filepath)
-        return jsonify({"success": True, "filepath": filepath, "filename": safe_filename})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route("/api/file/read", methods=["POST"])
-def read_file() -> Any:
-    """Læs indholdet af en fil"""
-    data = request.json
-    filepath = data.get("filepath", "")
-    
-    if not filepath:
-        return jsonify({"success": False, "error": t(K.ERR_NO_PATH, agent.lang)}), 400
-    
-    if not _is_safe_path(BASE_DIR, filepath):
-        return jsonify({"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}), 403
-    
-    try:
-        if not os.path.exists(filepath):
-            return jsonify({"success": False, "error": t(K.ERR_FILE_NOT_FOUND, agent.lang).format(path=filepath)}), 404
-        
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        return jsonify({
-            "success": True, 
-            "filepath": filepath,
-            "filename": os.path.basename(filepath),
-            "content": content,
-            "size": len(content),
-            "lines": len(content.split('\n'))
-        })
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
 from llm_wrapper import LMStudioWrapper
+
 
 def _normalize_images(images: list[dict]) -> list[dict]:
     """Convert url-safe base64 back to standard base64 for browser compatibility."""
@@ -521,21 +472,11 @@ def list_python_files() -> Any:
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ============ SESSION ENDPOINTS ============
 @app.route("/api/sessions", methods=["GET"])
 def list_sessions() -> Any:
-    """list sessions."""
+    """list all sessions."""
     sessions = session_manager.list_sessions()
     return jsonify({"success": True, "sessions": sessions})
-
-@app.route("/api/sessions/current", methods=["GET"])
-def get_current_session() -> Any:
-    """get current session."""
-    global current_session_id
-    if current_session_id:
-        session_data = session_manager.load_session(current_session_id)
-        return jsonify({"success": True, "session": session_data})
-    return jsonify({"success": False, "error": t(K.ERR_NO_SESSION, agent.lang), "session": None})
 
 @app.route("/api/sessions/create", methods=["POST"])
 def create_session() -> Any:
@@ -1100,7 +1041,7 @@ def decompose() -> Any:
     if session_id:
         current_session_id = session_id
     elif not current_session_id:
-        current_session_id, _ = session_manager.create_session(prompt[:30])
+        current_session_id, _ = session_manager.create_session(prompt[:100])
     
     agent.show_thinking = show_thinking
     agent.lang = lang
@@ -1132,13 +1073,16 @@ def decompose() -> Any:
 
     _ensure_model_loaded(agent.decompose_llm.model)
 
+    # Reset re-decompose counter — each explicit user click is a fresh attempt
+    agent._redecompose_count = 0
+
     try:
         tree = agent.decompose_prompt(prompt, files=files, template=template)
 
         def _update(data: dict) -> dict:
             data.update({
                 "id": current_session_id,
-                "name": prompt[:30],
+                "name": prompt[:100],
                 "tree": tree,
                 "execution_log": agent.execution_log or data.get("execution_log", []),
                 "agent_log": agent.agent_log,
@@ -1221,7 +1165,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
     for child in node.children:
         if _check_client(agent):
             return
-        if getattr(agent, 'issue_resolved', False):
+        if getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
             child.status = "skipped"
             skip_msg = "Skipped — issue was already resolved in an earlier phase"
             child.result = skip_msg
@@ -1239,16 +1183,33 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
         yield from _execute_with_stream(child, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id)
         if child.result:
             child_results.append(f"- {child.name}: {child.result}")
+        # Stop execution on failed phase — don't continue to siblings
+        if child.status == "failed":
+            for remaining in node.children[node.children.index(child) + 1:]:
+                remaining.status = "skipped"
+                skip_msg = f"Skipped — forrige fase '{child.name}' fejlede"
+                remaining.result = skip_msg
+                yield f"data: {json.dumps({'type': 'task_start', 'task': remaining.name, 'success_criteria': getattr(remaining, 'success_criteria', [])})}\n\n"
+                yield f"data: {json.dumps({'type': 'task_done', 'task': remaining.name, 'status': remaining.status, 'result': skip_msg})}\n\n"
+                agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {remaining.name}", "detail": skip_msg})
+                yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+                completed[0] += _count_tasks(remaining)
+            progress = int((completed[0] / total_tasks) * 100)
+            with execution_status_lock:
+                execution_status["progress"] = progress
+            yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+            break
 
-    if node.children and all(c.status in ("done", "skipped") for c in node.children):
-        node.status = "done"
+    if node.children and all(c.status in ("done", "skipped", "failed") for c in node.children):
+        has_failed = any(c.status == "failed" for c in node.children)
+        node.status = "failed" if has_failed else "done"
         node.result = "\n".join(child_results) if child_results else "All subtasks completed"
         completed[0] += 1
         progress = int((completed[0] / total_tasks) * 100)
         with execution_status_lock:
             execution_status["progress"] = progress
         yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-        yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'result': node.result[:500]})}\n\n"
+        yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': node.result[:500]})}\n\n"
         return
 
     node.status = "running"
@@ -1258,8 +1219,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
             return
         if event["type"] == "chunk":
             full_response += event["chunk"]
-            if show_thinking:
-                yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']})}\n\n"
+            yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']})}\n\n"
         elif event["type"] == "tool_call":
             yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
         elif event["type"] == "tool_result":
@@ -1281,7 +1241,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
         execution_status["progress"] = progress
         execution_status["log"].append({"task": node.name, "status": node.status, "result": full_response[:200]})
     yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-    yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': full_response[:500]})}\n\n"
+    yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': full_response})}\n\n"
     agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, ui_lang) + ": " + node.name, "detail": full_response})
     tests_failed = getattr(agent, '_tests_failed', None)
     agent.execution_log.append({
@@ -1547,6 +1507,126 @@ def version() -> Any:
     """version."""
     return jsonify({"success": True, "started": BUILD_INFO.get("started", "?"), "version": {k:v for k,v in BUILD_INFO.items() if k != "started"}})
 
+
+def _format_phase_check_description(phase_name: str, spec: dict[str, Any]) -> str:
+    """Format a phase check spec as a human-readable description (Danish).
+
+    Args:
+        phase_name: Name of the phase (e.g. "Plan", "Ekstraher")
+        spec: The check spec dict from TEMPLATE_PHASE_CHECKS
+    """
+    explicit = spec.get("description")
+    if explicit:
+        return explicit
+    check_type = spec.get("type", "")
+    if check_type == "file_exists":
+        paths = spec.get("paths", [])
+        require_all = spec.get("require_all", True)
+        if len(paths) == 1:
+            return f"Fasen afsluttes automatisk når filen `{paths[0]}` findes."
+        if require_all:
+            listed = ", ".join(f"`{p}`" for p in paths)
+            return f"Fasen afsluttes automatisk når alle disse filer findes: {listed}."
+        listed = ", ".join(f"`{p}`" for p in paths)
+        return f"Fasen afsluttes automatisk når mindst én af disse filer findes: {listed}."
+    if check_type == "files_from_plan":
+        plan_path = spec.get("plan_path", "refactor_plan.md")
+        ext = spec.get("ext", ".py")
+        min_files = int(spec.get("min_files", 1))
+        if min_files <= 1:
+            return (
+                f"Fasen afsluttes automatisk når alle `*{ext}`-moduler nævnt i "
+                f"`{plan_path}` er oprettet."
+            )
+        return (
+            f"Fasen afsluttes automatisk når mindst {min_files} `*{ext}`-moduler "
+            f"nævnt i `{plan_path}` er oprettet."
+        )
+    if check_type == "all_of":
+        sub_specs = spec.get("checks", []) or []
+        sub_descs = [
+            _format_phase_check_description(f"{phase_name}.{i}", sub)
+            for i, sub in enumerate(sub_specs)
+        ]
+        if sub_descs:
+            joined = " • ".join(sub_descs)
+            return f"Fasen afsluttes automatisk når alle disse kriterier er opfyldt: {joined}"
+        return f"Fasen afsluttes automatisk (check-type: {check_type})."
+    if check_type == "symbols_covered":
+        source = spec.get("source_file", "kildefilen")
+        plan = spec.get("plan_path", "refactor_plan.md")
+        return (
+            f"Fasen afsluttes automatisk når alle symboler fra `{source}` er "
+            f"defineret i præcis ét af modulerne nævnt i `{plan}`."
+        )
+    if check_type == "min_text_length":
+        return (
+            f"Fasen afsluttes automatisk når LLM har produceret mindst "
+            f"{spec.get('min_chars', 100)} tegn analyse."
+        )
+    if check_type == "tool_called":
+        tools = spec.get("tools", [])
+        listed = ", ".join(f"`{t}`" for t in tools)
+        if spec.get("require_all"):
+            return f"Fasen afsluttes automatisk når LLM har kaldt alle disse værktøjer: {listed}."
+        return f"Fasen afsluttes automatisk når LLM har kaldt ét af: {listed}."
+    if check_type == "code_contains":
+        path = spec.get("path", "")
+        patterns = spec.get("patterns", [])
+        n = len(patterns)
+        if spec.get("require_all"):
+            if n == 1:
+                return f"Fasen afsluttes automatisk når mønsteret matcher i `{path}`."
+            return f"Fasen afsluttes automatisk når alle {n} regex-mønstre matcher i `{path}`."
+        if n == 1:
+            return f"Fasen afsluttes automatisk når mønsteret matcher i `{path}`."
+        return f"Fasen afsluttes automatisk når mindst {spec.get('min_matches', 1)} af {n} mønstre matcher i `{path}`."
+    if check_type == "tests_pass":
+        return "Fasen afsluttes automatisk når `run_tests` er kaldt og alle tests bestod."
+    return f"Fasen afsluttes automatisk (check-type: {check_type})."
+
+
+@app.route("/api/phase-checks", methods=["GET"])
+def phase_checks() -> Any:
+    """Return the deterministic phase success checks for a template.
+
+    Query: ``?template=<template_name>``. If omitted, returns all templates.
+    Used by the frontend to display "✓ auto-completes when..." under each phase.
+    """
+    from agent_phase_checks import PHASE_ALIASES
+
+    def _build_phase_entry(phase_name: str, spec: dict[str, Any]) -> dict[str, Any]:
+        entry: dict[str, Any] = {
+            "spec": spec,
+            "description": _format_phase_check_description(phase_name, spec),
+        }
+        lower_name = phase_name.lower()
+        aliases = PHASE_ALIASES.get(lower_name, [])
+        if aliases:
+            entry["aliases"] = aliases
+        return entry
+
+    def _expand_with_aliases(phases: dict[str, dict[str, Any]]) -> dict[str, Any]:
+        """Return a dict with canonical keys + alias entries pointing to the same data."""
+        result: dict[str, Any] = {}
+        for phase_name, spec in phases.items():
+            entry = _build_phase_entry(phase_name, spec)
+            result[phase_name] = entry
+            lower_name = phase_name.lower()
+            for alias in PHASE_ALIASES.get(lower_name, []):
+                result[alias] = entry
+        return result
+
+    template = request.args.get("template", "").strip()
+    if template:
+        phases = TEMPLATE_PHASE_CHECKS.get(template, {})
+        out = {template: _expand_with_aliases(phases)}
+        return jsonify({"success": True, "template": template, "phases": out})
+    out: dict[str, Any] = {}
+    for tmpl, phases in TEMPLATE_PHASE_CHECKS.items():
+        out[tmpl] = _expand_with_aliases(phases)
+    return jsonify({"success": True, "templates": out})
+
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:
     """list issues."""
@@ -1675,7 +1755,7 @@ def skillflow_report() -> Any:
                     if isinstance(act, dict):
                         act_action = act.get('action', '?')
                         act_skill = f"`{act.get('skill','?')}`"
-                        act_result = act.get('result', '')[:120]
+                        act_result = act.get('message', act.get('result', ''))[:120]
                     else:
                         act_action = str(act)
                         act_skill = "—"
@@ -1731,6 +1811,13 @@ def skillflow_status() -> Any:
         with open(evolution_path, encoding="utf-8") as f:
             data["evolution"] = _json.load(f)
     return jsonify({"success": True, "data": data})
+
+# ============ REGISTER EXTRACTED ROUTES ============
+from routes import upload_file, read_file, get_current_session
+
+app.add_url_rule('/api/file/upload', 'upload_file', upload_file, methods=['POST'])
+app.add_url_rule('/api/file/read', 'read_file', read_file, methods=['POST'])
+app.add_url_rule('/api/sessions/current', 'get_current_session', get_current_session, methods=['GET'])
 
 if __name__ == "__main__":
     started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

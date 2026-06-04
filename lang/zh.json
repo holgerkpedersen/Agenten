@@ -21,15 +21,15 @@
     "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
     "kodeanalyse": "分析以下代码结构。只返回以下部分：\n## 目的\n## 导入和依赖\n## 架构\n## 代码质量\n## 安全性\n\n{lang_instruction}。不要使用 <think> 标签。",
     "diffanalyse": "你必须先调用 git_log(5) 和 git_diff(HEAD~1,HEAD)。不要使用其他工具。然后分析差异。只返回以下部分：\n## 更改概述\n## 风险评估（高/中/低 按文件）\n## 破坏性更改\n## 代码质量\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
-    "fri": "将以下任务分解为3-6个主要任务。每个必须是自包含的分析或操作——避免微观步骤。最多2层。只返回树形结构。不解释，不需要思考过程。\n\n任务：{prompt}",
-    "agenten": "你是PR工作流专家。使用工具完成Pull Request。按顺序执行以下步骤：\n1. 创建分支\n2. Stage和提交\n3. 推送到远程\n4. 创建Pull Request\n\n任务：{prompt}\n\n{lang_instruction}",
-    "programmering": "分析以下编程任务并将其分解为架构阶段。只返回树形结构，每级使用2个空格。\n\n阶段必须为：\n1. 需求分析 — 理解需求\n2. 架构设计 — 设计组件和数据流\n3. 实施计划 — 计划文件结构和顺序\n4. 安全分析 — 审查安全性和最佳实践\n5. 代码实施 — 编写代码\n\n任务：{prompt}",
-    "python-arkitektur": "分析以下项目并规划 Python/Flask 架构。只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
-    "billedanalyse": "在五个阶段中结构化分析图像。只返回树形结构，每级使用2个空格。\n\n阶段为：\n1. 描述 — 图像中看到什么\n2. 背景 — 图像代表什么\n3. 细节 — 具体元素、文本、代码、UI、数字\n4. 评估 — 质量、错误、改进建议\n5. 导出 — 使用 write_file 将分析保存到 ./exports/billedanalyse_{timestamp}.md\n\n任务：{prompt}",
-    "bugfix": "你必须按照TDD（测试驱动开发）修复一个bug。按顺序执行阶段：\n\n1. 分析 — 理解issue和根本原因\n2. 测试（Red） — 编写能捕获bug的pytest，运行它（必须失败）\n3. 实施 — 用最小修改修复代码\n4. 验证（Green） — 运行测试（必须通过），运行完整测试套件\n5. 更新 — 将issue状态更新为'resolved'\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
-    "refactor": "你必须结构化地重构一个Python文件。按顺序执行阶段：\n\n1. 分析 — 使用read_chunk读取文件，理解函数、类、导入及其职责\n2. 计划 — 决定如何将文件拆分为模块（例如每个类/职责一个模块）\n3. 提取 — 使用write_file创建新模块文件，移动相关代码。对于大型任务：每个文件创建一个阶段（例如\"提取 da.json\"、\"提取 en.json\"）\n4. 更新 — 更新原始文件以从新模块导入。对于大型任务：每次编辑创建一个阶段\n5. 测试 — 使用run_tests运行测试套件以验证没有损坏\n\n对于大型文件：拆分为多个小阶段，使每个阶段只做一件事。\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
-    "testgenerering": "你必须为Python文件生成测试。按顺序执行阶段：\n\n1. 分析 — 使用read_chunk读取文件，识别缺少测试的类、函数和方法\n2. 测试 (Red) — 使用write_file编写pytest测试（创建新测试文件）。使用run_tests运行 —— 测试必须通过（绿阶段）\n3. 实施 — 如果代码需要修改以使其可测试，使用edit_file\n4. 验证 (Green) — 使用run_tests运行完整的测试套件以验证没有回归\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
-    "issue_handler": "你必须处理一个Issue。严格遵守以下阶段顺序：\n\n1. 读取 — 使用read_issue读取issue。理解问题。不得阅读源代码。\n2. 澄清 — 分析issue，使用read_chunk阅读源代码，运行测试。如果缺少详细信息，使用update_issue_status更新。如果bug已修复：标记resolved并在resolution_note中写'已修复 — 未做任何更改'。\n3. 修复 — 使用edit_file修复，运行测试。不要标记resolved — 下一阶段处理。\n4. 关闭 Issue — 确认修复和测试通过，使用精确的resolution_note将状态更新为'resolved'。\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}"
+    "fri": "{lang_instruction}. {criteria_instr}\n\n为以下任务创建一个清晰的总体计划。计划必须有3-7个阶段，每个阶段都有可见的成功标准（括号内）。如果提示没有提到具体文件或不精确，第一个阶段必须是\u201c分析\u201d，检查项目文件以找到相关来源。成功标准是最终的——无论执行过程中发现什么，都不能更改。\n\n格式：每行一个任务。每级缩进2个空格。成功标准在任务名称后的括号内。最多2级。只返回树形结构。不要解释，不要思考过程。\n\n任务：{prompt}",
+    "agenten": "{lang_instruction}. {criteria_instr}\n\n你是PR工作流专家。使用工具完成Pull Request。按顺序执行以下步骤：\n1. 创建分支\n2. Stage和提交\n3. 推送到远程\n4. 创建Pull Request\n\n任务：{prompt}",
+    "programmering": "{lang_instruction}. 分析以下编程任务并将其分解为架构阶段。只返回树形结构，每级使用2个空格。\n\n阶段必须为（{criteria_instr}）：\n1. 需求分析 — 理解需求\n2. 架构设计 — 设计组件和数据流\n3. 实施计划 — 计划文件结构和顺序\n4. 安全分析 — 审查安全性和最佳实践\n5. 代码实施 — 编写代码\n\n任务：{prompt}",
+    "python-arkitektur": "{lang_instruction}. {criteria_instr}\n\n分析以下项目并规划 Python/Flask 架构。只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
+    "billedanalyse": "{lang_instruction}. 在五个阶段中结构化分析图像。只返回树形结构，每级使用2个空格。\n\n阶段为（{criteria_instr}）：\n1. 描述 — 图像中看到什么\n2. 背景 — 图像代表什么\n3. 细节 — 具体元素、文本、代码、UI、数字\n4. 评估 — 质量、错误、改进建议\n5. 导出 — 使用 write_file 将分析保存到 ./exports/billedanalyse_{timestamp}.md\n\n任务：{prompt}",
+    "bugfix": "{lang_instruction}. 你必须按照TDD（测试驱动开发）修复一个bug。按顺序执行阶段（{criteria_instr}）：\n\n1. 分析 — 理解issue和根本原因\n2. 测试（Red） — 编写能捕获bug的pytest，运行它（必须失败）\n3. 实施 — 用最小修改修复代码\n4. 验证（Green） — 运行测试（必须通过），运行完整测试套件\n5. 更新 — 将issue状态更新为'resolved'\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
+    "refactor": "{lang_instruction}. {criteria_instr}\n\n你必须严格遵循SOLID原则重构Python文件。按顺序执行以下阶段。每个阶段有一个明确目标 — 达成目标即停止。\n\n1. 分析 — 仅使用 list_symbols(filepath) + read_location/locate。不要用 read_chunk 读取整个文件。识别职责和SOLID违规。不要读取工具实现文件（agent_files.py, tools.py）。\n2. 计划 — 决定模块结构（routes.py, session.py, files.py, ...）。用 write_file 将计划写入 .md 文件。输出：refactor_plan.md。\n3. 提取 — 用 write_file 创建新模块文件。你的第一个操作必须是 write_file。从原文件复制代码。写作之前不要读取任何内容。\n4. 更新 — 用 edit_file 更新原文件：删除已移动的代码，添加导入。使用 read_location 查看需要编辑的确切代码。\n5. 测试 — 运行 run_tests。用 edit_file 修复失败。将问题状态更新为 'resolved'。输出：测试通过 + 问题已关闭。\n\n对于大文件：拆分为多个小阶段（例如每个创建的模块一个阶段）。每个阶段只能做一件事。\n\n只返回树形结构，每级使用2个空格。不要解释，不要分析工具，只要树。\n\n任务：{prompt}",
+    "testgenerering": "{lang_instruction}. 你必须为Python文件生成测试。按顺序执行阶段（{criteria_instr}）：\n\n1. 分析 — 使用read_chunk读取文件，识别缺少测试的类、函数和方法\n2. 测试 (Red) — 使用write_file编写pytest测试（创建新测试文件）。使用run_tests运行 —— 测试必须通过（绿阶段）\n3. 实施 — 如果代码需要修改以使其可测试，使用edit_file\n4. 验证 (Green) — 使用run_tests运行完整的测试套件以验证没有回归\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
+    "issue_handler": "{lang_instruction}. 你必须处理一个Issue。严格遵守以下阶段顺序（{criteria_instr}）：\n\n1. 读取 — 使用read_issue读取issue。理解问题。不得阅读源代码。\n2. 澄清 — 分析issue，使用read_chunk阅读源代码，运行测试。如果缺少详细信息，使用update_issue_status更新。如果bug已修复：标记resolved并在resolution_note中写'已修复 — 未做任何更改'。\n3. 修复 — 使用edit_file修复，运行测试。不要标记resolved — 下一阶段处理。\n4. 关闭 Issue — 确认修复和测试通过，使用精确的resolution_note将状态更新为'resolved'。\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}"
   },
   "template_fallback": {
     "resume": [
@@ -100,7 +100,15 @@
       "澄清",
       "修复",
       "关闭 Issue"
+    ],
+    "fri": [
+      "分析任务及相关文件",
+      "规划解决方案",
+      "实施解决方案",
+      "测试和验证",
+      "完成"
     ]
+
   },
   "fallback_tree": {
     "understand_purpose": "理解文件目的",
@@ -211,6 +219,8 @@
     "required_tools_missing": "缺少必需工具：{tools}。不使用这些工具无法完成任务。",
     "tests_passed_no_resolve": "✅ 测试通过 —— 请记得调用 update_issue_status() 将问题标记为已解决。",
     "red_test_passed": "✅ 红测试通过 —— 错误已修复。正在结束测试（红）阶段。",
+    "test_but_no_refactor": "⚠️ 测试通过，但重构未完成：refactor_plan.md 中的模块没有真实代码。请调用 edit_file 将函数从 api_server.py 移到模块中，然后重新运行 run_tests。",
+    "refactor_incomplete": "重构未完成。仍缺少 {missing_count} 个模块，或 api_server.py 未缩减到 1000 行以下。",
     "phase_complete": "阶段已自动完成。"
   },
   "errors": {
@@ -435,6 +445,13 @@
     "loading": "加载中...",
     "issues_error": "错误"
   },
+  "criteria.decompose": "在每个任务名称后的括号内指定成功标准，例如：任务 (标准1, 标准2)",
+  "criteria.header": "成功标准",
+  "criteria.conclude": "所有成功标准均已满足。",
+  "criteria.unmet": "以下成功标准未满足",
+  "criteria.label": "成功标准：",
+  "criteria.think_only_tools": "仅使用思考/工具来执行任务",
+  "criteria.doc_default_format": ".md 或 .txt",
   "extract_context_first": "在调用任何工具之前，你必须首先从以上上下文中提取相关信息。写2-3句话总结你对任务的了解，仅基于给定的上下文。然后调用必要的工具。",
   "extract_context_skipped": "你跳过了上下文提取。首先阅读并总结上下文中的相关信息，然后调用工具。",
   "rubric_passed": "✓",
@@ -444,5 +461,10 @@
   "write_required": "\n\n⛔ 你必须在此阶段编写/编辑代码。使用 write_file 或 edit_file。只读取文件而不编写代码意味着任务已失败。最多读取一次 — 然后编写你的解决方案。",
   "write_file_first": "\n\n🚫 已阻止：测试（红）阶段要求你首先编写测试。立即调用 write_file — 你已在分析阶段读取了足够的信息。",
   "tool_system_prompt_native": "你可以使用工具。在需要时调用它们以完成任务。\n\n{tools_desc}\n\n## 任务\n{task}",
-  "tool_continuation_native": "可用: {tools_list}。使用工具完成任务。"
+  "tool_continuation_native": "可用: {tools_list}。使用工具完成任务。",
+  "phase.current": "🎯 当前阶段:{phase_name}\n\n你只处于这个阶段。不要执行其他阶段 — 它们会在后续调用中自动运行。100% 专注于 **{phase_name}** 的任务,完成后用 <<<DONE>>> 结束。",
+  "phase.only": "\n\n⛔ 重要:你只在 '{phase_name}' 阶段。不要执行其他阶段(例如,如果你在提取阶段,不要创建计划;如果你在计划阶段,不要创建模块)。只专注于你的阶段。",
+  "refactor.plan_loaded": "📄 上一阶段的计划(从 refactor_plan.md 自动加载):\n\n```\n{plan_content}\n```\n\n↑ 使用此计划作为创建模块文件的基础。计划中提到的每个模块必须使用 write_file 创建为新的 .py 文件。",
+  "phase.auto_advanced": "✅ 阶段自动完成:{reason}\n\n系统已验证成功标准已满足。正在进入下一阶段。",
+  "task_failed_label": "任务失败"
 }
