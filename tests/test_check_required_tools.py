@@ -123,9 +123,9 @@ class TestGetMaxIterations(unittest.TestCase):
         self.assertEqual(_get_max_iterations(agent, "Plan"), 4)
 
     def test_refactor_ekstraher_higher_budget(self):
-        """Ekstraher needs 6 turns (deterministic tools reduce need)."""
+        """Ekstraher needs 15 turns (34+ symbols at ~1 call each)."""
         agent = FakeAgent([], template="refactor")
-        self.assertEqual(_get_max_iterations(agent, "Ekstraher"), 6)
+        self.assertEqual(_get_max_iterations(agent, "Ekstraher"), 15)
 
     def test_refactor_opdater_higher_budget(self):
         agent = FakeAgent([], template="refactor")
@@ -142,7 +142,7 @@ class TestGetMaxIterations(unittest.TestCase):
     def test_case_insensitive_phase(self):
         agent = FakeAgent([], template="refactor")
         for variant in ("Ekstraher", "ekstraher", "EKSTRAHER"):
-            self.assertEqual(_get_max_iterations(agent, variant), 6)
+            self.assertEqual(_get_max_iterations(agent, variant), 15)
 
     def test_unknown_template_falls_back(self):
         agent = FakeAgent([], template="nonexistent_template")

@@ -47,7 +47,7 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
     "refactor": {
         "Analyse": 4,    # Read issue + list_symbols + a few read_location
         "Plan": 4,       # Read + write refactor_plan.md (auto-advances)
-        "Ekstraher": 6, # extract_symbol does all the work in 1 call per symbol
+        "Ekstraher": 15, # extract_symbol does all the work in 1 call per symbol; 34+ symbols in plan
         "Opdat\u00e9r": 12,  # ~5-8 edit_file + read_location for imports
         "Test": 8,       # run_tests + 2-3 fix loops
     },

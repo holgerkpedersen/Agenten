@@ -399,15 +399,53 @@ class RefactoringEngine:
 
         needed_imports = ImportResolver.filter_for_symbol(content, lines, used_names)
 
-        import_block = '\n'.join(needed_imports)
-        if import_block and symbol_code:
-            target_content = import_block + '\n\n' + symbol_code + '\n'
-        elif symbol_code:
-            target_content = symbol_code + '\n'
-        else:
-            target_content = ''
-
         os.makedirs(os.path.dirname(target) or '.', exist_ok=True)
+
+        if os.path.exists(target):
+            with open(target, 'r', encoding='utf-8') as f:
+                existing = f.read().strip()
+        else:
+            existing = ''
+
+        existing_imports: set[str] = set()
+        if existing:
+            try:
+                existing_tree = ast.parse(existing)
+                for node in ast.walk(existing_tree):
+                    if isinstance(node, (ast.Import, ast.ImportFrom)):
+                        existing_imports.add(ast.unparse(node))
+            except SyntaxError:
+                existing_imports = set()
+
+        new_imports = [i for i in needed_imports if i not in existing_imports]
+        new_import_block = '\n'.join(new_imports)
+
+        if not existing:
+            if new_import_block and symbol_code:
+                target_content = new_import_block + '\n\n' + symbol_code + '\n'
+            elif symbol_code:
+                target_content = symbol_code + '\n'
+            else:
+                target_content = ''
+        else:
+            if new_imports and symbol_code:
+                target_content = existing + '\n\n' + new_import_block + '\n\n' + symbol_code + '\n'
+            elif symbol_code:
+                target_content = existing + '\n\n' + symbol_code + '\n'
+            elif new_imports:
+                target_content = existing + '\n\n' + new_import_block + '\n'
+            else:
+                target_content = existing
+
+        if target_content.strip():
+            try:
+                ast.parse(target_content)
+            except SyntaxError as e:
+                return {'success': False,
+                        'error': f"Target file would be syntactically invalid after extraction: {e}",
+                        'symbol': symbol_name, 'type': symbol_type,
+                        'source': source, 'target': target}
+
         self._write(target, target_content)
 
         return {
@@ -418,6 +456,8 @@ class RefactoringEngine:
             'target': target,
             'source_lines': f"{start_line + 1}-{end_line}",
             'imports_count': len(needed_imports),
+            'imports_added': len(new_imports),
+            'imports_deduped': len(needed_imports) - len(new_imports),
             'used_names': sorted(used_names),
         }
 

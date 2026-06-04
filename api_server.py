@@ -101,7 +101,7 @@ def _rate_limit() -> Any:
 def _guard_json_body() -> Any:
     """guard json body."""
     if request.method in ('POST', 'PUT', 'PATCH') and request.path.startswith('/api/'):
-        if request.path in ('/api/upload', '/api/image/upload', '/api/file/upload', '/api/stop'):
+        if request.path in ('/api/upload', '/api/image/upload', '/api/file/upload', '/api/stop', '/api/git/backup', '/api/git/reset'):
             return None
         if not request.is_json:
             return jsonify({"success": False, "error": "Content-Type must be application/json"}), 400

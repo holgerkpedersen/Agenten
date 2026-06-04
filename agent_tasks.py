@@ -124,6 +124,83 @@ def _refactor_actually_moved_code(agent: Any) -> bool:
     return True
 
 
+def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py") -> str:
+    """Build a structured symbol-status block for refactor phases.
+    Reads refactor_plan.md + AST of source/target modules so the LLM
+    sees EXACTLY which symbols need extraction/cleanup.
+    """
+    plan_path = os.path.join(os.getcwd(), "refactor_plan.md")
+    if not os.path.exists(plan_path):
+        return ""
+
+    modules = agent_phase_checks._parse_refactor_plan_modules(plan_path)
+    if not modules:
+        return ""
+
+    try:
+        with open(plan_path, encoding="utf-8") as f:
+            plan_text = f.read()
+    except Exception:
+        plan_text = ""
+
+    src_result = agent_files.list_symbols(source_file)
+    source_syms: dict[str, str] = {}
+    if src_result.get("success"):
+        source_syms = {s["name"]: s.get("type", "?")
+                       for s in src_result["symbols"]
+                       if s.get("type") in ("function", "class", "async_function")}
+
+    per_module: dict[str, list[str]] = {}
+    current_mod = None
+    for line in plan_text.splitlines():
+        m = re.match(r'^##\s*Module:\s*(\S+)', line)
+        if m:
+            current_mod = m.group(1)
+            continue
+        if current_mod and line.strip().startswith('- '):
+            sym = line.strip()[2:].strip()
+            if sym and not sym.startswith('#'):
+                per_module.setdefault(current_mod, []).append(sym)
+
+    parts: list[str] = []
+    parts.append("\n\n## STATUS: Symboler i api_server.py vs plan")
+
+    for mod_name in sorted(modules):
+        mod_path = os.path.join(os.getcwd(), mod_name)
+        planned_syms = per_module.get(mod_name, [])
+        if not planned_syms:
+            continue
+
+        target_syms: set[str] = set()
+        if os.path.exists(mod_path):
+            tgt_result = agent_files.list_symbols(mod_path)
+            if tgt_result.get("success"):
+                target_syms = {s["name"] for s in tgt_result["symbols"]
+                               if s.get("type") in ("function", "class", "async_function")}
+
+        in_source = sorted(s for s in planned_syms if s in source_syms)
+        in_target = sorted(s for s in planned_syms if s in target_syms)
+        missing = sorted(s for s in planned_syms if s not in source_syms and s not in target_syms)
+
+        parts.append(f"\n### {mod_name}")
+        if in_source:
+            parts.append(f"  I api_server.py (skal flyttes til {mod_name}): {', '.join(in_source)}")
+        if in_target:
+            parts.append(f"  ALLEREDE i {mod_name}: {', '.join(in_target)}")
+        if missing:
+            parts.append(f"  MANGLER (skal oprettes i {mod_name}): {', '.join(missing)}")
+
+    all_planned = set()
+    for syms in per_module.values():
+        all_planned.update(syms)
+    unplanned = sorted(s for s in source_syms if s not in all_planned)
+    if unplanned:
+        parts.append(f"\n### Ikke i planen (beholdes i {source_file})")
+        parts.append(f"  {', '.join(unplanned)}")
+
+    return "\n".join(parts)
+
+
 def _get_max_tool_calls(task_name: str) -> int:
     """get max tool calls.
     
@@ -338,12 +415,12 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             if prev_results:
                 sibling_block = "\n\n## Resultater fra tidligere faser\n" + "\n\n".join(prev_results)
 
-    # For refactor template's Ekstraher phase, auto-load refactor_plan.md from disk
-    # so the LLM knows which .py files to create (sibling_block only has Plan's text
-    # result, not the actual file content)
+    # For refactor template's Ekstraher and Opdatér phases, auto-load
+    # refactor_plan.md + symbol-status so the LLM knows EXACTLY which
+    # symbols need extraction/cleanup — no list_symbols needed.
     plan_block = ""
     if (agent.active_template == "refactor" and
-        task_node.name.lower() == "ekstraher" and
+        task_node.name.lower() in ("ekstraher", "opdatér") and
         not any("refactor_plan.md" in str(c) for c in agent.file_chunks.values())):
         plan_path = "refactor_plan.md"
         if os.path.exists(plan_path):
@@ -353,9 +430,10 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
                 plan_block = "\n\n" + t(K.REFACTOR_PLAN_LOADED, agent.lang).format(
                     plan_content=_plan_content[:3000]
                 )
-                agent._log("DEBUG", f"Auto-loaded {plan_path} ({len(_plan_content)} chars) for Ekstraher phase", "")
+                plan_block += _build_refactor_phase_context(agent)
+                agent._log("DEBUG", f"Auto-loaded {plan_path} ({len(_plan_content)} chars) + symbol status for {task_node.name}", "")
             except Exception as _e:
-                agent._log("DEBUG", f"Failed to auto-load {plan_path}: {_e}", "")
+                agent._log("DEBUG", f"Failed to auto-load refactor context: {_e}", "")
 
     # Phase anchor: tell the LLM which phase it's currently in and forbid
     # cross-phase reasoning (the LLM otherwise tries to re-do Plan/Extract/etc.
