@@ -4,6 +4,10 @@ import os
 from typing import Any
 from flask import request, jsonify, send_from_directory
 
+from lang import t
+from i18n import K
+
+
 
 def index() -> Any:
     """Serve index.html from static directory."""
@@ -27,8 +31,6 @@ def index() -> Any:
 def upload_file() -> Any:
     """Upload a file from the browser and save it with original name."""
     from api_server import agent, UPLOAD_DIR, sanitize_filename
-    from lang import t
-    from i18n import K
     if 'file' not in request.files:
         return jsonify({"success": False, "error": t(K.ERR_NO_FILE, agent.lang)}), 400
     file = request.files['file']
@@ -51,8 +53,6 @@ def read_file() -> Any:
     """Read the content of a file."""
     from api_server import agent, BASE_DIR
     from agent_files import _is_safe_path
-    from lang import t
-    from i18n import K
     data = request.json
     filepath = data.get("filepath", "")
     if not filepath:
@@ -78,9 +78,7 @@ def read_file() -> Any:
 
 def get_current_session() -> Any:
     """Get current session data."""
-    from api_server import current_session_id, session_manager
-    from lang import t
-    from i18n import K
+    from api_server import agent, current_session_id, session_manager
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
         return jsonify({"success": True, "session": session_data})
