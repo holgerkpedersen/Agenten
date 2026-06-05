@@ -39,17 +39,6 @@ def _is_development_mode() -> bool:
     """Check if server is running in development mode."""
     return os.environ.get('DEV_MODE', 'true').lower() == 'true'
 
-@app.before_request
-def check_api_key() -> Any:
-    """Require API key for all /api/* endpoints unless in dev mode."""
-    if request.path.startswith('/api/') and not _is_development_mode():
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        expected_key = os.environ.get('AGENT_API_KEY', '')
-        
-        # Enforce key only if configured in environment
-        if expected_key and api_key != expected_key:
-            return jsonify({"success": False, "error": "Unauthorized: Invalid or missing API key"}), 401
-
 # ============ RATE LIMITING ============
 class _RateLimiter:
     """rate limiter."""

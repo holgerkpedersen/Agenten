@@ -1,33 +1,25 @@
 """Security module for API key validation and rate limiting."""
 import os
 from functools import wraps
-from flask import request, jsonify
+from typing import Any
+from flask import app, request, jsonify
 import time
 import threading
-
-
-# Development mode check
-def _is_development_mode():
-    """Check if running in development mode."""
-    return os.environ.get('FLASK_ENV') == 'development' or \
-           os.environ.get('DEBUG', '').lower() in ('1', 'true', 'yes')
-
+from api_server import _is_development_mode
 
 # API Key validation
 API_KEY = os.environ.get('API_KEY', '')
 
-
-def check_api_key():
-    """Check if the request has a valid API key."""
-    if _is_development_mode():
-        return True
-    
-    api_key = request.headers.get('X-API-Key') or \
-              request.args.get('api_key') or \
-              request.form.get('api_key')
-    
-    return api_key == API_KEY
-
+@app.before_request
+def check_api_key() -> Any:
+    """Require API key for all /api/* endpoints unless in dev mode."""
+    if request.path.startswith('/api/') and not _is_development_mode():
+        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        expected_key = os.environ.get('AGENT_API_KEY', '')
+        
+        # Enforce key only if configured in environment
+        if expected_key and api_key != expected_key:
+            return jsonify({"success": False, "error": "Unauthorized: Invalid or missing API key"}), 401
 
 # Rate Limiter class
 class _RateLimiter:
