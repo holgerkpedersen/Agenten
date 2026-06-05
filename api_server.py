@@ -638,7 +638,7 @@ def get_lang(lang: str) -> Any:
     Args:
         lang:"""
     resp = jsonify(get_ui_translations(lang))
-    resp.headers['Cache-Control'] = 'public, max-age=3600'
+    resp.headers['Cache-Control'] = 'no-cache'
     return resp
 
 @app.route("/api/models")
@@ -1427,7 +1427,12 @@ def status() -> Any:
     """status."""
     with execution_status_lock:
         es = dict(execution_status)
-    return jsonify({**agent.get_agent_status(), "execution": es})
+    workdir = os.environ.get('AGENT_WORKDIR', '')
+    return jsonify({
+        **agent.get_agent_status(),
+        "execution": es,
+        "workdir": workdir
+    })
 
 @app.route("/api/search", methods=["POST"])
 def search() -> Any:
@@ -1670,6 +1675,18 @@ app.add_url_rule('/api/skillflow/status', 'skillflow_status', skillflow_status, 
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description='Agenten API Server')
+    parser.add_argument('--workdir', '-w', type=str, default='',
+                        help='Arbejdsmappe for filoperationer (f.eks. stien til projektet agenten skal arbejde på)')
+    args = parser.parse_args()
+    if args.workdir:
+        workdir_abs = os.path.abspath(args.workdir)
+        os.environ['AGENT_WORKDIR'] = workdir_abs
+        log.info("Arbejdsmappe: %s", workdir_abs)
+        session_manager = SessionManager(storage_dir=os.path.join(workdir_abs, 'sessions'))
+
+    _sessions_dir = session_manager.storage_dir
     started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     log.info("=" * 50)
     log.info("Dansk Agent API starter...")
@@ -1677,8 +1694,10 @@ if __name__ == "__main__":
     log.info("http://localhost:5000")
     log.info("Static mappe: %s", STATIC_DIR)
     log.info("api_server=%s | agent_core=%s | llm=%s", BUILD_INFO['api_server.py'], BUILD_INFO['agent_core.py'], BUILD_INFO['llm_wrapper.py'])
-    log.info("Sessions gemmes i ./sessions/")
+    log.info("Sessions gemmes i: %s", _sessions_dir)
     log.info("Filhåndtering via Python (tkinter)")
+    if args.workdir:
+        log.info("Målprojekt: %s", workdir_abs)
     log.info("=" * 50)
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(debug=debug, use_reloader=False, port=5000, threaded=True)

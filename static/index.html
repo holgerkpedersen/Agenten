@@ -637,6 +637,7 @@
         </div>
         <div id="headerBody">
         <div id="folderStatus" style="font-size: 11px; margin-bottom: 5px;"></div>
+        <div id="workdirStatus" style="font-size: 11px; margin-bottom: 5px; color: var(--accent);"></div>
         
         <div class="toolbar-row">
             <span class="toolbar-label" id="sessionsLabel">Sessions</span>
@@ -930,6 +931,7 @@ btn_edit: 'Rediger',
     new_session_prompt: 'Navn på ny session:',
     active: 'Aktiv',
     panel_placeholder: 'Indhold for {panel}',
+    task_failed_label: 'Opgaver fejlede',
     task_done_label: 'Opgave færdig',
     files_included: 'Filer inkluderet i LLM kontekst:',
     reading_file_title: 'Læser fil',
@@ -1407,6 +1409,18 @@ async function checkFolderStatus() {
     if (data.success && data.folder) {
         addLogEntry('INFO', _('export_folder_ok'), data.folder);
         document.getElementById('folderStatus').innerHTML = `${_('export_folder_path')} <span class="folder-status">${_('active')}</span>`.replace('{folder}', data.folder);
+    }
+}
+
+async function checkWorkdirStatus() {
+    const response = await fetch('/api/status');
+    const data = await response.json();
+    const el = document.getElementById('workdirStatus');
+    if (data.workdir) {
+        el.innerHTML = '📁 Arbejdsmappe: <strong>' + data.workdir + '</strong>';
+        el.style.display = '';
+    } else {
+        el.style.display = 'none';
     }
 }
 
@@ -3107,6 +3121,7 @@ document.addEventListener('DOMContentLoaded', function() {
     createPanels();
     refreshSessions();
     checkFolderStatus();
+    checkWorkdirStatus();
     try {
         if (localStorage.getItem('agenten_header_collapsed') === '1') {
             document.querySelector('.header').classList.add('collapsed');
