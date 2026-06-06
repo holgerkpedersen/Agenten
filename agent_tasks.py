@@ -435,6 +435,38 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             except Exception as _e:
                 agent._log("DEBUG", f"Failed to auto-load refactor context: {_e}", "")
 
+    # For programming template's later phases, auto-load docs from earlier phases.
+    PROGRAMMING_DOCS = [
+        ("docs/kravanalyse.md", "Kravanalyse"),
+        ("docs/arkitektur.md", "Arkitekturdesign"),
+        ("docs/implementeringsplan.md", "Implementeringsplan"),
+        ("docs/sikkerhedsanalyse.md", "Sikkerhedsanalyse"),
+    ]
+    PHASE_ORDER = ["kravanalyse", "arkitekturdesign", "implementeringsplan", "sikkerhedsanalyse", "kodeimplementering"]
+    if agent.active_template == "programmering" and not plan_block:
+        current_idx = -1
+        task_lower = task_node.name.lower() if task_node.name else ""
+        for i, p in enumerate(PHASE_ORDER):
+            if p in task_lower:
+                current_idx = i
+                break
+        if current_idx > 0:
+            loaded_blocks = []
+            for doc_path, doc_phase in PROGRAMMING_DOCS[:current_idx]:
+                full_path = os.path.join(os.getcwd(), doc_path)
+                if os.path.exists(full_path):
+                    try:
+                        with open(full_path, encoding="utf-8") as _df:
+                            _content = _df.read()
+                        loaded_blocks.append(
+                            f"### {doc_phase} — {doc_path}\n\n```\n{_content[:2000]}\n```"
+                        )
+                    except Exception as _e:
+                        agent._log("DEBUG", f"Failed to load {doc_path}: {_e}", "")
+            if loaded_blocks:
+                plan_block = "\n\n## Dokumenter fra tidligere faser\n" + "\n\n".join(loaded_blocks)
+                agent._log("DEBUG", f"Auto-loaded {len(loaded_blocks)} previous phase docs for {task_node.name}", "")
+
     # Phase anchor: tell the LLM which phase it's currently in and forbid
     # cross-phase reasoning (the LLM otherwise tries to re-do Plan/Extract/etc.
     # because it sees the workflow description in the section instruction).
