@@ -393,10 +393,12 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
                     agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name, "") or \
                     agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(_normalize_phase(task_node.name), "")
     criteria_block = ""
+    header = t(K.CRITERIA_HEADER, agent.lang)
     if task_node.success_criteria:
-        header = t(K.CRITERIA_HEADER, agent.lang)
         items = "\n".join(f"- {c}" for c in task_node.success_criteria)
         criteria_block = f"\n\n## {header}\n{items}\n"
+    elif section_instr and agent.active_template:
+        criteria_block = f"\n\n## {header}\n- {section_instr.split(chr(10))[0][:200]}\n"
 
     # Include results from previous sibling phases
     sibling_block = ""
@@ -1106,6 +1108,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     called_tools = {}
     consecutive_errors = 0
     consecutive_dedups = 0
+    consecutive_reads = 0
+    READ_ONLY_TOOLS = {"read_location", "read_chunk", "list_chunks", "list_files", "list_symbols", "locate", "read_issue"}
     agent._write_failed = False
     agent._tests_failed = False
     agent._located_files = set()
@@ -1212,6 +1216,21 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             consecutive_dedups = 0
                     continue
                 consecutive_dedups = 0
+                if tool_name in READ_ONLY_TOOLS:
+                    consecutive_reads += 1
+                    if consecutive_reads >= 5:
+                        write_tools = [t for t in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import")
+                                       if t in agent.tool_registry.active_tools]
+                        if write_tools:
+                            _add_user_msg(messages, (
+                                f"[SYSTEM: Du har lavet {consecutive_reads} l\u00e6sekald i tr\u00e6k uden at skrive noget. "
+                                f"STOP med at l\u00e6se. BRUG et v\u00e6rkt\u00f8j der SKRIVER: "
+                                f"{', '.join(write_tools)}. L\u00e6s h\u00f8jst \u00e9n ting mere, skriv s\u00e5.]"
+                            ))
+                            agent._log("SYSTEM", "Read-loop escape", f"{consecutive_reads} consecutive reads — force write")
+                            consecutive_reads = 0
+                elif tool_name in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import"):
+                    consecutive_reads = 0
                 if tool_name in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
                     result_str = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redig\u00e9r IKKE filer. Brug <<<DONE>>> for at afslutte, eller gen\u00e5bn issuet f\u00f8rst."
                     result = {"success": False, "error": "Issue already resolved"}
