@@ -1084,7 +1084,9 @@ def decompose() -> Any:
                 "lang": agent.lang,
                 "ui_lang": ui_lang,
                 "file_context": files,
-                "file_chunks": agent.file_chunks
+                "file_chunks": agent.file_chunks,
+                "decompose_model": agent.decompose_llm.model,
+                "execute_model": agent.llm.model
             })
             return data
         session_manager.update_session(current_session_id, _update)
@@ -1277,6 +1279,8 @@ def _save_session_data(current_session_id: str | None, stream_agent: Any, ui_lan
             "template": stream_agent.active_template,
             "file_chunks": stream_agent.file_chunks,
             "images": stream_agent.images,
+            "decompose_model": stream_agent.decompose_llm.model,
+            "execute_model": stream_agent.llm.model,
         })
         return data
     session_manager.update_session(current_session_id, _update)

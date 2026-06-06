@@ -2272,6 +2272,7 @@ async function loadSelectedSession() {
         
         addLogEntry('INFO', _('session_loaded'), data.session.name);
         renderImagePreview();
+        fetchModels();
     }
 }
 
