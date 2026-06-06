@@ -1382,11 +1382,14 @@ def execute_stream() -> Any:
         agent.issue_resolved = False
         agent.current_phase = None
 
-        MAX_CTX = 150000
-        task_context_prompt = original_prompt[:MAX_CTX] + ("\n\n[... trunkeret — brug read_chunk() for at læse flere chunks ...]" if len(original_prompt) > MAX_CTX else "")
+        agent._log("INFO", "Nedbryd LLM", agent.decompose_llm.model if hasattr(agent, 'decompose_llm') else '?')
+        agent._log("INFO", "Udfør LLM", agent.llm.model)
 
         for log in agent.agent_log[-10:]:
             yield f"data: {json.dumps({'type': 'log', 'log': log})}\n\n"
+
+        MAX_CTX = 150000
+        task_context_prompt = original_prompt[:MAX_CTX] + ("\n\n[... trunkeret — brug read_chunk() for at læse flere chunks ...]" if len(original_prompt) > MAX_CTX else "")
 
         total_tasks = _count_tasks(agent.task_tree.root)
         completed = [0]
