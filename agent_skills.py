@@ -44,7 +44,7 @@ TEMPLATE_TOOLS = {
 # to create 7 modules, but a simple bugfix Analyse only needs 4.
 # Falls back to MAX_TASK_ITERATIONS from config if not specified.
 TEMPLATE_PHASE_ITERATION_LIMITS = {
-    "programming": {
+    "programmering": {
         "Kravanalyse": 8,
         "Arkitekturdesign": 10,
         "Implementeringsplan": 8,
@@ -69,6 +69,13 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
 
 
 TEMPLATE_TASK_TOOLS = {
+    "programmering": {
+        "kravanalyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "arkitekturdesign": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "implementeringsplan": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "sikkerhedsanalyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "kodeimplementering": ["write_file", "edit_file", "run_tests", "locate", "list_symbols", "read_location", "list_chunks", "read_chunk", "list_files"],
+    },
     "agenten": {
         "branch": ["git_current_branch", "git_create_branch", "git_branch_list", "git_checkout", "git_remote_status", "git_pull"],
         "commit": ["git_add_all", "git_commit", "git_status", "git_diff", "git_log"],
