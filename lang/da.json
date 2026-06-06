@@ -152,9 +152,10 @@
     "git_current_branch": "Vis nuværende aktive branch",
     "git_branch_list": "List alle lokale branches",
     "git_pull": "Hent ændringer fra remote. Kræver: remote (fx 'origin'), branch",
-    "git_checkout": "Skift til en branch. Kræver: branch"
+    "git_checkout": "Skift til en branch. Kræver: branch",
+    "done": "Signal\u00e9r at opgaven/fasen er fuldf\u00f8rt. Native tool-pendant til <<<DONE>>>. Kald N\u00c5R du er f\u00e6rdig \u2014 n\u00e5r al n\u00f8dvendig kode/test/analyse er skrevet. Valgfri: result (kort beskrivelse). Eksempel: done(result='Opdaterede api_server.py med rate limiting')."
   },
-  "tool_system_prompt": "Du har adgang til værktøjer. Kald dem sådan:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nNår færdig, svar sådan:\n{DONE_MARKER}{{\"result\":\"DIN DETALJEREDE KONKLUSION — IKKE bare done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Opgave\n{task}",
+  "tool_system_prompt": "Du har adgang til v\u00e6rkt\u00f8jer. Kald dem s\u00e5dan:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nNår færdig, svar sådan:\n{DONE_MARKER}{{\"result\":\"DIN DETALJEREDE KONKLUSION — IKKE bare done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Opgave\n{task}",
   "tool_continuation": "Tilgængelige: {tools_list}. Brug {TOOL_MARKER} eller afslut {DONE_MARKER}.",
   "done_continuation": "Afslut med {DONE_MARKER}.",
   "tool_result_prefix": "VÆRKTØJ-RESULTAT for {tool}:",

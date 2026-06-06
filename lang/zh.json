@@ -153,7 +153,8 @@
     "git_current_branch": "显示当前活动分支",
     "git_branch_list": "列出所有本地分支",
     "git_pull": "从远程拉取更改。需要：remote（如 'origin'）、branch",
-    "git_checkout": "切换到分支。需要：branch"
+    "git_checkout": "切换到分支。需要：branch",
+    "done": "标记任务/阶段已完成。<<<DONE>>> 的原生工具对应。当你完成时调用——所有必要的代码/测试/分析都已编写完成。可选：result（简短描述）。示例：done(result='使用速率限制更新了 api_server.py')。"
   },
   "tool_system_prompt": "你可以使用工具。像这样调用它们：\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\n完成后，像这样回复：\n{DONE_MARKER}{{\"result\":\"你的详细结论 — 不仅仅是done\"}}{END_MARKER}\n\n{tools_desc}\n\n## 任务\n{task}",
   "tool_continuation": "可用：{tools_list}。使用 {TOOL_MARKER} 或用 {DONE_MARKER} 完成。",

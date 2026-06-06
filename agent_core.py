@@ -599,6 +599,13 @@ class Agent:
             lambda filepath, line_count, related_issues="": agent_issues.create_refactor_issue(self, filepath, int(line_count), (related_issues.split(",") if isinstance(related_issues, str) else related_issues) if related_issues else None)
         ))
         self.tool_registry.register(Tool(
+            "done",
+            t(K.TOOL_DONE, self.lang),
+            ["result"],
+            lambda result="": result,
+            optional_params=["result"]
+        ))
+        self.tool_registry.register(Tool(
             "create_issue",
             "Opret et nyt issue i issues.json. ÉT issue = ÉN specifik fejl (ikke flere endpoints samlet). Kræver: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location (format: filnavn:funktionsnavn), impact, proposed_fix. acceptance_criteria: beskriv præcist hvordan fixet verificeres (f.eks. 'Endpoint returnerer 403 ved ../ i stien').",
             ["title", "type", "severity", "description", "location", "impact", "proposed_fix", "acceptance_criteria"],

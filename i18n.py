@@ -85,6 +85,7 @@ class K(StrEnum):
     TOOL_GIT_BRANCH_LIST     = "tools.git_branch_list"
     TOOL_GIT_PULL            = "tools.git_pull"
     TOOL_GIT_CHECKOUT        = "tools.git_checkout"
+    TOOL_DONE                = "tools.done"
 
     # === Checkpoint messages (PR workflow) ===
     CP_NO_COMMIT    = "checkpoint.no_commit"

@@ -266,6 +266,8 @@ class ToolRegistry:
             if missing:
                 return {"success": False, "error": f"Manglende argumenter: {', '.join(missing)}. Kræves: {', '.join(self.tools[tool_name].parameters)}"}
             result = fn(**valid_args)
+            if isinstance(result, dict) and "success" in result:
+                return {"success": result["success"], "result": result}
             return {"success": True, "result": result}
         except Exception as e:
             log.error("Tool '%s' failed: %s", tool_name, traceback.format_exc())

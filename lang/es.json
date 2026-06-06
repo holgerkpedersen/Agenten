@@ -153,7 +153,8 @@
     "git_current_branch": "Mostrar rama activa actual",
     "git_branch_list": "Listar todas las ramas locales",
     "git_pull": "Obtener cambios del remoto. Requiere: remote (ej. 'origin'), branch",
-    "git_checkout": "Cambiar a una rama. Requiere: branch"
+    "git_checkout": "Cambiar a una rama. Requiere: branch",
+    "done": "Señalizar que la tarea/fase está completa. Herramienta nativa equivalente a <<<DONE>>>. Llama CUANDO hayas terminado — cuando todo el código/pruebas/análisis esté escrito. Opcional: result (descripción breve). Ejemplo: done(result='Actualizado api_server.py con rate limiting')."
   },
   "tool_system_prompt": "Tienes acceso a herramientas. Llámalas así:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nCuando termines, responde así:\n{DONE_MARKER}{{\"result\":\"TU CONCLUSIÓN DETALLADA — NO solo done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Tarea\n{task}",
   "tool_continuation": "Disponible: {tools_list}. Usa {TOOL_MARKER} o termina con {DONE_MARKER}.",

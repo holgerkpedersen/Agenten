@@ -152,7 +152,8 @@
     "git_current_branch": "Show current active branch",
     "git_branch_list": "List all local branches",
     "git_pull": "Pull changes from remote. Requires: remote (e.g. 'origin'), branch",
-    "git_checkout": "Switch to a branch. Requires: branch"
+    "git_checkout": "Switch to a branch. Requires: branch",
+    "done": "Signal that the task/phase is complete. Native tool counterpart to <<<DONE>>>. Call WHEN you are done \u2014 when all necessary code/test/analysis is written. Optional: result (short description). Example: done(result='Updated api_server.py with rate limiting')."
   },
   "tool_system_prompt": "You have access to tools. Call them like this:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nWhen done, respond like this:\n{DONE_MARKER}{{\"result\":\"YOUR DETAILED CONCLUSION — NOT just done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Task\n{task}",
   "tool_continuation": "Available: {tools_list}. Use {TOOL_MARKER} or finish with {DONE_MARKER}.",

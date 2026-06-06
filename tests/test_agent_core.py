@@ -280,3 +280,70 @@ class TestSafeInt:
     def test_safe_int_empty(self):
         from agent_core import _safe_int
         assert _safe_int("") == 0
+
+
+class TestDoneTool:
+    """done() tool must return a flat string result — NOT a nested dict."""
+
+    def test_execute_returns_string_result(self):
+        agent = Agent()
+        result = agent.tool_registry.execute("done", {"result": "task completed"})
+        assert result["success"] is True
+        assert isinstance(result["result"], str)
+        assert result["result"] == "task completed"
+        assert result["result"].lower() == "task completed"
+
+    def test_execute_no_args_returns_empty_string(self):
+        agent = Agent()
+        result = agent.tool_registry.execute("done", {})
+        assert result["success"] is True
+        assert isinstance(result["result"], str)
+        assert result["result"] == ""
+
+    def test_full_response_from_execute_is_string(self):
+        agent = Agent()
+        execute_result = agent.tool_registry.execute("done", {"result": "Kravanalyse fuldf\u00f8rt"})
+        full_response = execute_result.get("result", "")
+        assert isinstance(full_response, str)
+        full_response.lower()
+
+    def test_tool_execute_propagates_inner_success(self):
+        """execute() must propagate the tool's own 'success', not always True."""
+        agent = Agent()
+        result = agent.tool_registry.execute("read_issue", {"issue_id": "NONEXISTENT-999"})
+        assert result["success"] is False
+        assert result.get("result", {}).get("success") is False
+
+    def test_finalize_task_stream_accepts_string_full_response(self):
+        from agent_tasks import _finalize_task_stream
+        from task_tree import TaskNode
+
+        class MockAgent:
+            agent_log = []
+            tool_registry = type("tr", (), {"active_tools": None})()
+            _tests_failed = False
+            _write_failed = False
+            _needs_resolve_persist = False
+            issue_resolved = False
+            active_template = ""
+            lang = "da"
+            action_history = []
+
+            def _log(self, level, msg, detail="", log_file=None): pass
+            def _record_outcome(self, task_node): pass
+            def _evolve_if_needed(self): pass
+
+        agent = MockAgent()
+        task_node = TaskNode("Kravanalyse")
+        task_node.success_criteria = []
+        called_tools = {"done{}": 1}
+        events = list(_finalize_task_stream(
+            agent, task_node,
+            full_response="Kravanalyse fuldf\u00f8rt - dokument gemt",
+            text_fallback="",
+            called_tools=called_tools,
+            original_prompt="test",
+            messages=[],
+        ))
+        assert events[-1]["type"] == "done"
+        assert isinstance(events[-1]["result"], str)
