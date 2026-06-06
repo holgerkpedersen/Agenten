@@ -465,9 +465,9 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "write_file",
-            "Opret en NY fil med indhold. Virker KUN til nye filer — findes filen i forvejen, brug edit_file i stedet. Opretter mappen hvis den ikke findes. Syntestjekker .py filer.",
+            "Opret en NY fil med indhold, eller overskriv en eksisterende med overwrite=true. Opretter mappen hvis den ikke findes. Syntestjekker .py filer.",
             ["path", "content"],
-            lambda path, content: git_ops.write_file(path=path, content=content)
+            lambda path, content, overwrite=False: git_ops.write_file(path=path, content=content, overwrite=overwrite)
         ))
         self.tool_registry.register(Tool(
             "edit_file",

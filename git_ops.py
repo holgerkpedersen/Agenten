@@ -377,12 +377,13 @@ def _check_post_write(path: str, content: str, result: dict[str, Any]) -> dict[s
     return result
 
 
-def write_file(path: str, content: str) -> dict[str, Any]:
+def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, Any]:
     """write file.
     
     Args:
         path:
-        content:"""
+        content:
+        overwrite:"""
     path = _resolve_path(path)
     if not is_safe_location(path):
         return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
@@ -390,10 +391,10 @@ def write_file(path: str, content: str) -> dict[str, Any]:
     if dirname:
         os.makedirs(dirname, exist_ok=True)
     try:
-        if os.path.exists(path):
+        if os.path.exists(path) and not overwrite:
             return {
                 "success": False,
-                "error": f"Filen findes allerede: {path}. Brug edit_file til at redigere eksisterende filer."
+                "error": f"Filen findes allerede: {path}. Brug edit_file til at redigere eksisterende filer, eller brug overwrite=true for at erstatte den."
             }
         if path.endswith('.py'):
             try:
