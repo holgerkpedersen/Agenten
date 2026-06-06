@@ -94,11 +94,32 @@ def _is_safe_path(base_dir: str, target_path: str) -> bool:
         return False
 
 
+def _resolve_path(path: str) -> str:
+    """Resolve a path relative to AGENT_WORKDIR when set, otherwise relative to CWD."""
+    if os.path.isabs(path):
+        return os.path.abspath(path)
+    workdir = os.environ.get('AGENT_WORKDIR', '')
+    if workdir:
+        return os.path.abspath(os.path.join(workdir, path))
+    return os.path.abspath(path)
+
+
 def is_safe_location(target_path: str) -> bool:
-    """Checks if target_path is within any known-safe directory (project root, exports, uploads, temp)."""
+    """Checks if target_path is within any known-safe directory (project root, cwd, --workdir, exports, uploads, temp)."""
     try:
         real = os.path.realpath(target_path) if os.path.exists(target_path) else os.path.abspath(target_path)
         real = os.path.normcase(real)
+        # Check AGENT_WORKDIR if set (used by --workdir CLI arg)
+        workdir = os.environ.get('AGENT_WORKDIR', '')
+        if workdir:
+            workdir_real = os.path.realpath(workdir)
+            workdir_norm = os.path.normcase(workdir_real)
+            if real.startswith(workdir_norm + os.sep) or real == workdir_norm:
+                return True
+        # Also check current working directory as fallback
+        cwd = os.path.normcase(os.path.realpath(os.getcwd()))
+        if real.startswith(cwd + os.sep) or real == cwd:
+            return True
         for safe in _SAFE_DIRS:
             safe_norm = os.path.normcase(safe)
             if real.startswith(safe_norm + os.sep) or real == safe_norm:
@@ -569,6 +590,7 @@ def list_symbols(filepath: str) -> dict[str, Any]:
 
     Returns:
         dict with success flag, filepath, and symbols list"""
+    filepath = _resolve_path(filepath)
     if not filepath or not os.path.exists(filepath):
         return {"success": False, "error": f"File not found: {filepath}"}
     if not filepath.lower().endswith('.py'):
@@ -635,6 +657,8 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
             files = ", ".join(m[0] for m in matches)
             return {"success": False, "error": f"Symbol '{name}' found in multiple files: {files}. Specify filepath='fil.py' to disambiguate."}
         filepath = matches[0][0]
+    if filepath:
+        filepath = _resolve_path(filepath)
     if not filepath or not os.path.exists(filepath):
         return {"success": False, "error": f"File not found: {filepath}"}
     if not filepath.lower().endswith('.py'):

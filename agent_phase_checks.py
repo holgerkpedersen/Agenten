@@ -724,6 +724,37 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "scope": "all",
         },
     },
+    "programmering": {
+        "Kravanalyse": {
+            "type": "file_exists",
+            "paths": ["docs/kravanalyse.md"],
+            "min_files": 1,
+            "description": "Kravanalyse skal gemmes i docs/kravanalyse.md via write_file.",
+        },
+        "Arkitekturdesign": {
+            "type": "file_exists",
+            "paths": ["docs/arkitektur.md"],
+            "min_files": 1,
+            "description": "Arkitekturdesign skal gemmes i docs/arkitektur.md via write_file.",
+        },
+        "Implementeringsplan": {
+            "type": "file_exists",
+            "paths": ["docs/implementeringsplan.md"],
+            "min_files": 1,
+            "description": "Implementeringsplan skal gemmes i docs/implementeringsplan.md via write_file.",
+        },
+        "Sikkerhedsanalyse": {
+            "type": "file_exists",
+            "paths": ["docs/sikkerhedsanalyse.md"],
+            "min_files": 1,
+            "description": "Sikkerhedsanalyse skal gemmes i docs/sikkerhedsanalyse.md via write_file.",
+        },
+        "Kodeimplementering": {
+            "type": "tool_called",
+            "tools": ["write_file", "edit_file"],
+            "description": "Der skal skrives eller redigeres kodefiler via write_file eller edit_file.",
+        },
+    },
 }
 
 

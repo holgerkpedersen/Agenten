@@ -746,19 +746,30 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
         agent:
         called_tools:
         task_name:"""
-    if (getattr(agent, "active_template", "") == "refactor"
-        and task_name
-        and any(k in _normalize_phase(task_name).lower() for k in ("plan", "ekstraher", "opdat"))
-        and not any(k in (called_tools or {}) for k in (
+    template = getattr(agent, "active_template", "")
+    if template == "refactor" and task_name:
+        refactor_writing_phases = ("plan", "ekstraher", "opdat")
+        has_written = any(k in (called_tools or {}) for k in (
             k for k in called_tools
             if k.startswith("write_file") or k.startswith("edit_file") or k.startswith("extract_symbol") or k.startswith("remove_symbol") or k.startswith("add_import")
-        ))):
-        iteration = getattr(agent, "_current_task_iteration", 0)
-        if iteration >= 3 and not getattr(agent, "_non_productive_reminder_sent", False):
-            agent._non_productive_reminder_sent = True
-            return ("FEJL: Du har ikke kaldt write_file, edit_file, extract_symbol, remove_symbol eller add_import i "
-                    f"{iteration} iterationer. Refactor kræver at du SKRIVER kode. "
-                    "Brug write_file for nye moduler eller edit_file for at opdatere api_server.py.")
+        ))
+        if any(k in _normalize_phase(task_name).lower() for k in refactor_writing_phases) and not has_written:
+            iteration = getattr(agent, "_current_task_iteration", 0)
+            if iteration >= 3 and not getattr(agent, "_non_productive_reminder_sent", False):
+                agent._non_productive_reminder_sent = True
+                return ("FEJL: Du har ikke kaldt write_file, edit_file, extract_symbol, remove_symbol eller add_import i "
+                        f"{iteration} iterationer. Refactor kræver at du SKRIVER kode. "
+                        "Brug write_file for nye moduler eller edit_file for at opdatere api_server.py.")
+    elif template == "programming" and task_name:
+        programming_writing_phases = ("arkitekturdesign", "implementeringsplan", "kodeimplementering")
+        has_written = any(k in (called_tools or {}) for k in called_tools if k.startswith("write_file") or k.startswith("edit_file"))
+        if any(k in _normalize_phase(task_name).lower() for k in programming_writing_phases) and not has_written:
+            iteration = getattr(agent, "_current_task_iteration", 0)
+            if iteration >= 5 and not getattr(agent, "_non_productive_reminder_sent", False):
+                agent._non_productive_reminder_sent = True
+                return ("FEJL: Du har ikke kaldt write_file eller edit_file i "
+                        f"{iteration} iterationer. Programming kræver at du SKRIVER kode og design. "
+                        "Brug write_file til at oprette filer (arkitektur, plan, kode). Stop med at læse og begynd at skrive.")
     available = set(agent.tool_registry.active_tools or [])
     required = available & REQUIRED_ACTION_TOOLS
     if not required:

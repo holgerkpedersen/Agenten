@@ -644,6 +644,7 @@
             <select id="sessionSelect" class="session-select">
                 <option value="" id="selectSessionOpt">-- Vælg eller opret ny --</option>
             </select>
+            <span id="sessionIdDisplay" style="font-size:11px;color:var(--text-dim);margin-left:6px;user-select:all;cursor:pointer;" title="Klik for at kopiere"></span>
             <button onclick="refreshSessions()" id="refreshSess" title="Opdater">🔄</button>
             <button onclick="loadSelectedSession()" id="loadSess" title="Indlæs">📂 Indlæs</button>
             <button onclick="saveCurrentSession()" id="saveSess" title="Gem">💾 Gem</button>
@@ -2019,6 +2020,13 @@ function resetLayout() {
     saveLayoutToSession();
 }
 
+function updateSessionIdDisplay() {
+    const el = document.getElementById('sessionIdDisplay');
+    if (el) {
+        el.textContent = currentSessionId || '';
+        el.title = currentSessionId || '';
+    }
+}
 async function renameSession() {
     const select = document.getElementById('sessionSelect');
     const sessionId = select.value;
@@ -2087,6 +2095,7 @@ async function createNewSession() {
         const data = await response.json();
         if (data.success) {
             currentSessionId = data.session_id;
+            updateSessionIdDisplay();
             currentTree = null;
             selectedFiles = [];
             loadedFilesContent = [];
@@ -2127,6 +2136,7 @@ async function loadSelectedSession() {
     const data = await response.json();
     if (data.success) {
         currentSessionId = sessionId;
+        updateSessionIdDisplay();
         
         if (data.session.layout) {
             applyLayout(data.session.layout);

@@ -11,6 +11,17 @@ from i18n import K
 from lang import t
 from agent_files import is_safe_location, locate_code
 
+
+def _resolve_path(path: str) -> str:
+    """Resolve a path relative to AGENT_WORKDIR when set, otherwise relative to CWD."""
+    if os.path.isabs(path):
+        return os.path.abspath(path)
+    workdir = os.environ.get('AGENT_WORKDIR', '')
+    if workdir:
+        return os.path.abspath(os.path.join(workdir, path))
+    return os.path.abspath(path)
+
+
 _file_lock = threading.Lock()
 _BASE_DIR = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
 
@@ -372,8 +383,7 @@ def write_file(path: str, content: str) -> dict[str, Any]:
     Args:
         path:
         content:"""
-    if not os.path.isabs(path):
-        path = os.path.abspath(path)
+    path = _resolve_path(path)
     if not is_safe_location(path):
         return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
     dirname = os.path.dirname(path)
@@ -510,8 +520,7 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
         new_text:
         expected_hash:
         symbol:"""
-    if not os.path.isabs(path):
-        path = os.path.abspath(path)
+    path = _resolve_path(path)
     if not is_safe_location(path):
         return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
     try:
@@ -656,8 +665,7 @@ def list_files(path: str = ".", pattern: str | None = None, max_depth: int = 2) 
         pattern:
         max_depth:"""
     try:
-        if not os.path.isabs(path):
-            path = os.path.abspath(path)
+        path = _resolve_path(path)
         if not is_safe_location(path):
             return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
         if not os.path.isdir(path):

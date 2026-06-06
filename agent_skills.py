@@ -44,6 +44,13 @@ TEMPLATE_TOOLS = {
 # to create 7 modules, but a simple bugfix Analyse only needs 4.
 # Falls back to MAX_TASK_ITERATIONS from config if not specified.
 TEMPLATE_PHASE_ITERATION_LIMITS = {
+    "programming": {
+        "Kravanalyse": 8,
+        "Arkitekturdesign": 10,
+        "Implementeringsplan": 8,
+        "Sikkerhedsanalyse": 8,
+        "Kodeimplementering": 20,
+    },
     "refactor": {
         "Analyse": 4,    # Read issue + list_symbols + a few read_location
         "Plan": 4,       # Read + write refactor_plan.md (auto-advances)
@@ -117,10 +124,10 @@ SECTION_INSTRUCTIONS = {
         "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foresl\u00e5 forbedringer til diff'en.",
     },
     "programmering": {
-        "Kravanalyse": "Analyser kravene grundigt. Identific\u00e9r funktionelle og ikke-funktionelle krav, input/output, og eventuelle begr\u00e6nsninger. Beskriv hvad systemet skal kunne.",
-        "Arkitekturdesign": "Design systemarkitekturen: komponenter, moduler, dataflow og afh\u00e6ngigheder. Overvej relevante design patterns og SOLID-principper. Tegn arkitekturen med tekst.",
-        "Implementeringsplan": "Planl\u00e6g implementeringen: hvilke filer skal oprettes, i hvilken r\u00e6kkef\u00f8lge, og hvad skal hver fil indeholde. Overvej teststrategi og edge cases.",
-        "Sikkerhedsanalyse": "Analyser sikkerhedsaspekter: inputvalidering, autentifikation, kryptering, h\u00e5ndtering af f\u00f8lsomme data (passwords, keys). F\u00f8lg OWASP best practices og princip om mindste rettighed.",
+        "Kravanalyse": "Analyser kravene grundigt. Identific\u00e9r funktionelle og ikke-funktionelle krav, input/output, og eventuelle begr\u00e6nsninger. DIN F\u00d8RSTE handling SKAL v\u00e6re write_file \u2014 gem analysen i ./docs/kravanalyse.md. Beskriv hvad systemet skal kunne.",
+        "Arkitekturdesign": "Design systemarkitekturen: komponenter, moduler, dataflow og afh\u00e6ngigheder. Overvej relevante design patterns og SOLID-principper. Brug write_file til at gemme designet i ./docs/arkitektur.md. Tegn arkitekturen med tekst.",
+        "Implementeringsplan": "Planl\u00e6g implementeringen: hvilke filer skal oprettes, i hvilken r\u00e6kkef\u00f8lge, og hvad skal hver fil indeholde. Overvej teststrategi og edge cases. Brug write_file til at gemme planen i ./docs/implementeringsplan.md.",
+        "Sikkerhedsanalyse": "Analyser sikkerhedsaspekter: inputvalidering, autentifikation, kryptering, h\u00e5ndtering af f\u00f8lsomme data (passwords, keys). F\u00f8lg OWASP best practices og princip om mindste rettighed. Brug write_file til at gemme analysen i ./docs/sikkerhedsanalyse.md.",
         "Kodeimplementering": "Implement\u00e9r koden baseret p\u00e5 arkitekturdesign og implementeringsplan. Brug write_file til at oprette/redigere hver fil. Skriv ren, vedligeholdelsesvenlig kode med korrekt fejlh\u00e5ndtering og logging.",
     },
     "python-arkitektur": {
