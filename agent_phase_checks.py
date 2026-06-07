@@ -761,101 +761,56 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
     "kodeanalyse": {
         "Form\u00e5l": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Forklar hvad filen g\u00f8r og dens rolle i projektet. Kr\u00e6ver: l\u00e6s fil + beskriv form\u00e5l, ansvar, cohesion og single responsibility.",
+            "description": "FORM\u00c5L: Forklar hvad filen g\u00f8r og dens rolle i projektet. Kr\u00e6ver: fil gemt i docs/formaal.md med analyse af form\u00e5l, ansvar, cohesion og single responsibility.",
             "checks": [
-                {"type": "min_text_length", "min_chars": 200},
-                {"type": "tool_called", "tools": ["read_location", "list_symbols", "read_chunk", "list_chunks", "list_files", "locate"]},
-                {"type": "text_contains", "keywords": [
-                    "form\u00e5l",
-                    "ansvar",
-                    "rolle",
-                    "cohesion",
-                    "single responsibility",
-                    "modul",
-                ], "min_match": 4},
+                {"type": "file_exists", "paths": ["docs/formaal.md"], "min_files": 1},
+                {"type": "code_contains", "path": "docs/formaal.md", "patterns": [
+                    "form\u00e5l", "ansvar", "rolle", "cohesion", "single responsibility"
+                ], "min_matches": 3},
             ],
         },
         "Imports og afh\u00e6ngigheder": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Kr\u00e6ver: analys\u00e9r imports, cirkul\u00e6re afh\u00e6ngigheder, ubrugte imports og eksterne biblioteker.",
+            "description": "FORM\u00c5L: Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Kr\u00e6ver: fil gemt i docs/imports.md med gennemgang af imports, cirkul\u00e6re afh\u00e6ngigheder og ubrugte imports.",
             "checks": [
-                {"type": "min_text_length", "min_chars": 200},
-                {"type": "tool_called", "tools": ["read_location", "list_symbols", "read_chunk", "locate"]},
-                {"type": "text_contains", "keywords": [
-                    "import",
-                    "afh\u00e6ngighed",
-                    "cirkul\u00e6r",
-                    "ubrugt",
-                    "ekstern",
-                    "bibliotek",
-                    "version",
-                ], "min_match": 5},
+                {"type": "file_exists", "paths": ["docs/imports.md"], "min_files": 1},
+                {"type": "code_contains", "path": "docs/imports.md", "patterns": [
+                    "import", "afh\u00e6ngighed", "cirkul\u00e6r", "ubrugt", "ekstern"
+                ], "min_matches": 3},
             ],
         },
         "Arkitektur": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Analys\u00e9r filens struktur, design patterns og dataflow. Kr\u00e6ver: l\u00e6s 2+ funktioner/klasser + beskriv struktur, patterns, coupling og cohesion.",
+            "description": "FORM\u00c5L: Analys\u00e9r filens struktur, design patterns og dataflow. Kr\u00e6ver: fil gemt i docs/arkitektur.md med analyse af struktur, patterns, coupling og SOLID.",
             "checks": [
-                {"type": "min_text_length", "min_chars": 300},
-                {"type": "tool_called", "tools": ["read_location"], "min_count": 2},
-                {"type": "text_contains", "keywords": [
-                    "klasse",
-                    "funktion",
-                    "struktur",
-                    "metode",
-                    "dataflow",
-                    "design pattern",
-                    "kobling",
-                    "cohesion",
-                    "SOLID",
-                    "single responsibility",
-                ], "min_match": 6},
+                {"type": "file_exists", "paths": ["docs/arkitektur.md"], "min_files": 1},
+                {"type": "code_contains", "path": "docs/arkitektur.md", "patterns": [
+                    "klasse", "funktion", "struktur", "design pattern", "kobling",
+                    "cohesion", "SOLID", "single responsibility"
+                ], "min_matches": 4},
             ],
         },
         "Kodekvalitet": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Vurder kodekvalitet (DRY, SOLID, PEP 8, complexity, naming, tests). Kr\u00e6ver: l\u00e6s kode + vurder alle kvalitetsaspekter.",
+            "description": "FORM\u00c5L: Vurder kodekvalitet (DRY, SOLID, PEP 8, complexity, naming, tests). Kr\u00e6ver: fil gemt i docs/kodekvalitet.md med kvalitetsvurdering.",
             "checks": [
-                {"type": "min_text_length", "min_chars": 200},
-                {"type": "tool_called", "tools": ["read_location", "read_chunk", "list_symbols", "locate"]},
-                {"type": "text_contains", "keywords": [
-                    "DRY",
-                    "SOLID",
-                    "PEP 8",
-                    "navngivning",
-                    "complexity",
-                    "type hint",
-                    "fejlh\u00e5ndtering",
-                    "test coverage",
-                    "l\u00e6sbarhed",
-                    "vedligehold",
-                    "separation of concerns",
-                ], "min_match": 6},
+                {"type": "file_exists", "paths": ["docs/kodekvalitet.md"], "min_files": 1},
+                {"type": "code_contains", "path": "docs/kodekvalitet.md", "patterns": [
+                    "DRY", "SOLID", "PEP 8", "navngivning", "complexity",
+                    "type hint", "fejlh\u00e5ndtering", "test coverage"
+                ], "min_matches": 4},
             ],
         },
         "Sikkerhed": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Identific\u00e9r s\u00e5rbarheder (OWASP top 10). Kr\u00e6ver: l\u00e6s kode + tjek inputvalidering, autentifikation, access control, databeskyttelse, fejlh\u00e5ndtering, dependencies, security headers og API security.",
+            "description": "FORM\u00c5L: Identific\u00e9r s\u00e5rbarheder (OWASP top 10). Kr\u00e6ver: fil gemt i docs/sikkerhed.md med sikkerhedsanalyse.",
             "checks": [
-                {"type": "min_text_length", "min_chars": 200},
-                {"type": "tool_called", "tools": ["read_location", "read_chunk", "list_symbols", "locate"]},
-                {"type": "text_contains", "keywords": [
-                    "inputvalidering",
-                    "autentifikation",
-                    "access control",
-                    "autorisation",
-                    "kryptering",
-                    "datah\u00e5ndtering",
-                    "fejlh\u00e5ndtering",
-                    "session",
-                    "dependency",
-                    "security header",
-                    "rate limiting",
-                    "CSRF",
-                    "XSS",
-                    "SQL injection",
-                    "OWASP",
-                ], "min_match": 8},
+                {"type": "file_exists", "paths": ["docs/sikkerhed.md"], "min_files": 1},
+                {"type": "code_contains", "path": "docs/sikkerhed.md", "patterns": [
+                    "inputvalidering", "autentifikation", "access control",
+                    "kryptering", "fejlh\u00e5ndtering", "session",
+                    "CSRF", "XSS", "SQL injection", "OWASP"
+                ], "min_matches": 5},
             ],
         },
     },

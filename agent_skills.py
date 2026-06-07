@@ -9,7 +9,7 @@ from skill_loader import SkillLoader
 
 TEMPLATE_TOOLS = {
     "resume": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate"],
-    "kodeanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "create_issue", "create_refactor_issue"],
+    "kodeanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "write_file", "create_issue", "create_refactor_issue"],
     "diffanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "git_diff", "git_log", "create_issue", "create_refactor_issue"],
     "fri": None,
     "agenten": [
@@ -77,11 +77,11 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
 
 TEMPLATE_TASK_TOOLS = {
     "kodeanalyse": {
-        "form\u00e5l": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
-        "imports": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
-        "arkitektur": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
-        "kodekvalitet": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
-        "sikkerhed": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
+        "form\u00e5l": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "imports": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "arkitektur": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "kodekvalitet": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "sikkerhed": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
     },
     "programmering": {
         "kravanalyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
@@ -131,11 +131,11 @@ SECTION_INSTRUCTIONS = {
         "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foresl\u00e5 konkrete forbedringer og n\u00e6ste skridt.",
     },
     "kodeanalyse": {
-        "Form\u00e5l": "Skriv afsnittet 'Form\u00e5l': forklar hvad filen g\u00f8r og dens rolle i projektet. Vurder filens cohesion og om den overholder single responsibility.",
-        "Imports og afh\u00e6ngigheder": "Skriv afsnittet 'Imports og afh\u00e6ngigheder': gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Bem\u00e6rk ubrugte imports, cirkul\u00e6re afh\u00e6ngigheder og versionsproblemer.",
-        "Arkitektur": "Skriv afsnittet 'Arkitektur': analys\u00e9r filens struktur, klasser og funktioner. Vurder anvendte design patterns, kobling (coupling) mellem moduler, cohesion, og om SOLID-principperne overholdes.",
-        "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder l\u00e6sbarhed, vedligeholdbarhed, test coverage, navngivning (PEP 8), type hints, fejlh\u00e5ndtering, complexity, DRY-princippet og separation of concerns.",
-        "Sikkerhed": "Skriv afsnittet 'Sikkerhed': analys\u00e9r inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlh\u00e5ndtering, s\u00e5rbarheder i dependencies, security headers. F\u00f8lg OWASP top 10.",
+        "Form\u00e5l": "L\u00e6s f\u00f8rst docs/formaal.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/formaal.md. Forklar hvad filen g\u00f8r og dens rolle i projektet. Vurder filens cohesion og om den overholder single responsibility.",
+        "Imports og afh\u00e6ngigheder": "L\u00e6s f\u00f8rst docs/imports.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/imports.md. Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Bem\u00e6rk ubrugte imports, cirkul\u00e6re afh\u00e6ngigheder og versionsproblemer.",
+        "Arkitektur": "L\u00e6s f\u00f8rst docs/arkitektur.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/arkitektur.md. Analys\u00e9r filens struktur, klasser og funktioner. Vurder anvendte design patterns, kobling (coupling) mellem moduler, cohesion, og om SOLID-principperne overholdes.",
+        "Kodekvalitet": "L\u00e6s f\u00f8rst docs/kodekvalitet.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/kodekvalitet.md. Vurder l\u00e6sbarhed, vedligeholdbarhed, test coverage, navngivning (PEP 8), type hints, fejlh\u00e5ndtering, complexity, DRY-princippet og separation of concerns.",
+        "Sikkerhed": "L\u00e6s f\u00f8rst docs/sikkerhed.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/sikkerhed.md. Analys\u00e9r inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlh\u00e5ndtering, s\u00e5rbarheder i dependencies, security headers. F\u00f8lg OWASP top 10.",
     },
     "diffanalyse": {
         "Oversigt": "Skriv afsnittet 'Oversigt': beskriv hvad diff'en indeholder af \u00e6ndringer.",
