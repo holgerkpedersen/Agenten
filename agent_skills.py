@@ -44,6 +44,13 @@ TEMPLATE_TOOLS = {
 # to create 7 modules, but a simple bugfix Analyse only needs 4.
 # Falls back to MAX_TASK_ITERATIONS from config if not specified.
 TEMPLATE_PHASE_ITERATION_LIMITS = {
+    "kodeanalyse": {
+        "Form\u00e5l": 6,
+        "Imports og afh\u00e6ngigheder": 6,
+        "Arkitektur": 8,
+        "Kodekvalitet": 6,
+        "Sikkerhed": 6,
+    },
     "programmering": {
         "Kravanalyse": 8,
         "Arkitekturdesign": 10,
@@ -69,6 +76,13 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
 
 
 TEMPLATE_TASK_TOOLS = {
+    "kodeanalyse": {
+        "form\u00e5l": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
+        "imports": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
+        "arkitektur": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
+        "kodekvalitet": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
+        "sikkerhed": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_issue", "create_refactor_issue"],
+    },
     "programmering": {
         "kravanalyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
         "arkitekturdesign": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],

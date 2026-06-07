@@ -724,6 +724,33 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "scope": "all",
         },
     },
+    "kodeanalyse": {
+        "Form\u00e5l": {
+            "type": "min_text_length",
+            "min_chars": 200,
+            "description": "Form\u00e5lsafsnittet skal v\u00e6re mindst 200 tegn — kort beskrivelse af filens form\u00e5l.",
+        },
+        "Imports og afh\u00e6ngigheder": {
+            "type": "min_text_length",
+            "min_chars": 200,
+            "description": "Importanalyse skal v\u00e6re mindst 200 tegn — gennemg\u00e5 imports og eksterne afh\u00e6ngigheder.",
+        },
+        "Arkitektur": {
+            "type": "min_text_length",
+            "min_chars": 300,
+            "description": "Arkitekturafsnittet skal v\u00e6re mindst 300 tegn — analys\u00e9r struktur, klasser og funktioner.",
+        },
+        "Kodekvalitet": {
+            "type": "min_text_length",
+            "min_chars": 200,
+            "description": "Kodekvalitetsafsnittet skal v\u00e6re mindst 200 tegn — vurder l\u00e6sbarhed og vedligeholdbarhed.",
+        },
+        "Sikkerhed": {
+            "type": "min_text_length",
+            "min_chars": 200,
+            "description": "Sikkerhedsafsnittet skal v\u00e6re mindst 200 tegn — identific\u00e9r s\u00e5rbarheder.",
+        },
+    },
     "programmering": {
         "Kravanalyse": {
             "type": "file_exists",
