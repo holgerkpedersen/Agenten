@@ -1045,6 +1045,19 @@ def decompose() -> Any:
     if template == "billedanalyse" and not has_images and not files:
         image_warning = "🖼️  Billedanalyse kræver et billede! Upload et billede med 🖼 knappen før du kører Nedbryd."
         agent._log("WARNING", "Billedanalyse uden billede", image_warning)
+
+    # Guard: programmering (greenfield) must not run if .py files exist
+    if template == "programmering":
+        FRAMEWORK_PY = {"api_server.py", "agent_core.py", "agent_tasks.py", "agent_skills.py", "agent_files.py", "agent_issues.py", "agent_tree.py", "agent_git.py", "agent_phase_checks.py", "tools.py", "i18n.py", "lang.py", "config.py", "task_tree.py", "llm_wrapper.py", "model_manager.py", "session_manager.py", "flow_builder.py", "skill_evolution.py", "skill_loader.py", "skill_tracker.py", "refactoring_engine.py", "edit_file2.py", "github_wrapper.py", "app.py"}
+        existing_py = [f for f in os.listdir(".") if f.endswith(".py") and f not in FRAMEWORK_PY and os.path.isfile(f)]
+        if existing_py:
+            return jsonify({
+                "success": False,
+                "error": f"Programmeringsskabelonen er kun til greenfield-projekter. Workdir indeholder allerede .py-filer: {', '.join(existing_py[:5])}. Brug i stedet en bugfix-, refactor- eller kodeanalyse-skabelon.",
+                "template_warning": "",
+                "suggested_template": "",
+                "image_warning": image_warning,
+            }), 400
     
     # Validate prompt against selected template
     validation = _validate_template_prompt(prompt, template)
