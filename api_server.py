@@ -1679,6 +1679,25 @@ def delete_issue(issue_id: str) -> Any:
         json.dump(data, f, ensure_ascii=False, indent=2)
     return jsonify({"success": True, "deleted": issue_id})
 
+@app.route("/api/issues", methods=["POST"])
+def create_issue_from_ui() -> Any:
+    """create issue from UI."""
+    data = request.json
+    if not data or not data.get("title"):
+        return jsonify({"success": False, "error": "Title er påkrævet"}), 400
+    result = agent_issues.create_issue(
+        agent=agent,
+        title=data["title"],
+        type=data.get("type", "bug"),
+        severity=data.get("severity", "medium"),
+        description=data.get("description", ""),
+        location=data.get("location", ""),
+        impact=data.get("impact", ""),
+        proposed_fix=data.get("proposed_fix", ""),
+        acceptance_criteria=data.get("acceptance_criteria", ""),
+    )
+    return jsonify(result)
+
 @app.route("/api/test", methods=["GET"])
 def test() -> Any:
     """test."""

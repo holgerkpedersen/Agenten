@@ -75,6 +75,7 @@ ISSUE_TYPE_PREFIXES = {
     "performance": "PRF",
     "maintainability": "MNT",
     "refactor": "REFAC",
+    "feature": "FTR",
 }
 
 
