@@ -750,6 +750,13 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     result = agent.tool_registry.execute(parsed["tool"], parsed["args"])
     result_str = json.dumps(result, ensure_ascii=False)
     agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=parsed['tool']), result_str)
+    agent._record_tool_call(
+        phase=getattr(task_node, 'name', '?'),
+        tool=parsed['tool'],
+        args=parsed.get('args', {}),
+        success=result.get('success', False) if isinstance(result, dict) else True,
+        error=result.get('error', '') if isinstance(result, dict) else '',
+    )
 
     if parsed["tool"] in ("write_file", "edit_file", "extract_symbol"):
         if parsed["tool"] == "extract_symbol":
@@ -1229,6 +1236,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._located_files = set()
     agent._current_task_iteration = 0
     agent._non_productive_reminder_sent = False
+    agent._tool_log = []
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -1376,6 +1384,13 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                 result = agent.tool_registry.execute(tool_name, args_val)
                 result_str = json.dumps(result, ensure_ascii=False)
+                agent._record_tool_call(
+                    phase=getattr(task_node, 'name', '?'),
+                    tool=tool_name,
+                    args=args_val,
+                    success=result.get('success', False) if isinstance(result, dict) else True,
+                    error=result.get('error', '') if isinstance(result, dict) else '',
+                )
                 if tool_name in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import"):
                     if tool_name in ("extract_symbol", "remove_symbol", "add_import"):
                         if isinstance(result, dict) and not result.get("success"):

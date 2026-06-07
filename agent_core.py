@@ -308,6 +308,7 @@ class Agent:
         self._task_start_time: float | None = None
         self._file_hash_registry: dict[str, str] = {}
         self._delegation_index: dict[str, tuple[str, str]] | None = None
+        self._tool_log: list[dict[str, Any]] = []
         self._hints_requested: set[str] = set()
         self._hints_available: set[str] = set()
         self._rubric_retried: bool = False
@@ -713,6 +714,18 @@ class Agent:
             log_fn("%s: %s", str(message), str(detail)[:200])
         except Exception:
             pass
+
+    def _record_tool_call(self, phase: str, tool: str, args: dict,
+                          success: bool, error: str = "", duration: float = 0) -> None:
+        self._tool_log.append({
+            "timestamp": time.time(),
+            "phase": phase,
+            "tool": tool,
+            "args": args,
+            "success": success,
+            "error": error[:500] if error else "",
+            "duration": round(duration, 3),
+        })
 
     def _clean_task_name(self, name: str) -> str:
         """clean task name.

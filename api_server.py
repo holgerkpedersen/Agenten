@@ -1285,6 +1285,7 @@ def _save_session_data(current_session_id: str | None, stream_agent: Any, ui_lan
             "tree": stream_agent.task_tree_to_dict() if stream_agent.task_tree else data.get("tree"),
             "execution_log": stream_agent.execution_log,
             "agent_log": merged_log,
+            "tool_log": stream_agent._tool_log,
             "original_prompt": stream_agent.original_prompt or (stream_agent.task_tree.root.name if stream_agent.task_tree else ""),
             "prompt_history": data.get("prompt_history", []),
             "lang": stream_agent.lang,
