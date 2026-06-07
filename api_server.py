@@ -1652,7 +1652,7 @@ def phase_checks() -> Any:
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:
     """list issues."""
-    issues_path = os.path.join(BASE_DIR, "docs", "issues", "observed", "issues.json")
+    issues_path = agent_issues._get_issues_path()
     if not os.path.exists(issues_path):
         return jsonify({"success": True, "meta": {"total": 0}, "issues": []})
     with open(issues_path, encoding="utf-8") as f:
@@ -1665,7 +1665,7 @@ def delete_issue(issue_id: str) -> Any:
     
     Args:
         issue_id:"""
-    issues_path = os.path.join(BASE_DIR, "docs", "issues", "observed", "issues.json")
+    issues_path = agent_issues._get_issues_path()
     if not os.path.exists(issues_path):
         return jsonify({"success": False, "error": "Issues-fil findes ikke"}), 404
     with open(issues_path, encoding="utf-8") as f:
