@@ -17,6 +17,20 @@
     "testgenerering": "🧪 Testgenerering",
     "issue_handler": "🔷 Issue Håndtering"
   },
+  "template_descriptions": {
+    "fri": "Fri nedbrydning — ingen antagelser om workdir. Du vælger selv faser og værktøjer. Ingen skabelonbegrænsninger.",
+    "resume": "Lav resumé af tekst — ren analyse, ingen kodeskrivning. Workdir: irrelevant.",
+    "kodeanalyse": "Analysér eksisterende kode — read-only. Workdir: skal indeholde .py-filer der analyseres. Ingen skrivning til filer.",
+    "diffanalyse": "Analysér git diff mellem commits — read-only. Workdir: skal være et git repo med commits.",
+    "agenten": "PR workflow — opret branch, commit, push, opret PR. Workdir: skal være et git repo med en remote.",
+    "programmering": "Greenfield — opret nyt projekt fra bunden. Workdir: må IKKE allerede indeholde kildekode. Hvis .py-filer findes, brug bugfix/refactor i stedet.",
+    "python-arkitektur": "Analysér og planlæg arkitektur for et Python/Flask-projekt. Workdir: skal indeholde eksisterende kode der analyseres.",
+    "billedanalyse": "Analysér et billede og gem analysen som .md. Workdir: ligegyldigt. Brug add_image til at indlæse billedet.",
+    "bugfix": "Ret en specifik bug i eksisterende kode (TDD). Workdir: skal indeholde koden der skal rettes. Brug read_issue til at læse fejlbeskrivelsen.",
+    "refactor": "Opdel en stor fil i flere moduler (SOLID). Workdir: skal indeholde den store .py-fil der skal refaktoreres.",
+    "testgenerering": "Generér pytest-tests for en Python-fil. Workdir: skal indeholde den .py-fil der skal testes.",
+    "issue_handler": "Læs et issue, analysér og ret fejlen, luk issue. Workdir: skal indeholde koden der skal rettes."
+  },
   "template_prompts": {
     "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",
     "kodeanalyse": "Analyser følgende kode struktureret. Returnér KUN følgende sektioner:\n## Formål\n## Imports og afhængigheder\n## Arkitektur\n## Kodekvalitet\n## Sikkerhed\n\n{lang_instruction}. Brug ikke <think> tags.",

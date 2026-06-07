@@ -46,4 +46,7 @@ def get_ui_translations(lang: str) -> dict:
     T = data.get("templates", {})
     for k, v in T.items():
         ui[f"template_name_{k}"] = v
+    D = data.get("template_descriptions", {})
+    for k, v in D.items():
+        ui[f"template_description_{k}"] = v
     return ui

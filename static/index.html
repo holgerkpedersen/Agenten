@@ -654,7 +654,7 @@
         
         <div class="toolbar-row">
             <span class="toolbar-label" id="templateLabel">Skabelon</span>
-            <select id="templateSelect" class="toolbar-select">
+            <select id="templateSelect" class="toolbar-select" onchange="onTemplateChange(this.value)">
                 <option value="fri">🌳 Fri nedbrydning</option>
                 <option value="resume">📄 Resumé</option>
                 <option value="kodeanalyse">🔍 Kodeanalyse</option>
@@ -668,6 +668,7 @@
                 <option value="testgenerering">🧪 Testgenerering</option>
                 <option value="issue_handler">🔷 Issue Håndtering</option>
             </select>
+            <div id="templateDescription" style="font-size:11px;color:var(--text-secondary);margin-top:4px;line-height:1.4;padding:4px 8px;background:var(--input-bg);border-radius:4px;display:none;"></div>
         </div>
         
         <div class="toolbar-row" id="issueRow" style="display:none;">
@@ -1039,6 +1040,7 @@ function updateHtmlLabels() {
             if (label && label !== key) opt.textContent = label;
         }
     }
+    onTemplateChange(document.getElementById('templateSelect')?.value);
 }
 
 function updatePanelTitles() {
@@ -1122,9 +1124,22 @@ function toggleTheme() {
     if (btn) btn.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
 }
 
+function onTemplateChange(template) {
+    const descDiv = document.getElementById('templateDescription');
+    const key = 'template_description_' + template;
+    const desc = _(key);
+    if (desc && desc !== key) {
+        descDiv.textContent = desc;
+        descDiv.style.display = 'block';
+    } else {
+        descDiv.style.display = 'none';
+    }
+    document.getElementById('templateWarning').style.display = 'none';
+}
+
 function switchTemplate(template) {
     document.getElementById('templateSelect').value = template;
-    document.getElementById('templateWarning').style.display = 'none';
+    onTemplateChange(template);
     addLogEntry('INFO', 'Skiftede skabelon', `til '${template}' — gentag nedbrydning`);
     loadPhaseChecks(template);
 }

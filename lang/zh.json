@@ -17,6 +17,20 @@
     "testgenerering": "🧪 测试生成",
     "issue_handler": "🔷 Issue 处理"
   },
+  "template_descriptions": {
+    "fri": "自由分解 — 对工作目录无假设。您自由选择阶段和工具。无模板限制。",
+    "resume": "创建文本摘要 — 仅分析，不写代码。工作目录：无关。",
+    "kodeanalyse": "分析现有代码 — 只读。工作目录：必须包含要分析的 .py 文件。不写文件。",
+    "diffanalyse": "分析 git diff — 只读。工作目录：必须是带有提交的 git 仓库。",
+    "agenten": "PR 工作流 — 创建分支、提交、推送、创建 PR。工作目录：必须是带有远程仓库的 git 仓库。",
+    "programmering": "Greenfield — 从头创建新项目。工作目录：不得包含现有源代码。如果存在 .py 文件，请改用 bugfix/refactor。",
+    "python-arkitektur": "分析和规划 Python/Flask 项目的架构。工作目录：必须包含要分析的现有代码。",
+    "billedanalyse": "分析图像并将分析保存为 .md。工作目录：无关。使用 add_image 加载图像。",
+    "bugfix": "修复现有代码中的特定 bug（TDD）。工作目录：必须包含要修复的代码。使用 read_issue 读取错误描述。",
+    "refactor": "将大文件拆分为多个模块（SOLID）。工作目录：必须包含要重构的大 .py 文件。",
+    "testgenerering": "为 Python 文件生成 pytest 测试。工作目录：必须包含要测试的 .py 文件。",
+    "issue_handler": "读取 issue、分析和修复 bug、关闭 issue。工作目录：必须包含要修复的代码。"
+  },
   "template_prompts": {
     "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
     "kodeanalyse": "分析以下代码结构。只返回以下部分：\n## 目的\n## 导入和依赖\n## 架构\n## 代码质量\n## 安全性\n\n{lang_instruction}。不要使用 <think> 标签。",
