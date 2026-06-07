@@ -740,29 +740,44 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
     },
     "kodeanalyse": {
         "Form\u00e5l": {
-            "type": "min_text_length",
-            "min_chars": 200,
-            "description": "FORM\u00c5L: Forklar hvad filen g\u00f8r og dens rolle i projektet. Kr\u00e6ver: mindst 200 tegn.",
+            "type": "all_of",
+            "description": "FORM\u00c5L: Forklar hvad filen g\u00f8r og dens rolle i projektet. Kr\u00e6ver: filen skal v\u00e6re l\u00e6st (list_symbols, read_location eller read_chunk) + substantiel beskrivelse.",
+            "checks": [
+                {"type": "min_text_length", "min_chars": 200},
+                {"type": "tool_called", "tools": ["read_location", "list_symbols", "read_chunk", "list_chunks", "list_files", "locate"]},
+            ],
         },
         "Imports og afh\u00e6ngigheder": {
-            "type": "min_text_length",
-            "min_chars": 200,
-            "description": "FORM\u00c5L: Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Kr\u00e6ver: mindst 200 tegn.",
+            "type": "all_of",
+            "description": "FORM\u00c5L: Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Kr\u00e6ver: filen skal v\u00e6re analyseret (list_symbols eller read_location) + gennemgang af imports.",
+            "checks": [
+                {"type": "min_text_length", "min_chars": 200},
+                {"type": "tool_called", "tools": ["read_location", "list_symbols", "read_chunk", "locate"]},
+            ],
         },
         "Arkitektur": {
-            "type": "min_text_length",
-            "min_chars": 300,
-            "description": "FORM\u00c5L: Analys\u00e9r filens struktur, klasser og funktioner. Kr\u00e6ver: mindst 300 tegn.",
+            "type": "all_of",
+            "description": "FORM\u00c5L: Analys\u00e9r filens struktur, klasser og funktioner. Kr\u00e6ver: mindst 2 funktioner/klasser l\u00e6st med read_location + strukturbeskrivelse.",
+            "checks": [
+                {"type": "min_text_length", "min_chars": 300},
+                {"type": "tool_called", "tools": ["read_location"], "min_count": 2},
+            ],
         },
         "Kodekvalitet": {
-            "type": "min_text_length",
-            "min_chars": 200,
-            "description": "FORM\u00c5L: Vurder kodens l\u00e6sbarhed, vedligeholdbarhed og test coverage. Kr\u00e6ver: mindst 200 tegn.",
+            "type": "all_of",
+            "description": "FORM\u00c5L: Vurder kodens l\u00e6sbarhed, vedligeholdbarhed og test coverage. Kr\u00e6ver: kode skal v\u00e6re l\u00e6st + kvalitetsvurdering.",
+            "checks": [
+                {"type": "min_text_length", "min_chars": 200},
+                {"type": "tool_called", "tools": ["read_location", "read_chunk", "list_symbols", "locate"]},
+            ],
         },
         "Sikkerhed": {
-            "type": "min_text_length",
-            "min_chars": 200,
-            "description": "FORM\u00c5L: Identific\u00e9r potentielle s\u00e5rbarheder. Kr\u00e6ver: mindst 200 tegn.",
+            "type": "all_of",
+            "description": "FORM\u00c5L: Identific\u00e9r potentielle s\u00e5rbarheder (inputvalidering, auth, datah\u00e5ndtering). Kr\u00e6ver: kode skal v\u00e6re l\u00e6st + sikkerhedsanalyse.",
+            "checks": [
+                {"type": "min_text_length", "min_chars": 200},
+                {"type": "tool_called", "tools": ["read_location", "read_chunk", "list_symbols", "locate"]},
+            ],
         },
     },
     "programmering": {
