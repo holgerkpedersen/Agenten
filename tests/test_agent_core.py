@@ -330,6 +330,7 @@ class TestDoneTool:
             active_template = ""
             lang = "da"
             action_history = []
+            _seq = type("seq", (), {"record_task": lambda self, a, b, c, success: None, "save": lambda self: None})()
 
             def _log(self, level, msg, detail="", log_file=None): pass
             def _record_outcome(self, task_node): pass

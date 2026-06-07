@@ -598,6 +598,9 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     has_write = any(t in ('write_file', 'edit_file') for t in (agent.tool_registry.active_tools or []))
     if has_write:
         user_guidance += t(K.WRITE_REQUIRED, agent.lang)
+    wta_tip = agent._seq.generate_tool_tip(agent.active_template or "fri", task_node.name) if hasattr(agent, '_seq') else ""
+    if wta_tip:
+        user_guidance += "\n\n" + wta_tip
 
     # Tool-specific hints — filtered by active tools to avoid confusing the LLM
     active_tool_set = set(agent.tool_registry.active_tools or [])
@@ -1183,6 +1186,12 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
             full_response = full_response + "\n\n\u26a0\ufe0f  ADVARSEL: Dette resultat ser ufuldst\u00e6ndigt ud. Overvej at k\u00f8re opgaven igen med en tydeligere prompt."
     agent.action_history.append(task_node.name.split()[0] if task_node.name else "unknown")
     agent._record_outcome(task_node)
+    template = getattr(agent, 'active_template', '') or 'fri'
+    tool_sequence = [k.split("{")[0] for k in called_tools]
+    if tool_sequence:
+        agent._seq.record_task(template, task_node.name, tool_sequence, success=(task_node.status == "done"))
+        if len(called_tools) % 10 < 2:
+            agent._seq.save()
     if task_node.status == "failed":
         agent._log("INFO", t(K.LOG_TASK_FAILED, agent.lang), task_node.name)
     else:

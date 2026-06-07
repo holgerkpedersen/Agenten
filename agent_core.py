@@ -18,6 +18,7 @@ import agent_files
 import agent_tree
 import agent_skills
 import agent_git
+from agent_wta import WTAState, SequenceLearner
 import agent_tasks
 import edit_file2
 import config
@@ -309,6 +310,10 @@ class Agent:
         self._file_hash_registry: dict[str, str] = {}
         self._delegation_index: dict[str, tuple[str, str]] | None = None
         self._tool_log: list[dict[str, Any]] = []
+        self._wta: WTAState = WTAState()
+        self._wta.load()
+        self._seq: SequenceLearner = SequenceLearner()
+        self._seq.load()
         self._hints_requested: set[str] = set()
         self._hints_available: set[str] = set()
         self._rubric_retried: bool = False
@@ -726,6 +731,10 @@ class Agent:
             "error": error[:500] if error else "",
             "duration": round(duration, 3),
         })
+        template = self.active_template or "fri"
+        self._wta.record(template, phase, tool, success)
+        if len(self._tool_log) % 5 == 0:
+            self._wta.save()
 
     def _clean_task_name(self, name: str) -> str:
         """clean task name.

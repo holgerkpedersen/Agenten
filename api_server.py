@@ -1297,6 +1297,11 @@ def _save_session_data(current_session_id: str | None, stream_agent: Any, ui_lan
             "execute_model": stream_agent.llm.model,
         })
         return data
+    try:
+        stream_agent._wta.save()
+        stream_agent._seq.save()
+    except Exception:
+        pass
     session_manager.update_session(current_session_id, _update)
 
 
