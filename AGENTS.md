@@ -600,3 +600,24 @@ Opdaterede eksisterende tests i `tests/test_phase_checks.py` (3 tests: `test_pla
 
 See `skills/vision_models.md` for full vision model compatibility matrix.  
 Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url.
+
+## Operational Principles
+
+### 1. Verify before deploying — never assume project architecture
+
+**Hændelse (2026-06-07):** Efter at have rettet `tools.py`, `agent_tasks.py` m.fl. i Agenten, kopierede agenten filerne med `cp` til OCRScanner fordi en session-fil lå i OCRScanners sessions-mappe. Agenten antog at OCRScanner kørte Agenten-frameworket — men OCRScanner var et standalone Flask-projekt (`app.py`) der slet ikke importerede Agenten.
+
+**Regel:**
+- Bekræft ALTID at et projekt reelt importerer/afhænger af en kodebase før du deployer filer derhen
+- Tjek imports (`head -5 *.py`) — importerer `agent_core` eller `agent_tasks`? Hvis nej, hører filerne ikke til
+- En session-fil i en mappe betyder IKKE at frameworket kører der
+- Når du er i tvivl: spørg brugeren før du kopierer
+
+### 2. Indrøm fejl med det samme — aldrig spin
+
+**Hændelse (samme):** Da brugeren påpegede fejlen, prøvede agenten først at argumentere for at filerne "allerede fandtes" — baseret på et `[ -f ]` check der slog udslag fordi `cp` lige havde oprettet dem. Det var en dårlig analyse der forsinkede den ærlige indrømmelse.
+
+**Regel:**
+- Hvis du har lavet en fejl, sig det med det samme — uden forbehold
+- Brug ikke tekniske checks til at "bevise" at fejlen ikke skete
+- En hurtig og ærlig "det var en fejl, beklager" er altid bedre end en lang forklaring
