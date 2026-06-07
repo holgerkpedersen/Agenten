@@ -606,8 +606,8 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         "read_chunk": "\n  Read_chunk må KUN bruges til IKKE-PYTHON filer (JSON, HTML, TXT, osv.). For .py-filer, brug read_location i stedet.",
         "locate": "\n  Brug locate(name='funktionsnavn') for at finde en funktion på tværs af ALLE .py-filer (filepath er valgfri). locate returnerer også 'also_in_file'.",
         "read_location": "\n  Brug read_location(filepath='fil.py', name='funktionsnavn') for at læse KUN en bestemt funktion/metode/klasse — IKKE hele filen.",
-        "write_file": "\n  Brug write_file(filepath='ny_fil.py', content='...') for at oprette NYE filer. Skriv HELE modulet på ÉN gang.",
-        "edit_file": "\n  Brug edit_file(filepath='fil.py', old_text='...', new_text='...') for at redigere EKSISTERENDE kode.",
+        "write_file": "\n  Brug write_file(path='ny_fil.py', content='...') for at oprette NYE filer (brug overwrite=true til at erstatte eksisterende). Skriv HELE modulet på ÉN gang.",
+        "edit_file": "\n  Brug edit_file(path='fil.py', old_text='...', new_text='...') for at redigere EKSISTERENDE kode.",
         "run_tests": "\n  Brug run_tests() for at køre tests og verificere at din kode virker.",
         "update_issue_status": "\n  Brug update_issue_status(issue_id='...', status='resolved') når et issue er løst.",
     }
