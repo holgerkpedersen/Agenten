@@ -630,3 +630,23 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 - `git add` og `git commit` ALLE ændringer før du starter `python api_server.py`
 - Tjek med `git status --short` at working tree er rent
 - Hvis du glemmer det og ændringer forsvinder: `git stash pop stash@{0}` bringer dem tilbage
+
+### 4. Non-deterministic LLM behaviour — Formål/importer faser fejler intermittently
+
+**Symptom:** Samme kode, samme prompt — nogle gange lykkes Formål (skriver til docs/), andre gange fejler den med "Manglende påkrævede værktøjer: write_file".
+
+**Root cause:** LLM'en vælger nogle gange at læse funktioner én ad gangen (1 iteration per read), andre gange i parallel (3-4 reads i samme iteration). Ved 1-per-iteration bruges alle 6-8 iterationer på læsning, og write_file når aldrig at blive kaldt.
+
+**Løsning (flere lag):**
+| Lag | Hvad | Status |
+|-----|------|--------|
+| Iteration limits | Øget 6→8 (agent_skills.py) | ✅ Implementeret |
+| Tool call limits | MAX_TOOL_CALLS_ANALYSE 6→10 (config.py) | ✅ Implementeret |
+| Batch-read instruktion | "Send FLERE read_location-kald på én gang" | ✅ Implementeret |
+| Read-loop escape | System-tvang ved 5+ consecutive reads | ✅ Implementeret |
+| Skill-flow kendte fejl | Dokumenteret i skills/kodeanalyse.md | ✅ Implementeret |
+| Per-fase iteration tracking | SkillFlow sporer success/failure per skill | ✅ Aktiv (84% success for kodeanalyse) |
+
+**Hvad mangler:** Hvis LLM ignorerer read-loop escape (ses i log som "STOP med at læse" + alligevel endnu et read), er der ingen mekanisme til at tvinge den til at skrive. En mulig forbedring: bryd loopet og inject write-påbud som system-role i stedet for user-role.
+
+**Monitorering:** Brug SkillFlow `/skillflow` rapporten til at følge success rate over tid.

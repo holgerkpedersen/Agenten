@@ -33,3 +33,13 @@ Før du påstår at noget er et problem, **verificer det i koden**:
 - Død kode eller ubrugte imports
 
 **Vigtigt:** Vær konkret — henvis til specifikke linjer og funktioner. Eftervis ALTID med faktisk kodeindhold.
+
+<!-- skillflow:known_failures -->
+## Kendte Fejlmønstre
+
+**Intermittent failure på Formål/Imports/Arkitektur/Kodekvalitet/Sikkerhed faserne**
+- Symptom: LLM læser funktioner én ad gangen (1 read_location per iteration), bruger alle iterationer på læsning og når aldrig at kalde write_file.
+- Fasen fejler med "Manglende påkrævede værktøjer: write_file"
+- Fix: **Batch reads** — send FLERE read_location-kald i parallel på én gang. Brug list_symbols først for at se alle funktioner, læs dem så 3-4 ad gangen.
+- Skriv så snart du har nok data — du behøver ikke læse ALT før du skriver.
+<!-- /skillflow:known_failures -->
