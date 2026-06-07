@@ -27,6 +27,7 @@ class FakeAgent:
         self.lang = "da"
         self.issue_resolved = issue_resolved
         self.active_template = template
+        self._tool_log = []
 
 
 from agent_tasks import _check_required_tools, _get_max_iterations  # noqa: E402

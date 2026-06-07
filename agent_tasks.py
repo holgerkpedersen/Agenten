@@ -935,6 +935,22 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
         uncalled.discard("write_file")
     if "edit_file" in uncalled and "write_file" in called_names:
         uncalled.discard("edit_file")
+    # tool_log success check: tools som blev kaldt men ALLE forsøg fejlede tæller ikke
+    if agent._tool_log and not uncalled:
+        for req_tool in required:
+            if req_tool in called_names:
+                attempts = [e for e in agent._tool_log if e.get("tool") == req_tool and e.get("success") is False]
+                all_attempts = [e for e in agent._tool_log if e.get("tool") == req_tool]
+                if all_attempts and len(attempts) == len(all_attempts):
+                    if req_tool == "write_file" and "edit_file" in called_names:
+                        continue
+                    if req_tool == "edit_file" and "write_file" in called_names:
+                        continue
+                    if req_tool == "write_file" and "extract_symbol" in called_names:
+                        continue
+                    if req_tool == "extract_symbol" and "write_file" in called_names:
+                        continue
+                    uncalled.add(req_tool)
     if uncalled:
         return t(K.LOG_REQUIRED_TOOLS_MISSING, agent.lang).format(tools=", ".join(sorted(uncalled)))
     return None
