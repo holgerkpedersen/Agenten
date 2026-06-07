@@ -45,11 +45,11 @@ TEMPLATE_TOOLS = {
 # Falls back to MAX_TASK_ITERATIONS from config if not specified.
 TEMPLATE_PHASE_ITERATION_LIMITS = {
     "kodeanalyse": {
-        "Form\u00e5l": 6,
-        "Imports og afh\u00e6ngigheder": 6,
+        "Form\u00e5l": 8,
+        "Imports og afh\u00e6ngigheder": 8,
         "Arkitektur": 8,
-        "Kodekvalitet": 6,
-        "Sikkerhed": 6,
+        "Kodekvalitet": 8,
+        "Sikkerhed": 8,
     },
     "programmering": {
         "Kravanalyse": 8,
@@ -131,11 +131,11 @@ SECTION_INSTRUCTIONS = {
         "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foresl\u00e5 konkrete forbedringer og n\u00e6ste skridt.",
     },
     "kodeanalyse": {
-        "Form\u00e5l": "L\u00e6s f\u00f8rst docs/formaal.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/formaal.md. Forklar hvad filen g\u00f8r og dens rolle i projektet. Vurder filens cohesion og om den overholder single responsibility.",
-        "Imports og afh\u00e6ngigheder": "L\u00e6s f\u00f8rst docs/imports.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/imports.md. Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Bem\u00e6rk ubrugte imports, cirkul\u00e6re afh\u00e6ngigheder og versionsproblemer.",
-        "Arkitektur": "L\u00e6s f\u00f8rst docs/arkitektur.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/arkitektur.md. Analys\u00e9r filens struktur, klasser og funktioner. Vurder anvendte design patterns, kobling (coupling) mellem moduler, cohesion, og om SOLID-principperne overholdes.",
-        "Kodekvalitet": "L\u00e6s f\u00f8rst docs/kodekvalitet.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/kodekvalitet.md. Vurder l\u00e6sbarhed, vedligeholdbarhed, test coverage, navngivning (PEP 8), type hints, fejlh\u00e5ndtering, complexity, DRY-princippet og separation of concerns.",
-        "Sikkerhed": "L\u00e6s f\u00f8rst docs/sikkerhed.md hvis den findes (read_chunk) — overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Brug derefter write_file til at gemme analysen i docs/sikkerhed.md. Analys\u00e9r inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlh\u00e5ndtering, s\u00e5rbarheder i dependencies, security headers. F\u00f8lg OWASP top 10.",
+        "Form\u00e5l": "L\u00e6s f\u00f8rst docs/formaal.md hvis den findes (read_chunk) \u2014 overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Send FLERE read_location-kald p\u00e5 \u00e9n gang for at gennemg\u00e5 funktionerne hurtigt. Brug derefter write_file til at gemme analysen i docs/formaal.md. Forklar hvad filen g\u00f8r og dens rolle i projektet. Vurder filens cohesion og om den overholder single responsibility.",
+        "Imports og afh\u00e6ngigheder": "L\u00e6s f\u00f8rst docs/imports.md hvis den findes (read_chunk) \u2014 overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Send FLERE read_location-kald p\u00e5 \u00e9n gang for at gennemg\u00e5 funktionernes imports. Brug derefter write_file til at gemme analysen i docs/imports.md. Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Bem\u00e6rk ubrugte imports, cirkul\u00e6re afh\u00e6ngigheder og versionsproblemer.",
+        "Arkitektur": "L\u00e6s f\u00f8rst docs/arkitektur.md hvis den findes (read_chunk) \u2014 overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Send FLERE read_location-kald p\u00e5 \u00e9n gang for at gennemg\u00e5 strukturen hurtigt. Brug derefter write_file til at gemme analysen i docs/arkitektur.md. Analys\u00e9r filens struktur, klasser og funktioner. Vurder anvendte design patterns, kobling (coupling) mellem moduler, cohesion, og om SOLID-principperne overholdes.",
+        "Kodekvalitet": "L\u00e6s f\u00f8rst docs/kodekvalitet.md hvis den findes (read_chunk) \u2014 overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Send FLERE read_location-kald p\u00e5 \u00e9n gang for at gennemg\u00e5 funktionerne hurtigt. Brug derefter write_file til at gemme analysen i docs/kodekvalitet.md. Vurder l\u00e6sbarhed, vedligeholdbarhed, test coverage, navngivning (PEP 8), type hints, fejlh\u00e5ndtering, complexity, DRY-princippet og separation of concerns.",
+        "Sikkerhed": "L\u00e6s f\u00f8rst docs/sikkerhed.md hvis den findes (read_chunk) \u2014 overskriv IKKE eksisterende analyser uden at l\u00e6se dem. Send FLERE read_location-kald p\u00e5 \u00e9n gang for at gennemg\u00e5 funktionerne hurtigt. Brug derefter write_file til at gemme analysen i docs/sikkerhed.md. Analys\u00e9r inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlh\u00e5ndtering, s\u00e5rbarheder i dependencies, security headers. F\u00f8lg OWASP top 10.",
     },
     "diffanalyse": {
         "Oversigt": "Skriv afsnittet 'Oversigt': beskriv hvad diff'en indeholder af \u00e6ndringer.",

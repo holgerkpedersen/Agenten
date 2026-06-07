@@ -98,7 +98,7 @@ def _guard_json_body() -> Any:
             return jsonify({"success": False, "error": "Content-Type must be application/json"}), 400
 
 agent = Agent()
-session_manager = SessionManager()
+session_manager = SessionManager(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions"))
 current_session_id = None
 execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
 execution_status_lock = threading.Lock()

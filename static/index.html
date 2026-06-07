@@ -649,6 +649,7 @@
             <button onclick="loadSelectedSession()" id="loadSess" title="Indlæs">📂 Indlæs</button>
             <button onclick="saveCurrentSession()" id="saveSess" title="Gem">💾 Gem</button>
             <button onclick="renameSession()" id="renameSess" title="Omdøb">✏️ Omdøb</button>
+            <button onclick="reuseCurrentSession()" id="reuseSess" title="Genbrug prompt og skabelon i ny session">♻️ Genbrug</button>
             <button onclick="createNewSession()" id="newSess" title="Ny session">➕ Ny</button>
         </div>
         
@@ -2134,6 +2135,56 @@ async function createNewSession() {
             document.getElementById('imagePreview').style.display = 'none';
             document.getElementById('imagePreview').innerHTML = '';
         }
+    }
+}
+
+async function reuseCurrentSession() {
+    if (!currentSessionId) {
+        addLogEntry('ERROR', 'Ingen session at genbruge', 'Vælg eller opret en session f\u00f8rst');
+        return;
+    }
+    try {
+        addLogEntry('INFO', 'Genbruger session', `Henter ${currentSessionId.slice(0, 12)}...`);
+        const resp = await fetch(`/api/sessions/load/${currentSessionId}`);
+        if (!resp.ok) {
+            const errBody = await resp.text().catch(() => '');
+            addLogEntry('ERROR', `HTTP ${resp.status} ved genbrug`, errBody.slice(0, 200));
+            return;
+        }
+        const data = await resp.json();
+        if (!data.success || !data.session) {
+            addLogEntry('ERROR', 'Kunne ikke indl\u00e6se session', '');
+            return;
+        }
+        const s = data.session;
+        const promptEl = document.getElementById('mainPrompt');
+        if (promptEl && s.original_prompt) {
+            promptEl.value = s.original_prompt;
+            promptEl.style.outline = '2px solid var(--accent, #4CAF50)';
+            promptEl.style.outlineOffset = '2px';
+            promptEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+                promptEl.style.outline = '';
+                promptEl.style.outlineOffset = '';
+            }, 2000);
+        }
+        if (s.template) {
+            document.getElementById('templateSelect').value = s.template;
+            onTemplateChange(s.template);
+        }
+        currentTree = null;
+        const treeContainer = document.getElementById('treeContainer');
+        if (treeContainer) treeContainer.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
+        const llmContent = document.getElementById('llmContent');
+        if (llmContent) llmContent.innerHTML = '';
+        addLogEntry('INFO', 'Session genbrugt', `prompt: ${(s.original_prompt || '').slice(0, 60)}...`);
+        const toast = document.createElement('div');
+        toast.textContent = '✅ Prompt og skabelon genbrugt — klik "Nedbryd" for at fortsætte';
+        toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--accent,#4CAF50);color:#fff;padding:12px 20px;border-radius:8px;z-index:9999;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity .5s';
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
+    } catch(e) {
+        addLogEntry('ERROR', 'Fejl ved genbrug', String(e));
     }
 }
 

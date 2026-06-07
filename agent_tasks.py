@@ -207,7 +207,7 @@ def _get_max_tool_calls(task_name: str) -> int:
     Args:
         task_name:"""
     phase = _normalize_phase(task_name).lower()
-    if any(k in phase for k in ["analyse", "læs", "afklar"]):
+    if any(k in phase for k in ["analyse", "formål", "læs", "afklar"]):
         return config.MAX_TOOL_CALLS_ANALYSE
     if any(k in phase for k in ["implementering", "fix", "test", "ekstraher", "opdatér",
                                   "kravanalyse", "arkitekturdesign", "kodeimplementering"]):
