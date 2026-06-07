@@ -20,6 +20,7 @@ from i18n import K
 from agent_files import _is_safe_path
 from agent_phase_checks import TEMPLATE_PHASE_CHECKS
 from config import get_logger
+import agent_issues
 
 
 log = get_logger(__name__)
