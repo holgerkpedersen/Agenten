@@ -478,6 +478,7 @@
   "write_required": "\n\n⛔ YOU MUST write/edit code in this phase. Use write_file or edit_file. Only reading files without writing code means the task has FAILED. Read at most once — then write your solution.",
   "write_file_first": "\n\n🚫 BLOCKED: Test (Red) phase requires you to write the test FIRST. Call write_file NOW — you already read enough in the Analysis phase.",
   "validation_done_too_short": "Result is too short ({0} chars). Write a more detailed analysis with concrete changes, code examples, and reasoning.",
+  "validation_done_missing_keywords": "Phase '{0}' requires keywords in the result: {1}. Please add the necessary details.",
   "tool_system_prompt_native": "You have access to tools. Call them when needed to complete the task.\n\n{tools_desc}\n\n## Task\n{task}",
   "tool_continuation_native": "Available: {tools_list}. Use the tools to complete the task.",
   "phase.current": "🎯 CURRENT PHASE: {phase_name}\n\nYou are ONLY in this phase. Do NOT execute other phases — they run automatically in subsequent calls. Focus 100% on the task for **{phase_name}** and end with <<<DONE>>> when complete.",

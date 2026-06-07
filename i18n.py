@@ -125,6 +125,7 @@ class K(StrEnum):
     WRITE_REQUIRED        = "write_required"
     WRITE_FILE_FIRST      = "write_file_first"
     VALIDATION_DONE_TOO_SHORT = "validation_done_too_short"
+    VALIDATION_DONE_MISSING_KEYWORDS = "validation_done_missing_keywords"
 
     # === System prompt fragments ===
     SYS_EXAMPLE_PREFIX  = "sys_example_prefix"

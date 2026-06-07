@@ -478,6 +478,7 @@
   "anti_leakage_warning": "⚠️ Este issue tiene sugerencias de solución que no has leído. Llama a read_issue con include_hints=true para leerlas antes de escribir/editar código.",
   "write_required": "\n\n⛔ DEBES escribir/editar código en esta fase. Usa write_file o edit_file. Solo leer archivos sin escribir código significa que la tarea ha FALLADO. Lee como máximo una vez — luego escribe tu solución.",
   "write_file_first": "\n\n🚫 BLOQUEADO: La fase Test (Red) requiere que PRIMERO escribas la prueba. ¡Llama a write_file AHORA — ya has leído suficiente en la fase de Análisis.",
+  "validation_done_missing_keywords": "La fase '{0}' requiere palabras clave en el resultado: {1}. Agregue los detalles necesarios.",
   "tool_system_prompt_native": "Tienes acceso a herramientas. Llámalas cuando sea necesario para completar la tarea.\n\n{tools_desc}\n\n## Tarea\n{task}",
   "tool_continuation_native": "Disponible: {tools_list}. Usa las herramientas para completar la tarea.",
   "phase.current": "🎯 FASE ACTUAL: {phase_name}\n\nEstás SOLO en esta fase. NO ejecutes otras fases — se ejecutan automáticamente en llamadas posteriores. Enfócate 100% en la tarea de **{phase_name}** y termina con <<<DONE>>> cuando esté completa.",
