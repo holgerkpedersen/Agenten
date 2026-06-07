@@ -30,7 +30,12 @@ OVERSIZE_LINE_LIMIT = 1000
 
 
 def _get_issues_path() -> str:
-    """get issues path."""
+    """get issues path - uses workdir hvis AGENT_WORKDIR er sat, ellers Agentens."""
+    workdir = os.environ.get("AGENT_WORKDIR", "")
+    if workdir:
+        wd_path = os.path.join(workdir, "docs", "issues", "observed", "issues.json")
+        if os.path.exists(wd_path):
+            return wd_path
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
 
 
