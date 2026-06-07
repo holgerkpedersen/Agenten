@@ -15,8 +15,8 @@ from config import get_logger
 log = get_logger(__name__)
 
 
-EVOLUTION_FILE = ".agent_storage/skill_evolution_log.json"
-ACTIONS_LOG = ".agent_storage/evolution_actions.json"
+EVOLUTION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".agent_storage", "skill_evolution_log.json")
+ACTIONS_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".agent_storage", "evolution_actions.json")
 
 # Thresholds
 RETAIN_MIN_RATE = 0.80

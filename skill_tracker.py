@@ -12,7 +12,7 @@ from datetime import datetime
 
 class SkillTracker:
     """skill tracker."""
-    DATA_DIR = ".agent_storage"
+    DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".agent_storage")
     DATA_FILE = "skill_outcomes.json"
     _lock = threading.Lock()
 
