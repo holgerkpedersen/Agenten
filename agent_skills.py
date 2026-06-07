@@ -135,7 +135,7 @@ SECTION_INSTRUCTIONS = {
         "Imports og afh\u00e6ngigheder": "Skriv afsnittet 'Imports og afh\u00e6ngigheder': gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder.",
         "Arkitektur": "Skriv afsnittet 'Arkitektur': analys\u00e9r filens struktur, klasser og funktioner.",
         "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder kodens l\u00e6sbarhed, vedligeholdbarhed og test coverage.",
-        "Sikkerhed": "Skriv afsnittet 'Sikkerhed': identific\u00e9r potentielle sikkerhedsproblemer og s\u00e5rbarheder.",
+        "Sikkerhed": "Skriv afsnittet 'Sikkerhed': analys\u00e9r inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlh\u00e5ndtering, s\u00e5rbarheder i dependencies, security headers. F\u00f8lg OWASP top 10.",
     },
     "diffanalyse": {
         "Oversigt": "Skriv afsnittet 'Oversigt': beskriv hvad diff'en indeholder af \u00e6ndringer.",
@@ -148,7 +148,7 @@ SECTION_INSTRUCTIONS = {
         "Kravanalyse": "Analyser kravene grundigt. Identific\u00e9r funktionelle og ikke-funktionelle krav, input/output, og eventuelle begr\u00e6nsninger. DIN F\u00d8RSTE handling SKAL v\u00e6re write_file \u2014 gem analysen i ./docs/kravanalyse.md. Beskriv hvad systemet skal kunne.",
         "Arkitekturdesign": "Design systemarkitekturen: komponenter, moduler, dataflow og afh\u00e6ngigheder. Overvej relevante design patterns og SOLID-principper. Brug write_file til at gemme designet i ./docs/arkitektur.md. Tegn arkitekturen med tekst.",
         "Implementeringsplan": "L\u00e6s f\u00f8rst tidligere fasedokumenter hvis de findes: brug read_chunk til at indl\u00e6se docs/kravanalyse.md og docs/arkitektur.md for at forst\u00e5 hvad der allerede er besluttet. Planl\u00e6g derefter implementeringen: hvilke filer skal oprettes, i hvilken r\u00e6kkef\u00f8lge, og hvad skal hver fil indeholde. Overvej teststrategi og edge cases. Brug write_file til at gemme planen i ./docs/implementeringsplan.md. Systemet auto-afslutter denne fase n\u00e5r planfilen findes \u2014 du beh\u00f8ver IKKE lave ekstra kald bagefter.",
-        "Sikkerhedsanalyse": "Analyser sikkerhedsaspekter: inputvalidering, autentifikation, kryptering, h\u00e5ndtering af f\u00f8lsomme data (passwords, keys). F\u00f8lg OWASP best practices og princip om mindste rettighed. Brug write_file til at gemme analysen i ./docs/sikkerhedsanalyse.md.",
+        "Sikkerhedsanalyse": "Analyser sikkerhedsaspekter (OWASP best practices): inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlh\u00e5ndtering og logging, s\u00e5rbarheder i dependencies, security headers (CSP, HSTS, X-Frame-Options), API security (rate limiting, CSRF), mindste rettighedsprincip. Brug write_file til at gemme analysen i ./docs/sikkerhedsanalyse.md.",
         "Kodeimplementering": "Greenfield-fase: m\u00e5 KUN oprette nye filer. Hvis der allerede findes .py-filer i workdir (p\u00e5 n\u00e6r framework-filer), skal du straks afslutte med fejl \u2014 projektet h\u00f8rer til i en bugfix- eller refactor-skabelon. Implement\u00e9r koden baseret p\u00e5 arkitekturdesign og implementeringsplan. Brug write_file til at oprette hver ny fil. Skriv ren, vedligeholdelsesvenlig kode med korrekt fejlh\u00e5ndtering og logging.",
     },
     "python-arkitektur": {

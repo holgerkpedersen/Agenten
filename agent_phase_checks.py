@@ -187,6 +187,24 @@ def check_files_from_plan(spec: dict[str, Any], base_dir: str | None = None) -> 
     )
 
 
+def check_text_contains(spec: dict[str, Any], full_response: str = "") -> tuple[bool, str]:
+    """Check that the LLM's output mentions certain keywords.
+
+    Spec keys:
+      - ``keywords`` — list of required keywords/substrings (case-insensitive)
+      - ``min_match`` — minimum number of keywords that must be present (default: all)
+    """
+    keywords = spec.get("keywords", [])
+    if not keywords:
+        return False, "text_contains: ingen keywords specificeret"
+    lower = full_response.lower()
+    found = [kw for kw in keywords if kw.lower() in lower]
+    min_match = spec.get("min_match", len(keywords))
+    if len(found) >= min_match:
+        return True, f"text_contains: {len(found)}/{len(keywords)} keywords fundet"
+    return False, f"text_contains: kun {len(found)}/{len(keywords)} keywords fundet — mangler: {', '.join(k for k in keywords if k.lower() not in lower)}"
+
+
 def check_min_text_length(spec: dict[str, Any], full_response: str = "", agent: Any | None = None) -> tuple[bool, str]:
     """Return ``(passed, message)`` for a min_text_length check.
 
@@ -555,6 +573,8 @@ def check_all_of(
             r = check_tests_pass(sub, agent=agent, tool_name=tool_name, called_tools=called_tools)
         elif sub_type == "symbols_covered":
             r = check_symbols_covered_by_modules(sub, base_dir=base_dir)
+        elif sub_type == "text_contains":
+            r = check_text_contains(sub, full_response=full_response)
         else:
             r = (False, f"unknown sub-check: {sub_type}")
         if r[0]:
@@ -741,42 +761,63 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
     "kodeanalyse": {
         "Form\u00e5l": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Forklar hvad filen g\u00f8r og dens rolle i projektet. Kr\u00e6ver: filen skal v\u00e6re l\u00e6st (list_symbols, read_location eller read_chunk) + substantiel beskrivelse.",
+            "description": "FORM\u00c5L: Forklar hvad filen g\u00f8r og dens rolle i projektet. Kr\u00e6ver: filen skal v\u00e6re l\u00e6st + beskriv form\u00e5l, rolle og ansvar.",
             "checks": [
                 {"type": "min_text_length", "min_chars": 200},
                 {"type": "tool_called", "tools": ["read_location", "list_symbols", "read_chunk", "list_chunks", "list_files", "locate"]},
+                {"type": "text_contains", "keywords": ["form\u00e5l", "rolle", "ansvar"]},
             ],
         },
         "Imports og afh\u00e6ngigheder": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Kr\u00e6ver: filen skal v\u00e6re analyseret (list_symbols eller read_location) + gennemgang af imports.",
+            "description": "FORM\u00c5L: Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Kr\u00e6ver: analys\u00e9r imports, eksterne biblioteker og afh\u00e6ngigheder.",
             "checks": [
                 {"type": "min_text_length", "min_chars": 200},
                 {"type": "tool_called", "tools": ["read_location", "list_symbols", "read_chunk", "locate"]},
+                {"type": "text_contains", "keywords": ["import", "afh\u00e6ngighed", "bibliotek", "ekstern"]},
             ],
         },
         "Arkitektur": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Analys\u00e9r filens struktur, klasser og funktioner. Kr\u00e6ver: mindst 2 funktioner/klasser l\u00e6st med read_location + strukturbeskrivelse.",
+            "description": "FORM\u00c5L: Analys\u00e9r filens struktur, klasser og funktioner. Kr\u00e6ver: l\u00e6s mindst 2 funktioner/klasser + beskriv struktur, dataflow og ansvarsomr\u00e5der.",
             "checks": [
                 {"type": "min_text_length", "min_chars": 300},
                 {"type": "tool_called", "tools": ["read_location"], "min_count": 2},
+                {"type": "text_contains", "keywords": ["klasse", "funktion", "struktur", "metode", "dataflow"], "min_match": 3},
             ],
         },
         "Kodekvalitet": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Vurder kodens l\u00e6sbarhed, vedligeholdbarhed og test coverage. Kr\u00e6ver: kode skal v\u00e6re l\u00e6st + kvalitetsvurdering.",
+            "description": "FORM\u00c5L: Vurder kodens l\u00e6sbarhed, vedligeholdbarhed og test coverage. Kr\u00e6ver: l\u00e6s kode + vurder kvalitet, complexity, naming og tests.",
             "checks": [
                 {"type": "min_text_length", "min_chars": 200},
                 {"type": "tool_called", "tools": ["read_location", "read_chunk", "list_symbols", "locate"]},
+                {"type": "text_contains", "keywords": ["kvalitet", "l\u00e6sbarhed", "vedligehold", "complexity", "navngivning", "test"], "min_match": 3},
             ],
         },
         "Sikkerhed": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Identific\u00e9r potentielle s\u00e5rbarheder (inputvalidering, auth, datah\u00e5ndtering). Kr\u00e6ver: kode skal v\u00e6re l\u00e6st + sikkerhedsanalyse.",
+            "description": "FORM\u00c5L: Identific\u00e9r s\u00e5rbarheder (OWASP top 10). Kr\u00e6ver: l\u00e6s kode + tjek inputvalidering, autentifikation, access control, databeskyttelse, fejlh\u00e5ndtering, dependencies, security headers og API security.",
             "checks": [
                 {"type": "min_text_length", "min_chars": 200},
                 {"type": "tool_called", "tools": ["read_location", "read_chunk", "list_symbols", "locate"]},
+                {"type": "text_contains", "keywords": [
+                    "inputvalidering",
+                    "autentifikation",
+                    "access control",
+                    "autorisation",
+                    "kryptering",
+                    "datah\u00e5ndtering",
+                    "fejlh\u00e5ndtering",
+                    "session",
+                    "dependency",
+                    "security header",
+                    "rate limiting",
+                    "CSRF",
+                    "XSS",
+                    "SQL injection",
+                    "OWASP",
+                ], "min_match": 4},
             ],
         },
     },
@@ -866,6 +907,8 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
         return check_tests_pass(spec, agent=agent, tool_name=tool_name, called_tools=called_tools)
     if check_type == "symbols_covered":
         return check_symbols_covered_by_modules(spec, base_dir=base_dir)
+    if check_type == "text_contains":
+        return check_text_contains(spec, full_response=full_response)
     if check_type == "all_of":
         return check_all_of(
             spec, agent=agent, task_node=task_node, called_tools=called_tools,
