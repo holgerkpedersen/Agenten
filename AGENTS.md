@@ -621,3 +621,12 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 - Hvis du har lavet en fejl, sig det med det samme — uden forbehold
 - Brug ikke tekniske checks til at "bevise" at fejlen ikke skete
 - En hurtig og ærlig "det var en fejl, beklager" er altid bedre end en lang forklaring
+
+### 3. Commit før du starter api_server.py
+
+**Hændelse (2026-06-07):** Ændringer i agent_tasks.py, config.py, agent_skills.py m.fl. blev auto-stash'et til `stash@{0}` hver gang serveren fejlede. Det skete fordi serverens error-håndtering stasher ikke-committede ændringer før genstart. Flere forsøg gik tabt.
+
+**Regel:**
+- `git add` og `git commit` ALLE ændringer før du starter `python api_server.py`
+- Tjek med `git status --short` at working tree er rent
+- Hvis du glemmer det og ændringer forsvinder: `git stash pop stash@{0}` bringer dem tilbage
