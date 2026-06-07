@@ -131,10 +131,10 @@ SECTION_INSTRUCTIONS = {
         "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foresl\u00e5 konkrete forbedringer og n\u00e6ste skridt.",
     },
     "kodeanalyse": {
-        "Form\u00e5l": "Skriv afsnittet 'Form\u00e5l': forklar hvad filen g\u00f8r og dens rolle i projektet.",
-        "Imports og afh\u00e6ngigheder": "Skriv afsnittet 'Imports og afh\u00e6ngigheder': gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder.",
-        "Arkitektur": "Skriv afsnittet 'Arkitektur': analys\u00e9r filens struktur, klasser og funktioner.",
-        "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder kodens l\u00e6sbarhed, vedligeholdbarhed og test coverage.",
+        "Form\u00e5l": "Skriv afsnittet 'Form\u00e5l': forklar hvad filen g\u00f8r og dens rolle i projektet. Vurder filens cohesion og om den overholder single responsibility.",
+        "Imports og afh\u00e6ngigheder": "Skriv afsnittet 'Imports og afh\u00e6ngigheder': gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Bem\u00e6rk ubrugte imports, cirkul\u00e6re afh\u00e6ngigheder og versionsproblemer.",
+        "Arkitektur": "Skriv afsnittet 'Arkitektur': analys\u00e9r filens struktur, klasser og funktioner. Vurder anvendte design patterns, kobling (coupling) mellem moduler, cohesion, og om SOLID-principperne overholdes.",
+        "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder l\u00e6sbarhed, vedligeholdbarhed, test coverage, navngivning (PEP 8), type hints, fejlh\u00e5ndtering, complexity, DRY-princippet og separation of concerns.",
         "Sikkerhed": "Skriv afsnittet 'Sikkerhed': analys\u00e9r inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlh\u00e5ndtering, s\u00e5rbarheder i dependencies, security headers. F\u00f8lg OWASP top 10.",
     },
     "diffanalyse": {
