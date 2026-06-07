@@ -18,18 +18,18 @@
     "issue_handler": "🔷 Issue Håndtering"
   },
   "template_descriptions": {
-    "fri": "Fri nedbrydning — ingen antagelser om workdir. Du vælger selv faser og værktøjer. Ingen skabelonbegrænsninger.",
-    "resume": "Lav resumé af tekst — ren analyse, ingen kodeskrivning. Workdir: irrelevant.",
-    "kodeanalyse": "Analysér eksisterende kode — read-only. Workdir: skal indeholde .py-filer der analyseres. Ingen skrivning til filer.",
-    "diffanalyse": "Analysér git diff mellem commits — read-only. Workdir: skal være et git repo med commits.",
-    "agenten": "PR workflow — opret branch, commit, push, opret PR. Workdir: skal være et git repo med en remote.",
-    "programmering": "Greenfield — opret nyt projekt fra bunden. Workdir: må IKKE allerede indeholde kildekode. Hvis .py-filer findes, brug bugfix/refactor i stedet.",
-    "python-arkitektur": "Analysér og planlæg arkitektur for et Python/Flask-projekt. Workdir: skal indeholde eksisterende kode der analyseres.",
-    "billedanalyse": "Analysér et billede og gem analysen som .md. Workdir: ligegyldigt. Brug add_image til at indlæse billedet.",
-    "bugfix": "Ret en specifik bug i eksisterende kode (TDD). Workdir: skal indeholde koden der skal rettes. Brug read_issue til at læse fejlbeskrivelsen.",
-    "refactor": "Opdel en stor fil i flere moduler (SOLID). Workdir: skal indeholde den store .py-fil der skal refaktoreres.",
-    "testgenerering": "Generér pytest-tests for en Python-fil. Workdir: skal indeholde den .py-fil der skal testes.",
-    "issue_handler": "Læs et issue, analysér og ret fejlen, luk issue. Workdir: skal indeholde koden der skal rettes."
+    "fri": "FORMÅL: Fri opgavedeling uden skabelon. Du definerer selv faser. Ingen antagelser om workdir. Velegnet til vilkårlige opgaver der ikke passer i de andre skabeloner.",
+    "resume": "FORMÅL: Opsummér tekst til et struktureret resumé. Read-only — ingen filskrivning. Workdir: irrelevant.",
+    "kodeanalyse": "FORMÅL: Analysér eksisterende Python-kode for kvalitet, struktur og sikkerhed. Read-only — opretter issues hvis der findes fejl. Workdir: skal indeholde .py-filer.",
+    "diffanalyse": "FORMÅL: Analysér en git diff mellem to commits. Read-only — vurder risiko og kvalitet af ændringer. Workdir: skal være et git repo.",
+    "agenten": "FORMÅL: Gennemfør en Pull Request workflow: branch → commit → push → PR. Workdir: skal være et git repo med remote.",
+    "programmering": "FORMÅL: Opret et nyt projekt fra bunden (greenfield). Workdir må IKKE indeholde .py-filer i forvejen. Faser: Kravanalyse → Arkitekturdesign → Implementeringsplan → Sikkerhedsanalyse → Kodeimplementering.",
+    "python-arkitektur": "FORMÅL: Analysér et eksisterende Python/Flask-projekt og planlæg arkitekturforbedringer. Workdir: skal indeholde eksisterende kode.",
+    "billedanalyse": "FORMÅL: Analysér et billede og gem resultatet som .md-dokument. Workdir: irrelevant. Upload billede med add_image.",
+    "bugfix": "FORMÅL: Ret en specifik bug i eksisterende kode (TDD). Faser: Analyse (læs issue) → Test (Red) → Implementering (ret) → Verifikation (Green) → Opdatering (luk issue). Workdir: skal indeholde koden.",
+    "refactor": "FORMÅL: Opdel en stor fil i flere moduler (SOLID-principper). Faser: Analyse → Plan → Ekstraher → Opdatér → Test. Workdir: skal indeholde den store .py-fil.",
+    "testgenerering": "FORMÅL: Generér pytest-tests for en Python-fil. Workdir: skal indeholde .py-filen der skal testes. Faser: Analyse → Test (Red) → Implementering → Verifikation (Green).",
+    "issue_handler": "FORMÅL: Læs et issue, analysér og ret fejlen, luk issue. Workdir: skal indeholde koden der skal rettes. Faser: Læs → Afklar → Fix → Luk Issue."
   },
   "template_prompts": {
     "resume": "Lav et struktureret resumé af nedenstående materiale. Returnér KUN følgende sektioner:\n## Overblik\n## Nøglepunkter\n## Konklusion\n## Anbefalinger\n\n{lang_instruction}. Brug ikke <think> tags.",

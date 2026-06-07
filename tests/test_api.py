@@ -183,7 +183,7 @@ class TestAPIPhaseChecks:
         assert plan_check["spec"]["plan_path"] == "refactor_plan.md"
         assert plan_check["spec"]["min_files"] == 5
         assert "refactor_plan.md" in plan_check["description"]
-        assert "afsluttes automatisk" in plan_check["description"]
+        assert "FORMÅL" in plan_check["description"]
 
     def test_ekstraher_phase_check_format(self, client):
         resp = client.get("/api/phase-checks?template=refactor")
@@ -195,4 +195,4 @@ class TestAPIPhaseChecks:
         assert "symbols_covered" in sub_types
         symbols_spec = next(c for c in ekstraher_check["spec"]["checks"] if c["type"] == "symbols_covered")
         assert symbols_spec["source_file"] == "api_server.py"
-        assert "præcis ét" in ekstraher_check["description"] or "pr\u00e6cis" in ekstraher_check["description"]
+        assert "FORMÅL" in ekstraher_check["description"]

@@ -18,18 +18,18 @@
     "issue_handler": "🔷 Manejador de Issues"
   },
   "template_descriptions": {
-    "fri": "Descomposición libre — sin suposiciones sobre el workdir. Tú eliges las fases y herramientas. Sin restricciones de plantilla.",
-    "resume": "Crear resumen de texto — solo análisis, sin escritura de código. Workdir: irrelevante.",
-    "kodeanalyse": "Analizar código existente — solo lectura. Workdir: debe contener archivos .py para analizar. Sin escritura.",
-    "diffanalyse": "Analizar git diff entre commits — solo lectura. Workdir: debe ser un repositorio git con commits.",
-    "agenten": "Flujo PR — crear rama, commit, push, crear PR. Workdir: debe ser un repositorio git con un remoto.",
-    "programmering": "Greenfield — crear proyecto nuevo desde cero. Workdir: NO debe contener código fuente ya existente. Si hay archivos .py, usa bugfix/refactor en su lugar.",
-    "python-arkitektur": "Analizar y planificar arquitectura para proyecto Python/Flask. Workdir: debe contener código existente para analizar.",
-    "billedanalyse": "Analizar una imagen y guardar análisis como .md. Workdir: irrelevante. Usa add_image para cargar la imagen.",
-    "bugfix": "Corregir un bug específico en código existente (TDD). Workdir: debe contener el código a corregir. Usa read_issue para leer descripción del error.",
-    "refactor": "Dividir un archivo grande en múltiples módulos (SOLID). Workdir: debe contener el archivo .py grande a refactorizar.",
-    "testgenerering": "Generar pruebas pytest para un archivo Python. Workdir: debe contener el archivo .py a probar.",
-    "issue_handler": "Leer un issue, analizar y corregir el error, cerrar el issue. Workdir: debe contener el código a corregir."
+    "fri": "PROP\u00d3SITO: Descomposici\u00f3n libre sin plantilla. T\u00fa defines las fases. Sin supuestos sobre el workdir.",
+    "resume": "PROP\u00d3SITO: Resumir texto en secciones estructuradas. Solo lectura. Workdir: irrelevante.",
+    "kodeanalyse": "PROP\u00d3SITO: Analizar c\u00f3digo Python existente (calidad, estructura, seguridad). Solo lectura. Workdir: debe contener .py.",
+    "diffanalyse": "PROP\u00d3SITO: Analizar git diff entre commits. Solo lectura. Workdir: debe ser un repo git.",
+    "agenten": "PROP\u00d3SITO: Completar flujo PR: rama \u2192 commit \u2192 push \u2192 PR. Workdir: repo git con remoto.",
+    "programmering": "PROP\u00d3SITO: Crear proyecto nuevo desde cero (greenfield). Workdir NO debe tener .py. Fases: Requisitos \u2192 Arquitectura \u2192 Plan \u2192 Seguridad \u2192 C\u00f3digo.",
+    "python-arkitektur": "PROP\u00d3SITO: Analizar proyecto Python/Flask y planificar mejoras de arquitectura. Workdir: debe contener c\u00f3digo.",
+    "billedanalyse": "PROP\u00d3SITO: Analizar imagen y guardar resultado como .md. Workdir: irrelevante. Usa add_image.",
+    "bugfix": "PROP\u00d3SITO: Corregir bug en c\u00f3digo existente (TDD). Workdir: debe contener el c\u00f3digo. Fases: An\u00e1lisis \u2192 Test (Red) \u2192 Fix \u2192 Verificaci\u00f3n (Green) \u2192 Cierre.",
+    "refactor": "PROP\u00d3SITO: Dividir archivo grande en m\u00faltiples m\u00f3dulos (SOLID). Workdir: debe contener el .py grande. Fases: An\u00e1lisis \u2192 Plan \u2192 Extraer \u2192 Actualizar \u2192 Test.",
+    "testgenerering": "PROP\u00d3SITO: Generar pruebas pytest para un archivo Python. Workdir: debe contener el .py a probar.",
+    "issue_handler": "PROP\u00d3SITO: Leer issue, analizar y corregir bug, cerrar issue. Workdir: debe contener el c\u00f3digo."
   },
   "template_prompts": {
     "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",

@@ -18,18 +18,18 @@
     "issue_handler": "🔷 Issue Handler"
   },
   "template_descriptions": {
-    "fri": "Free decomposition — no assumptions about workdir. You choose phases and tools freely. No template restrictions.",
-    "resume": "Create a summary of text — analysis only, no code writing. Workdir: irrelevant.",
-    "kodeanalyse": "Analyze existing code — read-only. Workdir: must contain .py files to analyze. No file writing.",
-    "diffanalyse": "Analyze git diff between commits — read-only. Workdir: must be a git repo with commits.",
-    "agenten": "PR workflow — create branch, commit, push, create PR. Workdir: must be a git repo with a remote.",
-    "programmering": "Greenfield — create new project from scratch. Workdir: must NOT already contain source code. If .py files exist, use bugfix/refactor instead.",
-    "python-arkitektur": "Analyze and plan architecture for a Python/Flask project. Workdir: must contain existing code to analyze.",
-    "billedanalyse": "Analyze an image and save analysis as .md. Workdir: irrelevant. Use add_image to load the image.",
-    "bugfix": "Fix a specific bug in existing code (TDD). Workdir: must contain the code to fix. Use read_issue to read the bug description.",
-    "refactor": "Split a large file into multiple modules (SOLID). Workdir: must contain the large .py file to refactor.",
-    "testgenerering": "Generate pytest tests for a Python file. Workdir: must contain the .py file to test.",
-    "issue_handler": "Read an issue, analyze and fix the bug, close the issue. Workdir: must contain the code to fix."
+    "fri": "PURPOSE: Free task decomposition without template. You define phases. No workdir assumptions. For tasks that don't fit other templates.",
+    "resume": "PURPOSE: Summarize text into structured sections. Read-only — no file writing. Workdir: irrelevant.",
+    "kodeanalyse": "PURPOSE: Analyze existing Python code for quality, structure, security. Read-only — creates issues if problems found. Workdir: must contain .py files.",
+    "diffanalyse": "PURPOSE: Analyze a git diff between two commits. Read-only — assess risk and quality. Workdir: must be a git repo.",
+    "agenten": "PURPOSE: Complete a Pull Request workflow: branch → commit → push → PR. Workdir: must be a git repo with remote.",
+    "programmering": "PURPOSE: Create a new project from scratch (greenfield). Workdir must NOT contain .py files. Phases: Requirements → Architecture → Implementation Plan → Security → Code.",
+    "python-arkitektur": "PURPOSE: Analyze existing Python/Flask project and plan architecture improvements. Workdir: must contain existing code.",
+    "billedanalyse": "PURPOSE: Analyze an image and save result as .md document. Workdir: irrelevant. Upload image with add_image.",
+    "bugfix": "PURPOSE: Fix a specific bug in existing code (TDD). Phases: Analysis → Test (Red) → Fix → Verification (Green) → Close. Workdir: must contain the code.",
+    "refactor": "PURPOSE: Split a large file into multiple modules (SOLID). Phases: Analysis → Plan → Extract → Update → Test. Workdir: must contain the large .py file.",
+    "testgenerering": "PURPOSE: Generate pytest tests for a Python file. Workdir: must contain the .py file to test. Phases: Analysis → Test (Red) → Implementation → Verification (Green).",
+    "issue_handler": "PURPOSE: Read an issue, analyze and fix the bug, close the issue. Workdir: must contain the code to fix. Phases: Read → Clarify → Fix → Close."
   },
   "template_prompts": {
     "resume": "Create a structured summary of the material below. Return ONLY the following sections:\n## Overview\n## Key Points\n## Conclusion\n## Recommendations\n\n{lang_instruction}. Do not use <think> tags.",

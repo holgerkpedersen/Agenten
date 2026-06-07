@@ -608,7 +608,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
     "refactor": {
         "Analyse": {
             "type": "all_of",
-            "description": "Analysen skal (1) være substantiv — mindst 500 tegn der beskriver ansvarsområder og SOLID-overtrædelser — OG (2) have læst mindst 3 funktioner med read_location for at forstå koden.",
+            "description": "FORM\u00c5L: Forst\u00e5 den store fils struktur og ansvarsomr\u00e5der. Kr\u00e6ver: mindst 500 tegn analyse + 3 funktioner l\u00e6st med read_location.",
             "checks": [
                 {"type": "min_text_length", "min_chars": 500},
                 {"type": "tool_called", "tools": ["read_location"], "min_count": 3},
@@ -619,11 +619,11 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "plan_path": "refactor_plan.md",
             "ext": ".py",
             "min_files": 5,
-            "description": "Fasen afsluttes automatisk når `refactor_plan.md` eksisterer OG indeholder mindst 5 `*.py`-modulnavne (sikrer at planen er opdateret og dækker alle moduler).",
+            "description": "FORM\u00c5L: Beslut modulopdeling og skriv plan. Kr\u00e6ver: refactor_plan.md med mindst 5 *.py-moduler.",
         },
         "Ekstraher": {
             "type": "all_of",
-            "description": "Fasen afsluttes automatisk når (1) alle `*.py`-moduler nævnt i `refactor_plan.md` er oprettet OG (2) hvert symbol fra den originale .py-fil er landet i præcis ét af disse moduler.",
+            "description": "FORM\u00c5L: Opret nye modulfiler med kode fra den originale fil. Kr\u00e6ver: alle planlagte *.py-moduler oprettet + alle symboler fordelt.",
             "checks": [
                 {
                     "type": "files_from_plan",
@@ -654,101 +654,115 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             ],
             "require_all": False,
             "min_matches": 1,
-            "description": "Fasen afsluttes automatisk når `api_server.py` importerer fra mindst ét af de nye moduler (routes, session_manager, file_handler, image_handler, model_manager, security, helpers).",
+            "description": "FORM\u00c5L: Fjern flyttet kode fra original fil, tilf\u00f8j imports til nye moduler. Kr\u00e6ver: api_server.py importerer fra mindst \u00e9t nyt modul.",
         },
         "Test": {
             "type": "tests_pass",
             "scope": "all",
+            "description": "FORM\u00c5L: Bekr\u00e6ft at refactoring ikke har brudt noget. Kr\u00e6ver: alle tests best\u00e5r.",
         },
     },
     "bugfix": {
         "Analyse": {
             "type": "min_text_length",
             "min_chars": 300,
+            "description": "FORM\u00c5L: Forst\u00e5 buggen og identific\u00e9r rod\u00e5rsag i koden. Kr\u00e6ver: mindst 300 tegn analyse.",
         },
         "Test (Red)": {
             "type": "file_exists",
             "paths": ["tests/temp/test_*.py"],
             "require_all": False,
             "min_files": 1,
+            "description": "FORM\u00c5L: Skriv en pytest der reproducerer buggen. Kr\u00e6ver: test-fil i tests/temp/. Testen skal fejle (r\u00f8d fase).",
         },
         "Implementering": {
             "type": "tool_called",
             "tools": ["edit_file", "write_file"],
+            "description": "FORM\u00c5L: Ret koden med minimal \u00e6ndring. Kr\u00e6ver: edit_file eller write_file kaldt.",
         },
         "Verifikation (Green)": {
             "type": "tests_pass",
             "scope": "all",
+            "description": "FORM\u00c5L: Bekr\u00e6ft at fixet virker og ingen regressions. Kr\u00e6ver: alle tests best\u00e5r.",
         },
         "Opdatering": {
             "type": "tool_called",
             "tools": ["update_issue_status"],
+            "description": "FORM\u00c5L: Luk issue med beskrivelse af hvad der blev rettet. Kr\u00e6ver: update_issue_status kaldt.",
         },
     },
     "issue_handler": {
         "L\u00e6s": {
             "type": "tool_called",
             "tools": ["read_issue"],
+            "description": "FORM\u00c5L: L\u00e6s issue-beskrivelsen og forst\u00e5 problemet. Kr\u00e6ver: read_issue kaldt.",
         },
         "Afklar": {
             "type": "min_text_length",
             "min_chars": 200,
+            "description": "FORM\u00c5L: Analys\u00e9r koden, afg\u00f8r om fejlen findes. Kr\u00e6ver: mindst 200 tegn analyse.",
         },
         "Fix": {
             "type": "tool_called",
             "tools": ["edit_file", "write_file"],
+            "description": "FORM\u00c5L: Ret fejlen i koden. Kr\u00e6ver: edit_file eller write_file kaldt.",
         },
         "Luk Issue": {
             "type": "tool_called",
             "tools": ["update_issue_status"],
+            "description": "FORM\u00c5L: Mark\u00e9r issue som resolved med rettelsesnote. Kr\u00e6ver: update_issue_status kaldt.",
         },
     },
     "testgenerering": {
         "Analyse": {
             "type": "min_text_length",
             "min_chars": 300,
+            "description": "FORM\u00c5L: Forst\u00e5 hvilke funktioner der mangler testd\u00e6kning. Kr\u00e6ver: mindst 300 tegn analyse.",
         },
         "Test (Red)": {
             "type": "file_exists",
             "paths": ["tests/temp/test_*.py"],
             "require_all": False,
             "min_files": 1,
+            "description": "FORM\u00c5L: Skriv pytest-tests for den manglende d\u00e6kning. Kr\u00e6ver: test-fil i tests/temp/.",
         },
         "Implementering": {
             "type": "tool_called",
             "tools": ["edit_file"],
             "optional": True,
+            "description": "FORM\u00c5L: G\u00f8r koden testbar hvis n\u00f8dvendigt. Kr\u00e6ver: edit_file kaldt (kun hvis koden skal \u00e6ndres).",
         },
         "Verifikation (Green)": {
             "type": "tests_pass",
             "scope": "all",
+            "description": "FORM\u00c5L: Bekr\u00e6ft at nye tests best\u00e5r og ingen regressions. Kr\u00e6ver: alle tests best\u00e5r.",
         },
     },
     "kodeanalyse": {
         "Form\u00e5l": {
             "type": "min_text_length",
             "min_chars": 200,
-            "description": "Form\u00e5lsafsnittet skal v\u00e6re mindst 200 tegn — kort beskrivelse af filens form\u00e5l.",
+            "description": "FORM\u00c5L: Forklar hvad filen g\u00f8r og dens rolle i projektet. Kr\u00e6ver: mindst 200 tegn.",
         },
         "Imports og afh\u00e6ngigheder": {
             "type": "min_text_length",
             "min_chars": 200,
-            "description": "Importanalyse skal v\u00e6re mindst 200 tegn — gennemg\u00e5 imports og eksterne afh\u00e6ngigheder.",
+            "description": "FORM\u00c5L: Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Kr\u00e6ver: mindst 200 tegn.",
         },
         "Arkitektur": {
             "type": "min_text_length",
             "min_chars": 300,
-            "description": "Arkitekturafsnittet skal v\u00e6re mindst 300 tegn — analys\u00e9r struktur, klasser og funktioner.",
+            "description": "FORM\u00c5L: Analys\u00e9r filens struktur, klasser og funktioner. Kr\u00e6ver: mindst 300 tegn.",
         },
         "Kodekvalitet": {
             "type": "min_text_length",
             "min_chars": 200,
-            "description": "Kodekvalitetsafsnittet skal v\u00e6re mindst 200 tegn — vurder l\u00e6sbarhed og vedligeholdbarhed.",
+            "description": "FORM\u00c5L: Vurder kodens l\u00e6sbarhed, vedligeholdbarhed og test coverage. Kr\u00e6ver: mindst 200 tegn.",
         },
         "Sikkerhed": {
             "type": "min_text_length",
             "min_chars": 200,
-            "description": "Sikkerhedsafsnittet skal v\u00e6re mindst 200 tegn — identific\u00e9r s\u00e5rbarheder.",
+            "description": "FORM\u00c5L: Identific\u00e9r potentielle s\u00e5rbarheder. Kr\u00e6ver: mindst 200 tegn.",
         },
     },
     "programmering": {
@@ -756,30 +770,30 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "type": "file_exists",
             "paths": ["docs/kravanalyse.md"],
             "min_files": 1,
-            "description": "Kravanalyse skal gemmes i docs/kravanalyse.md via write_file.",
+            "description": "FORM\u00c5L: Afd\u00e6k og dokument\u00e9r alle krav (funktionelle og ikke-funktionelle). Kr\u00e6ver: docs/kravanalyse.md eksisterer.",
         },
         "Arkitekturdesign": {
             "type": "file_exists",
             "paths": ["docs/arkitektur.md"],
             "min_files": 1,
-            "description": "Arkitekturdesign skal gemmes i docs/arkitektur.md via write_file.",
+            "description": "FORM\u00c5L: Design systemarkitektur med komponenter, moduler og dataflow. Kr\u00e6ver: docs/arkitektur.md eksisterer.",
         },
         "Implementeringsplan": {
             "type": "file_exists",
             "paths": ["docs/implementeringsplan.md"],
             "min_files": 1,
-            "description": "Implementeringsplan skal gemmes i docs/implementeringsplan.md via write_file.",
+            "description": "FORM\u00c5L: Planl\u00e6g filstruktur, r\u00e6kkef\u00f8lge og teststrategi. Kr\u00e6ver: docs/implementeringsplan.md eksisterer.",
         },
         "Sikkerhedsanalyse": {
             "type": "file_exists",
             "paths": ["docs/sikkerhedsanalyse.md"],
             "min_files": 1,
-            "description": "Sikkerhedsanalyse skal gemmes i docs/sikkerhedsanalyse.md via write_file.",
+            "description": "FORM\u00c5L: Analys\u00e9r sikkerhedsaspekter (OWASP, inputvalidering, auth). Kr\u00e6ver: docs/sikkerhedsanalyse.md eksisterer.",
         },
         "Kodeimplementering": {
             "type": "tool_called",
             "tools": ["write_file", "edit_file"],
-            "description": "Der skal skrives eller redigeres kodefiler via write_file eller edit_file.",
+            "description": "FORM\u00c5L: Skriv koden baseret p\u00e5 design og plan. Kr\u00e6ver: write_file eller edit_file kaldt (greenfield).",
         },
     },
 }
