@@ -1331,6 +1331,15 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     continue
                 consecutive_dedups = 0
                 if tool_name in READ_ONLY_TOOLS:
+                    if getattr(agent, '_read_escape_sent', False):
+                        result_str = f"[SYSTEM: L\u00e6sekald BLOKERET. Du fik besked om at skrive. Brug write_file NU.]"
+                        result = {"success": True, "result": "Skipped — write forced"}
+                        agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                        continue
                     consecutive_reads += 1
                     if consecutive_reads >= 5:
                         write_tools = [t for t in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import")
@@ -1343,8 +1352,18 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             ))
                             agent._log("SYSTEM", "Read-loop escape", f"{consecutive_reads} consecutive reads — force write")
                             consecutive_reads = 0
+                            agent._read_escape_sent = True
+                            result_str = f"[SYSTEM: L\u00e6sekald blokeret. Brug {', '.join(write_tools)}.]"
+                            result = {"success": True, "result": "Skipped — force write"}
+                            agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                            agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                            messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                            yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                            yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                            continue
                 elif tool_name in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import"):
                     consecutive_reads = 0
+                    agent._read_escape_sent = False
                 if tool_name in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
                     result_str = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redig\u00e9r IKKE filer. Brug <<<DONE>>> for at afslutte, eller gen\u00e5bn issuet f\u00f8rst."
                     result = {"success": False, "error": "Issue already resolved"}
