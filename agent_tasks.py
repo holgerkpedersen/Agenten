@@ -300,6 +300,89 @@ def _count_fix_attempts(agent: Any, called_tools: dict[str, int]) -> str | None:
     return None
 
 
+def _ensure_done_tool(agent: Any) -> None:
+    """Tilf\u00f8j 'done' til active_tools hvis NATIVE_TOOLS er sl\u00e5et til."""
+    if not config.NATIVE_TOOLS:
+        return
+    current = list(agent.tool_registry.active_tools) if agent.tool_registry.active_tools is not None else []
+    if "done" not in current:
+        agent.tool_registry.set_active_tools(current + ["done"])
+
+
+def _validate_done_completion(
+    agent: Any, messages: list[dict], called_tools: dict[str, int],
+    task_node: Any, original_prompt: str, result_text: str = ""
+) -> tuple[str | None, list[tuple]]:
+    """F\u00e6lles valideringsk\u00e6de for b\u00e5de <<<DONE>>> (text-mode) og done() (native)."""
+    yields_to_emit: list[tuple] = []
+
+    if agent._write_failed:
+        return (
+            f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med "
+            f"<<<DONE>>>/done() n\u00e5r edit_file har fejlet. "
+            f"Ret din anmodning og kald edit_file igen.",
+            yields_to_emit
+        )
+
+    if agent._tests_failed and "test" not in _normalize_phase(task_node.name).lower():
+        return (
+            f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med "
+            f"<<<DONE>>>/done() n\u00e5r tests fejler. Ret koden med edit_file "
+            f"og k\u00f8r run_tests() igen indtil ALLE tests best\u00e5r.",
+            yields_to_emit
+        )
+
+    if not _check_done_pr_requirements(agent, messages, called_tools, original_prompt, task_node.name):
+        if agent_git.is_pr_workflow(task_node.name):
+            yields_to_emit.append(("checkpoint", {
+                "message": t(K.CP_PR_FAILED, agent.lang), "tool": "done"
+            }))
+        return (
+            f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: PR-kravene er ikke opfyldt. "
+            f"Fuldf\u00f8r alle p\u00e5kr\u00e6vede trin f\u00f8rst.",
+            yields_to_emit
+        )
+
+    passed, failed = _validate_rubrics(agent, called_tools)
+    if failed:
+        try:
+            from skill_tracker import tracker  # noqa: PLC0415
+            skill_name = "__none__"
+            for s in agent._active_skills:
+                if not s.get("base"):
+                    skill_name = s["name"]
+                    break
+            tracker.record(
+                skill_name=skill_name,
+                task_summary=f"rubric_failure: {task_node.name}",
+                success=False,
+                template=agent.active_template or "",
+                detail="; ".join(r.get("desc", "?")[:120] for r in failed),
+            )
+        except Exception:
+            pass
+    if failed and not agent._rubric_retried:
+        agent._rubric_retried = True
+        feedback = t(K.RUBRIC_FAILED, agent.lang)
+        for r in failed:
+            feedback += "\n" + t(K.RUBRIC_FAILED_DETAIL, agent.lang).format(desc=r["desc"])
+        return (feedback, yields_to_emit)
+
+    missing_msg = _check_required_tools(agent, called_tools, task_node.name)
+    if missing_msg:
+        return (f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {missing_msg}", yields_to_emit)
+
+    validation_err = _validate_done_output(agent, result_text, task_node.name, task_node)
+    if validation_err:
+        return (f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {validation_err}", yields_to_emit)
+
+    fix_err = _count_fix_attempts(agent, called_tools)
+    if fix_err:
+        return (f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {fix_err}", yields_to_emit)
+
+    return (None, yields_to_emit)
+
+
 def set_task_tools(agent: Any, task_name: str) -> None:
     """set task tools.
     
@@ -307,21 +390,25 @@ def set_task_tools(agent: Any, task_name: str) -> None:
         agent:
         task_name:"""
     if not agent.active_template or agent.active_template not in agent_skills.TEMPLATE_TASK_TOOLS:
+        _ensure_done_tool(agent)
         return
     template_tools = agent_skills.TEMPLATE_TASK_TOOLS[agent.active_template]
     phase = _normalize_phase(task_name)
     if phase in template_tools:
         agent.tool_registry.set_active_tools(template_tools[phase])
         agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(template_tools[phase]))
+        _ensure_done_tool(agent)
         return
     for keyword, tools in template_tools.items():
         if keyword in phase.lower():
             agent.tool_registry.set_active_tools(tools)
             agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
+            _ensure_done_tool(agent)
             return
     allowed = agent_skills.TEMPLATE_TOOLS.get(agent.active_template)
     if allowed is not None:
         agent.tool_registry.set_active_tools(allowed)
+    _ensure_done_tool(agent)
 
 
 def solve_task(agent: Any, task_node: Any, original_prompt: str) -> str:
@@ -836,6 +923,11 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
         uncalled.discard("write_file")
     if "extract_symbol" in uncalled and "write_file" in called_names:
         uncalled.discard("extract_symbol")
+    # write_file and edit_file are alternatives — you either create new files or edit existing ones
+    if "write_file" in uncalled and "edit_file" in called_names:
+        uncalled.discard("write_file")
+    if "edit_file" in uncalled and "write_file" in called_names:
+        uncalled.discard("edit_file")
     if uncalled:
         return t(K.LOG_REQUIRED_TOOLS_MISSING, agent.lang).format(tools=", ".join(sorted(uncalled)))
     return None
@@ -1288,7 +1380,23 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     if file_key.startswith("file_"):
                         file_path = os.path.abspath(file_key[5:])
                         if file_path in agent._located_files:
-                            result_str += "\n\n📌 OBS: Du har allerede læst funktion(er) i denne fil med locate. Brug locate(filepath='...', name='andet_navn') i stedet for read_chunk — det er hurtigere."
+                            result_str += "\n\n\u2705 OBS: Du har allerede l\u00e6st funktion(er) i denne fil med locate. Brug locate(filepath='...', name='andet_navn') i stedet for read_chunk \u2014 det er hurtigere."
+                if tool_name == "done":
+                    error_msg, yields_to_emit = _validate_done_completion(
+                        agent, messages, called_tools, task_node, original_prompt,
+                        result.get("result", "")
+                    )
+                    for y_type, y_data in yields_to_emit:
+                        yield {"type": y_type, **y_data}
+                    agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                    yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                    yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                    if error_msg:
+                        _add_user_msg(messages, error_msg)
+                        messages = _truncate_messages(messages, agent.max_conversation_chars)
+                        continue
+                    full_response = result.get("result", t(K.LOG_TASK_DONE, agent.lang))
+                    break
                 msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=full_response)
                 if msg:
                     agent._log("INFO", msg, "")

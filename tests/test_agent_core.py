@@ -3,6 +3,7 @@ import pytest
 from agent_core import Agent
 import agent_skills
 import agent_git
+import config
 
 
 class TestAgentInit:
@@ -254,7 +255,8 @@ class TestSetTaskTools:
         agent.tool_registry.set_active_tools(["git_status"])
         agent.active_template = None
         agent._set_task_tools("some random task")
-        assert agent.tool_registry.active_tools == ["git_status"]
+        expected = ["git_status", "done"] if config.NATIVE_TOOLS else ["git_status"]
+        assert agent.tool_registry.active_tools == expected
 
     def test_falls_back_to_template_tools_if_no_keyword_match(self):
         agent = Agent()
