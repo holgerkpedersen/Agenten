@@ -772,7 +772,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                     "cohesion",
                     "single responsibility",
                     "modul",
-                ], "min_match": 3},
+                ], "min_match": 4},
             ],
         },
         "Imports og afh\u00e6ngigheder": {
@@ -789,7 +789,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                     "ekstern",
                     "bibliotek",
                     "version",
-                ], "min_match": 3},
+                ], "min_match": 5},
             ],
         },
         "Arkitektur": {
@@ -809,7 +809,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                     "cohesion",
                     "SOLID",
                     "single responsibility",
-                ], "min_match": 4},
+                ], "min_match": 6},
             ],
         },
         "Kodekvalitet": {
@@ -830,7 +830,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                     "l\u00e6sbarhed",
                     "vedligehold",
                     "separation of concerns",
-                ], "min_match": 4},
+                ], "min_match": 6},
             ],
         },
         "Sikkerhed": {
@@ -855,7 +855,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                     "XSS",
                     "SQL injection",
                     "OWASP",
-                ], "min_match": 4},
+                ], "min_match": 8},
             ],
         },
     },
