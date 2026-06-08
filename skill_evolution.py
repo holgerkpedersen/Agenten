@@ -592,7 +592,7 @@ def _add_refinement_note(content: str, action: dict[str, Any]) -> str:
         f"\n\n{marker}\n"
         f"### Kendte Fejlmønstre\n"
         f"\n"
-        f"Opdateret: {datetime.now().strftime('%Y-%m-%d')}\n"
+        f"Opdateret: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
         f"\n"
         f"**Hyppige fejl ved brug af denne skill:**\n"
     )
