@@ -1425,6 +1425,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     consecutive_dedups = 0
     consecutive_reads = 0
     consecutive_failures = 0
+    consecutive_same_tool = 0
+    last_tool_name = ""
     READ_ONLY_TOOLS = {"read_location", "read_chunk", "list_chunks", "list_files", "list_symbols", "locate", "read_issue"}
     agent._write_failed = False
     agent._tests_failed = False
@@ -1522,6 +1524,23 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     except (json.JSONDecodeError, ValueError):
                         args_val = {}
                 tool_name = tc["function"]["name"]
+
+                if tool_name == last_tool_name:
+                    consecutive_same_tool += 1
+                    if consecutive_same_tool >= 3:
+                        alt_tools = [t for t in agent.tool_registry.active_tools
+                                     if t not in ("read_issue", "locate", "read_location", "list_symbols")][:5]
+                        tip = f" Pr\u00f8v: {', '.join(alt_tools)}." if alt_tools else ""
+                        _add_user_msg(messages,
+                            f"[SYSTEM: Du har kaldt '{tool_name}' {consecutive_same_tool} gange i tr\u00e6k.{tip}"
+                            f" Brug <<<DONE>>> eller skift v\u00e6rkt\u00f8j.]")
+                        agent._log("SYSTEM", "Same-tool-loop escape",
+                                   f"{consecutive_same_tool}x {tool_name} in a row{tip}")
+                        consecutive_same_tool = 0
+                else:
+                    consecutive_same_tool = 0
+                    last_tool_name = tool_name
+
                 tool_key = tool_name + str(args_val)
                 dup_count = called_tools.get(tool_key, 0)
                 called_tools[tool_key] = dup_count + 1
