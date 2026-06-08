@@ -325,7 +325,17 @@ def detect_oversize_file(agent: Any, filename: str, content: str, related_bugs: 
         related_bugs:"""
     line_count = content.count("\n")
     if line_count < OVERSIZE_LINE_LIMIT:
+        agent._pending_refactor = None
         return None
+    # Do NOT use truncated content — count lines directly from disk if content looks truncated
+    resolved = agent_files._resolve_path(filename) if hasattr(agent_files, '_resolve_path') else filename
+    try:
+        with open(resolved, 'r', encoding='utf-8') as f:
+            real_lines = sum(1 for _ in f)
+        if real_lines > line_count:
+            line_count = real_lines
+    except Exception:
+        pass
     result = {"file": filename, "lines": line_count, "related": related_bugs or []}
     agent._log("WARNING", f"Fil overskrider {OVERSIZE_LINE_LIMIT} linjer: {filename}", f"{line_count} linjer")
     agent._pending_refactor = result

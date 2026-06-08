@@ -129,6 +129,7 @@ def _add_file_entry(file_context: str, agent: Agent, filename: str, content: str
     agent_issues.detect_oversize_file(agent, filename, content)
     if agent._pending_refactor:
         agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
+        agent._pending_refactor = None
     is_python = filename.endswith('.py')
     if is_python:
         ast_index = agent_files.build_ast_index(content, filename)
