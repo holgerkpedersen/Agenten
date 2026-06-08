@@ -1,5 +1,6 @@
 """Agent tasks execution module."""
 
+import ast
 import os
 import re
 import time
@@ -63,6 +64,33 @@ def _save_llm_log_file(agent: Any, task_name: str, iteration: int, content: str)
     except Exception:
         pass
     return filepath
+
+
+def _check_import_placement(filepath: str) -> str | None:
+    """Check if any import statements are inside functions/classes.
+    Returns a warning message if found, None otherwise."""
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            code = f.read()
+    except Exception:
+        return None
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return None
+    bad = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            for child in ast.walk(node):
+                if child is node:
+                    continue
+                if isinstance(child, (ast.Import, ast.ImportFrom)):
+                    names = ", ".join(a.name for a in child.names)
+                    kind = type(node).__name__
+                    bad.append(f"'{names}' inside {kind} '{node.name}' at line {child.lineno}")
+    if bad:
+        return "\u26a0\ufe0f Import inde i funktion/klasse: " + "; ".join(bad) + ". Flyt importen til toppen af filen."
+    return None
 
 
 PHASE_ALIASES = {
@@ -1644,6 +1672,12 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success") is False:
                     agent._write_failed = True
                     result_str += f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: edit_file MISLYKKEDES. DU M\u00c5 IKKE bruge <<<DONE>>> f\u00f8r edit_file lykkes. Ret din anmodning og pr\u00f8v igen."
+                if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success"):
+                    fpath = args_val.get("path", "")
+                    if fpath and fpath.lower().endswith('.py'):
+                        warning = _check_import_placement(fpath)
+                        if warning:
+                            result_str += f"\n\n{warning}"
                 if tool_name == "run_tests":
                     inner = result.get("result", {}) if isinstance(result, dict) else {}
                     if isinstance(inner, dict) and inner.get("success") is False:

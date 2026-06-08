@@ -489,7 +489,8 @@ class Agent:
              "2) Search-and-replace: Angiv old_text (PRÆCIS tekst fra filen — kopieret direkte, IKKE omskrevet) + new_text. "
              "Søgeteksten skal være en 1:1 byte-kopi af filindholdet. Redigér IKKE old_text — den matcher ELLERS ikke.\n"
              "3) For at tilføje i slutningen af en fil: Brug AST-tilstand med symbol='<sidste_funktion>' + new_text med begge funktioner.\n"
-             "Syntestjekker .py filer. Opretter IKKE nye filer — brug write_file til det. "
+              "Syntestjekker .py filer. Opretter IKKE nye filer — brug write_file til det. "
+             "Import-regel: alle import-sætninger hører i toppen af filen, ALDRIG inde i funktioner/klasser (dårlig stil + pylint klager). "
              "Læs funktionen med locate(name='funktionsnavn') FØRST for at se den nøjagtige nuværende kode.",
             ["path", "old_text", "new_text"],
             lambda path, old_text="", new_text="", symbol=None: git_ops.edit_file(
