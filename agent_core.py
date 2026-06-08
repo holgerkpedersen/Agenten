@@ -482,9 +482,15 @@ class Agent:
         self.tool_registry.register(Tool(
             "edit_file",
             "Rediger en eksisterende fil. To tilstande:\n"
-            "1) AST-tilstand: Angiv symbol='funktionsnavn' + new_text (hele funktionen). Systemet finder funktionen via AST-linjenumre — old_text ignoreres.\n"
-            "2) Search-and-replace: Angiv old_text (præcis tekst) + new_text. Søgeteksten skal findes præcis én gang.\n"
-            "Syntestjekker .py filer. Opretter IKKE nye filer — brug write_file til det.",
+             "1) AST-tilstand (ANBEFALET til .py filer): Angiv symbol='funktionsnavn' + new_text=HELE den nye funktion. "
+             "Systemet finder funktionen via AST-linjenumre — old_text ignoreres. "
+             "Du behøver IKKE finde linjenumre — bare giv funktionsnavnet. "
+             "Eksempel: edit_file(path='app.py', symbol='translate_to_dansk', new_text='def translate_to_dansk(text):\\n    return text.strip()')\n"
+             "2) Search-and-replace: Angiv old_text (PRÆCIS tekst fra filen — kopieret direkte, IKKE omskrevet) + new_text. "
+             "Søgeteksten skal være en 1:1 byte-kopi af filindholdet. Redigér IKKE old_text — den matcher ELLERS ikke.\n"
+             "3) For at tilføje i slutningen af en fil: Brug AST-tilstand med symbol='<sidste_funktion>' + new_text med begge funktioner.\n"
+             "Syntestjekker .py filer. Opretter IKKE nye filer — brug write_file til det. "
+             "Læs funktionen med locate(name='funktionsnavn') FØRST for at se den nøjagtige nuværende kode.",
             ["path", "old_text", "new_text"],
             lambda path, old_text="", new_text="", symbol=None: git_ops.edit_file(
                 path=path, old_text=old_text, new_text=new_text,
