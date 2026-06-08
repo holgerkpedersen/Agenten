@@ -33,6 +33,22 @@ def _parse_test_summary(result: dict) -> str:
 EXECUTION_TIMEOUT = config.EXECUTION_TIMEOUT
 
 
+def _save_llm_prompt_file(agent: Any, task_name: str, iteration: int, messages: list[dict]) -> str:
+    """Save full LLM prompt (all messages) to a file for later inspection."""
+    session_id = getattr(agent, '_session_id', 'unknown')
+    session_dir = os.path.join("logs", "llm_prompts", session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    safe_name = task_name.replace(" ", "_").replace("/", "_").replace("\\", "_")[:30]
+    filename = f"{safe_name}_iter{iteration}.json"
+    filepath = os.path.join(session_dir, filename)
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(messages, f, ensure_ascii=False, indent=2, default=str)
+    except Exception:
+        pass
+    return filepath
+
+
 def _save_llm_log_file(agent: Any, task_name: str, iteration: int, content: str) -> str:
     """Save LLM response to a file for later inspection."""
     session_id = getattr(agent, '_session_id', 'unknown')
@@ -1459,6 +1475,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
             for entry in agent.agent_log[_report_logs:]:
                 yield {"type": "log", "log": entry}
             _report_logs = len(agent.agent_log)
+            _save_llm_prompt_file(agent, task_node.name, i, messages)
             for chunk in agent.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=agent.max_tokens, images=agent.images, tools=tools_param):
                 if agent.stop_requested:
                     break
