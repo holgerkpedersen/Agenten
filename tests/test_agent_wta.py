@@ -5,7 +5,7 @@ import os
 import tempfile
 from collections import Counter
 
-from agent_wta import WTAState, SequenceLearner, EXPLORATION_RATE
+from agent_wta import WTAState, SequenceLearner
 
 
 # ============ WTAState Tests ============
@@ -38,89 +38,69 @@ def test_laplace_score_poor_tool():
     assert round(score, 4) == 0.25, f"Expected 0.25, got {score}"
 
 
-def test_select_winner_highest_score():
-    """Among 3 candidates with scores [0.9, 0.6, 0.3], winner is the 0.9."""
+def test_rank_tool_calls_order_by_score():
+    """Tool calls should be sorted descending by Laplace score."""
     wta = WTAState()
-    wta.record("t1", "p1", "tool_a", True)  # 1/1 → (1+1)/(1+2) = 0.6667
-    wta.record("t1", "p1", "tool_a", True)  # 2/2 → (2+1)/(2+2) = 0.75
+    wta.record("t1", "p1", "tool_a", True)  # 1/1 → 0.6667
+    wta.record("t1", "p1", "tool_a", True)  # 2/2 → 0.75
     wta.record("t1", "p1", "tool_b", True)  # 1/1 → 0.6667
-    wta.record("t1", "p1", "tool_c", False)  # 0/1 → (0+1)/(1+2) = 0.3333
+    wta.record("t1", "p1", "tool_c", False)  # 0/1 → 0.3333
 
-    candidates = [
+    calls = [
+        {"function": {"name": "tool_c", "arguments": {}}},
+        {"function": {"name": "tool_b", "arguments": {}}},
+        {"function": {"name": "tool_a", "arguments": {}}},
+    ]
+    ranked = wta.rank_tool_calls("t1", "p1", calls)
+    names = [tc["function"]["name"] for tc in ranked]
+    assert names == ["tool_a", "tool_b", "tool_c"], f"Expected tool_a first, got {names}"
+
+
+def test_rank_tool_calls_max_calls():
+    """max_calls should truncate the result to the top N."""
+    wta = WTAState()
+    wta.record("t1", "p1", "tool_a", True)
+    wta.record("t1", "p1", "tool_a", True)
+    wta.record("t1", "p1", "tool_b", True)
+    wta.record("t1", "p1", "tool_c", True)
+
+    calls = [
+        {"function": {"name": "tool_c", "arguments": {}}},
         {"function": {"name": "tool_a", "arguments": {}}},
         {"function": {"name": "tool_b", "arguments": {}}},
-        {"function": {"name": "tool_c", "arguments": {}}},
     ]
-    winner = wta.select_winner("t1", "p1", candidates)
-    assert winner is not None
-    assert winner["function"]["name"] == "tool_a"
+    ranked = wta.rank_tool_calls("t1", "p1", calls, max_calls=2)
+    assert len(ranked) == 2
 
 
-def test_select_winner_bypass_write_file():
-    """write_file should always win regardless of scores."""
+def test_rank_tool_calls_empty():
+    """Empty input should return empty list."""
     wta = WTAState()
-    wta.record("t1", "p1", "read_location", True)  # high score
-    wta.record("t1", "p1", "read_location", True)
-    wta.record("t1", "p1", "read_location", True)  # 3/3 → (3+1)/(3+2) = 0.8
-    # write_file has no records → score 0.5
+    assert wta.rank_tool_calls("t1", "p1", []) == []
 
-    candidates = [
-        {"function": {"name": "read_location", "arguments": {}}},
-        {"function": {"name": "write_file", "arguments": {"filepath": "test.py", "content": "x"}}},
+
+def test_rank_tool_calls_preserves_args():
+    """Arguments of each tool call must survive reordering."""
+    wta = WTAState()
+    wta.record("t1", "p1", "locate", True)
+    wta.record("t1", "p1", "locate", True)
+
+    calls = [
+        {"function": {"name": "locate", "arguments": {"name": "foo"}}},
+        {"function": {"name": "locate", "arguments": {"name": "bar"}}},
     ]
-    winner = wta.select_winner("t1", "p1", candidates)
-    assert winner is not None
-    assert winner["function"]["name"] == "write_file"
+    ranked = wta.rank_tool_calls("t1", "p1", calls)
+    assert len(ranked) == 2
+    assert ranked[0]["function"]["arguments"]["name"] in ("foo", "bar")
 
 
-def test_select_winner_edit_file_bypass():
-    """edit_file should also bypass WTA scoring."""
+def test_rank_tool_calls_unknown_tool():
+    """Unknown tools (score 0.5) should not crash and appear in output."""
     wta = WTAState()
-    wta.record("t1", "p1", "list_symbols", True)
-    wta.record("t1", "p1", "list_symbols", True)
-    wta.record("t1", "p1", "list_symbols", True)
-
-    candidates = [
-        {"function": {"name": "list_symbols", "arguments": {}}},
-        {"function": {"name": "edit_file", "arguments": {"filepath": "test.py"}}},
-    ]
-    winner = wta.select_winner("t1", "p1", candidates)
-    assert winner["function"]["name"] == "edit_file"
-
-
-def test_select_winner_dedup_skip():
-    """A candidate whose key is already in called_tools should be skipped."""
-    wta = WTAState()
-    wta.record("t1", "p1", "list_files", True)
-    wta.record("t1", "p1", "list_files", True)
-    wta.record("t1", "p1", "list_symbols", True)
-
-    candidates = [
-        {"function": {"name": "list_files", "arguments": {}}},
-        {"function": {"name": "list_symbols", "arguments": {}}},
-    ]
-    called_tools = {"list_files{}": 1}  # list_files already called
-    winner = wta.select_winner("t1", "p1", candidates, called_tools)
-    assert winner is not None
-    assert winner["function"]["name"] == "list_symbols"
-
-
-def test_select_winner_all_dedup():
-    """If all candidates are dedup, return the first one (fallback)."""
-    wta = WTAState()
-    candidates = [
-        {"function": {"name": "locate", "arguments": {}}},
-    ]
-    called_tools = {"locate{}": 2}
-    winner = wta.select_winner("t1", "p1", candidates, called_tools)
-    assert winner is not None
-    assert winner["function"]["name"] == "locate"
-
-
-def test_select_winner_empty():
-    """Empty candidates → None."""
-    wta = WTAState()
-    assert wta.select_winner("t1", "p1", []) is None
+    calls = [{"function": {"name": "mystery_tool", "arguments": {}}}]
+    ranked = wta.rank_tool_calls("t1", "p1", calls)
+    assert len(ranked) == 1
+    assert ranked[0]["function"]["name"] == "mystery_tool"
 
 
 def test_persist_roundtrip():
@@ -155,17 +135,7 @@ def test_multiple_templates_independent():
     assert score_bf < 0.5
 
 
-def test_tool_args_dedup_key():
-    """Tool with same name but different args should be treated separately."""
-    wta = WTAState()
-    candidates = [
-        {"function": {"name": "locate", "arguments": {"name": "foo"}}},
-        {"function": {"name": "locate", "arguments": {"name": "bar"}}},
-    ]
-    called_tools = {"locate{'name': 'foo'}": 1}
-    winner = wta.select_winner("t1", "p1", candidates, called_tools)
-    assert winner is not None
-    assert winner["function"]["arguments"]["name"] == "bar"
+
 
 
 # ============ SequenceLearner Tests ============

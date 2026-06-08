@@ -15,7 +15,6 @@ _SEQUENCE_DEFAULT_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     ".agent_storage", "tool_sequences.json"
 )
-EXPLORATION_RATE = 0.10
 SEQUENCE_MIN_SAMPLES = 3
 SEQUENCE_MIN_CONFIDENCE = 0.6
 
@@ -23,8 +22,8 @@ SEQUENCE_MIN_CONFIDENCE = 0.6
 class WTAState:
     """Tracks per-tool success rates per (template, phase) with Laplace smoothing.
 
-    Used to select the most effective tool call when the LLM proposes
-    multiple candidates (Winner-Takes-All).
+    Used to rank tool calls by historical success rate within a given
+    template + phase, so the most reliable tools execute first.
     """
 
     def __init__(self, path: str = "") -> None:
@@ -63,65 +62,42 @@ class WTAState:
         entry = self._tool_entry(template, phase, tool)
         return float(entry.get("score", 0.5))
 
-    def select_winner(
+    def rank_tool_calls(
         self,
         template: str,
         phase: str,
-        candidates: list[dict],
-        called_tools: dict[str, int] | None = None,
-    ) -> dict | None:
-        if not candidates:
-            return None
-        called_tools = called_tools or {}
+        tool_calls: list[dict],
+        max_calls: int | None = None,
+    ) -> list[dict]:
+        """Score and reorder tool calls by historical success rate.
 
-        # Phase 1: required tools always win
-        bypass = {"write_file", "edit_file"}
-        for tc in candidates:
-            if tc["function"]["name"] in bypass:
-                return tc
+        Tools with higher success rates come first; low-success tools sink
+        to the end of the list. Optionally cap the total number returned.
 
-        # Phase 2: remove already-called (dedup)
-        fresh = []
-        for tc in candidates:
-            name = tc["function"]["name"]
-            args = tc["function"].get("arguments", {})
-            if isinstance(args, str):
-                try:
-                    args = json.loads(args)
-                except (json.JSONDecodeError, ValueError):
-                    args = {}
-            key = name + str(args)
-            if called_tools.get(key, 0) == 0:
-                fresh.append(tc)
+        Args:
+            template: Template name (e.g. 'refactor', 'bugfix').
+            phase: Phase name (e.g. 'Ekstraher', 'Implementering').
+            tool_calls: List of tool-call dicts from the LLM.
+            max_calls: If set, only the top *N* calls are returned.
 
-        if not fresh:
-            return candidates[0]
+        Returns:
+            Reordered (and optionally truncated) list of tool-call dicts.
+        """
+        if not tool_calls:
+            return []
 
-        if len(fresh) == 1:
-            return fresh[0]
-
-        # Phase 3: score candidates
         scored = []
-        for tc in fresh:
-            name = tc["function"]["name"]
-            s = self.get_score(template, phase, name)
-            scored.append((s, tc))
+        for tc in tool_calls:
+            name = tc.get("function", {}).get("name", "?")
+            score = self.get_score(template, phase, name)
+            scored.append((score, tc))
 
         scored.sort(key=lambda x: -x[0])
 
-        # Phase 4: exploration
-        if len(scored) > 1 and _exploration_roll():
-            import random
-            winner = random.choice(scored[1:])[1]
-            return winner
-
-        return scored[0][1]
-
-
-def _exploration_roll() -> bool:
-    """Return True if exploration should trigger (10% chance)."""
-    import random
-    return random.random() < EXPLORATION_RATE
+        result = [tc for _, tc in scored]
+        if max_calls is not None and max_calls > 0:
+            result = result[:max_calls]
+        return result
 
 
 class SequenceLearner:
