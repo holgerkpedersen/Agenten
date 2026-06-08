@@ -1118,10 +1118,20 @@ def _set_phase_model(agent: Any, task_name: str) -> None:
             if not model_name:
                 return  # empty string = keep current execution model
             current = getattr(agent.llm, 'model', '')
-            if current != model_name:
-                agent.llm.set_model(model_name)
-                agent._log("MODEL", f"Switched to {model_name} for {task_name}",
-                           f"{current} \u2192 {model_name}")
+            if current == model_name:
+                return
+            # Check om modellen er tilgaengelig — hvis ikke, spring skift over
+            try:
+                available = agent.llm.list_models()
+                if available and model_name not in available:
+                    agent._log("MODEL", f"Cannot switch to {model_name} — not available, keeping {current}",
+                               f"available: {', '.join(available[:5])}...")
+                    return
+            except Exception:
+                pass  # hvis vi ikke kan liste modeller, forsøg skift alligevel
+            agent.llm.set_model(model_name)
+            agent._log("MODEL", f"Switched to {model_name} for {task_name}",
+                       f"{current} \u2192 {model_name}")
             return
 
 
