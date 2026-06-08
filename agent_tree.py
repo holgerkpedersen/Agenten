@@ -107,6 +107,7 @@ def parse_tree_from_llm(agent: Any, prompt: str, llm_response: str) -> TaskTree:
     lines = llm_response.strip().split('\n')
     stack = [(tree.root, 0)]
     added_count = 0
+    MAX_TASKS = 20
     skip_words = ['think', 'thinking', 'brainstorm', 'draft', 'constraint',
                  'repetition', 'politeness', 'indentation', 'compliance',
                  'thought', 'channel', 'namesekundar', 'namesearch',
@@ -152,6 +153,8 @@ def parse_tree_from_llm(agent: Any, prompt: str, llm_response: str) -> TaskTree:
         parent.add_child(new_node)
         stack.append((new_node, level))
         added_count += 1
+        if added_count >= MAX_TASKS:
+            break
 
     if added_count == 0:
         agent._log("WARNING", t(K.LOG_NO_VALID_TASKS, agent.lang), "")
