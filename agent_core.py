@@ -18,6 +18,7 @@ import agent_files
 import agent_tree
 import agent_skills
 import agent_git
+import agent_logs
 from agent_wta import WTAState, SequenceLearner
 from core_analytics import CoreAnalytics, TOOL_HANDLER_MAP
 import agent_tasks
@@ -619,6 +620,12 @@ class Agent:
             "Opret et nyt issue i issues.json. ÉT issue = ÉN specifik fejl (ikke flere endpoints samlet). Kræver: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location (format: filnavn:funktionsnavn), impact, proposed_fix. acceptance_criteria: beskriv præcist hvordan fixet verificeres (f.eks. 'Endpoint returnerer 403 ved ../ i stien').",
             ["title", "type", "severity", "description", "location", "impact", "proposed_fix", "acceptance_criteria"],
             lambda title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="", acceptance_criteria="": agent_issues.create_issue(self, title=title, type=type, severity=severity, description=description, location=location, impact=impact, proposed_fix=proposed_fix, acceptance_criteria=acceptance_criteria)
+        ))
+        self.tool_registry.register(Tool(
+            "analyze_own_logs",
+            "Analyser Agentens egne session-logs for fejlm\u00f8nstre og eksekveringshistorik. Args: session_id (UUID, valgfri \u2014 specifik session), pattern (s\u00f8gestreng eller regex, valgfri), max_sessions (antal seneste sessioner, default 5). Uden session_id: oversigt over seneste sessioner. Med session_id: detaljeret analyse + error patterns.",
+            ["session_id", "pattern", "max_sessions"],
+            lambda session_id="", pattern="", max_sessions="5": agent_logs.analyze_own_logs(session_id=session_id, pattern=pattern, max_sessions=int(max_sessions) if max_sessions else 5)
         ))
 
     def _add_image(self, path: str) -> dict[str, Any]:

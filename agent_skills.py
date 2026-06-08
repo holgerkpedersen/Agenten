@@ -37,6 +37,14 @@ TEMPLATE_TOOLS = {
         "edit_file", "write_file",
         "create_issue", "create_refactor_issue",
     ],
+    "selvforbedring": [
+        "read_issue", "update_issue_status", "run_tests",
+        "read_location", "list_chunks", "list_files", "list_symbols", "locate",
+        "edit_file", "write_file",
+        "create_issue", "analyze_own_logs",
+        "git_status", "git_diff", "git_commit", "git_push",
+        "git_create_branch", "git_checkout",
+    ],
 }
 
 # Per-template, per-phase iteration limits (LLM conversation turns).
