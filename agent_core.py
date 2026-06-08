@@ -19,6 +19,7 @@ import agent_tree
 import agent_skills
 import agent_git
 from agent_wta import WTAState, SequenceLearner
+from core_analytics import CoreAnalytics, TOOL_HANDLER_MAP
 import agent_tasks
 import edit_file2
 import config
@@ -314,6 +315,8 @@ class Agent:
         self._wta.load()
         self._seq: SequenceLearner = SequenceLearner()
         self._seq.load()
+        self._core: CoreAnalytics = CoreAnalytics()
+        self._core.load()
         self._hints_requested: set[str] = set()
         self._hints_available: set[str] = set()
         self._rubric_retried: bool = False
@@ -733,8 +736,13 @@ class Agent:
         })
         template = self.active_template or "fri"
         self._wta.record(template, phase, tool, success)
+        self._core.record_tool_outcome(tool, success, error=error)
+        if tool in ("write_file", "edit_file", "extract_symbol", "remove_symbol"):
+            handler = TOOL_HANDLER_MAP.get(tool, "unknown.py")
+            self._core.record_edit(handler)
         if len(self._tool_log) % 5 == 0:
             self._wta.save()
+            self._core.save()
 
     def _clean_task_name(self, name: str) -> str:
         """clean task name.

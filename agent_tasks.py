@@ -785,6 +785,12 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
             agent._tests_failed = False
         test_summary = _parse_test_summary(inner)
         exit_code = inner.get("exit_code")
+        if hasattr(agent, '_core'):
+            agent._core.record_test_outcome(
+                test_file=parsed.get("args", {}).get("test_path", "") or "run_tests",
+                passed=exit_code == 0,
+                summary=test_summary,
+            )
         if test_summary:
             if exit_code == 0:
                 agent._log("INFO", f"✅ Tests PASSED: {test_summary}",
@@ -1448,6 +1454,12 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         agent._tests_failed = False
                     test_summary = _parse_test_summary(inner)
                     exit_code = inner.get("exit_code")
+                    if hasattr(agent, '_core'):
+                        agent._core.record_test_outcome(
+                            test_file=args_val.get("test_path", "") or "run_tests",
+                            passed=exit_code == 0,
+                            summary=test_summary,
+                        )
                     if test_summary:
                         if exit_code == 0:
                             agent._log("INFO", f"✅ Tests PASSED: {test_summary}",
