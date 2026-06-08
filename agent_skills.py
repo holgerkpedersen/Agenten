@@ -20,21 +20,23 @@ TEMPLATE_TOOLS = {
         "list_symbols",
         "locate",
         "github_create_pr",
+        "github_create_repo", "github_list_repos", "github_create_issue",
         "git_status", "git_add_all", "git_commit", "git_push",
         "git_diff", "git_log",
         "git_create_branch", "git_current_branch", "git_pull", "git_checkout",
+        "git_set_remote",
         "git_remote_status"
     ],
     "programmering": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "add_image", "create_issue", "create_refactor_issue"],
     "python-arkitektur": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "create_issue", "create_refactor_issue"],
     "billedanalyse": ["add_image", "write_file", "list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "create_issue", "create_refactor_issue"],
     "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_location", "list_symbols", "locate", "write_file", "edit_file", "list_files"],
-    "refactor": ["read_issue", "update_issue_status", "list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "extract_symbol", "remove_symbol", "add_import", "verify_refactor"],
+    "refactor": ["read_issue", "update_issue_status", "list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "edit_file2", "run_tests", "create_issue", "create_refactor_issue", "extract_symbol", "remove_symbol", "add_import", "verify_refactor"],
     "testgenerering": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
     "issue_handler": [
         "read_issue", "update_issue_status", "run_tests",
         "read_location", "list_chunks", "list_files", "list_symbols", "locate",
-        "edit_file", "write_file",
+        "edit_file", "edit_file2", "write_file",
         "create_issue", "create_refactor_issue",
     ],
     "selvforbedring": [
@@ -86,6 +88,12 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
         "Ret": 12,
         "Verific\u00e9r": 8,
         "Commit": 4,
+    },
+    "testgenerering": {
+        "Analyse": 6,
+        "Test (Red)": 8,
+        "Implementering": 10,
+        "Verifikation (Green)": 8,
     },
 }
 
@@ -244,6 +252,12 @@ SECTION_INSTRUCTIONS = {
         "Commit": "TRIN 1: Brug git_create_branch('self-improve/CORE-xxx') for at oprette en branch.\nTRIN 2: Brug git_status() og git_diff() for at se hvad der er \u00e6ndret.\nTRIN 3: Brug git_commit() med en beskrivende commit-message.\nTRIN 4: Brug git_push() for at skubbe til remote.\nAfslut med <<<DONE>>>.",
     },
 
+    "agenten": {
+        "Branch": "TRIN 1: Kald git_current_branch() for at se hvilken branch du er p\u00e5.\\nTRIN 2: Brug git_create_branch('feature/xxx') for at oprette en ny branch.\\nTRIN 3: Bekr\u00e6ft med git_current_branch().\\nAfslut med <<<DONE>>>.",
+        "Commit": "TRIN 1: Brug git_status() og git_diff() for at se \u00e6ndringer.\\nTRIN 2: Stage med git_add_all().\\nTRIN 3: Commit med git_commit('besked').\\nAfslut med <<<DONE>>>.",
+        "Push": "TRIN 1: Brug git_push() for at skubbe til remote.\\nTRIN 2: Bekr\u00e6ft med git_remote_status().\\nAfslut med <<<DONE>>>.",
+        "Pull request": "TRIN 1: Brug github_create_pr() med title og body.\\nTRIN 2: Bekr\u00e6ft at PR'en er oprettet.\\nAfslut med <<<DONE>>>.",
+    },
 }
 
 
@@ -368,5 +382,10 @@ def get_templates(agent: Any) -> dict[str, dict[str, str | None]]:
             "name": t(K.T_ISSUE_HANDLER, agent.lang),
             "prompt": t(K.TP_ISSUE_HANDLER, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
             "fallback": t(K.TF_ISSUE_HANDLER, agent.lang),
+        },
+        "selvforbedring": {
+            "name": t(K.T_SELVFORBEDRING, agent.lang),
+            "prompt": t(K.TP_SELVFORBEDRING, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
+            "fallback": t(K.TF_SELVFORBEDRING, agent.lang),
         },
     }
