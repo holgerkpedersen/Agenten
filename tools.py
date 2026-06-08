@@ -38,9 +38,24 @@ class Tool:
             optional_params:"""
         self.name = name
         self.description = description
-        self.parameters = parameters
         self.function = function
-        self.optional_params = set(optional_params or [])
+
+        sig = inspect.signature(function)
+        sig_params = [p for p in sig.parameters if p != 'self']
+        sig_optional = {p for p, par in sig.parameters.items() if p != 'self' and par.default is not par.empty}
+
+        if set(parameters) != set(sig_params):
+            config.get_logger(__name__).warning(
+                "Tool '%s': manual parameters %s don't match signature %s — auto-correcting",
+                name, parameters, sig_params
+            )
+            self.parameters = sig_params
+        else:
+            self.parameters = parameters
+
+        self.optional_params = sig_optional
+        if optional_params:
+            self.optional_params |= set(optional_params)
 
     def to_prompt_desc(self) -> str:
         """to prompt desc."""

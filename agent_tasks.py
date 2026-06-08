@@ -486,7 +486,11 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         items = "\n".join(f"- {c}" for c in task_node.success_criteria)
         criteria_block = f"\n\n## {header}\n{items}\n"
     elif section_instr and agent.active_template:
-        criteria_block = f"\n\n## {header}\n- {section_instr.split(chr(10))[0][:200]}\n"
+        lines = [l.strip() for l in section_instr.split("\n") if l.strip() and not l.startswith("Afslut")]
+        criteria_text = "\n".join(f"- {l}" for l in lines[:6])
+        if len(lines) > 6:
+            criteria_text += "\n- ..."
+        criteria_block = f"\n\n## {header}\n{criteria_text}\n"
 
     # Include results from previous sibling phases
     sibling_block = ""
@@ -501,7 +505,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             prev_results = []
             for sib in siblings[:my_idx]:
                 if sib.status == "done" and sib.result and len(sib.result.strip()) > 50:
-                    prev_results.append(f"### {sib.name}\n{sib.result[:2000].strip()}")
+                    prev_results.append(f"### {sib.name}\n{sib.result.strip()}")
             if prev_results:
                 sibling_block = "\n\n## Resultater fra tidligere faser\n" + "\n\n".join(prev_results)
 
