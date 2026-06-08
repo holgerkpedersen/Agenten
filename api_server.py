@@ -548,7 +548,7 @@ def save_current_session() -> Any:
             "template": data.get("template") or getattr(source, 'active_template', None) or "fri",
             "lang": data.get("lang") or getattr(source, 'lang', 'da'),
             "ui_lang": data.get("ui_lang") or data.get("lang") or getattr(source, 'lang', 'da'),
-            "prompt_history": data.get("prompt_history", []),
+            "prompt_history": data.get("prompt_history") or existing.get("prompt_history", []),
             "file_context": data.get("file_context", ""),
             "file_chunks": getattr(source, 'file_chunks', None) or existing.get("file_chunks", {}),
             "images": getattr(source, 'images', None) or existing.get("images", []),
