@@ -601,6 +601,10 @@ Opdaterede eksisterende tests i `tests/test_phase_checks.py` (3 tests: `test_pla
 See `skills/vision_models.md` for full vision model compatibility matrix.  
 Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url.
 
+### 5. Commit ALTID før test
+
+**Regel:** `git add` + `git commit` ALLE ændringer **før** du beder brugeren om at starte serveren eller teste. Serveren auto-stasher uncommitted ændringer ved fejl — de går tabt. Sig aldrig "prøv nu" med ucommittede ændringer.
+
 ## Operational Principles
 
 ### 1. Verify before deploying — never assume project architecture
