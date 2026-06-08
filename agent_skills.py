@@ -92,7 +92,8 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
 # Per-template, per-phase model overrides. Phases not listed keep the
 # current session model. Useful when write-capable models (minimax-m2.5)
 # are needed for editing phases but cheaper/faster models suffice for
-# read-only analysis phases.
+# read-only analysis phases. Use empty string ``""`` to explicitly keep
+# the current execution model without switching.
 TEMPLATE_PHASE_MODEL_MAP: dict[str, dict[str, str]] = {
     "selvforbedring": {
         "analyser": "deepseek-v4-pro",
@@ -100,6 +101,14 @@ TEMPLATE_PHASE_MODEL_MAP: dict[str, dict[str, str]] = {
         "ret": "minimax-m2.5",
         "verific\u00e9r": "minimax-m2.5",
         "commit": "deepseek-v4-pro",
+    },
+    "issue_handler": {
+        "l\u00e6s": "",
+        "analyse": "",
+        "afklar": "",
+        "fix": "",
+        "luk": "",
+        "close issue": "",
     },
 }
 

@@ -1115,6 +1115,8 @@ def _set_phase_model(agent: Any, task_name: str) -> None:
         return
     for key, model_name in phase_map.items():
         if key in phase_lower or phase_lower in key:
+            if not model_name:
+                return  # empty string = keep current execution model
             current = getattr(agent.llm, 'model', '')
             if current != model_name:
                 agent.llm.set_model(model_name)
