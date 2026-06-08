@@ -19,6 +19,7 @@ class K(StrEnum):
     T_REFACTOR         = "templates.refactor"
     T_TESTGENERERING   = "templates.testgenerering"
     T_ISSUE_HANDLER    = "templates.issue_handler"
+    T_SELVFORBEDRING   = "templates.selvforbedring"
 
     # === Template prompts ===
     TP_RESUME          = "template_prompts.resume"
@@ -33,6 +34,7 @@ class K(StrEnum):
     TP_REFACTOR         = "template_prompts.refactor"
     TP_TESTGENERERING   = "template_prompts.testgenerering"
     TP_ISSUE_HANDLER    = "template_prompts.issue_handler"
+    TP_SELVFORBEDRING   = "template_prompts.selvforbedring"
 
     # === Template fallback sections ===
     TF_FRI             = "template_fallback.fri"
@@ -47,6 +49,7 @@ class K(StrEnum):
     TF_REFACTOR         = "template_fallback.refactor"
     TF_TESTGENERERING   = "template_fallback.testgenerering"
     TF_ISSUE_HANDLER    = "template_fallback.issue_handler"
+    TF_SELVFORBEDRING   = "template_fallback.selvforbedring"
 
     # === Fallback tree node names ===
     FT_UNDERSTAND_PURPOSE    = "fallback_tree.understand_purpose"

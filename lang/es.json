@@ -15,21 +15,23 @@
     "bugfix": "🐛 Bugfix (TDD)",
     "refactor": "🔧 Refactorización",
     "testgenerering": "🧪 Generación de Pruebas",
-    "issue_handler": "🔷 Manejador de Issues"
+    "issue_handler": "🔷 Manejador de Issues",
+    "selvforbedring": "🔄 Auto-mejora"
   },
   "template_descriptions": {
-    "fri": "PROP\u00d3SITO: Descomposici\u00f3n libre sin plantilla. T\u00fa defines las fases. Sin supuestos sobre el workdir.",
-    "resume": "PROP\u00d3SITO: Resumir texto en secciones estructuradas. Solo lectura. Workdir: irrelevante.",
-    "kodeanalyse": "PROP\u00d3SITO: Analizar c\u00f3digo Python existente (calidad, estructura, seguridad). Solo lectura. Workdir: debe contener .py.",
-    "diffanalyse": "PROP\u00d3SITO: Analizar git diff entre commits. Solo lectura. Workdir: debe ser un repo git.",
-    "agenten": "PROP\u00d3SITO: Completar flujo PR: rama \u2192 commit \u2192 push \u2192 PR. Workdir: repo git con remoto.",
-    "programmering": "PROP\u00d3SITO: Crear proyecto nuevo desde cero (greenfield). Workdir NO debe tener .py. Fases: Requisitos \u2192 Arquitectura \u2192 Plan \u2192 Seguridad \u2192 C\u00f3digo.",
-    "python-arkitektur": "PROP\u00d3SITO: Analizar proyecto Python/Flask y planificar mejoras de arquitectura. Workdir: debe contener c\u00f3digo.",
-    "billedanalyse": "PROP\u00d3SITO: Analizar imagen y guardar resultado como .md. Workdir: irrelevante. Usa add_image.",
-    "bugfix": "PROP\u00d3SITO: Corregir bug en c\u00f3digo existente (TDD). Workdir: debe contener el c\u00f3digo. Fases: An\u00e1lisis \u2192 Test (Red) \u2192 Fix \u2192 Verificaci\u00f3n (Green) \u2192 Cierre.",
-    "refactor": "PROP\u00d3SITO: Dividir archivo grande en m\u00faltiples m\u00f3dulos (SOLID). Workdir: debe contener el .py grande. Fases: An\u00e1lisis \u2192 Plan \u2192 Extraer \u2192 Actualizar \u2192 Test.",
-    "testgenerering": "PROP\u00d3SITO: Generar pruebas pytest para un archivo Python. Workdir: debe contener el .py a probar.",
-    "issue_handler": "PROP\u00d3SITO: Leer issue, analizar y corregir bug, cerrar issue. Workdir: debe contener el c\u00f3digo."
+    "fri": "PROPÓSITO: Descomposición libre sin plantilla. Tú defines las fases. Sin supuestos sobre el workdir.",
+    "resume": "PROPÓSITO: Resumir texto en secciones estructuradas. Solo lectura. Workdir: irrelevante.",
+    "kodeanalyse": "PROPÓSITO: Analizar código Python existente (calidad, estructura, seguridad). Solo lectura. Workdir: debe contener .py.",
+    "diffanalyse": "PROPÓSITO: Analizar git diff entre commits. Solo lectura. Workdir: debe ser un repo git.",
+    "agenten": "PROPÓSITO: Completar flujo PR: rama → commit → push → PR. Workdir: repo git con remoto.",
+    "programmering": "PROPÓSITO: Crear proyecto nuevo desde cero (greenfield). Workdir NO debe tener .py. Fases: Requisitos → Arquitectura → Plan → Seguridad → Código.",
+    "python-arkitektur": "PROPÓSITO: Analizar proyecto Python/Flask y planificar mejoras de arquitectura. Workdir: debe contener código.",
+    "billedanalyse": "PROPÓSITO: Analizar imagen y guardar resultado como .md. Workdir: irrelevante. Usa add_image.",
+    "bugfix": "PROPÓSITO: Corregir bug en código existente (TDD). Workdir: debe contener el código. Fases: Análisis → Test (Red) → Fix → Verificación (Green) → Cierre.",
+    "refactor": "PROPÓSITO: Dividir archivo grande en múltiples módulos (SOLID). Workdir: debe contener el .py grande. Fases: Análisis → Plan → Extraer → Actualizar → Test.",
+    "testgenerering": "PROPÓSITO: Generar pruebas pytest para un archivo Python. Workdir: debe contener el .py a probar.",
+    "issue_handler": "PROPÓSITO: Leer issue, analizar y corregir bug, cerrar issue. Workdir: debe contener el código.",
+    "selvforbedring": "PROPÓSITO: Mejorar el propio código fuente del agente basado en hotspots de CoreAnalytics. Corregir bugs en archivos core, verificar con tests, commit. Fases: Analizar → Diagnosticar → Corregir → Verificar → Commit."
   },
   "template_prompts": {
     "resume": "Crea un resumen estructurado del material. Devuelve SOLO estas secciones:\n## Descripción General\n## Puntos Clave\n## Conclusión\n## Recomendaciones\n\n{lang_instruction}. No uses etiquetas <think>.",
@@ -43,7 +45,8 @@
     "bugfix": "{lang_instruction}. Debes corregir un bug siguiendo TDD (Desarrollo Guiado por Pruebas). Ejecuta las fases en orden ({criteria_instr}):\n\n1. Análisis — comprender el issue y la causa raíz\n2. Prueba (Red) — escribir un pytest que detecte el bug, ejecutarlo (debe fallar)\n3. Implementación — corregir el código con el cambio mínimo\n4. Verificación (Green) — ejecutar la prueba (debe pasar), ejecutar todo el suite\n5. Actualización — actualizar el estado del issue a 'resolved'\n\nDevuelve SOLO la estructura de árbol con 2 espacios por nivel.\n\nTarea: {prompt}",
     "refactor": "{lang_instruction}. {criteria_instr}\n\nDEBES refactorizar un archivo Python siguiendo los principios SOLID. Ejecuta estas fases ESTRICTAMENTE. Cada fase tiene UNA meta clara — DETENTE cuando la meta se alcance.\n\n1. Análisis — Usa SOLO list_symbols(filepath) + read_location/locate. NO leas todo el archivo con read_chunk. Identifica responsabilidades y violaciones SOLID. NO leas archivos de implementación de herramientas (agent_files.py, tools.py).\n2. Plan — Decide la estructura de módulos (routes.py, session.py, files.py, ...). Escribe el plan en un archivo .md con write_file. OUTPUT: refactor_plan.md.\n3. Extraer — Crea NUEVOS archivos de módulo con write_file. Tu PRIMERA acción DEBE ser write_file. Copia código del archivo original. NO leas nada antes de escribir.\n4. Actualizar — Actualiza el archivo original con edit_file: elimina código movido, agrega imports. Usa read_location para ver el código exacto que necesita edición.\n5. Probar — Ejecuta run_tests. Corrige fallos con edit_file. Actualiza el estado del issue a 'resolved'. OUTPUT: pruebas pasando + issue cerrado.\n\nPara archivos grandes: divide en muchas fases pequeñas (ej. UNA fase por módulo creado). Cada fase puede hacer solo UNA cosa.\n\nDevuelve SOLO la estructura de árbol con 2 espacios por nivel. SIN explicaciones, SIN análisis de herramientas, SOLO el árbol.\n\nTarea: {prompt}",
     "testgenerering": "{lang_instruction}. Debes generar pruebas para un archivo Python. Ejecuta las fases en orden ({criteria_instr}):\n\n1. Análisis — lee el archivo con read_chunk, identifica clases, funciones y métodos sin pruebas\n2. Prueba (Red) — escribe pruebas pytest con write_file (crea nuevo archivo de prueba). Ejecuta con run_tests — las pruebas DEBEN pasar (fase verde)\n3. Implementación — si el código necesita cambios para ser comprobable, usa edit_file\n4. Verificación (Green) — ejecuta TODO el suite de pruebas con run_tests para verificar que no hay regresiones\n\nDevuelve SOLO la estructura de árbol con 2 espacios por nivel.\n\nTarea: {prompt}",
-    "issue_handler": "{lang_instruction}. Debes manejar un issue. Sigue estas fases estrictamente en orden ({criteria_instr}):\n\n1. Leer — lee el issue con read_issue. Entiende el problema. NO debes leer código fuente.\n2. Clarificar — analiza el issue, lee código con read_chunk, ejecuta pruebas. Actualiza con update_issue_status si faltan detalles. Si el bug YA está arreglado: marca resolved y escribe 'Ya está arreglado — no se hicieron cambios' en la resolution_note.\n3. Arreglar — arregla con edit_file, ejecuta pruebas. NO marques resolved — la siguiente fase lo hace.\n4. Cerrar Issue — confirma que el arreglo y pruebas están OK, actualiza estado a 'resolved' con nota precisa.\n\nDevuelve SOLO la estructura de árbol con 2 espacios por nivel.\n\nTarea: {prompt}"
+    "issue_handler": "{lang_instruction}. Debes manejar un issue. Sigue estas fases estrictamente en orden ({criteria_instr}):\n\n1. Leer — lee el issue con read_issue. Entiende el problema. NO debes leer código fuente.\n2. Clarificar — analiza el issue, lee código con read_chunk, ejecuta pruebas. Actualiza con update_issue_status si faltan detalles. Si el bug YA está arreglado: marca resolved y escribe 'Ya está arreglado — no se hicieron cambios' en la resolution_note.\n3. Arreglar — arregla con edit_file, ejecuta pruebas. NO marques resolved — la siguiente fase lo hace.\n4. Cerrar Issue — confirma que el arreglo y pruebas están OK, actualiza estado a 'resolved' con nota precisa.\n\nDevuelve SOLO la estructura de árbol con 2 espacios por nivel.\n\nTarea: {prompt}",
+    "selvforbedring": "{lang_instruction}. {criteria_instr}\n\nDEBES mejorar el código fuente del propio agente. Sigue estas fases estrictamente:\n\n1. Analizar — Lee el issue CORE con read_issue. Usa datos de CoreAnalytics para identificar el hotspot. Lee el código con list_symbols/locate/read_location. NO edites nada aún.\n2. Diagnosticar — Comprende la causa raíz. Ejecuta run_tests para ver qué pruebas fallan. Lee el código a fondo. Usa SOLO herramientas de lectura.\n3. Corregir — Corrige con edit_file. Usa SIEMPRE edit_file basado en AST con parámetros symbol= — NUNCA old_text search-and-replace. Ejecuta run_tests después de cada edición.\n4. Verificar — Ejecuta el suite COMPLETO con run_tests(). TODAS las pruebas deben pasar. Si fallan, corrige con edit_file y vuelve a ejecutar. Cuando todas pasen, actualiza el estado del issue a 'resolved'.\n5. Commit — Git commit con mensaje descriptivo. Usa git_create_branch('self-improve/CORE-xxx') primero. Push al remoto.\n\n⚠️ REGLAS DE SEGURIDAD:\n- NUNCA edites api_server.py, agent_core.py, agent_tasks.py con old_text — usa SOLO AST (symbol=)\n- Ejecuta run_tests() DESPUÉS de cada edit_file\n- Si las pruebas fallan después de tu edición: revierte con git checkout e inténtalo de nuevo\n\nDevuelve SOLO la estructura de árbol con 2 espacios por nivel.\n\nTarea: {prompt}"
   },
   "template_fallback": {
     "resume": [
@@ -121,8 +124,14 @@
       "Implementar la solución",
       "Probar y verificar",
       "Finalizar"
+    ],
+    "selvforbedring": [
+      "Analizar",
+      "Diagnosticar",
+      "Corregir",
+      "Verificar",
+      "Commit"
     ]
-
   },
   "fallback_tree": {
     "understand_purpose": "Entender el propósito del archivo",

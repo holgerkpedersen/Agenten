@@ -198,6 +198,14 @@ SECTION_INSTRUCTIONS = {
         "en_clarify": "Read issue with read_issue(). Analyze if details are missing — update with update_issue_status() if needed. Read relevant source code with read_chunk() and run run_tests() to verify if the bug still exists. If already fixed: update status to 'resolved'. End with <<<DONE>>>.",
         "da_afklar": "Læs issue med read_issue(). Analyser om der mangler detaljer (præcis location, acceptance criteria, repro steps) — opdater i så fald med update_issue_status(). Læs den relevante kildekode med read_chunk() og kør run_tests() for at verificere om fejlen stadig eksisterer. Hvis fejlen ALLEREDE er løst: opdater status til 'resolved' med update_issue_status() og skriv en HONEST resolution_note. Afslut med <<<DONE>>>.",
     },
+    "selvforbedring": {
+        "Analyser": "TRIN 1: L\u00e6s CORE-issue med read_issue() \u2014 forst\u00e5 hvilken funktion/omr\u00e5de har h\u00f8jest fejlrate.\nTRIN 2: Brug list_symbols() p\u00e5 den angivne source-fil for at se ALLE symboler.\nTRIN 3: L\u00e6s den fejlende kode med read_location() eller locate() \u2014 forst\u00e5 hvad koden g\u00f8r og hvorfor den fejler.\nTRIN 4: Afslut med <<<DONE>>> n\u00e5r du har l\u00e6st nok til at forst\u00e5 problemet.\n\nBrug KUN l\u00e6sev\u00e6rkt\u00f8jer \u2014 redig\u00e9r INGENTING.",
+        "Diagnostic\u00e9r": "TRIN 1: K\u00f8r run_tests() for at se hvilke tests der fejler \u2014 bekr\u00e6ft fejlm\u00f8nsteret.\nTRIN 2: L\u00e6s koden grundigt med read_location() \u2014 identific\u00e9r den pr\u00e6cise rod\u00e5rsag.\nTRIN 3: Afslut med <<<DONE>>> n\u00e5r du forst\u00e5r HVAD der skal rettes og HVORDAN.\n\nBrug KUN l\u00e6sev\u00e6rkt\u00f8jer \u2014 redig\u00e9r INGENTING.",
+        "Ret": "\U0001f525 AST-BASERET REDIGERING: Brug KUN edit_file med symbol= parameter \u2014 ALDRIG old_text search-and-replace. Dette g\u00e6lder is\u00e6r for api_server.py, agent_core.py og agent_tasks.py.\n\n\u26a0\ufe0f SIKKERHED: K\u00f8r run_tests() EFTER hver eneste edit_file. Hvis tests fejler, brug git checkout -- <fil> for at fortryde og pr\u00f8v igen.\n\nAfvent ikke \u2014 redig\u00e9r nu.",
+        "Verific\u00e9r": "K\u00f8r HELE testsuiten med run_tests(). ALLE tests SKAL best\u00e5. Hvis tests fejler, g\u00e5 tilbage til Ret-fasen og ret med edit_file. N\u00e5r alle tests best\u00e5r, opdater issue-status til 'resolved' med update_issue_status() og skriv pr\u00e6cis resolution_note.",
+        "Commit": "TRIN 1: Brug git_create_branch('self-improve/CORE-xxx') for at oprette en branch.\nTRIN 2: Brug git_status() og git_diff() for at se hvad der er \u00e6ndret.\nTRIN 3: Brug git_commit() med en beskrivende commit-message.\nTRIN 4: Brug git_push() for at skubbe til remote.\nAfslut med <<<DONE>>>.",
+    },
+
 }
 
 

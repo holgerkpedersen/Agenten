@@ -15,7 +15,8 @@
     "bugfix": "🐛 Bugfix (TDD)",
     "refactor": "🔧 重构",
     "testgenerering": "🧪 测试生成",
-    "issue_handler": "🔷 Issue 处理"
+    "issue_handler": "🔷 Issue 处理",
+    "selvforbedring": "🔄 自我改进"
   },
   "template_descriptions": {
     "fri": "目的：自由任务分解，无模板限制。您定义阶段。无工作目录假设。",
@@ -29,13 +30,14 @@
     "bugfix": "目的：修复现有代码中的特定 bug（TDD）。工作目录：必须包含要修复的代码。阶段：分析 → 测试（红）→ 修复 → 验证（绿）→ 关闭。",
     "refactor": "目的：将大文件拆分为多个模块（SOLID）。工作目录：必须包含要重构的大 .py 文件。阶段：分析 → 计划 → 提取 → 更新 → 测试。",
     "testgenerering": "目的：为 Python 文件生成 pytest 测试。工作目录：必须包含要测试的 .py 文件。",
-    "issue_handler": "目的：读取 issue、分析并修复 bug、关闭 issue。工作目录：必须包含要修复的代码。"
+    "issue_handler": "目的：读取 issue、分析并修复 bug、关闭 issue。工作目录：必须包含要修复的代码。",
+    "selvforbedring": "目的：基于 CoreAnalytics 热点改进代理的自己的源代码。修复核心文件中的 bug，用测试验证，提交。阶段：分析 → 诊断 → 修复 → 验证 → 提交。"
   },
   "template_prompts": {
     "resume": "创建以下材料的结构化摘要。只返回以下部分：\n## 概述\n## 要点\n## 结论\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
     "kodeanalyse": "分析以下代码结构。只返回以下部分：\n## 目的\n## 导入和依赖\n## 架构\n## 代码质量\n## 安全性\n\n{lang_instruction}。不要使用 <think> 标签。",
     "diffanalyse": "你必须先调用 git_log(5) 和 git_diff(HEAD~1,HEAD)。不要使用其他工具。然后分析差异。只返回以下部分：\n## 更改概述\n## 风险评估（高/中/低 按文件）\n## 破坏性更改\n## 代码质量\n## 建议\n\n{lang_instruction}。不要使用 <think> 标签。",
-    "fri": "{lang_instruction}. {criteria_instr}\n\n为以下任务创建一个清晰的总体计划。计划必须有3-7个阶段，每个阶段都有可见的成功标准（括号内）。如果提示没有提到具体文件或不精确，第一个阶段必须是\u201c分析\u201d，检查项目文件以找到相关来源。成功标准是最终的——无论执行过程中发现什么，都不能更改。\n\n格式：每行一个任务。每级缩进2个空格。成功标准在任务名称后的括号内。最多2级。只返回树形结构。不要解释，不要思考过程。\n\n任务：{prompt}",
+    "fri": "{lang_instruction}. {criteria_instr}\n\n为以下任务创建一个清晰的总体计划。计划必须有3-7个阶段，每个阶段都有可见的成功标准（括号内）。如果提示没有提到具体文件或不精确，第一个阶段必须是“分析”，检查项目文件以找到相关来源。成功标准是最终的——无论执行过程中发现什么，都不能更改。\n\n格式：每行一个任务。每级缩进2个空格。成功标准在任务名称后的括号内。最多2级。只返回树形结构。不要解释，不要思考过程。\n\n任务：{prompt}",
     "agenten": "{lang_instruction}. {criteria_instr}\n\n你是PR工作流专家。使用工具完成Pull Request。按顺序执行以下步骤：\n1. 创建分支\n2. Stage和提交\n3. 推送到远程\n4. 创建Pull Request\n\n任务：{prompt}",
     "programmering": "{lang_instruction}. 分析以下编程任务并将其分解为架构阶段。只返回树形结构，每级使用2个空格。\n\n阶段必须为（{criteria_instr}）：\n1. 需求分析 — 理解需求\n2. 架构设计 — 设计组件和数据流\n3. 实施计划 — 计划文件结构和顺序\n4. 安全分析 — 审查安全性和最佳实践\n5. 代码实施 — 编写代码\n\n任务：{prompt}",
     "python-arkitektur": "{lang_instruction}. {criteria_instr}\n\n分析以下项目并规划 Python/Flask 架构。只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
@@ -43,7 +45,8 @@
     "bugfix": "{lang_instruction}. 你必须按照TDD（测试驱动开发）修复一个bug。按顺序执行阶段（{criteria_instr}）：\n\n1. 分析 — 理解issue和根本原因\n2. 测试（Red） — 编写能捕获bug的pytest，运行它（必须失败）\n3. 实施 — 用最小修改修复代码\n4. 验证（Green） — 运行测试（必须通过），运行完整测试套件\n5. 更新 — 将issue状态更新为'resolved'\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
     "refactor": "{lang_instruction}. {criteria_instr}\n\n你必须严格遵循SOLID原则重构Python文件。按顺序执行以下阶段。每个阶段有一个明确目标 — 达成目标即停止。\n\n1. 分析 — 仅使用 list_symbols(filepath) + read_location/locate。不要用 read_chunk 读取整个文件。识别职责和SOLID违规。不要读取工具实现文件（agent_files.py, tools.py）。\n2. 计划 — 决定模块结构（routes.py, session.py, files.py, ...）。用 write_file 将计划写入 .md 文件。输出：refactor_plan.md。\n3. 提取 — 用 write_file 创建新模块文件。你的第一个操作必须是 write_file。从原文件复制代码。写作之前不要读取任何内容。\n4. 更新 — 用 edit_file 更新原文件：删除已移动的代码，添加导入。使用 read_location 查看需要编辑的确切代码。\n5. 测试 — 运行 run_tests。用 edit_file 修复失败。将问题状态更新为 'resolved'。输出：测试通过 + 问题已关闭。\n\n对于大文件：拆分为多个小阶段（例如每个创建的模块一个阶段）。每个阶段只能做一件事。\n\n只返回树形结构，每级使用2个空格。不要解释，不要分析工具，只要树。\n\n任务：{prompt}",
     "testgenerering": "{lang_instruction}. 你必须为Python文件生成测试。按顺序执行阶段（{criteria_instr}）：\n\n1. 分析 — 使用read_chunk读取文件，识别缺少测试的类、函数和方法\n2. 测试 (Red) — 使用write_file编写pytest测试（创建新测试文件）。使用run_tests运行 —— 测试必须通过（绿阶段）\n3. 实施 — 如果代码需要修改以使其可测试，使用edit_file\n4. 验证 (Green) — 使用run_tests运行完整的测试套件以验证没有回归\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
-    "issue_handler": "{lang_instruction}. 你必须处理一个Issue。严格遵守以下阶段顺序（{criteria_instr}）：\n\n1. 读取 — 使用read_issue读取issue。理解问题。不得阅读源代码。\n2. 澄清 — 分析issue，使用read_chunk阅读源代码，运行测试。如果缺少详细信息，使用update_issue_status更新。如果bug已修复：标记resolved并在resolution_note中写'已修复 — 未做任何更改'。\n3. 修复 — 使用edit_file修复，运行测试。不要标记resolved — 下一阶段处理。\n4. 关闭 Issue — 确认修复和测试通过，使用精确的resolution_note将状态更新为'resolved'。\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}"
+    "issue_handler": "{lang_instruction}. 你必须处理一个Issue。严格遵守以下阶段顺序（{criteria_instr}）：\n\n1. 读取 — 使用read_issue读取issue。理解问题。不得阅读源代码。\n2. 澄清 — 分析issue，使用read_chunk阅读源代码，运行测试。如果缺少详细信息，使用update_issue_status更新。如果bug已修复：标记resolved并在resolution_note中写'已修复 — 未做任何更改'。\n3. 修复 — 使用edit_file修复，运行测试。不要标记resolved — 下一阶段处理。\n4. 关闭 Issue — 确认修复和测试通过，使用精确的resolution_note将状态更新为'resolved'。\n\n只返回树形结构，每级使用2个空格。\n\n任务：{prompt}",
+    "selvforbedring": "{lang_instruction}. {criteria_instr}\n\n你必须改进代理的自己的源代码。严格按以下阶段执行：\n\n1. 分析 — 用 read_issue 读取 CORE issue。使用 CoreAnalytics 数据识别热点。用 list_symbols/locate/read_location 读取失败的代码。还不要编辑任何内容。\n2. 诊断 — 理解根本原因。运行 run_tests 查看哪些测试失败。深入阅读代码。只使用阅读工具。\n3. 修复 — 用 edit_file 修复。始终使用 AST 基础的 edit_file，使用 symbol= 参数 — 绝不使用 old_text 搜索替换。每次编辑后运行 run_tests。\n4. 验证 — 运行完整的 run_tests()。所有测试必须通过。如果失败，用 edit_file 修复并重新运行。全部通过后，将 issue 状态更新为 'resolved'。\n5. 提交 — 提交 git，描述性的提交信息。先用 git_create_branch('self-improve/CORE-xxx')。推送到远程。\n\n⚠️ 安全规则：\n- 绝不用 old_text 编辑 api_server.py、agent_core.py、agent_tasks.py — 只用 AST (symbol=)\n- 每次 edit_file 后运行 run_tests()\n- 如果编辑后测试失败：用 git checkout 回滚并重试\n\n只返回树形结构，每级使用 2 个空格。\n\n任务：{prompt}"
   },
   "template_fallback": {
     "resume": [
@@ -121,8 +124,14 @@
       "实施解决方案",
       "测试和验证",
       "完成"
+    ],
+    "selvforbedring": [
+      "分析",
+      "诊断",
+      "修复",
+      "验证",
+      "提交"
     ]
-
   },
   "fallback_tree": {
     "understand_purpose": "理解文件目的",

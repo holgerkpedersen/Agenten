@@ -81,6 +81,7 @@ ISSUE_TYPE_PREFIXES = {
     "maintainability": "MNT",
     "refactor": "REFAC",
     "feature": "FTR",
+    "self": "CORE",
 }
 
 

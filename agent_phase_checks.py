@@ -845,6 +845,36 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "description": "FORM\u00c5L: Skriv koden baseret p\u00e5 design og plan. Kr\u00e6ver: write_file eller edit_file kaldt (greenfield).",
         },
     },
+    "selvforbedring": {
+        "Analyser": {
+            "type": "tool_called",
+            "tools": ["read_issue"],
+            "description": "FORM\u00c5L: L\u00e6s CORE-issue og forst\u00e5 hotspot. Kr\u00e6ver: read_issue kaldt.",
+        },
+        "Diagnostic\u00e9r": {
+            "type": "tool_called",
+            "tools": ["run_tests"],
+            "description": "FORM\u00c5L: Bekr\u00e6ft fejlm\u00f8nster med tests. Kr\u00e6ver: run_tests kaldt.",
+        },
+        "Ret": {
+            "type": "tool_called",
+            "tools": ["edit_file"],
+            "description": "FORM\u00c5L: Redig\u00e9r koden med AST-baseret edit. Kr\u00e6ver: edit_file kaldt.",
+        },
+        "Verific\u00e9r": {
+            "type": "all_of",
+            "description": "FORM\u00c5L: K\u00f8r tests og mark\u00e9r issue som resolved. Kr\u00e6ver: tests best\u00e5et + update_issue_status kaldt.",
+            "checks": [
+                {"type": "tests_pass"},
+                {"type": "tool_called", "tools": ["update_issue_status"]},
+            ],
+        },
+        "Commit": {
+            "type": "tool_called",
+            "tools": ["git_commit"],
+            "description": "FORM\u00c5L: Commit og push \u00e6ndringerne. Kr\u00e6ver: git_commit kaldt.",
+        },
+    },
 }
 
 
