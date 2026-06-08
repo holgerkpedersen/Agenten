@@ -75,7 +75,7 @@ else:
     LLM_BASE_URL = os.environ.get('OPENCODE_BASE_URL') or os.environ.get('LLM_BASE_URL') or os.environ.get('LM_BASE_URL') or f'http://{LM_HOST}:{_LM_PORT}/v1'
 LM_PORT = _LM_PORT
 LLM_MODEL = os.environ.get("LM_MODEL", "qwen3.5-9b-mtp")
-LLM_STREAM_TIMEOUT = 300
+LLM_STREAM_TIMEOUT = 900
 LLM_CONNECT_TIMEOUT = 30
 
 # Image upload
