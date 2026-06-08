@@ -35,6 +35,8 @@ class LMStudioWrapper:
         self.model = model or os.environ.get('LM_MODEL') or config.LLM_MODEL
         self._pending_tool_calls = []
         self._pending_reasoning = None
+        self._stream_timeout = config.LLM_STREAM_TIMEOUT
+        self._stream_timeout_max = 3600
         self.on_request = on_request
 
     def _headers(self) -> dict[str, str]:
@@ -312,7 +314,7 @@ class LMStudioWrapper:
         log.info("Streaming chat request to LLM")
         if len(compressed) > 3:
             compressed = self._truncate_messages(compressed)
-        stream_timeout = config.LLM_STREAM_TIMEOUT
+        stream_timeout = self._stream_timeout
         body = {
             "model": self.model,
             "messages": compressed,
@@ -394,8 +396,14 @@ class LMStudioWrapper:
                         log.error("Parse error in stream: %s", e)
                         continue
         except requests.exceptions.Timeout:
+            self._stream_timeout = min(self._stream_timeout * 2, self._stream_timeout_max)
+            log.warning("Stream timeout after %ss — next timeout will be %ss", stream_timeout, self._stream_timeout)
             yield f"\n[ERROR: Timeout after {stream_timeout}s — ingen data i 30s]"
         except requests.exceptions.ConnectionError:
             yield f"\n[ERROR: Cannot connect to LM Studio at {self.base_url}]"
         except Exception as e:
             yield f"\n[ERROR: {str(e)}]"
+        else:
+            if self._stream_timeout != config.LLM_STREAM_TIMEOUT:
+                self._stream_timeout = config.LLM_STREAM_TIMEOUT
+                log.info("Stream completed successfully — timeout reset to %ss", self._stream_timeout)
