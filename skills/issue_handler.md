@@ -16,7 +16,7 @@ Håndter issues (bugs, security, performance, tests, etc.) gennem en strukturere
 
 2. **Afklar**: Analyser issue-teksten og verificér om fejlen stadig eksisterer. Læs den relevante kildekode med `read_chunk()`. Kør `run_tests()` for at bekræfte testsuiten. Hvis der mangler detaljer (præcis location, acceptance criteria, repro steps), opdater med `update_issue_status()`. Du må IKKE sætte status til 'resolved' i denne fase. Hvis fejlen ALLEREDE er løst: opdater status til 'resolved' og stop. Hvis fejlen findes: fortsæt til Fix.
 
-3. **Fix**: Læs kildekoden med `read_chunk()`. Ret fejlen med `edit_file()` — brug PRÆCIS tekst fra filen (samme indentering, samme quotes). Kør `run_tests()` for at bekræfte rettelsen OG at ingen tests er gået i stykker. Du må IKKE selv markere issue som resolved — det gøres i Luk Issue.
+3. **Fix**: Læs kildekoden med `read_chunk()` — **maks 2 læsekald, skriv så straks**. Ret fejlen med `edit_file()` — brug PRÆCIS tekst fra filen (samme indentering, samme quotes). Kør `run_tests()` for at bekræfte rettelsen OG at ingen tests er gået i stykker. Du må IKKE selv markere issue som resolved — det gøres i Luk Issue.
 
 4. **Luk Issue**: Bekræft at fix'et er implementeret og alle tests består. Opdater issue-status til 'resolved' med `update_issue_status()` og tilføj en PRÆCIS resolution_note: beskriv HVAD der blev ændret, HVORFOR, og bekræft at ALLE tests består.
 
@@ -32,6 +32,8 @@ Issue → Læs → Afklar → Fix → Luk Issue
 
 - **Ét issue ad gangen.** Forsøg ikke at løse flere issues i én session.
 - **Præcis tekst:** Når du bruger `edit_file`, kopiér tekst DIREKTE fra filen — samme indentering, samme tegn.
+- **Skriv ELLER redigér:** Hvis issuet kræver ny funktionalitet, brug `write_file` til at oprette nye filer. Hvis issuet kræver ændring i eksisterende kode, brug `edit_file`.
+- **Stop med at læse — begynd at skrive:** Når du har læst de relevante funktioner (maks 2 læsekald), SKAL du straks kalde `edit_file` eller `write_file`. Læs ikke mere — skriv din løsning.
 - **Test før luk:** Kør ALTID `run_tests()` før du afslutter Luk Issue-fasen.
 - **Præcis resolution_note:** Beskriv hvad der blev ændret og hvorfor. Sig ikke "implementeret" hvis intet blev ændret.
 - **Ingen status-hopping:** Kun Afklar (hvis allerede løst) og Luk Issue må sætte status til 'resolved'.
@@ -69,16 +71,37 @@ For SEC-013 (Path Traversal):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- skillflow:known_failures -->
 ### Kendte Fejlmønstre
 
-Opdateret: 2026-06-08 13:09
+Opdateret: 2026-06-08 13:55
 
 **Hyppige fejl ved brug af denne skill:**
 - 
 - Læste issue med read_issue før handling
 
 {% end skillflow:known_failures %}
+
+
+
+
+
+
+
 
 
 
