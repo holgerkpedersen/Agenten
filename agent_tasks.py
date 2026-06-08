@@ -1120,13 +1120,15 @@ def _set_phase_model(agent: Any, task_name: str) -> None:
             current = getattr(agent.llm, 'model', '')
             if current == model_name:
                 return
-            # Check om modellen er tilgaengelig — hvis ikke, spring skift over
+            # Check om modellen er tilgaengelig — log advarsel men skift alligevel
+            # (modellen kan vaere paa et andet URL end den nuvarende backend)
             try:
                 available = agent.llm.list_models()
                 if available and model_name not in available:
-                    agent._log("MODEL", f"Cannot switch to {model_name} — not available, keeping {current}",
+                    agent._log("MODEL", f"Warning: {model_name} not found in current backend — switching anyway",
                                f"available: {', '.join(available[:5])}...")
-                    return
+            except Exception:
+                pass
             except Exception:
                 pass  # hvis vi ikke kan liste modeller, forsøg skift alligevel
             agent.llm.set_model(model_name)
