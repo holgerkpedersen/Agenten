@@ -13,6 +13,8 @@ _FILE_CONTENT_CACHE: Dict[str, Tuple[str, float]] = {}
 _CONTENT_CACHE_MAX_SIZE = 100  # Maximum number of files to cache
 _CONTENT_CACHE_TTL = 60  # Cache time-to-live in seconds
 
+_indexed_dirs: set = set()
+
 
 def _is_file_cached(filepath: str) -> bool:
     """Check if file is in cache and not expired."""
@@ -549,14 +551,27 @@ def _list_top_level_symbols(tree: ast.Module) -> list[tuple[str, str, int]]:
     return symbols
 
 
-def _build_global_symbol_index() -> dict[str, list[Any]]:
-    """build global symbol index."""
-    index = {}
-    for fname in os.listdir('.'):
+def _scan_dir_into_index(dir_path: str, index: dict) -> None:
+    """Scan a directory for .py files and add symbols to the index.
+    
+    Skips directories already in _indexed_dirs to avoid re-scanning.
+    """
+    abs_path = os.path.abspath(dir_path)
+    if abs_path in _indexed_dirs:
+        return
+    _indexed_dirs.add(abs_path)
+
+    try:
+        entries = os.listdir(abs_path)
+    except Exception:
+        return
+
+    for fname in entries:
         if not fname.endswith('.py'):
             continue
+        fpath = os.path.join(abs_path, fname)
         try:
-            with open(fname, 'r', encoding='utf-8') as f:
+            with open(fpath, 'r', encoding='utf-8') as f:
                 tree = ast.parse(f.read())
         except Exception:
             continue
@@ -577,7 +592,20 @@ def _build_global_symbol_index() -> dict[str, list[Any]]:
             elif isinstance(node, ast.AnnAssign):
                 if isinstance(node.target, ast.Name):
                     index.setdefault(node.target.id, []).append((fname, node.lineno))
+
+
+def _build_global_symbol_index() -> dict[str, list[Any]]:
+    """build global symbol index from CWD."""
+    index = {}
+    _scan_dir_into_index('.', index)
     return index
+
+
+def _ensure_workdir_indexed() -> None:
+    """Ensure AGENT_WORKDIR .py files are included in the global symbol index."""
+    workdir = os.environ.get('AGENT_WORKDIR', '')
+    if workdir:
+        _scan_dir_into_index(workdir, _GLOBAL_SYMBOL_INDEX)
 
 _GLOBAL_SYMBOL_INDEX = _build_global_symbol_index()
 
@@ -649,10 +677,20 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
         filepath:
         name:
         line_no:"""
+    _ensure_workdir_indexed()
+
     if not filepath and name:
         matches = _GLOBAL_SYMBOL_INDEX.get(name, [])
         if not matches:
-            return {"success": False, "error": f"Symbol '{name}' not found in any file"}
+            suggestions = sorted(_GLOBAL_SYMBOL_INDEX.keys())
+            tip = ""
+            if suggestions:
+                fuzzy = [s for s in suggestions if name.lower() in s.lower()][:5]
+                if fuzzy:
+                    tip = f" Mente du: {', '.join(fuzzy)}?"
+                else:
+                    tip = f" Prøv list_symbols eller brug et af disse symboler: {', '.join(suggestions[:12])}"
+            return {"success": False, "error": f"Symbol '{name}' not found in any file.{tip}"}
         if len(matches) > 1:
             files = ", ".join(m[0] for m in matches)
             return {"success": False, "error": f"Symbol '{name}' found in multiple files: {files}. Specify filepath='fil.py' to disambiguate."}

@@ -1424,6 +1424,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     consecutive_errors = 0
     consecutive_dedups = 0
     consecutive_reads = 0
+    consecutive_failures = 0
     READ_ONLY_TOOLS = {"read_location", "read_chunk", "list_chunks", "list_files", "list_symbols", "locate", "read_issue"}
     agent._write_failed = False
     agent._tests_failed = False
@@ -1607,6 +1608,20 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         agent._non_productive_reminder_sent = False
                         consecutive_dedups = 0
                 agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                if isinstance(result, dict) and not result.get("success"):
+                    consecutive_failures += 1
+                    if consecutive_failures >= 3:
+                        alt_tools = [t for t in ("list_symbols", "list_chunks", "read_chunk", "write_file", "edit_file")
+                                     if t in agent.tool_registry.active_tools and t != tool_name]
+                        tip = ""
+                        if alt_tools:
+                            tip = f" Pr\u00f8v i stedet: {', '.join(alt_tools)}."
+                        msg = f"[SYSTEM: {consecutive_failures} v\u00e6rkt\u00f8jskald i tr\u00e6k fejlede.{tip}]"
+                        _add_user_msg(messages, msg)
+                        agent._log("SYSTEM", "Fail-loop escape", f"{consecutive_failures} consecutive failures — {tool_name} fails")
+                        consecutive_failures = 0
+                else:
+                    consecutive_failures = 0
                 if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success") is False:
                     agent._write_failed = True
                     result_str += f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: edit_file MISLYKKEDES. DU M\u00c5 IKKE bruge <<<DONE>>> f\u00f8r edit_file lykkes. Ret din anmodning og pr\u00f8v igen."
