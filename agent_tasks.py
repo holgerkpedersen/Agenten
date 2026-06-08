@@ -1098,6 +1098,31 @@ def _extract_last_assistant_text(messages: list[dict]) -> str:
     return ""
 
 
+def _set_phase_model(agent: Any, task_name: str) -> None:
+    """Switch model per template/phase if configured in TEMPLATE_PHASE_MODEL_MAP.
+
+    Read-only analysis phases use a cheap/fast model; write-heavy
+    phases use a model known for reliable code generation.
+
+    Does nothing if the current template or phase has no entry in the map.
+    """
+    template = getattr(agent, 'active_template', '') or ''
+    if not template:
+        return
+    phase_lower = _normalize_phase(task_name).lower()
+    phase_map = agent_skills.TEMPLATE_PHASE_MODEL_MAP.get(template, {})
+    if not phase_map:
+        return
+    for key, model_name in phase_map.items():
+        if key in phase_lower or phase_lower in key:
+            current = getattr(agent.llm, 'model', '')
+            if current != model_name:
+                agent.llm.set_model(model_name)
+                agent._log("MODEL", f"Switched to {model_name} for {task_name}",
+                           f"{current} \u2192 {model_name}")
+            return
+
+
 FRAMEWORK_PY = {"api_server.py", "agent_core.py", "agent_tasks.py", "agent_skills.py", "agent_files.py", "agent_issues.py", "agent_tree.py", "agent_git.py", "agent_phase_checks.py", "agent_wta.py", "core_analytics.py", "tools.py", "i18n.py", "lang.py", "config.py", "task_tree.py", "llm_wrapper.py", "model_manager.py", "session_manager.py", "flow_builder.py", "skill_evolution.py", "skill_loader.py", "skill_tracker.py", "refactoring_engine.py", "edit_file2.py", "github_wrapper.py", "app.py"}
 
 
@@ -1325,6 +1350,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._task_start_time = time.time()
     agent.current_phase = _normalize_phase(task_node.name)
     agent._log("INFO", t(K.LOG_TASK_START, agent.lang), f"{task_node.name} (model: {agent.llm.model})")
+    _set_phase_model(agent, task_node.name)
     set_task_tools(agent, task_node.name)
     agent._checkpoint_tools = set()
     agent._checkpoint_branch = ""

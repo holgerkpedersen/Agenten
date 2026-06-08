@@ -55,3 +55,18 @@ For SEC-013 (Path Traversal):
      "Added _is_safe_path() to read_file, save_to_folder,
       list_folder_contents, list_python_files. All 314 tests pass.")
 ```
+
+
+
+
+<!-- skillflow:known_failures -->
+### Kendte Fejlmønstre
+
+Opdateret: 2026-06-08
+
+**Hyppige fejl ved brug af denne skill:**
+- 
+- Læste issue med read_issue før handling
+
+{% end skillflow:known_failures %}
+
