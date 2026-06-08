@@ -650,3 +650,20 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 **Hvad mangler:** Hvis LLM ignorerer read-loop escape (ses i log som "STOP med at læse" + alligevel endnu et read), er der ingen mekanisme til at tvinge den til at skrive. En mulig forbedring: bryd loopet og inject write-påbud som system-role i stedet for user-role.
 
 **Monitorering:** Brug SkillFlow `/skillflow` rapporten til at følge success rate over tid.
+
+## WTA: select_winner fjernet, rank_tool_calls tilføjet
+
+**Ændring 2026-06-08:** `select_winner` var dead code — aldrig kaldt i production. Designet til at vælge én tool-call blandt multiple kandidater, men native function calling returnerer ALLE kald LLM'en vil lave, ikke konkurrerende alternativer. `_exploration_roll` og `EXPLORATION_RATE` fulgte med.
+
+**Erstattet af `rank_tool_calls(template, phase, tool_calls, max_calls)`** (`agent_wta.py:65-100`):
+- Scorer hvert tool-kald med Laplace success rate per `(template, phase)`
+- Sorterer højeste score først — de mest pålidelige værktøjer kører først
+- `max_calls` kan begrænse antallet (endnu ikke brugt i production, men param findes)
+- Integreret i `solve_task_stream()` (`agent_tasks.py:1325-1331`) — kører efter LLM returnerer `pending_tc`, før execution
+
+**Hvorfor dette er bedre:**
+- Data indsamles via `record()` (kaldt for alle tools) → reorderer dynamisk
+- Logges kun når rækkefølgen faktisk ændrer sig (`WTA: Reordered: ...`)
+- Ingen bypass-logik (write_file beats alt i gamle select_winner) — nu ren score-baseret
+
+**Tests:** 5 nye `rank_tool_calls` tests, 6 gamle `select_winner` tests fjernet.
