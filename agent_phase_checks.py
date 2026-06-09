@@ -164,7 +164,7 @@ def check_files_from_plan(spec: dict[str, Any], base_dir: str | None = None) -> 
       - ``base_dir`` (optional) — override the cwd for both the plan and the
         module files. If not provided, uses ``os.getcwd()``.
     """
-    base = base_dir or os.getcwd()
+    base = base_dir or os.environ.get('AGENT_WORKDIR') or os.getcwd()
     plan_rel = spec.get("plan_path", "refactor_plan.md")
     plan_path = os.path.join(base, plan_rel) if not os.path.isabs(plan_rel) else plan_rel
     ext = spec.get("ext", ".py")

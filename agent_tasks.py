@@ -603,7 +603,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
                     except Exception as _e:
                         agent._log("DEBUG", f"Failed to load {doc_path}: {_e}", "")
             if loaded_blocks:
-                plan_block = "\n\n## Dokumenter fra tidligere faser\n" + "\n\n".join(loaded_blocks)
+                plan_block = "\n\n## Dokumenter fra tidligere faser (ALLEREDE INDLÆST — behøver IKKE read_chunk)\n" + "\n\n".join(loaded_blocks)
                 agent._log("DEBUG", f"Auto-loaded {len(loaded_blocks)} previous phase docs for {task_node.name}", "")
 
     # Phase anchor: tell the LLM which phase it's currently in and forbid
@@ -1534,7 +1534,13 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
 
                 if tool_name == last_tool_name:
                     consecutive_same_tool += 1
-                    if consecutive_same_tool >= 3:
+                    # Skip same-tool-loop escape for greenfield write_file calls
+                    is_greenfield_write = (
+                        agent.active_template == "programmering"
+                        and "kodeimplementering" in (task_node.name or "").lower()
+                        and tool_name == "write_file"
+                    )
+                    if consecutive_same_tool >= 3 and not is_greenfield_write:
                         alt_tools = [t for t in agent.tool_registry.active_tools
                                      if t not in ("read_issue", "locate", "read_location", "list_symbols")][:5]
                         tip = f" Pr\u00f8v: {', '.join(alt_tools)}." if alt_tools else ""
