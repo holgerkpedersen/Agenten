@@ -37,9 +37,9 @@ TOOL_HANDLER_MAP: dict[str, str] = {
     "git_create_branch": "agent_git.py",
     "git_checkout": "agent_git.py",
     "add_image": "agent_tasks.py",
-    "extract_symbol": "edit_file2.py",
-    "remove_symbol": "edit_file2.py",
-    "add_import": "edit_file2.py",
+    "extract_symbol": "refactoring_engine.py",
+    "remove_symbol": "refactoring_engine.py",
+    "add_import": "refactoring_engine.py",
     "ddg_search": "ddg_search.py",
 }
 

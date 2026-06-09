@@ -31,12 +31,12 @@ TEMPLATE_TOOLS = {
     "python-arkitektur": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "create_issue", "create_refactor_issue"],
     "billedanalyse": ["add_image", "write_file", "list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "create_issue", "create_refactor_issue"],
     "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_location", "list_symbols", "locate", "write_file", "edit_file", "list_files"],
-    "refactor": ["read_issue", "update_issue_status", "list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "edit_file2", "run_tests", "create_issue", "create_refactor_issue", "extract_symbol", "remove_symbol", "add_import", "verify_refactor"],
+    "refactor": ["read_issue", "update_issue_status", "list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "extract_symbol", "remove_symbol", "add_import", "verify_refactor"],
     "testgenerering": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
     "issue_handler": [
         "read_issue", "update_issue_status", "run_tests",
         "read_location", "list_chunks", "list_files", "list_symbols", "locate",
-        "edit_file", "edit_file2", "write_file",
+        "edit_file", "write_file",
         "create_issue", "create_refactor_issue",
     ],
     "selvforbedring": [

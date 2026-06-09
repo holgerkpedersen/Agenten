@@ -22,7 +22,6 @@ import agent_logs
 from agent_wta import WTAState, SequenceLearner
 from core_analytics import CoreAnalytics, TOOL_HANDLER_MAP
 import agent_tasks
-import edit_file2
 import config
 from config import get_logger
 log = get_logger(__name__)
@@ -482,37 +481,22 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "edit_file",
-            "Rediger en eksisterende fil. To tilstande:\n"
-             "1) AST-tilstand (ANBEFALET til .py filer): Angiv symbol='funktionsnavn' + new_text=HELE den nye funktion. "
-             "Systemet finder funktionen via AST-linjenumre — old_text ignoreres. "
-             "Du behøver IKKE finde linjenumre — bare giv funktionsnavnet. "
-             "Eksempel: edit_file(path='app.py', symbol='translate_to_dansk', new_text='def translate_to_dansk(text):\\n    return text.strip()')\n"
-             "2) Search-and-replace: Angiv old_text (PRÆCIS tekst fra filen — kopieret direkte, IKKE omskrevet) + new_text. "
-             "Søgeteksten skal være en 1:1 byte-kopi af filindholdet. Redigér IKKE old_text — den matcher ELLERS ikke.\n"
-             "3) For at tilføje i slutningen af en fil: Brug AST-tilstand med symbol='<sidste_funktion>' + new_text med begge funktioner.\n"
-              "Syntestjekker .py filer. Opretter IKKE nye filer — brug write_file til det. "
-             "Import-regel: alle import-sætninger hører i toppen af filen, ALDRIG inde i funktioner/klasser (dårlig stil + pylint klager). "
+            "Rediger en eksisterende fil. Tre tilstande:\n"
+             "1) AST+LLM (BEDST til .py): Angiv symbol='funktionsnavn' + requirements='hvad skal ændres'. "
+             "Systemet finder funktionen via AST, forbedrer den med LLM, erstatter, og kører tests. Ingen old_text/new_text nødvendig.\n"
+             "2) AST (hurtig): Angiv symbol='funktionsnavn' + new_text=HELE den nye funktion. "
+             "Systemet erstatter funktionen via AST-linjenumre — old_text ignoreres.\n"
+             "3) Search-and-replace: Angiv old_text (PRÆCIS tekst fra filen — kopieret direkte, IKKE omskrevet) + new_text. "
+             "Søgeteksten skal være en 1:1 byte-kopi af filindholdet.\n\n"
+             "Import-regel: alle import-sætninger hører i toppen af filen, ALDRIG inde i funktioner/klasser. "
              "Læs funktionen med locate(name='funktionsnavn') FØRST for at se den nøjagtige nuværende kode.",
             ["path", "old_text", "new_text"],
-            lambda path, old_text="", new_text="", symbol=None: git_ops.edit_file(
+            lambda path, old_text="", new_text="", symbol=None, requirements="", test_path="": git_ops.edit_file(
                 path=path, old_text=old_text, new_text=new_text,
                 expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path))),
-                symbol=symbol
+                symbol=symbol, requirements=requirements, test_path=test_path, llm=self.llm,
             ),
-            optional_params=["symbol"]
-        ))
-        self.tool_registry.register(Tool(
-            "edit_file2",
-            "AST-bevidst symbol-redigering med LLM-forbedring og automatisk retry. "
-            "Trin: (0) backup, (1) find symbol via AST, (2) send til LLM med krav, "
-            "(3) erstat symbol, (4) kør test — hvis fejl: gendan backup + tilføj fejl til prompt + gentag, "
-            "(5) slet backup. Meget smartere end edit_file — LLM'en ser hele funktionen og forbedrer den.",
-            ["filepath", "name", "requirements"],
-            lambda filepath, name, requirements, test_path="": edit_file2.edit_file2(
-                filepath=filepath, name=name, requirements=requirements,
-                llm=self.llm, test_path=test_path or None,
-            ),
-            optional_params=["test_path"]
+            optional_params=["symbol", "requirements", "test_path"]
         ))
         self.tool_registry.register(Tool(
             "list_files",

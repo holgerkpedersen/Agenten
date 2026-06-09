@@ -512,7 +512,7 @@ def _normalize_indentation(new_text: str, search_text: str) -> str:
     return '\n'.join(result)
 
 
-def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: str | None = None, symbol: str | None = None) -> dict[str, Any]:
+def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: str | None = None, symbol: str | None = None, requirements: str = "", test_path: str = "", llm: Any | None = None) -> dict[str, Any]:
     """edit file.
     
     Args:
@@ -520,7 +520,10 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
         old_text:
         new_text:
         expected_hash:
-        symbol:"""
+        symbol:
+        requirements:
+        test_path:
+        llm:"""
     path = _resolve_path(path)
     if not is_safe_location(path):
         return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
@@ -540,6 +543,15 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                         f"Genindlæs filen og prøv igen."
                     )
                 }
+
+        # Route to edit_file2 pipeline when symbol + requirements (smarter LLM mode for .py files)
+        if requirements and symbol and path.endswith('.py') and llm:
+            import edit_file2
+            return edit_file2.edit_file2(
+                filepath=path, name=symbol, requirements=requirements,
+                llm=llm, test_path=test_path or None,
+            )
+
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read()
 
