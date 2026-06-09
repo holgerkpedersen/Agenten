@@ -1050,7 +1050,8 @@ def decompose() -> Any:
     # Guard: programmering (greenfield) must not run if .py files exist
     if template == "programmering":
         FRAMEWORK_PY = {"api_server.py", "agent_core.py", "agent_tasks.py", "agent_skills.py", "agent_files.py", "agent_issues.py", "agent_tree.py", "agent_git.py", "agent_phase_checks.py", "agent_wta.py", "core_analytics.py", "agent_logs.py", "tools.py", "i18n.py", "lang.py", "config.py", "task_tree.py", "llm_wrapper.py", "model_manager.py", "session_manager.py", "flow_builder.py", "skill_evolution.py", "skill_loader.py", "skill_tracker.py", "refactoring_engine.py", "github_wrapper.py"}
-        existing_py = [f for f in os.listdir(".") if f.endswith(".py") and f not in FRAMEWORK_PY and os.path.isfile(f)]
+        check_dir = os.environ.get('AGENT_WORKDIR') or '.'
+        existing_py = [f for f in os.listdir(check_dir) if f.endswith(".py") and f not in FRAMEWORK_PY and os.path.isfile(os.path.join(check_dir, f))]
         if existing_py:
             return jsonify({
                 "success": False,

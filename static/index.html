@@ -2495,6 +2495,7 @@ async function decompose() {
         }
     } else {
         addLogEntry('ERROR', 'Nedbrydning fejlede', data.error);
+        showToast(data.error || 'Ukendt fejl', 'error');
     }
 }
 
