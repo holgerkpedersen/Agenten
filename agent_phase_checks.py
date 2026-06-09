@@ -113,7 +113,7 @@ def _has_real_code(filepath: str, min_lines: int = 20) -> bool:
     return content.count("\n") >= min_lines
 
 
-def _extract_modules_from_plan(plan_content: str, ext: str = ".py") -> list[str]:
+def _extract_modules_from_plan(plan_content: str, ext: str = ".py", allow_nested: bool = False) -> list[str]:
     """Extract module filenames from a refactor plan markdown.
 
     The plan format from the LLM typically looks like:
@@ -124,6 +124,13 @@ def _extract_modules_from_plan(plan_content: str, ext: str = ".py") -> list[str]
 
     We also pick up bare filenames like ``routes.py`` anywhere in the text
     (in case the LLM didn't use a heading).
+
+    Args:
+        plan_content: The markdown content of the plan file.
+        ext: File extension to look for (default ".py").
+        allow_nested: If True, keep paths with ``/`` or ``\\`` (e.g.
+            ``gui/browser_window.py``). Used by greenfield projects where
+            modules are organized in subdirectories.
     """
     if not plan_content:
         return []
@@ -137,7 +144,9 @@ def _extract_modules_from_plan(plan_content: str, ext: str = ".py") -> list[str]
     for pat in (heading_pat, inline_pat):
         for m in pat.finditer(plan_content):
             name = m.group(1).strip()
-            if not name or "/" in name or "\\" in name:
+            if not name:
+                continue
+            if not allow_nested and ("/" in name or "\\" in name):
                 continue
             seen.add(name)
     return sorted(seen)
@@ -150,6 +159,8 @@ def check_files_from_plan(spec: dict[str, Any], base_dir: str | None = None) -> 
       - ``plan_path`` (required) — path to the plan file (relative to base_dir)
       - ``ext`` (default ".py") — file extension to look for
       - ``min_files`` (default 1) — minimum number of files that must be listed
+      - ``allow_nested`` (default False) — if True, keep paths with ``/`` or
+        ``\\`` (e.g. ``gui/browser_window.py``). Used by greenfield projects.
       - ``base_dir`` (optional) — override the cwd for both the plan and the
         module files. If not provided, uses ``os.getcwd()``.
     """
@@ -158,6 +169,7 @@ def check_files_from_plan(spec: dict[str, Any], base_dir: str | None = None) -> 
     plan_path = os.path.join(base, plan_rel) if not os.path.isabs(plan_rel) else plan_rel
     ext = spec.get("ext", ".py")
     min_files = int(spec.get("min_files", 1))
+    allow_nested = bool(spec.get("allow_nested", False))
     if not os.path.exists(plan_path):
         return False, f"files_from_plan: planfil {plan_path} findes ikke"
     try:
@@ -165,7 +177,7 @@ def check_files_from_plan(spec: dict[str, Any], base_dir: str | None = None) -> 
             plan_content = f.read()
     except OSError as e:
         return False, f"files_from_plan: kunne ikke læse {plan_path}: {e}"
-    modules = _extract_modules_from_plan(plan_content, ext=ext)
+    modules = _extract_modules_from_plan(plan_content, ext=ext, allow_nested=allow_nested)
     if len(modules) < min_files:
         return False, (
             f"files_from_plan: fandt kun {len(modules)} modulnavne i {plan_path} "
@@ -840,9 +852,11 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "description": "FORM\u00c5L: Analys\u00e9r sikkerhedsaspekter (OWASP, inputvalidering, auth). Kr\u00e6ver: docs/sikkerhedsanalyse.md eksisterer.",
         },
         "Kodeimplementering": {
-            "type": "tool_called",
-            "tools": ["write_file", "edit_file"],
-            "description": "FORM\u00c5L: Skriv koden baseret p\u00e5 design og plan. Kr\u00e6ver: write_file eller edit_file kaldt (greenfield).",
+            "type": "files_from_plan",
+            "plan_path": "docs/implementeringsplan.md",
+            "min_files": 5,
+            "allow_nested": True,
+            "description": "FORM\u00c5L: Skriv koden baseret p\u00e5 design og plan. Kr\u00e6ver: alle moduler n\u00e6vnt i docs/implementeringsplan.md er oprettet (greenfield).",
         },
     },
     "selvforbedring": {

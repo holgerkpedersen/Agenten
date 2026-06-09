@@ -582,6 +582,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     ]
     PHASE_ORDER = ["kravanalyse", "arkitekturdesign", "implementeringsplan", "sikkerhedsanalyse", "kodeimplementering"]
     if agent.active_template == "programmering" and not plan_block:
+        workdir = os.environ.get('AGENT_WORKDIR') or os.getcwd()
         current_idx = -1
         task_lower = task_node.name.lower() if task_node.name else ""
         for i, p in enumerate(PHASE_ORDER):
@@ -591,13 +592,13 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         if current_idx > 0:
             loaded_blocks = []
             for doc_path, doc_phase in PROGRAMMING_DOCS[:current_idx]:
-                full_path = os.path.join(os.getcwd(), doc_path)
+                full_path = os.path.join(workdir, doc_path)
                 if os.path.exists(full_path):
                     try:
                         with open(full_path, encoding="utf-8") as _df:
                             _content = _df.read()
                         loaded_blocks.append(
-                            f"### {doc_phase} — {doc_path}\n\n```\n{_content[:2000]}\n```"
+                            f"### {doc_phase} — {doc_path}\n\n{_content[:4000]}"
                         )
                     except Exception as _e:
                         agent._log("DEBUG", f"Failed to load {doc_path}: {_e}", "")
