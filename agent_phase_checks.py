@@ -851,6 +851,18 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "min_files": 1,
             "description": "FORM\u00c5L: Analys\u00e9r sikkerhedsaspekter (OWASP, inputvalidering, auth). Kr\u00e6ver: docs/sikkerhedsanalyse.md eksisterer.",
         },
+        "Uddyb/refinements": {
+            "type": "file_exists",
+            "paths": [
+                "docs/uddybning_dialog.md",
+                "docs/kravanalyse.md",
+                "docs/arkitektur.md",
+                "docs/implementeringsplan.md",
+                "docs/sikkerhedsanalyse.md",
+            ],
+            "min_files": 5,
+            "description": "FORM\u00c5L: Identificer manglende specifikationer, lad LLM svare, opdater docs. Kr\u00e6ver: docs/uddybning_dialog.md eksisterer OG alle 4 originale docs er bevaret.",
+        },
         "Kodeimplementering": {
             "type": "files_from_plan",
             "plan_path": "docs/implementeringsplan.md",

@@ -261,6 +261,43 @@ def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_co
     return agent.task_tree_to_dict()
 
 
+def _run_doc_refinement(workdir: str, rounds: int = 7, model: str = "") -> dict[str, Any]:
+    """Kør iterativ doc-refinement via scripts/run_doc_refinement.py.
+
+    Returnerer dict med success, rounds, model, output, dialog_path.
+    """
+    import subprocess
+    import sys as _sys
+    if not workdir:
+        return {"success": False, "error": "workdir mangler"}
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.join(project_root, "scripts", "run_doc_refinement.py")
+    if not os.path.isfile(script_path):
+        return {"success": False, "error": f"Script ikke fundet: {script_path}"}
+    cmd = [_sys.executable, script_path, "--workdir", workdir, "--rounds", str(int(rounds))]
+    if model:
+        cmd.extend(["--model", model])
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        output = (result.stdout or "") + (result.stderr or "")
+        dialog_path = os.path.join(workdir, "docs", "uddybning_dialog.md")
+        return {
+            "success": result.returncode == 0,
+            "exit_code": result.returncode,
+            "output": output[-2000:],
+            "dialog_path": dialog_path if os.path.isfile(dialog_path) else None,
+        }
+    except subprocess.TimeoutExpired:
+        return {"success": False, "error": "Refinement script timeout (>600s)"}
+    except Exception as e:
+        return {"success": False, "error": f"Refinement script fejl: {e}"}
+
+
 class Agent:
     """agent."""
     def __init__(self) -> None:
@@ -581,6 +618,12 @@ class Agent:
             "Kør pytest og returner resultat. Args: test_path (valgfri). Eksempel: run_tests(test_path='tests/test_tools.py::TestToolExecution')",
             ["test_path"],
             lambda test_path="": agent_issues.run_pytest(test_path)
+        ))
+        self.tool_registry.register(Tool(
+            "run_refinement",
+            "Kør iterativ doc-refinement: læs docs/*.md, identificer mangler, lad LLM svare, gem dialog i docs/uddybning_dialog.md. Args: workdir (absolut sti til projekt med docs/), rounds (max antal iterationer, default 7), model (valgfri - default auto-select stærkeste loaded).",
+            ["workdir"],
+            lambda workdir, rounds=7, model="": _run_doc_refinement(workdir, rounds, model)
         ))
         self.tool_registry.register(Tool(
             "read_issue",

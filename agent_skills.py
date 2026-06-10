@@ -27,7 +27,7 @@ TEMPLATE_TOOLS = {
         "git_set_remote",
         "git_remote_status"
     ],
-    "programmering": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "edit_file", "write_file", "add_image", "create_issue", "create_refactor_issue"],
+    "programmering": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "edit_file", "write_file", "read_chunk", "add_image", "create_issue", "create_refactor_issue", "run_refinement"],
     "python-arkitektur": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "create_issue", "create_refactor_issue"],
     "billedanalyse": ["add_image", "write_file", "list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "create_issue", "create_refactor_issue"],
     "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_location", "list_symbols", "locate", "write_file", "edit_file", "list_files"],
@@ -66,6 +66,7 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
         "Arkitekturdesign": 10,
         "Implementeringsplan": 8,
         "Sikkerhedsanalyse": 8,
+        "Uddyb/refinements": 15,
         "Kodeimplementering": 20,
     },
     "refactor": {
@@ -140,6 +141,7 @@ TEMPLATE_TASK_TOOLS = {
         "arkitekturdesign": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
         "implementeringsplan": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
         "sikkerhedsanalyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
+        "uddyb/refinements": ["read_chunk", "list_files", "list_chunks", "read_location", "write_file", "run_refinement"],
         "kodeimplementering": ["edit_file", "write_file", "run_tests", "locate", "list_symbols", "read_location", "list_chunks", "read_chunk", "list_files"],
     },
     "agenten": {
@@ -201,6 +203,7 @@ SECTION_INSTRUCTIONS = {
         "Arkitekturdesign": "Design systemarkitekturen: komponenter, moduler, dataflow og afh\u00e6ngigheder. Overvej relevante design patterns og SOLID-principper. Brug write_file til at gemme designet i ./docs/arkitektur.md. Tegn arkitekturen med tekst.",
         "Implementeringsplan": "L\u00e6s f\u00f8rst tidligere fasedokumenter hvis de findes: brug read_chunk til at indl\u00e6se docs/kravanalyse.md og docs/arkitektur.md for at forst\u00e5 hvad der allerede er besluttet. Planl\u00e6g derefter implementeringen: hvilke filer skal oprettes, i hvilken r\u00e6kkef\u00f8lge, og hvad skal hver fil indeholde. Overvej teststrategi og edge cases. Brug write_file til at gemme planen i ./docs/implementeringsplan.md. Systemet auto-afslutter denne fase n\u00e5r planfilen findes \u2014 du beh\u00f8ver IKKE lave ekstra kald bagefter.",
         "Sikkerhedsanalyse": "Analyser sikkerhedsaspekter (OWASP best practices): inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlh\u00e5ndtering og logging, s\u00e5rbarheder i dependencies, security headers (CSP, HSTS, X-Frame-Options), API security (rate limiting, CSRF), mindste rettighedsprincip. Brug write_file til at gemme analysen i ./docs/sikkerhedsanalyse.md.",
+        "Uddyb/refinements": "Læs de 4 eksisterende dokumenter i ./docs/ (kravanalyse.md, arkitektur.md, implementeringsplan.md, sikkerhedsanalyse.md). Identificer specifikationer der mangler for at en fungerende standard-løsning kan bygges. Stil spørgsmål ELLER svar selv med reference til standard praksis (Chrome/Firefox/Safari for browsere, PEP 8/SOLID for Python, etc.). Kald run_refinement(workdir='./', rounds=7) som dit FØRSTE tool-kald. LLM'en i refinement-scriptet kører 5+ iterative runder, identificerer mangler, svarer selv, og skriver docs/uddybning_dialog.md. Bagefter: refinér de 4 docs med write_file (path='docs/X.md', overwrite=true) baseret på dialogen. Tilføj nye sektioner som 'Edge cases', 'Konkrete teknologivalg', 'Standard browser-praksis' etc. Fokuser på hvad en udvikler har brug for at vide for at implementere. Stop når alle 4 docs er opdateret OG dialogen er gemt.",
         "Kodeimplementering": "Greenfield-fase: m\u00e5 KUN oprette nye filer. L\u00e6s f\u00f8rst docs/implementeringsplan.md for at se hvilke moduler der skal oprettes. Opret ALLE moduler n\u00e6vnt i planen med write_file \u2014 inkl. undermapper som gui/, engine/, rendering/. Systemet auto-afslutter denne fase n\u00e5r ALLE moduler fra planen findes \u2014 du beh\u00f8ver IKKE lave ekstra kald bagefter. Skriv ren, vedligeholdelsesvenlig kode med korrekt fejlh\u00e5ndtering og logging.",
         "Kodeimplementering (vedligeholdelse)": "Vedligeholdelsesfase: rediger EKSISTERENDE filer med edit_file \u2014 det er dit prim\u00e6re v\u00e6rkt\u00f8j. L\u00e6s f\u00f8rst de eksisterende filer med locate/read_location for at forst\u00e5 strukturen. Brug write_file KUN hvis du skal oprette helt nye moduler der ikke findes i forvejen. Systemet auto-afslutter IKKE denne fase \u2014 du afslutter selv med <<<DONE>>> n\u00e5r implementeringen er f\u00e6rdig. K\u00f8r run_tests for at verificere at dine \u00e6ndringer ikke bryder noget.",
     },
