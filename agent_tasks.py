@@ -50,6 +50,37 @@ def _save_llm_prompt_file(agent: Any, task_name: str, iteration: int, messages: 
     return filepath
 
 
+def _save_maintenance_prompt_dump(agent: Any, task_name: str, iteration: int, messages: list[dict], tool_defs: list[dict]) -> str:
+    """Save full prompt + native tool definitions for programmering/kodeimplementering maintenance mode.
+    
+    This is used to debug why LLM chooses write_file over edit_file in an
+    existing-project (vedligeholdelse) context. Logs everything the LLM sees:
+    messages, native tool definitions, active tool list, and greenfield status.
+    """
+    session_id = getattr(agent, '_session_id', 'unknown')
+    session_dir = os.path.join("logs", "maintenance_prompt_dump", session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    safe_name = task_name.replace(" ", "_").replace("/", "_").replace("\\", "_")[:30]
+    filepath = os.path.join(session_dir, f"{safe_name}_iter{iteration}.json")
+    dump = {
+        "session_id": session_id,
+        "template": agent.active_template,
+        "phase": task_name,
+        "iteration": iteration,
+        "is_greenfield": _is_greenfield(),
+        "active_tools": list(agent.tool_registry.active_tools or []),
+        "native_tools_enabled": config.NATIVE_TOOLS,
+        "messages": messages,
+        "tool_definitions": tool_defs,
+    }
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(dump, f, ensure_ascii=False, indent=2, default=str)
+    except Exception:
+        pass
+    return filepath
+
+
 def _save_llm_log_file(agent: Any, task_name: str, iteration: int, content: str) -> str:
     """Save LLM response to a file for later inspection."""
     session_id = getattr(agent, '_session_id', 'unknown')
@@ -1537,6 +1568,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
             break
 
         pending_tc = getattr(agent.llm, '_pending_tool_calls', [])
+        if pending_tc and agent.active_template == "programmering" and "kodeimplementering" in _normalize_phase(task_node.name) and not _is_greenfield():
+            _save_maintenance_prompt_dump(agent, task_node.name, i, messages, tools_param if tools_param else [])
         if pending_tc and hasattr(agent, '_wta'):
             template = getattr(agent, 'active_template', 'fri') or 'fri'
             phase = getattr(task_node, 'name', '?')
