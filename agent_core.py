@@ -474,12 +474,6 @@ class Agent:
             optional_params=["filepath"]
         ))
         self.tool_registry.register(Tool(
-            "write_file",
-            "Opret en NY fil med indhold, eller overskriv en eksisterende med overwrite=true. Brug path='docs/fil.md' for at gemme i docs-mappen. Opretter mappen hvis den ikke findes. Syntestjekker .py filer.",
-            ["path", "content"],
-            lambda path, content, overwrite=False: git_ops.write_file(path=path, content=content, overwrite=overwrite)
-        ))
-        self.tool_registry.register(Tool(
             "edit_file",
             "Rediger en eksisterende fil. Tre tilstande:\n"
              "1) AST+LLM (BEDST til .py): Angiv symbol='funktionsnavn' + requirements='hvad skal ændres'. "
@@ -497,6 +491,12 @@ class Agent:
                 symbol=symbol, requirements=requirements, test_path=test_path, llm=self.llm,
             ),
             optional_params=["symbol", "requirements", "test_path"]
+        ))
+        self.tool_registry.register(Tool(
+            "write_file",
+            "Opret en NY fil med indhold, eller overskriv en eksisterende med overwrite=true. Brug path='docs/fil.md' for at gemme i docs-mappen. Opretter mappen hvis den ikke findes. Syntestjekker .py filer.",
+            ["path", "content"],
+            lambda path, content, overwrite=False: git_ops.write_file(path=path, content=content, overwrite=overwrite)
         ))
         self.tool_registry.register(Tool(
             "list_files",

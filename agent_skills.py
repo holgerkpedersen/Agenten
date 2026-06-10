@@ -140,7 +140,7 @@ TEMPLATE_TASK_TOOLS = {
         "arkitekturdesign": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
         "implementeringsplan": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
         "sikkerhedsanalyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "write_file", "create_issue", "create_refactor_issue"],
-        "kodeimplementering": ["write_file", "edit_file", "run_tests", "locate", "list_symbols", "read_location", "list_chunks", "read_chunk", "list_files"],
+        "kodeimplementering": ["edit_file", "write_file", "run_tests", "locate", "list_symbols", "read_location", "list_chunks", "read_chunk", "list_files"],
     },
     "agenten": {
         "branch": ["git_current_branch", "git_create_branch", "git_branch_list", "git_checkout", "git_remote_status", "git_pull"],
