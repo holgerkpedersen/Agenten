@@ -1162,6 +1162,21 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
     global execution_status
     if _check_client(agent):
         return
+
+    # Skip nodes already marked done/skipped (manual checkpoint)
+    if node.status in ("done", "skipped"):
+        skip_msg = node.result or f"Markeret som {node.status} (manuelt)"
+        yield f"data: {json.dumps({'type': 'task_start', 'task': node.name, 'success_criteria': getattr(node, 'success_criteria', []), 'skipped': True})}\n\n"
+        yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': skip_msg})}\n\n"
+        completed[0] += _count_tasks(node)
+        progress = int((completed[0] / total_tasks) * 100)
+        with execution_status_lock:
+            execution_status["progress"] = progress
+        yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+        agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {node.name}", "detail": f"Allerede markeret som {node.status}"})
+        yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+        return
+
     task_data = {'type': 'task_start', 'task': node.name}
     if hasattr(node, 'success_criteria') and node.success_criteria:
         task_data['success_criteria'] = node.success_criteria
@@ -1650,6 +1665,83 @@ def phase_checks() -> Any:
     for tmpl, phases in TEMPLATE_PHASE_CHECKS.items():
         out[tmpl] = _expand_with_aliases(phases)
     return jsonify({"success": True, "templates": out})
+
+
+@app.route("/api/update-task-status", methods=["POST"])
+def update_task_status() -> Any:
+    """Mark a task node as done/skipped so it won't be re-executed.
+
+    POST JSON::
+        {"session_id": "...", "task_path": "0.1.2", "status": "done"}
+
+    ``task_path`` is dot-notation into ``root.children[]`` (e.g. "0" = first task,
+    "0.1" = second child of first task).  Returns the updated node name + status.
+    """
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "error": "Ingen JSON-body"}), 400
+
+    session_id = data.get("session_id") or current_session_id
+    task_path = data.get("task_path", "")
+    new_status = data.get("status", "done")
+
+    if not session_id:
+        return jsonify({"success": False, "error": "Ingen session"}), 400
+    if new_status not in ("done", "skipped"):
+        return jsonify({"success": False, "error": "Status skal v\u00e6re 'done' eller 'skipped'"}), 400
+
+    # Resolve agent -- prefer stream agent if active
+    stream_agent = agent
+    if session_id:
+        with active_streams_lock:
+            if session_id in active_streams:
+                stream_agent = active_streams[session_id]
+
+    # Load tree from session if needed
+    if stream_agent is agent or not stream_agent.task_tree:
+        session_data = session_manager.load_session(session_id)
+        if session_data and session_data.get("tree"):
+            stream_agent.task_tree_from_dict(session_data["tree"])
+        else:
+            return jsonify({"success": False, "error": "Intet tr\u00e6 i session"}), 400
+
+    if not stream_agent.task_tree:
+        return jsonify({"success": False, "error": "Intet tr\u00e6"}), 400
+
+    # Navigate to node via dot-path
+    node = stream_agent.task_tree.root
+    if task_path:
+        for p in task_path.split("."):
+            idx = int(p)
+            if node.children and idx < len(node.children):
+                node = node.children[idx]
+            else:
+                return jsonify({"success": False, "error": f"Ugyldig sti: {task_path}"}), 400
+
+    node.status = new_status
+    if not node.result:
+        node.result = f"Markeret som {new_status} (manuelt)"
+
+    # Persist session
+    if session_id:
+        try:
+            session_manager.save_session(session_id, {
+                "id": session_id,
+                "tree": stream_agent.task_tree_to_dict(),
+                "file_chunks": getattr(stream_agent, "file_chunks", {}),
+                "images": getattr(stream_agent, "images", []),
+                "template": getattr(stream_agent, "active_template", ""),
+                "lang": getattr(stream_agent, "lang", "da"),
+                "ui_lang": getattr(stream_agent, "lang", "da"),
+                "original_prompt": getattr(stream_agent, "original_prompt", ""),
+                "full_prompt_with_context": getattr(stream_agent, "full_prompt_with_context", ""),
+                "show_thinking": getattr(stream_agent, "show_thinking", True),
+            })
+        except Exception:
+            pass
+
+    return jsonify({"success": True, "task": node.name, "status": node.status, "path": task_path})
+
 
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:

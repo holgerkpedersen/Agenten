@@ -1285,6 +1285,8 @@ function renderTree(node, path = []) {
     }
     if (treeEditMode) {
         html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="${_('btn_edit')}" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="${_('btn_delete')}" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="${_('btn_add_child')}" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
+    } else if (node.status !== 'done' && node.status !== 'skipped') {
+        html += `<span style="margin-left:8px;white-space:nowrap;"><button onclick="markTaskDone('${pathStr}','done')" title="Mark\u00e9r som fuldf\u00f8rt" style="padding:1px 6px;font-size:10px;background:#22c55e;border:none;border-radius:3px;color:white;cursor:pointer;">\u2713 F\u00e6rdig</button> <button onclick="markTaskDone('${pathStr}','skipped')" title="Spring over" style="padding:1px 6px;font-size:10px;background:#64748b;border:none;border-radius:3px;color:white;cursor:pointer;">\u23ed Spring</button></span>`;
     }
     html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>${criteriaHtml}${phaseCheckHtml}`;
     if (node.children && node.children.length > 0) { 
@@ -1382,6 +1384,34 @@ function addTreeChild(path) {
         parent.children.push({ name: name.trim().substring(0, 80), status: 'pending', children: [], result: null });
         updateTreeDisplay();
         addLogEntry('INFO', _('task_added'), name);
+    }
+}
+
+async function markTaskDone(path, status) {
+    const label = status === 'done' ? 'Fuldf\u00f8rt' : 'Sprunget over';
+    if (!confirm(`Mark\u00e9r "${getNodeByPath(currentTree, path)?.name}" som ${label}?`)) return;
+    const sessionId = currentSessionId || document.getElementById('sessionSelect')?.value;
+    try {
+        const resp = await fetch('/api/update-task-status', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId, task_path: path, status: status}),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const node = getNodeByPath(currentTree, path);
+            if (node) {
+                node.status = status;
+                if (!node.result) node.result = `Markeret som ${status} (manuelt)`;
+            }
+            updateTreeDisplay();
+            addLogEntry('INFO', `Opgave markeret: ${data.task}`, `${label} (sti: ${path})`);
+            await saveCurrentSession();
+        } else {
+            alert('Fejl: ' + (data.error || 'Ukendt'));
+        }
+    } catch (e) {
+        alert('Kunne ikke opdatere opgave: ' + e.message);
     }
 }
 
@@ -2703,26 +2733,27 @@ async function executeWithStream() {
             case 'task_done':
                 const taskElem = document.getElementById('currentTask');
                 const isFail = data.status === 'failed';
-                const doneColor = isFail ? 'var(--error, #ef4444)' : 'var(--success)';
-                const doneIcon = isFail ? '✗' : '✓';
-                const doneEmoji = isFail ? '❌' : '✅';
-                const msgLabel = isFail ? _('task_failed_label') || 'Opgaver fejlede' : _('task_done_label');
-                if (taskElem) taskElem.innerHTML = `<span style="color:${doneColor};">${doneIcon} ${escapeHtml(data.task)} ${isFail ? 'fejlede' : 'færdig'}</span>`;
+                const isSkipped = data.status === 'skipped';
+                const doneColor = isFail ? 'var(--error, #ef4444)' : (isSkipped ? '#f59e0b' : 'var(--success)');
+                const doneIcon = isFail ? '✗' : (isSkipped ? '⏭' : '✓');
+                const doneEmoji = isFail ? '❌' : (isSkipped ? '⏭️' : '✅');
+                const msgLabel = isFail ? (_('task_failed_label') || 'Opgaver fejlede') : (isSkipped ? 'Opgave sprunget over' : _('task_done_label'));
+                if (taskElem) taskElem.innerHTML = `<span style="color:${doneColor};">${doneIcon} ${escapeHtml(data.task)} ${isFail ? 'fejlede' : (isSkipped ? 'sprunget over' : 'færdig')}</span>`;
                 
                 if (llmBox) {
                     const output = stripHarmony(currentOutputs[data.task] || data.result || '');
                     const existing = llmBox.querySelector(`[data-task="${data.task}"]`);
-                    const borderColor = isFail ? 'var(--error, #ef4444)' : 'var(--success)';
+                    const borderColor = isFail ? 'var(--error, #ef4444)' : (isSkipped ? '#f59e0b' : 'var(--success)');
                     const resultDiv = `<div style="white-space:pre-wrap;margin-top:5px;padding:8px;background:var(--input-bg);border-radius:6px;border-left:3px solid ${borderColor};">${escapeHtml(output)}</div>`;
                     if (existing) {
-                        existing.innerHTML += `<div style="margin-top:8px;"><strong style="color:${doneColor};">${doneEmoji} ${isFail ? 'Fejl' : 'Resultat'}</strong>${resultDiv}</div>`;
+                        existing.innerHTML += `<div style="margin-top:8px;"><strong style="color:${doneColor};">${doneEmoji} ${isFail ? 'Fejl' : (isSkipped ? 'Sprunget over' : 'Resultat')}</strong>${resultDiv}</div>`;
                     } else {
                         llmBox.innerHTML += `<div data-task="${data.task}" style="margin-bottom:15px;"><strong style="color:${doneColor};">${doneEmoji} ${escapeHtml(data.task)}</strong>${resultDiv}</div>`;
                     }
                 }
                 
                 function markDone(node) {
-                    if (node.name === data.task) node.status = isFail ? 'failed' : 'done';
+                    if (node.name === data.task) node.status = isFail ? 'failed' : (isSkipped ? 'skipped' : 'done');
                     if (node.children) node.children.forEach(markDone);
                 }
                 if (currentTree) {
