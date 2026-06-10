@@ -552,7 +552,7 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "write_file",
-            "Opret en NY fil med indhold, eller overskriv en eksisterende med overwrite=true. Brug path='docs/fil.md' for at gemme i docs-mappen. Opretter mappen hvis den ikke findes. Syntestjekker .py filer.",
+            "Opret en NY fil med indhold, eller overskriv en eksisterende med overwrite=true. Brug path='docs/fil.md' for at gemme i docs-mappen. Opretter mappen hvis den ikke findes. Syntestjekker .py filer. Brug overwrite=\"force\" for at tvinge overskrivning af eksisterende indhold.",
             ["path", "content"],
             lambda path, content, overwrite=False: git_ops.write_file(path=path, content=content, overwrite=overwrite)
         ))

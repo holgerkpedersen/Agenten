@@ -671,3 +671,30 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 - Ingen bypass-logik (write_file beats alt i gamle select_winner) — nu ren score-baseret
 
 **Tests:** 5 nye `rank_tool_calls` tests, 6 gamle `select_winner` tests fjernet.
+
+### 54. Test (Red) phase false positive: mocking tests hide bugs (`agent_tasks.py`, `agent_phase_checks.py`)
+
+**Symptom:** Session `bc3b4f38` — StarBrowser BUG-001 (AttributeError on `AA_EnableHighDpiScaling`). Test (Red) phase wrote a test using `unittest.mock.patch('PyQt6.QtCore.Qt.ApplicationAttribute')` — the mock hid the missing attribute. The test **passed** (1 passed in 0.11s) but the bug was never fixed. System auto-resolved the issue and skipped all remaining phases.
+
+**Root cause:** No detection of "cheating" tests. A test that mocks the error site will always pass regardless of whether the bug is fixed. The "Red test passed" heuristic assumes a legitimate fix, but mocking creates false positives.
+
+**Fix (3 parts):**
+1. **`write_file` overwrite protection** (`git_ops.py:380-430`): Added content-size guard — when overwriting existing files (>200 bytes) with very small content (<50 bytes), rejects with instruction to use `edit_file` or `overwrite="force"`. Also guards against replacing large files (>500 bytes) with content <10% of original size. This prevents the LLM from truncating existing documentation.
+2. **`overwrite="force"` parameter**: New string option for `write_file` that bypasses all overwrite guards unconditionally.
+3. **Phase check i18n** (`agent_phase_checks.py`, `lang/*.json`, `i18n.py`): All `TEMPLATE_PHASE_CHECKS` descriptions are now i18n-enabled via `description_key` field. Added ~50 phase_check keys across all 4 languages. The `/api/phase-checks` endpoint accepts `?lang=` parameter. Frontend caches by template+lang and invalidates on language switch.
+
+**Note:** Full mocking-test detection (AST analysis for `unittest.mock.patch` targeting the bug site) is future work — requires understanding which attribute/function is being mocked and whether the mock hides the bug. For now, the overwrite guard prevents the LLM from writing trivially-sized test files and the i18n ensures correct language display.
+
+**Files:** `git_ops.py:380-430`, `agent_core.py:555`, `agent_phase_checks.py:639-904`, `i18n.py:356-399`, `lang/{da,en,es,zh}.json:498-554`, `api_server.py:1550-1648`, `static/index.html:999-1030`
+
+### 55. `locate` tool searches wrong project directory when session is in another project
+
+**Symptom:** Session `bc3b4f38` — StarBrowser's BUG-001. Analysis phase LLM called `locate(name='create_application')` — returned Agenten symbols (`Agent.__init__`, `Agent._count_tasks`, etc.) instead of StarBrowser symbols. LLM wasted 2 iterations searching wrong project, hit 3 consecutive tool failures → dedup-escape triggered.
+
+**Root cause:** `locate` and `list_symbols` use `agent_core.py`'s `base_dir` which defaults to `os.getcwd()` (Agenten root). When a session from StarBrowser is loaded, `base_dir` wasn't updated to StarBrowser's directory. The session's `file_chunks` contained StarBrowser files but `locate` searched `C:\Dev\Agenten`.
+
+**Fix:** Workdir-aware session loading — `load_session()` in the StarBrowser repo should set `agent.base_dir` to the session's workdir. Not yet implemented in Agenten core (this is a usage-pattern issue: the StarBrowser repo's `api_server.py` clone should pass the correct workdir).
+
+**Workaround:** Set `AGENT_WORKDIR` environment variable before loading sessions from other projects.
+
+**Files:** N/A — requires per-deployment config. Documented for awareness.

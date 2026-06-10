@@ -1008,6 +1008,11 @@ async function loadLang(lang) {
     document.getElementById('langSelect').value = lang;
     currentLang = lang;
     localStorage.setItem('agenten_lang', lang);
+    phaseChecksByTemplate = {};
+    if (currentTemplate) {
+        await loadPhaseChecks(currentTemplate);
+        updateTreeDisplay();
+    }
     updateAllUIText();
 }
 
@@ -1024,10 +1029,40 @@ function switchLang(lang) {
     loadLang(lang);
 }
 
-function switchLLMLang(lang) {
+async function switchLLMLang(lang) {
+    const oldLang = currentLLMLang;
     currentLLMLang = lang;
     localStorage.setItem('agenten_llm_lang', lang);
     document.getElementById('llmLangSelect').value = lang;
+
+    if (currentTree && currentTree.children && currentTree.children.length > 0 && oldLang !== lang) {
+        const langNames = {da:'🇩🇰 Dansk', en:'🇬🇧 English', es:'🇪🇸 Español', zh:'🇨🇳 中文'};
+        if (confirm(`Vil du gen-nedbryde opgavetræet på ${langNames[lang] || lang}? Node-navne og succeskriterier vil blive oversat. Eksisterende status bevares.`)) {
+            await redecomposeTree(lang);
+        }
+    }
+}
+
+async function redecomposeTree(lang) {
+    if (!currentSessionId) return;
+    addLogEntry('INFO', 'Re-decompose', `Gen-nedbryder træ på ${lang}...`);
+    try {
+        const resp = await fetch('/api/redecompose', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: currentSessionId, lang: lang})
+        });
+        const data = await resp.json();
+        if (data.success && data.tree) {
+            currentTree = data.tree;
+            await updateTreeDisplay();
+            addLogEntry('INFO', 'Re-decompose', `Træ gen-nedbrudt på ${lang}`);
+        } else {
+            addLogEntry('ERROR', 'Re-decompose', data.error || 'Ukendt fejl');
+        }
+    } catch(e) {
+        addLogEntry('ERROR', 'Re-decompose', e.message || 'Fejl');
+    }
 }
 
 function updateAllUIText() {
@@ -1275,7 +1310,8 @@ function renderTree(node, path = []) {
     let phaseCheckHtml = '';
     if (currentTemplate && phaseChecksByTemplate[currentTemplate]) {
         const phaseName = (node.name || '').toLowerCase();
-        const phases = phaseChecksByTemplate[currentTemplate];
+        const cacheKey = currentTemplate + '|' + currentLang;
+        const phases = phaseChecksByTemplate[cacheKey] || phaseChecksByTemplate[currentTemplate] || {};
         for (const [key, info] of Object.entries(phases)) {
             if (key.toLowerCase() === phaseName) {
                 phaseCheckHtml = `<div class="task-phase-check" style="font-size: 0.78em; opacity: 0.75; margin-top: 2px; padding-left: 20px; color: #4ade80;">✓ ${escapeHtml(info.description)}</div>`;
@@ -1307,14 +1343,16 @@ async function loadPhaseChecks(template) {
         phaseChecksByTemplate = {};
         return;
     }
-    if (phaseChecksByTemplate[template]) {
+    const cacheKey = template + '|' + currentLang;
+    if (phaseChecksByTemplate[cacheKey]) {
         return;
     }
     try {
-        const resp = await fetch(`/api/phase-checks?template=${encodeURIComponent(template)}`);
+        const resp = await fetch(`/api/phase-checks?template=${encodeURIComponent(template)}&lang=${encodeURIComponent(currentLang)}`);
         const data = await resp.json();
         if (data.success && data.phases) {
-            phaseChecksByTemplate[template] = data.phases[template] || {};
+            phaseChecksByTemplate[cacheKey] = data.phases[template] || {};
+            phaseChecksByTemplate[template] = phaseChecksByTemplate[cacheKey];
         }
     } catch (e) {
         console.warn('Failed to load phase checks:', e);

@@ -1119,7 +1119,69 @@ def decompose() -> Any:
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ============ EXECUTE STREAM HELPERS ============
+@app.route("/api/redecompose", methods=["POST"])
+def redecompose() -> Any:
+    """Re-decompose tree in a new LLM language while preserving status/results.
+
+    Expects: ``{"session_id": str, "lang": str}``.
+    Re-reads the session's original prompt and re-runs decomposition with
+    the new language, then maps old node statuses to new nodes by name.
+    """
+    data = request.json
+    session_id = data.get("session_id")
+    lang = data.get("lang", "da")
+
+    if not session_id:
+        return jsonify({"success": False, "error": t(K.ERR_NO_SESSION, lang)}), 400
+
+    session_data = session_manager.load_session(session_id)
+    if not session_data:
+        return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, lang)}), 404
+
+    old_tree = session_data.get("tree")
+    old_children = old_tree.get("children", []) if old_tree else []
+    old_prompt = session_data.get("original_prompt", "")
+    old_template = session_data.get("template", "fri")
+    old_file_context = session_data.get("file_context", [])
+
+    if not old_prompt:
+        return jsonify({"success": False, "error": t(K.ERR_NO_PROMPT, lang)}), 400
+
+    old_status_map: dict[str, dict] = {}
+    for child in old_children:
+        old_status_map[child.get("name", "").strip().lower()] = {
+            "status": child.get("status", "pending"),
+            "result": child.get("result"),
+            "success_criteria": child.get("success_criteria", []),
+        }
+
+    agent.lang = lang
+    agent.active_template = old_template
+
+    prefix = "# RE-DECOMPOSE i nyt sprog\n"
+    full_prompt = prefix + old_prompt
+
+    try:
+        new_tree = agent.decompose_prompt(full_prompt, files=old_file_context, template=old_template)
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Fejl under gen-nedbrydning: {e}"}), 500
+
+    new_children = new_tree.get("children", []) or []
+    for child in new_children:
+        name_lower = (child.get("name", "") or "").strip().lower()
+        old_state = old_status_map.get(name_lower)
+        if old_state:
+            child["status"] = old_state["status"]
+            child["result"] = old_state["result"]
+            child["success_criteria"] = old_state.get("success_criteria", child.get("success_criteria", []))
+
+    session_manager.update_session(session_id, lambda d: {**d, "tree": new_tree, "lang": lang})
+
+    return jsonify({
+        "success": True,
+        "tree": new_tree,
+        "lang": lang,
+    })
 
 def _count_tasks(node: Any) -> int:
     """count tasks.
@@ -1547,13 +1609,22 @@ def version() -> Any:
     return jsonify({"success": True, "started": BUILD_INFO.get("started", "?"), "version": {k:v for k,v in BUILD_INFO.items() if k != "started"}})
 
 
-def _format_phase_check_description(phase_name: str, spec: dict[str, Any]) -> str:
-    """Format a phase check spec as a human-readable description (Danish).
+def _format_phase_check_description(phase_name: str, spec: dict[str, Any], lang: str = "da") -> str:
+    """Format a phase check spec as a human-readable description.
+
+    Uses i18n keys (description_key) when available, falling back to
+    hardcoded Danish descriptions for backward compatibility.
 
     Args:
         phase_name: Name of the phase (e.g. "Plan", "Ekstraher")
         spec: The check spec dict from TEMPLATE_PHASE_CHECKS
+        lang: Language code (da/en/es/zh) for i18n lookups
     """
+    desc_key = spec.get("description_key")
+    if desc_key:
+        translated = t(desc_key, lang)
+        if translated != desc_key:
+            return translated
     explicit = spec.get("description")
     if explicit:
         return explicit
@@ -1562,82 +1633,72 @@ def _format_phase_check_description(phase_name: str, spec: dict[str, Any]) -> st
         paths = spec.get("paths", [])
         require_all = spec.get("require_all", True)
         if len(paths) == 1:
-            return f"Fasen afsluttes automatisk når filen `{paths[0]}` findes."
+            return t(K.PHASE_CHECK_FILE_EXISTS_SINGLE, lang).format(path=f"`{paths[0]}`")
         if require_all:
             listed = ", ".join(f"`{p}`" for p in paths)
-            return f"Fasen afsluttes automatisk når alle disse filer findes: {listed}."
+            return t(K.PHASE_CHECK_FILE_EXISTS_ALL, lang).format(paths=listed)
         listed = ", ".join(f"`{p}`" for p in paths)
-        return f"Fasen afsluttes automatisk når mindst én af disse filer findes: {listed}."
+        return t(K.PHASE_CHECK_FILE_EXISTS_ANY, lang).format(paths=listed)
     if check_type == "files_from_plan":
         plan_path = spec.get("plan_path", "refactor_plan.md")
         ext = spec.get("ext", ".py")
         min_files = int(spec.get("min_files", 1))
         if min_files <= 1:
-            return (
-                f"Fasen afsluttes automatisk når alle `*{ext}`-moduler nævnt i "
-                f"`{plan_path}` er oprettet."
-            )
-        return (
-            f"Fasen afsluttes automatisk når mindst {min_files} `*{ext}`-moduler "
-            f"nævnt i `{plan_path}` er oprettet."
-        )
+            return t(K.PHASE_CHECK_FILES_FROM_PLAN, lang).format(plan_path=f"`{plan_path}`", ext=ext)
+        return t(K.PHASE_CHECK_FILES_FROM_PLAN_MIN, lang).format(min_files=min_files, plan_path=f"`{plan_path}`", ext=ext)
     if check_type == "all_of":
         sub_specs = spec.get("checks", []) or []
         sub_descs = [
-            _format_phase_check_description(f"{phase_name}.{i}", sub)
+            _format_phase_check_description(f"{phase_name}.{i}", sub, lang)
             for i, sub in enumerate(sub_specs)
         ]
         if sub_descs:
-            joined = " • ".join(sub_descs)
-            return f"Fasen afsluttes automatisk når alle disse kriterier er opfyldt: {joined}"
-        return f"Fasen afsluttes automatisk (check-type: {check_type})."
+            joined = " \u2022 ".join(sub_descs)
+            return t(K.PHASE_CHECK_ALL_OF, lang).format(checks=joined)
+        return t(K.PHASE_CHECK_ALL_OF, lang).format(checks=check_type)
     if check_type == "symbols_covered":
         source = spec.get("source_file", "kildefilen")
         plan = spec.get("plan_path", "refactor_plan.md")
-        return (
-            f"Fasen afsluttes automatisk når alle symboler fra `{source}` er "
-            f"defineret i præcis ét af modulerne nævnt i `{plan}`."
-        )
+        return t(K.PHASE_CHECK_SYMBOLS_COVERED, lang).format(source=f"`{source}`", plan=f"`{plan}`")
     if check_type == "min_text_length":
-        return (
-            f"Fasen afsluttes automatisk når LLM har produceret mindst "
-            f"{spec.get('min_chars', 100)} tegn analyse."
-        )
+        return t(K.PHASE_CHECK_MIN_TEXT_LENGTH, lang).format(min_chars=spec.get("min_chars", 100))
     if check_type == "tool_called":
         tools = spec.get("tools", [])
         listed = ", ".join(f"`{t}`" for t in tools)
         if spec.get("require_all"):
-            return f"Fasen afsluttes automatisk når LLM har kaldt alle disse værktøjer: {listed}."
-        return f"Fasen afsluttes automatisk når LLM har kaldt ét af: {listed}."
+            return t(K.PHASE_CHECK_TOOL_CALLED_ALL, lang).format(tools=listed)
+        return t(K.PHASE_CHECK_TOOL_CALLED, lang).format(tools=listed)
     if check_type == "code_contains":
         path = spec.get("path", "")
         patterns = spec.get("patterns", [])
         n = len(patterns)
         if spec.get("require_all"):
             if n == 1:
-                return f"Fasen afsluttes automatisk når mønsteret matcher i `{path}`."
-            return f"Fasen afsluttes automatisk når alle {n} regex-mønstre matcher i `{path}`."
+                return t(K.PHASE_CHECK_CODE_CONTAINS, lang).format(path=f"`{path}`")
+            return t(K.PHASE_CHECK_CODE_CONTAINS_ALL, lang).format(n=n, path=f"`{path}`")
         if n == 1:
-            return f"Fasen afsluttes automatisk når mønsteret matcher i `{path}`."
-        return f"Fasen afsluttes automatisk når mindst {spec.get('min_matches', 1)} af {n} mønstre matcher i `{path}`."
+            return t(K.PHASE_CHECK_CODE_CONTAINS, lang).format(path=f"`{path}`")
+        return t(K.PHASE_CHECK_CODE_CONTAINS_MIN, lang).format(min_matches=spec.get("min_matches", 1), n=n, path=f"`{path}`")
     if check_type == "tests_pass":
-        return "Fasen afsluttes automatisk når `run_tests` er kaldt og alle tests bestod."
-    return f"Fasen afsluttes automatisk (check-type: {check_type})."
+        return t(K.PHASE_CHECK_TESTS_PASS, lang)
+    return t(K.PHASE_CHECK_ALL_OF, lang).format(checks=check_type)
 
 
 @app.route("/api/phase-checks", methods=["GET"])
 def phase_checks() -> Any:
     """Return the deterministic phase success checks for a template.
 
-    Query: ``?template=<template_name>``. If omitted, returns all templates.
+    Query: ``?template=<template_name>&lang=<lang>``. If ``lang`` omitted, defaults to ``"da"``.
     Used by the frontend to display "✓ auto-completes when..." under each phase.
     """
     from agent_phase_checks import PHASE_ALIASES
 
+    lang = request.args.get("lang", "da").strip() or "da"
+
     def _build_phase_entry(phase_name: str, spec: dict[str, Any]) -> dict[str, Any]:
         entry: dict[str, Any] = {
             "spec": spec,
-            "description": _format_phase_check_description(phase_name, spec),
+            "description": _format_phase_check_description(phase_name, spec, lang),
         }
         lower_name = phase_name.lower()
         aliases = PHASE_ALIASES.get(lower_name, [])

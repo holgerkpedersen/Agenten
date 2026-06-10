@@ -641,6 +641,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
         "Analyse": {
             "type": "all_of",
             "description": "FORM\u00c5L: Forst\u00e5 den store fils struktur og ansvarsomr\u00e5der. Kr\u00e6ver: mindst 500 tegn analyse + 3 funktioner l\u00e6st med read_location.",
+            "description_key": "phase_check.refactor.analyse",
             "checks": [
                 {"type": "min_text_length", "min_chars": 500},
                 {"type": "tool_called", "tools": ["read_location"], "min_count": 3},
@@ -652,10 +653,12 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "ext": ".py",
             "min_files": 5,
             "description": "FORM\u00c5L: Beslut modulopdeling og skriv plan. Kr\u00e6ver: refactor_plan.md med mindst 5 *.py-moduler.",
+            "description_key": "phase_check.refactor.plan",
         },
         "Ekstraher": {
             "type": "all_of",
             "description": "FORM\u00c5L: Opret nye modulfiler med kode fra den originale fil. Kr\u00e6ver: alle planlagte *.py-moduler oprettet + alle symboler fordelt.",
+            "description_key": "phase_check.refactor.ekstraher",
             "checks": [
                 {
                     "type": "files_from_plan",
@@ -687,11 +690,13 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "require_all": False,
             "min_matches": 1,
             "description": "FORM\u00c5L: Fjern flyttet kode fra original fil, tilf\u00f8j imports til nye moduler. Kr\u00e6ver: api_server.py importerer fra mindst \u00e9t nyt modul.",
+            "description_key": "phase_check.refactor.opdater",
         },
         "Test": {
             "type": "tests_pass",
             "scope": "all",
             "description": "FORM\u00c5L: Bekr\u00e6ft at refactoring ikke har brudt noget. Kr\u00e6ver: alle tests best\u00e5r.",
+            "description_key": "phase_check.refactor.test",
         },
     },
     "bugfix": {
@@ -699,6 +704,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "type": "min_text_length",
             "min_chars": 300,
             "description": "FORM\u00c5L: Forst\u00e5 buggen og identific\u00e9r rod\u00e5rsag i koden. Kr\u00e6ver: mindst 300 tegn analyse.",
+            "description_key": "phase_check.bugfix.analyse",
         },
         "Test (Red)": {
             "type": "file_exists",
@@ -706,21 +712,25 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "require_all": False,
             "min_files": 1,
             "description": "FORM\u00c5L: Skriv en pytest der reproducerer buggen. Kr\u00e6ver: test-fil i tests/temp/. Testen skal fejle (r\u00f8d fase).",
+            "description_key": "phase_check.bugfix.test_red",
         },
         "Implementering": {
             "type": "tool_called",
             "tools": ["edit_file", "write_file"],
             "description": "FORM\u00c5L: Ret koden med minimal \u00e6ndring. Kr\u00e6ver: edit_file eller write_file kaldt.",
+            "description_key": "phase_check.bugfix.implementering",
         },
         "Verifikation (Green)": {
             "type": "tests_pass",
             "scope": "all",
             "description": "FORM\u00c5L: Bekr\u00e6ft at fixet virker og ingen regressions. Kr\u00e6ver: alle tests best\u00e5r.",
+            "description_key": "phase_check.bugfix.verifikation",
         },
         "Opdatering": {
             "type": "tool_called",
             "tools": ["update_issue_status"],
             "description": "FORM\u00c5L: Luk issue med beskrivelse af hvad der blev rettet. Kr\u00e6ver: update_issue_status kaldt.",
+            "description_key": "phase_check.bugfix.opdatering",
         },
     },
     "issue_handler": {
@@ -728,21 +738,25 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "type": "tool_called",
             "tools": ["read_issue"],
             "description": "FORM\u00c5L: L\u00e6s issue-beskrivelsen og forst\u00e5 problemet. Kr\u00e6ver: read_issue kaldt.",
+            "description_key": "phase_check.issue_handler.laes",
         },
         "Afklar": {
             "type": "min_text_length",
             "min_chars": 200,
             "description": "FORM\u00c5L: Analys\u00e9r koden, afg\u00f8r om fejlen findes. Kr\u00e6ver: mindst 200 tegn analyse.",
+            "description_key": "phase_check.issue_handler.afklar",
         },
         "Fix": {
             "type": "tool_called",
             "tools": ["edit_file", "write_file"],
             "description": "FORM\u00c5L: Ret fejlen i koden. Kr\u00e6ver: edit_file eller write_file kaldt.",
+            "description_key": "phase_check.issue_handler.fix",
         },
         "Luk Issue": {
             "type": "tool_called",
             "tools": ["update_issue_status"],
             "description": "FORM\u00c5L: Mark\u00e9r issue som resolved med rettelsesnote. Kr\u00e6ver: update_issue_status kaldt.",
+            "description_key": "phase_check.issue_handler.luk",
         },
     },
     "testgenerering": {
@@ -750,6 +764,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "type": "min_text_length",
             "min_chars": 300,
             "description": "FORM\u00c5L: Forst\u00e5 hvilke funktioner der mangler testd\u00e6kning. Kr\u00e6ver: mindst 300 tegn analyse.",
+            "description_key": "phase_check.testgenerering.analyse",
         },
         "Test (Red)": {
             "type": "file_exists",
@@ -757,23 +772,27 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "require_all": False,
             "min_files": 1,
             "description": "FORM\u00c5L: Skriv pytest-tests for den manglende d\u00e6kning. Kr\u00e6ver: test-fil i tests/temp/.",
+            "description_key": "phase_check.testgenerering.test_red",
         },
         "Implementering": {
             "type": "tool_called",
             "tools": ["edit_file"],
             "optional": True,
             "description": "FORM\u00c5L: G\u00f8r koden testbar hvis n\u00f8dvendigt. Kr\u00e6ver: edit_file kaldt (kun hvis koden skal \u00e6ndres).",
+            "description_key": "phase_check.testgenerering.implementering",
         },
         "Verifikation (Green)": {
             "type": "tests_pass",
             "scope": "all",
             "description": "FORM\u00c5L: Bekr\u00e6ft at nye tests best\u00e5r og ingen regressions. Kr\u00e6ver: alle tests best\u00e5r.",
+            "description_key": "phase_check.testgenerering.verifikation",
         },
     },
     "kodeanalyse": {
         "Form\u00e5l": {
             "type": "all_of",
             "description": "FORM\u00c5L: Forklar hvad filen g\u00f8r og dens rolle i projektet. Kr\u00e6ver: fil gemt i docs/formaal.md med analyse af form\u00e5l, ansvar, cohesion og single responsibility.",
+            "description_key": "phase_check.kodeanalyse.formaal",
             "checks": [
                 {"type": "file_exists", "paths": ["docs/formaal.md"], "min_files": 1},
                 {"type": "code_contains", "path": "docs/formaal.md", "patterns": [
@@ -784,6 +803,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
         "Imports og afh\u00e6ngigheder": {
             "type": "all_of",
             "description": "FORM\u00c5L: Gennemg\u00e5 filens imports og eksterne afh\u00e6ngigheder. Kr\u00e6ver: fil gemt i docs/imports.md med gennemgang af imports, cirkul\u00e6re afh\u00e6ngigheder og ubrugte imports.",
+            "description_key": "phase_check.kodeanalyse.imports",
             "checks": [
                 {"type": "file_exists", "paths": ["docs/imports.md"], "min_files": 1},
                 {"type": "code_contains", "path": "docs/imports.md", "patterns": [
@@ -794,6 +814,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
         "Arkitektur": {
             "type": "all_of",
             "description": "FORM\u00c5L: Analys\u00e9r filens struktur, design patterns og dataflow. Kr\u00e6ver: fil gemt i docs/arkitektur.md med analyse af struktur, patterns, coupling og SOLID.",
+            "description_key": "phase_check.kodeanalyse.arkitektur",
             "checks": [
                 {"type": "file_exists", "paths": ["docs/arkitektur.md"], "min_files": 1},
                 {"type": "code_contains", "path": "docs/arkitektur.md", "patterns": [
@@ -805,6 +826,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
         "Kodekvalitet": {
             "type": "all_of",
             "description": "FORM\u00c5L: Vurder kodekvalitet (DRY, SOLID, PEP 8, complexity, naming, tests). Kr\u00e6ver: fil gemt i docs/kodekvalitet.md med kvalitetsvurdering.",
+            "description_key": "phase_check.kodeanalyse.kvalitet",
             "checks": [
                 {"type": "file_exists", "paths": ["docs/kodekvalitet.md"], "min_files": 1},
                 {"type": "code_contains", "path": "docs/kodekvalitet.md", "patterns": [
@@ -816,6 +838,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
         "Sikkerhed": {
             "type": "all_of",
             "description": "FORM\u00c5L: Identific\u00e9r s\u00e5rbarheder (OWASP top 10). Kr\u00e6ver: fil gemt i docs/sikkerhed.md med sikkerhedsanalyse.",
+            "description_key": "phase_check.kodeanalyse.sikkerhed",
             "checks": [
                 {"type": "file_exists", "paths": ["docs/sikkerhed.md"], "min_files": 1},
                 {"type": "code_contains", "path": "docs/sikkerhed.md", "patterns": [
@@ -832,24 +855,28 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "paths": ["docs/kravanalyse.md"],
             "min_files": 1,
             "description": "FORM\u00c5L: Afd\u00e6k og dokument\u00e9r alle krav (funktionelle og ikke-funktionelle). Kr\u00e6ver: docs/kravanalyse.md eksisterer.",
+            "description_key": "phase_check.programmering.kravanalyse",
         },
         "Arkitekturdesign": {
             "type": "file_exists",
             "paths": ["docs/arkitektur.md"],
             "min_files": 1,
             "description": "FORM\u00c5L: Design systemarkitektur med komponenter, moduler og dataflow. Kr\u00e6ver: docs/arkitektur.md eksisterer.",
+            "description_key": "phase_check.programmering.arkitekturdesign",
         },
         "Implementeringsplan": {
             "type": "file_exists",
             "paths": ["docs/implementeringsplan.md"],
             "min_files": 1,
             "description": "FORM\u00c5L: Planl\u00e6g filstruktur, r\u00e6kkef\u00f8lge og teststrategi. Kr\u00e6ver: docs/implementeringsplan.md eksisterer.",
+            "description_key": "phase_check.programmering.implementeringsplan",
         },
         "Sikkerhedsanalyse": {
             "type": "file_exists",
             "paths": ["docs/sikkerhedsanalyse.md"],
             "min_files": 1,
             "description": "FORM\u00c5L: Analys\u00e9r sikkerhedsaspekter (OWASP, inputvalidering, auth). Kr\u00e6ver: docs/sikkerhedsanalyse.md eksisterer.",
+            "description_key": "phase_check.programmering.sikkerhedsanalyse",
         },
         "Uddyb/refinements": {
             "type": "file_exists",
@@ -862,6 +889,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             ],
             "min_files": 5,
             "description": "FORM\u00c5L: Identificer manglende specifikationer, lad LLM svare, opdater docs. Kr\u00e6ver: docs/uddybning_dialog.md eksisterer OG alle 4 originale docs er bevaret.",
+            "description_key": "phase_check.programmering.uddyb",
         },
         "Kodeimplementering": {
             "type": "files_from_plan",
@@ -869,6 +897,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "min_files": 5,
             "allow_nested": True,
             "description": "FORM\u00c5L: Skriv koden baseret p\u00e5 design og plan. Kr\u00e6ver: alle moduler n\u00e6vnt i docs/implementeringsplan.md er oprettet (greenfield).",
+            "description_key": "phase_check.programmering.kodeimplementering",
         },
     },
     "selvforbedring": {
@@ -876,20 +905,24 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "type": "tool_called",
             "tools": ["read_issue"],
             "description": "FORM\u00c5L: L\u00e6s CORE-issue og forst\u00e5 hotspot. Kr\u00e6ver: read_issue kaldt.",
+            "description_key": "phase_check.selvforbedring.analyser",
         },
         "Diagnostic\u00e9r": {
             "type": "tool_called",
             "tools": ["run_tests"],
             "description": "FORM\u00c5L: Bekr\u00e6ft fejlm\u00f8nster med tests. Kr\u00e6ver: run_tests kaldt.",
+            "description_key": "phase_check.selvforbedring.diagnosticer",
         },
         "Ret": {
             "type": "tool_called",
             "tools": ["edit_file"],
             "description": "FORM\u00c5L: Redig\u00e9r koden med AST-baseret edit. Kr\u00e6ver: edit_file kaldt.",
+            "description_key": "phase_check.selvforbedring.ret",
         },
         "Verific\u00e9r": {
             "type": "all_of",
             "description": "FORM\u00c5L: K\u00f8r tests og mark\u00e9r issue som resolved. Kr\u00e6ver: tests best\u00e5et + update_issue_status kaldt.",
+            "description_key": "phase_check.selvforbedring.verificer",
             "checks": [
                 {"type": "tests_pass"},
                 {"type": "tool_called", "tools": ["update_issue_status"]},
@@ -899,6 +932,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "type": "tool_called",
             "tools": ["git_commit"],
             "description": "FORM\u00c5L: Commit og push \u00e6ndringerne. Kr\u00e6ver: git_commit kaldt.",
+            "description_key": "phase_check.selvforbedring.commit",
         },
     },
 }

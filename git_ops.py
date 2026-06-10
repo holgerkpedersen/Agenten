@@ -379,14 +379,16 @@ def _check_post_write(path: str, content: str, result: dict[str, Any]) -> dict[s
 
 def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, Any]:
     """write file.
-    
+
     Args:
-        path:
-        content:
-        overwrite:"""
+        path: File path to write (relative to project root or absolute).
+        content: File content as string.
+        overwrite: ``False`` = reject if exists. ``True`` = allow but warn if
+            replacing meaningful content. ``"force"`` or ``"replace"`` = unconditional.
+    """
     path = _resolve_path(path)
     if not is_safe_location(path):
-        return {"success": False, "error": f"Adgang nægtet: stien er uden for projektmappen: {path}"}
+        return {"success": False, "error": f"Adgang n\u00e6gtet: stien er uden for projektmappen: {path}"}
     dirname = os.path.dirname(path)
     if dirname:
         os.makedirs(dirname, exist_ok=True)
@@ -396,13 +398,34 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
                 "success": False,
                 "error": f"Filen findes allerede: {path}. Brug edit_file til at redigere eksisterende filer, eller brug overwrite=true for at erstatte den."
             }
+        if os.path.exists(path) and overwrite == True:
+            existing_size = os.path.getsize(path)
+            new_size = len(content)
+            if existing_size > 200 and new_size < 50:
+                return {
+                    "success": False,
+                    "error": (
+                        f"Filen indeholder eksisterende indhold ({existing_size} bytes). "
+                        f"Nyt indhold er kun {new_size} bytes — risiko for at slette meningsfuldt indhold. "
+                        f"Brug edit_file til at redigere, eller overwrite=\"force\" for at tvinge overskrivning."
+                    )
+                }
+            if existing_size > 500 and new_size < existing_size // 10:
+                return {
+                    "success": False,
+                    "error": (
+                        f"Filen indeholder {existing_size} bytes meningsfuldt indhold. "
+                        f"Nyt indhold er kun {new_size} bytes ({existing_size // new_size}x mindre). "
+                        f"Brug edit_file for at bevare indhold, eller overwrite=\"force\" for at tvinge."
+                    )
+                }
         if path.endswith('.py'):
             try:
                 ast.parse(content)
             except SyntaxError as e:
                 return {
                     "success": False,
-                    "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
+                    "error": f"Syntaksfejl p\u00e5 linje {e.lineno}: {e.msg}",
                     "line": e.lineno,
                     "msg": e.msg
                 }
