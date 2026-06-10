@@ -200,7 +200,7 @@ Flask API (api_server.py)
 - **Autonom refactoring**: 🔧 Refactor-skabelon → Analyse → Plan → Ekstraher → Opdatér → Test
 - **Testgenerering**: 🧪 Generer tests for utestede klasser/funktioner/metoder
 - **Billedanalyse**: Upload → Decompose → 5-trins struktureret analyse → .md eksport
-- **Vision support**: Automatisk model-detektion (VISION_KEYWORDS), format-tilpasning (raw_b64/data_url)
+- **Vision support**: Automatisk model-detektion (VISION_KEYWORDS), format-tilpasning (raw_b64/data_url, Gemma kræver images-before-text)
 - **Issues viewer**: 🐛 Issues knap viser alle issues med detaljer og "Brug som opgave"
 - **Issue Handler**: 📋 Automatisk issue fix workflow (læs → analysér → fix → verificér)
 - **Sessions**: Gem/indlæs/omdøb/slet — persistent JSON storage med atomic write
@@ -221,6 +221,8 @@ Flask API (api_server.py)
 - **OpenCode Go support**: Sæt `OPENCODE_BASE_URL` + `OPENCODE_API_KEY` for at bruge OpenCode Go i stedet for LM Studio
 - **Native function calling**: OpenAI native `tools` parameter sendes med chat completions — model returnerer strukturerede tool_calls i stedet for marker-parsing
 - **Session persistence fix**: `current_session_id` læk mellem test-filer fikset, `_save_session_data` debounce fjernet (altid gem ved SSE afslutning), tree serialisering inkluderer nu `result` felt
+- **Phase checks & auto-advance**: Deterministiske succeskriterier for faser. Systemet auto-afslutter når alle moduler findes eller planen er skrevet.
+- **Refactor template iteration limits**: Højere budget (15-12 iterationer) til at håndtere store refaktor arbejdsbelastninger.
 - **432 tests**: pytest suite med test af alle moduler (alle passerer på 3.6s)
 
 ## 📋 Requirements

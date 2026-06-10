@@ -200,7 +200,7 @@ Flask API (api_server.py)
 - **Autonomous refactoring**: 🔧 Refactor template → Analysis → Plan → Extract → Update → Test
 - **Test generation**: 🧪 Generate tests for untested classes/functions/methods
 - **Image analysis**: Upload → Decompose → Structured 5-phase analysis → .md export
-- **Vision support**: Automatic model detection, format adaptation
+- **Vision support**: Automatic model detection, format adaptation (Gemma requires raw_b64 + images-before-text)
 - **Issues viewer**: 🐛 Issues button shows all tracked issues with details and "Use as task" action
 - **Issue Handler**: 📋 Automated issue fix workflow (read → analyze → fix → verify)
 - **Precise file editing**: `edit_file` search-and-replace instead of full-file rewrites
@@ -221,6 +221,8 @@ Flask API (api_server.py)
 - **OpenCode Go support**: Set `OPENCODE_BASE_URL` + `OPENCODE_API_KEY` to use OpenCode Go instead of LM Studio
 - **Native function calling**: OpenAI native `tools` parameter sent with chat completions — model returns structured tool_calls instead of marker parsing
 - **Session persistence fix**: `current_session_id` leak between test files fixed, `_save_session_data` debounce removed (always saves at SSE end), tree serialization now includes `result` field
+- **Phase checks & auto-advance**: Deterministic success criteria for phases. System auto-completes when all modules exist or plan is written.
+- **Refactor template iteration limits**: Higher budget (15-12 iterations) to handle large refactor workloads.
 - **432 tests**: pytest suite covering all modules (all pass in 3.6s)
 
 ## 📋 Requirements

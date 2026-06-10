@@ -195,11 +195,11 @@ API Flask (api_server.py)
 
 ## 📝 Características
 
-- **Bugfix autónomo**: Plantilla 🐛 Bugfix (TDD) → Análisis → Prueba → Implementación → Verificación → Actualización
-- **Refactorización autónoma**: Plantilla 🔧 Refactor → Análisis → Plan → Extraer → Actualizar → Probar
+- **Bugfix autónomo**: 🐛 Plantilla Bugfix (TDD) → Análisis → Prueba → Implementación → Verificación → Actualización
+- **Refactorización autónoma**: 🔧 Refactor → Análisis → Plan → Extraer → Actualizar → Probar
 - **Generación de pruebas**: 🧪 Genera pruebas para clases/funciones/métodos no probados
 - **Análisis de imágenes**: Subir → Descomponer → Análisis estructurado de 5 fases → Exportar .md
-- **Soporte de visión**: Detección automática de modelos, adaptación de formato
+- **Soporte de visión**: Detección automática de modelos, adaptación de formato (Gemma requiere raw_b64 + imágenes antes del texto)
 - **Visor de issues**: Botón 🐛 Issues muestra todos los issues rastreados con detalles y acción "Usar como tarea"
 - **Issue Handler**: 📋 Flujo de trabajo automatizado para corregir issues (leer → analizar → corregir → verificar)
 - **Edición precisa de archivos**: `edit_file` búsqueda y reemplazo en lugar de reescrituras completas
@@ -216,6 +216,12 @@ API Flask (api_server.py)
 - **Auto-DONE**: Evita bucles infinitos de herramientas después de 10-15 iteraciones
 - **Análisis JSON robusto**: `json.JSONDecoder().raw_decode()` maneja la salida de IA
 - **Soporte LM Link**: Modelos API REST compatibles con OpenAI
+- **Context-CoT integration**: Extract-first guidance (LLM debe resumir el contexto antes de las herramientas), anti-leakage read_issue (solo problema por defecto, sugerencias en solicitud), validación basada en rúbrica por habilidad (checks binarios → retry)
+- **Soporte OpenCode Go**: Establece `OPENCODE_BASE_URL` + `OPENCODE_API_KEY` para usar OpenCode Go en lugar de LM Studio
+- **Llamadas nativas de funciones**: El parámetro nativo `tools` de OpenAI se envía con completaciones de chat — el modelo devuelve tool_calls estructurados en lugar del análisis de marcadores
+- **Corrección persistencia de sesiones**: Fuga de `current_session_id` entre archivos de prueba corregida, debounce en `_save_session_data` eliminado (siempre guarda al final SSE), serialización de árbol ahora incluye el campo `result`
+- **Checks de fases y autoavance**: Criterios de éxito determinísticos para las fases. El sistema se completa automáticamente cuando todos los módulos existen o la planificación está escrita.
+- **Límites de iteraciones para plantilla Refactor**: Presupuesto más alto (15-12 iteraciones) para manejar grandes cargas de trabajo de refactorización.
 - **384 pruebas**: Suite pytest que cubre todos los módulos
 
 ## 📋 Requisitos

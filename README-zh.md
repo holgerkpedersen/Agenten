@@ -199,7 +199,7 @@ Flask API (api_server.py)
 - **自主重构**：🔧 重构模板 → 分析 → 计划 → 提取 → 更新 → 测试
 - **测试生成**：🧪 为未测试的类/函数/方法生成测试
 - **图像分析**：上传 → 分解 → 5阶段结构化分析 → 导出 .md
-- **视觉支持**：自动模型检测、格式适配
+- **视觉支持**：自动模型检测、格式适配 (Gemma 需要 raw_b64 + 图像在文本前)
 - **Issues查看器**：🐛 Issues 按钮显示所有跟踪的 issues，附带详细信息和"用作任务"操作
 - **Issue Handler**：📋 自动问题修复工作流（读取 → 分析 → 修复 → 验证）
 - **精确文件编辑**：`edit_file` 搜索替换而不是全文件重写
@@ -216,6 +216,12 @@ Flask API (api_server.py)
 - **自动完成**：防止 10-15 次迭代后出现无限工具循环
 - **健壮JSON解析**：`json.JSONDecoder().raw_decode()` 处理 AI 输出
 - **LM Link支持**：兼容 OpenAI 的 REST API 模型
+- **Context-CoT integration**: Extract-first guidance (LLM 必须总结上下文后再调用工具)，anti-leakage read_issue (默认只读问题，请求时包含提示)，基于技能的验证（二元检查 → retry）
+- **OpenCode Go支持**：设置 `OPENCODE_BASE_URL` + `OPENCODE_API_KEY` 以使用 OpenCode Go 而不是 LM Studio
+- **原生函数调用**：OpenAI 原生 `tools` 参数随聊天完成一起发送 — 模型返回结构化 tool_calls 而非标记解析
+- **会话持久化修复**：`current_session_id` 在测试文件间的泄漏已修复，`_save_session_data` 的防抖移除（总是在 SSE 结束时保存），树序列化现在包含 `result` 字段
+- **阶段检查和自动推进**：阶段的确定性成功标准。系统在所有模块存在或计划写入后自动完成。
+- **重构模板迭代限制**：更高的预算 (15-12 次迭代) 以处理大的重构工作量。
 - **384 项测试**：覆盖所有模块的 pytest 测试套件
 
 ## 📋 要求
