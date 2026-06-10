@@ -34,8 +34,8 @@ def _get_issues_path() -> str:
     workdir = os.environ.get("AGENT_WORKDIR", "")
     if workdir:
         wd_path = os.path.join(workdir, "docs", "issues", "observed", "issues.json")
-        if os.path.exists(wd_path):
-            return wd_path
+        os.makedirs(os.path.dirname(wd_path), exist_ok=True)
+        return wd_path
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
 
 
