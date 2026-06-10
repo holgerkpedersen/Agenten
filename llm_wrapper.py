@@ -327,6 +327,17 @@ class LMStudioWrapper:
         if self.on_request:
             self.on_request(body)
         try:
+            workdir = os.environ.get('AGENT_WORKDIR') or os.getcwd()
+            req_dir = os.path.join(workdir, "logs", "llm_requests")
+            os.makedirs(req_dir, exist_ok=True)
+            ts = int(time.time() * 1000)
+            sess = os.environ.get('AGENT_SESSION_ID', 'unknown')
+            req_path = os.path.join(req_dir, f"{sess}_{ts}.json")
+            try:
+                with open(req_path, 'w', encoding='utf-8') as rf:
+                    json.dump(body, rf, ensure_ascii=False, indent=2, default=str)
+            except Exception as dump_err:
+                log.debug("Could not save LLM request body to %s: %s", req_path, dump_err)
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 json=body,
