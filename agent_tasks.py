@@ -428,6 +428,18 @@ def _validate_done_completion(
     return (None, yields_to_emit)
 
 
+def _is_greenfield() -> bool:
+    """Return True if target workdir has NO .py files (pure greenfield project)."""
+    workdir = os.environ.get('AGENT_WORKDIR') or os.getcwd()
+    try:
+        for f in os.listdir(workdir):
+            if f.endswith(".py") and os.path.isfile(os.path.join(workdir, f)):
+                return False
+    except OSError:
+        pass
+    return True
+
+
 def set_task_tools(agent: Any, task_name: str) -> None:
     """set task tools.
     
@@ -440,12 +452,23 @@ def set_task_tools(agent: Any, task_name: str) -> None:
     template_tools = agent_skills.TEMPLATE_TASK_TOOLS[agent.active_template]
     phase = _normalize_phase(task_name)
     if phase in template_tools:
-        agent.tool_registry.set_active_tools(template_tools[phase])
-        agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(template_tools[phase]))
+        tools = list(template_tools[phase])
+        # programmering/kodeimplementering: adapt tool order to project context
+        if agent.active_template == "programmering" and "kodeimplementering" in phase:
+            is_greenfield = _is_greenfield()
+            if is_greenfield:
+                tools.sort(key=lambda t: t != "write_file")  # write_file first
+        agent.tool_registry.set_active_tools(tools)
+        agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
         _ensure_done_tool(agent)
         return
-    for keyword, tools in template_tools.items():
+    for keyword, tools_kv in template_tools.items():
         if keyword in phase.lower():
+            tools = list(tools_kv)
+            if agent.active_template == "programmering" and "kodeimplementering" in phase:
+                is_greenfield = _is_greenfield()
+                if is_greenfield:
+                    tools.sort(key=lambda t: t != "write_file")  # write_file first
             agent.tool_registry.set_active_tools(tools)
             agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
             _ensure_done_tool(agent)
@@ -520,10 +543,21 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     clean_prompt = getattr(agent, 'prompt', original_prompt)
     file_ctx = getattr(agent, '_file_context_str', '')
 
-    section_instr = agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(agent.lang + "_" + task_node.name.lower(), "") or \
-                    agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name.lower(), "") or \
-                    agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(task_node.name, "") or \
-                    agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(_normalize_phase(task_node.name), "")
+    # Maintenance mode: use vedligeholdelse section instruction when .py files exist
+    phase_name = task_node.name or ""
+    maintenance_key = phase_name + " (vedligeholdelse)"
+    is_maintenance = (
+        agent.active_template == "programmering"
+        and "kodeimplementering" in _normalize_phase(phase_name)
+        and not _is_greenfield()
+    )
+    if is_maintenance:
+        section_instr = agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(maintenance_key, "")
+    else:
+        section_instr = agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(agent.lang + "_" + phase_name.lower(), "") or \
+                        agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(phase_name.lower(), "") or \
+                        agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(phase_name, "") or \
+                        agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(_normalize_phase(phase_name), "")
     criteria_block = ""
     header = t(K.CRITERIA_HEADER, agent.lang)
     if task_node.success_criteria:

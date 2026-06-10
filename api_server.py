@@ -1047,19 +1047,15 @@ def decompose() -> Any:
         image_warning = "🖼️  Billedanalyse kræver et billede! Upload et billede med 🖼 knappen før du kører Nedbryd."
         agent._log("WARNING", "Billedanalyse uden billede", image_warning)
 
-    # Guard: programmering (greenfield) must not run if .py files exist
+    # Guard: programmering (greenfield) warns but does not block if .py files exist
+    non_greenfield = False
     if template == "programmering":
         FRAMEWORK_PY = {"api_server.py", "agent_core.py", "agent_tasks.py", "agent_skills.py", "agent_files.py", "agent_issues.py", "agent_tree.py", "agent_git.py", "agent_phase_checks.py", "agent_wta.py", "core_analytics.py", "agent_logs.py", "tools.py", "i18n.py", "lang.py", "config.py", "task_tree.py", "llm_wrapper.py", "model_manager.py", "session_manager.py", "flow_builder.py", "skill_evolution.py", "skill_loader.py", "skill_tracker.py", "refactoring_engine.py", "github_wrapper.py"}
         check_dir = os.environ.get('AGENT_WORKDIR') or '.'
         existing_py = [f for f in os.listdir(check_dir) if f.endswith(".py") and f not in FRAMEWORK_PY and os.path.isfile(os.path.join(check_dir, f))]
         if existing_py:
-            return jsonify({
-                "success": False,
-                "error": f"Programmeringsskabelonen er kun til greenfield-projekter. Workdir indeholder allerede .py-filer: {', '.join(existing_py[:5])}. Brug i stedet en bugfix-, refactor- eller kodeanalyse-skabelon.",
-                "template_warning": "",
-                "suggested_template": "",
-                "image_warning": image_warning,
-            }), 400
+            non_greenfield = True
+            log.warning("Workdir indeholder allerede .py-filer: %s — kører programmering i vedligeholdelsestilstand", ', '.join(existing_py[:5]))
     
     # Validate prompt against selected template
     validation = _validate_template_prompt(prompt, template)
