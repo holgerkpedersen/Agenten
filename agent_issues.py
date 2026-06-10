@@ -103,12 +103,13 @@ def run_pytest(test_path: str = "") -> dict[str, Any]:
     Args:
         test_path:"""
     try:
+        workdir = os.environ.get('AGENT_WORKDIR') or os.getcwd()
         cmd = [sys.executable, "-m", "pytest", "-v"]
         if test_path:
             cmd.append(test_path)
         else:
             cmd.append("--ignore=tests/temp")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=config.SUBPROCESS_TIMEOUT)
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=workdir, timeout=config.SUBPROCESS_TIMEOUT)
         return {"success": result.returncode == 0, "stdout": result.stdout, "stderr": result.stderr, "exit_code": result.returncode}
     except subprocess.TimeoutExpired:
         return {"success": False, "stdout": "", "stderr": f"Timeout ({config.SUBPROCESS_TIMEOUT}s)", "exit_code": -1}

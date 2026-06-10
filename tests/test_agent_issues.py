@@ -146,6 +146,31 @@ class TestRunPytest:
             result = run_pytest()
             assert result["success"] is False
 
+    def test_run_pytest_in_workdir(self):
+        from agent_issues import run_pytest
+        with patch("subprocess.run") as mock_run, \
+             patch.dict("os.environ", {"AGENT_WORKDIR": "C:/Dev/StarBrowser"}, clear=True):
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = "OK"
+            mock_run.return_value.stderr = ""
+            result = run_pytest()
+            assert result["success"] is True
+            _, kwargs = mock_run.call_args
+            assert kwargs["cwd"] == "C:/Dev/StarBrowser"
+
+    def test_run_pytest_falls_back_to_cwd(self):
+        from agent_issues import run_pytest
+        with patch("subprocess.run") as mock_run, \
+             patch("os.getcwd", return_value="C:/Dev/Agenten"), \
+             patch.dict("os.environ", {"AGENT_WORKDIR": ""}, clear=True):
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = "OK"
+            mock_run.return_value.stderr = ""
+            result = run_pytest()
+            assert result["success"] is True
+            _, kwargs = mock_run.call_args
+            assert kwargs["cwd"] == "C:/Dev/Agenten"
+
 
 class TestCreateIssue:
     def test_create_new_issue(self, tmp_path):
