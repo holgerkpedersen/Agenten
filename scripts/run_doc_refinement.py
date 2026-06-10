@@ -65,6 +65,29 @@ def select_strongest_loaded_model(llm: LMStudioWrapper) -> str | None:
     return loaded[0]
 
 
+def find_working_model(llm: LMStudioWrapper, preferred: str | None = None) -> str | None:
+    """Try models in priority order until one responds successfully.
+
+    Returns the first model name that gives a non-error response to a trivial prompt.
+    """
+    candidates = list(STRONGEST_MODEL_PRIORITY)
+    if preferred and preferred in candidates:
+        candidates.remove(preferred)
+        candidates.insert(0, preferred)
+    test_prompt = "Reply with the single word: ok"
+    for candidate in candidates:
+        try:
+            llm.set_model(candidate)
+            resp = llm.generate(prompt=test_prompt, temperature=0.0, max_tokens=10, use_cache=False)
+            if resp and not resp.startswith("ERROR:") and len(resp.strip()) > 0:
+                log.info("Working model found: %s (responded: %r)", candidate, resp[:50])
+                return candidate
+        except Exception as e:
+            log.debug("Model %s failed: %s", candidate, e)
+            continue
+    return None
+
+
 SYSTEM_PROMPT = """Du er en senior softwarearkitekt der hjælper med at gøre eksisterende dokumentation komplet.
 
 Opgave:
@@ -190,15 +213,16 @@ def main() -> int:
     parser.add_argument("--model", "-m", default=None, help="Force a specific model (default: auto-select strongest)")
     parser.add_argument("--dry-run", action="store_true", help="Don't write changes to disk")
     parser.add_argument("--base-url", default=None, help="Override LM Studio base URL")
+    parser.add_argument("--timeout", type=int, default=600, help="Per-LLM-call timeout in seconds (default 600)")
     args = parser.parse_args()
 
     workdir = os.path.abspath(args.workdir)
     log.info("Refining docs in: %s", workdir)
 
     if args.base_url:
-        llm = LMStudioWrapper(base_url=args.base_url)
+        llm = LMStudioWrapper(base_url=args.base_url, timeout=args.timeout)
     else:
-        llm = LMStudioWrapper()
+        llm = LMStudioWrapper(timeout=args.timeout)
 
     model = args.model or select_strongest_loaded_model(llm)
     if not model:
@@ -207,6 +231,15 @@ def main() -> int:
     if model != llm.model:
         log.info("Switching to model: %s (was %s)", model, llm.model)
         llm.set_model(model)
+    log.info("Probing model availability: %s", model)
+    working_model = find_working_model(llm, preferred=model)
+    if not working_model:
+        log.error("No working model found in priority list. Tried: %s", STRONGEST_MODEL_PRIORITY)
+        return 1
+    if working_model != model:
+        log.info("Preferred model %s unavailable, falling back to: %s", model, working_model)
+        llm.set_model(working_model)
+        model = working_model
     log.info("Using model: %s", model)
 
     docs = read_docs(workdir)
