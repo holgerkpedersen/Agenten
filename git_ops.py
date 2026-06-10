@@ -562,20 +562,57 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
             if not new_text:
                 return {"success": False, "error": "new_text is required when using symbol."}
             loc = locate_code(filepath=path, name=symbol)
-            if not loc.get("success"):
+            if loc.get("success"):
+                start = loc["line"]
+                end = loc["end_line"]
+                lines_list = content.split('\n')
+                if start < 1 or end > len(lines_list):
+                    return {"success": False, "error": f"Symbol '{symbol}' line range {start}-{end} outside file"}
+                search = '\n'.join(lines_list[start - 1:end])
+                if content.count(search) != 1:
+                    return {"success": False, "error": f"Symbol body for '{symbol}' matched {content.count(search)} times (expected 1)"}
+                if _has_placeholders(new_text):
+                    return {"success": False, "error": f"new_text for symbol '{symbol}' indeholder pladsholdere (..., 'full new function body', osv.). Erstat med den faktiske kode."}
+                idx = content.index(search)
+                search_len = len(search)
+                exact_old = content[idx:idx + search_len]
+                if exact_old.count('\n') != search.count('\n'):
+                    lines = search.split('\n')
+                    pos = idx
+                    parts = []
+                    for line in lines:
+                        next_newline = content.find('\n', pos)
+                        if next_newline == -1:
+                            parts.append(content[pos:])
+                            break
+                        parts.append(content[pos:next_newline + 1])
+                        pos = next_newline + 1
+                    exact_old = ''.join(parts)
+                new_content = content.replace(exact_old, new_text, 1)
+            elif "." in symbol:
+                class_name = symbol.rsplit(".", 1)[0]
+                class_loc = locate_code(filepath=path, name=class_name)
+                if not class_loc.get("success") or class_loc.get("type") not in ("class",):
+                    return {"success": False, "error": f"Symbol '{symbol}' not found in {path}. Use old_text/new_text instead."}
+                lines_list = content.split('\n')
+                insert_at = class_loc["end_line"]
+                while insert_at > class_loc["line"] and insert_at <= len(lines_list):
+                    if lines_list[insert_at - 1].strip() == '':
+                        insert_at -= 1
+                    else:
+                        break
+                if insert_at < class_loc["end_line"]:
+                    insert_at = class_loc["end_line"]
+                trimmed = new_text.rstrip('\n')
+                trimmed_lines = trimmed.split('\n')
+                indent = "    "
+                if trimmed_lines and not trimmed_lines[0].startswith(indent):
+                    trimmed_lines = [indent + l if l.strip() else l for l in trimmed_lines]
+                new_method_block = '\n' + '\n'.join(trimmed_lines)
+                lines_list.insert(insert_at, new_method_block)
+                new_content = '\n'.join(lines_list)
+            else:
                 return {"success": False, "error": f"Symbol '{symbol}' not found in {path}. Use old_text/new_text instead."}
-            start = loc["line"]
-            end = loc["end_line"]
-            lines_list = content.split('\n')
-            if start < 1 or end > len(lines_list):
-                return {"success": False, "error": f"Symbol '{symbol}' line range {start}-{end} outside file"}
-            search = '\n'.join(lines_list[start - 1:end])
-            if content.count(search) != 1:
-                return {"success": False, "error": f"Symbol body for '{symbol}' matched {content.count(search)} times (expected 1)"}
-            if _has_placeholders(new_text):
-                return {"success": False, "error": f"new_text for symbol '{symbol}' indeholder pladsholdere (..., 'full new function body', osv.). Erstat med den faktiske kode."}
-            idx = content.index(search)
-            search_len = len(search)
         elif old_text:
             search = old_text.replace('\r\n', '\n').replace('\r', '\n')
             count = content.count(search)
@@ -597,42 +634,46 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                     return {"success": False, "error": f"Teksten fundet {count} gange — brug en mere specifik søgestreng"}
                 idx = content.index(search)
                 search_len = len(search)
-        else:
-            return {"success": False, "error": "Provide either symbol (AST-based) or old_text+new_text (search-and-replace)."}
+            exact_old = content[idx:idx + search_len]
+            if exact_old.count('\n') != search.count('\n'):
+                lines = search.split('\n')
+                pos = idx
+                parts = []
+                for line in lines:
+                    next_newline = content.find('\n', pos)
+                    if next_newline == -1:
+                        parts.append(content[pos:])
+                        break
+                    parts.append(content[pos:next_newline + 1])
+                    pos = next_newline + 1
+                exact_old = ''.join(parts)
+            new_content = content.replace(exact_old, new_text, 1)
 
-        exact_old = content[idx:idx + search_len]
-        if exact_old.count('\n') != search.count('\n'):
-            lines = search.split('\n')
-            pos = idx
-            parts = []
-            for line in lines:
-                next_newline = content.find('\n', pos)
-                if next_newline == -1:
-                    # Ved filens ende uden newline
-                    parts.append(content[pos:])
-                    break
-                parts.append(content[pos : next_newline + 1])
-                pos = next_newline + 1
-            exact_old = ''.join(parts)
-        new_content = content.replace(exact_old, new_text, 1)
-        if path.endswith('.py'):
-            try:
-                ast.parse(new_content)
-            except SyntaxError as e:
-                if symbol:
-                    normalized_new = _normalize_indentation(new_text, search)
-                    if normalized_new != new_text:
-                        normalized_content = content.replace(exact_old, normalized_new, 1)
-                        try:
-                            ast.parse(normalized_content)
-                            new_text = normalized_new
-                            new_content = normalized_content
-                        except SyntaxError as e2:
+            if path.endswith('.py'):
+                try:
+                    ast.parse(new_content)
+                except SyntaxError as e:
+                    if symbol:
+                        normalized_new = _normalize_indentation(new_text, search)
+                        if normalized_new != new_text:
+                            normalized_content = content.replace(exact_old, normalized_new, 1)
+                            try:
+                                ast.parse(normalized_content)
+                                new_text = normalized_new
+                                new_content = normalized_content
+                            except SyntaxError as e2:
+                                return {
+                                    "success": False,
+                                    "error": f"Syntaksfejl på linje {e2.lineno}: {e2.msg}",
+                                    "line": e2.lineno,
+                                    "msg": e2.msg
+                                }
+                        else:
                             return {
                                 "success": False,
-                                "error": f"Syntaksfejl på linje {e2.lineno}: {e2.msg}",
-                                "line": e2.lineno,
-                                "msg": e2.msg
+                                "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
+                                "line": e.lineno,
+                                "msg": e.msg
                             }
                     else:
                         return {
@@ -641,13 +682,15 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                             "line": e.lineno,
                             "msg": e.msg
                         }
-                else:
-                    return {
-                        "success": False,
-                        "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
-                        "line": e.lineno,
-                        "msg": e.msg
-                    }
+        else:
+            return {"success": False, "error": "Provide either symbol (AST-based) or old_text+new_text (search-and-replace)."}
+
+        # Syntax check for symbol-based edits (both replace and append at class end)
+        if symbol and path.endswith('.py') and new_content and new_content != content:
+            try:
+                ast.parse(new_content)
+            except SyntaxError as e:
+                return {"success": False, "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}", "line": e.lineno, "msg": e.msg}
 
         with _file_lock:
             with open(path, 'w', encoding='utf-8') as f:

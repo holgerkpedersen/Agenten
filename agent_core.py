@@ -531,16 +531,17 @@ class Agent:
             optional_params=["filepath"]
         ))
         self.tool_registry.register(Tool(
-            "edit_file",
-            "Rediger en eksisterende fil. Tre tilstande:\n"
-             "1) AST+LLM (BEDST til .py): Angiv symbol='funktionsnavn' + requirements='hvad skal ændres'. "
-             "Systemet finder funktionen via AST, forbedrer den med LLM, erstatter, og kører tests. Ingen old_text/new_text nødvendig.\n"
-             "2) AST (hurtig): Angiv symbol='funktionsnavn' + new_text=HELE den nye funktion. "
-             "Systemet erstatter funktionen via AST-linjenumre — old_text ignoreres.\n"
-             "3) Search-and-replace: Angiv old_text (PRÆCIS tekst fra filen — kopieret direkte, IKKE omskrevet) + new_text. "
-             "Søgeteksten skal være en 1:1 byte-kopi af filindholdet.\n\n"
-             "Import-regel: alle import-sætninger hører i toppen af filen, ALDRIG inde i funktioner/klasser. "
-             "Læs funktionen med locate(name='funktionsnavn') FØRST for at se den nøjagtige nuværende kode.",
+             "edit_file",
+             "Rediger en eksisterende fil. Tre tilstande:\n"
+              "1) AST+LLM (BEDST til .py): Angiv symbol='funktionsnavn' + requirements='hvad skal ændres'. "
+              "Systemet finder funktionen via AST, forbedrer den med LLM, erstatter, og kører tests. Ingen old_text/new_text nødvendig.\n"
+              "2) AST (hurtig): Angiv symbol='Klasse.metode' + new_text=HELE den nye funktion. "
+              "Systemet erstatter funktionen via AST — old_text ignoreres. "
+              "HVIS metoden ikke findes men klassen gør, auto-tilføjes metoden i klassen.\n"
+              "3) Search-and-replace: Angiv old_text (PRÆCIS tekst fra filen — kopieret direkte, IKKE omskrevet) + new_text. "
+              "Søgeteksten skal være en 1:1 byte-kopi af filindholdet.\n\n"
+              "Import-regel: alle import-sætninger hører i toppen af filen, ALDRIG inde i funktioner/klasser. "
+              "Læs funktionen med locate(name='funktionsnavn') FØRST for at se den nøjagtige nuværende kode.",
             ["path", "old_text", "new_text"],
             lambda path, old_text="", new_text="", symbol=None, requirements="", test_path="": git_ops.edit_file(
                 path=path, old_text=old_text, new_text=new_text,

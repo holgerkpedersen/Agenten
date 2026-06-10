@@ -13,7 +13,6 @@ import agent_git
 import agent_files
 import agent_issues
 import agent_phase_checks
-from git_ops import write_file as _write_file
 import config
 from typing import Any, Generator
 
@@ -1727,21 +1726,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     consecutive_failures = 0
                 if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success") is False:
                     agent._write_failed = True
-                    # Auto-retry write_file with overwrite=True when file already exists
-                    if tool_name == "write_file" and "Filen findes allerede" in result.get("error", ""):
-                        retry_path = args_val.get("path", "")
-                        retry_content = args_val.get("content", "")
-                        agent._log("SYSTEM", "write_file auto-retry", f"File exists, retrying with overwrite=True: {retry_path}")
-                        result = _write_file(path=retry_path, content=retry_content, overwrite=True)
-                        if result.get("success"):
-                            agent._write_failed = False
-                            result_str = f"✅ {t(K.EXTRACT_WRITE_SUCCESS, agent.lang)} (overwrite=true)"
-                            agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                        else:
-                            result_str = f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: write_file MISLYKKEDES (overwrite=true fejlede også). {result.get('error', '')}"
-                    else:
-                        tool_label = "write_file" if tool_name == "write_file" else "edit_file"
-                        result_str += f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: {tool_label} MISLYKKEDES. DU M\u00c5 IKKE bruge <<<DONE>>> f\u00f8r {tool_label} lykkes. Ret din anmodning og pr\u00f8v igen."
+                    tool_label = "write_file" if tool_name == "write_file" else "edit_file"
+                    result_str += f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: {tool_label} MISLYKKEDES. DU M\u00c5 IKKE bruge <<<DONE>>> f\u00f8r {tool_label} lykkes. Ret din anmodning og pr\u00f8v igen."
                 if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success"):
                     fpath = args_val.get("path", "")
                     if fpath and fpath.lower().endswith('.py'):

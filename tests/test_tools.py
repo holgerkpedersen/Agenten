@@ -382,6 +382,79 @@ class TestRouteMismatch:
         updated = req.read_text(encoding='utf-8')
         assert "cryptography" in updated
 
+    def test_write_file_new_file_creates_successfully(self, tmp_path):
+        """write_file creates a new .py file and returns success."""
+        from git_ops import write_file
+        f = tmp_path / "new_file.py"
+        result = write_file(str(f), "x = 1\n")
+        assert result["success"] is True
+        assert f.read_text(encoding='utf-8') == "x = 1\n"
+
+    def test_write_file_new_non_python_skips_ast_check(self, tmp_path):
+        """write_file creates non-.py files without AST validation."""
+        from git_ops import write_file
+        f = tmp_path / "data.txt"
+        result = write_file(str(f), "any content")
+        assert result["success"] is True
+        assert f.read_text(encoding='utf-8') == "any content"
+
+    def test_write_file_existing_file_rejected_without_overwrite(self, tmp_path):
+        """write_file rejects overwriting an existing .py file unless overwrite=True."""
+        from git_ops import write_file
+        f = tmp_path / "existing.py"
+        f.write_text("x = 1\n", encoding='utf-8')
+        result = write_file(str(f), "x = 2\n")
+        assert result["success"] is False
+        assert "Filen findes allerede" in result.get("error", "")
+        assert f.read_text(encoding='utf-8') == "x = 1\n"
+
+    def test_write_file_existing_file_overwrite_true_succeeds(self, tmp_path):
+        """write_file succeeds with overwrite=True on existing .py file."""
+        from git_ops import write_file
+        f = tmp_path / "existing.py"
+        f.write_text("x = 1\n", encoding='utf-8')
+        result = write_file(str(f), "x = 2\n", overwrite=True)
+        assert result["success"] is True
+        assert f.read_text(encoding='utf-8') == "x = 2\n"
+
+    def test_write_file_error_mentions_edit_file_and_overwrite(self, tmp_path):
+        """Error message tells the LLM how to fix it: use edit_file or overwrite=true."""
+        from git_ops import write_file
+        f = tmp_path / "existing.py"
+        f.write_text("x = 1\n", encoding='utf-8')
+        result = write_file(str(f), "x = 2\n")
+        assert result["success"] is False
+        error = result.get("error", "")
+        assert "edit_file" in error, f"Error should mention edit_file, got: {error}"
+        assert "overwrite" in error, f"Error should mention overwrite, got: {error}"
+
+    def test_write_file_overwrite_preserves_other_files(self, tmp_path):
+        """Overwriting one .py file doesn't affect other files."""
+        from git_ops import write_file
+        a = tmp_path / "a.py"
+        b = tmp_path / "b.py"
+        a.write_text("x = 1\n", encoding='utf-8')
+        b.write_text("y = 2\n", encoding='utf-8')
+        result = write_file(str(a), "x = 99\n", overwrite=True)
+        assert result["success"] is True
+        assert a.read_text(encoding='utf-8') == "x = 99\n"
+        assert b.read_text(encoding='utf-8') == "y = 2\n"
+
+    def test_write_file_invalid_python_rejected(self, tmp_path):
+        """write_file rejects .py files with invalid Python syntax."""
+        from git_ops import write_file
+        f = tmp_path / "bad.py"
+        result = write_file(str(f), "this is not valid python @@")
+        assert result["success"] is False
+        assert "Syntaksfejl" in result.get("error", "")
+
+    def test_write_file_non_python_skips_syntax_check(self, tmp_path):
+        """write_file accepts non-.py files even with invalid syntax."""
+        from git_ops import write_file
+        f = tmp_path / "template.html"
+        result = write_file(str(f), "<html>{{ invalid python }}</html>")
+        assert result["success"] is True
+
 
 class TestEditFile:
     def test_edit_file_basic(self, tmp_path):
