@@ -50,13 +50,7 @@ def _save_llm_prompt_file(agent: Any, task_name: str, iteration: int, messages: 
     return filepath
 
 
-def _save_maintenance_prompt_dump(agent: Any, task_name: str, iteration: int, messages: list[dict], tool_defs: list[dict]) -> str:
-    """Save full prompt + native tool definitions for programmering/kodeimplementering maintenance mode.
-    
-    This is used to debug why LLM chooses write_file over edit_file in an
-    existing-project (vedligeholdelse) context. Logs everything the LLM sees:
-    messages, native tool definitions, active tool list, and greenfield status.
-    """
+def _save_maintenance_prompt_dump(agent: Any, task_name: str, iteration: int, messages: list[dict], tool_defs: list[dict], pending_tc: list | None = None) -> str:
     session_id = getattr(agent, '_session_id', 'unknown')
     session_dir = os.path.join("logs", "maintenance_prompt_dump", session_id)
     os.makedirs(session_dir, exist_ok=True)
@@ -70,7 +64,8 @@ def _save_maintenance_prompt_dump(agent: Any, task_name: str, iteration: int, me
         "is_greenfield": _is_greenfield(),
         "active_tools": list(agent.tool_registry.active_tools or []),
         "native_tools_enabled": config.NATIVE_TOOLS,
-        "messages": messages,
+        "tool_choices": [tc.get("function", {}).get("name", "?") for tc in pending_tc] if pending_tc else [],
+        "messages": messages[:2],
         "tool_definitions": tool_defs,
     }
     try:
@@ -1569,7 +1564,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
 
         pending_tc = getattr(agent.llm, '_pending_tool_calls', [])
         if pending_tc and agent.active_template == "programmering" and "kodeimplementering" in _normalize_phase(task_node.name) and not _is_greenfield():
-            _save_maintenance_prompt_dump(agent, task_node.name, i, messages, tools_param if tools_param else [])
+            _save_maintenance_prompt_dump(agent, task_node.name, i, messages, tools_param if tools_param else [], pending_tc)
         if pending_tc and hasattr(agent, '_wta'):
             template = getattr(agent, 'active_template', 'fri') or 'fri'
             phase = getattr(task_node, 'name', '?')
@@ -1634,7 +1629,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             reminder = (
                                 f"[SYSTEM: Du er i en l\u00f8kke med identiske resultater. "
                                 f"STOP med at l\u00e6se. BRUG et v\u00e6rkt\u00f8j der SKRIVER: "
-                                f"{', '.join(write_tools)}. Hvis du er i tvivl, brug write_file med et NYT filnavn.]"
+                                f"{', '.join(write_tools)}. "
+                                f"Forklar HVORFOR du ikke kan skrive \u2014 hvad mangler du?]"
                             )
                             messages.append({"role": "system", "content": reminder})
                             agent._log("SYSTEM", "Dedup-loop escape", reminder[:120])
@@ -1659,7 +1655,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             _add_user_msg(messages, (
                                 f"[SYSTEM: Du har lavet {consecutive_reads} l\u00e6sekald i tr\u00e6k uden at skrive noget. "
                                 f"STOP med at l\u00e6se. BRUG et v\u00e6rkt\u00f8j der SKRIVER: "
-                                f"{', '.join(write_tools)}. L\u00e6s h\u00f8jst \u00e9n ting mere, skriv s\u00e5.]"
+                                f"{', '.join(write_tools)}. "
+                                f"Forklar HVORFOR du bliver ved med at l\u00e6se \u2014 hvad mangler du?]"
                             ))
                             agent._log("SYSTEM", "Read-loop escape", f"{consecutive_reads} consecutive reads — force write")
                             consecutive_reads = 0
