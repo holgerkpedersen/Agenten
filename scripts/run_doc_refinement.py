@@ -241,6 +241,14 @@ def main() -> int:
         llm.set_model(working_model)
         model = working_model
     log.info("Using model: %s", model)
+    log.info("=" * 60)
+    log.info("CONFIGURATION:")
+    log.info("  Rounds: %d (max iterations)", args.rounds)
+    log.info("  Per-call timeout: %ds (%d min)", args.timeout, args.timeout // 60)
+    log.info("  Estimated total time: ~%d-%d min",
+             args.rounds * 8, args.rounds * 15)
+    log.info("  Press Ctrl+C to stop (dialog will be saved on success)")
+    log.info("=" * 60)
 
     docs = read_docs(workdir)
     log.info("Read %d docs: %s", len(docs), list(docs.keys()))

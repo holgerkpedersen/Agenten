@@ -264,6 +264,9 @@ def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_co
 def _run_doc_refinement(workdir: str, rounds: int = 7, model: str = "") -> dict[str, Any]:
     """Kør iterativ doc-refinement via scripts/run_doc_refinement.py.
 
+    Auto-beregner per-call timeout (default 900s) og total script timeout
+    (per_call_timeout * rounds * 1.5) for at give buffer.
+
     Returnerer dict med success, rounds, model, output, dialog_path.
     """
     import subprocess
@@ -274,7 +277,15 @@ def _run_doc_refinement(workdir: str, rounds: int = 7, model: str = "") -> dict[
     script_path = os.path.join(project_root, "scripts", "run_doc_refinement.py")
     if not os.path.isfile(script_path):
         return {"success": False, "error": f"Script ikke fundet: {script_path}"}
-    cmd = [_sys.executable, script_path, "--workdir", workdir, "--rounds", str(int(rounds))]
+    rounds = max(1, int(rounds))
+    per_call_timeout = 900
+    total_timeout = int(per_call_timeout * rounds * 1.5)
+    cmd = [
+        _sys.executable, script_path,
+        "--workdir", workdir,
+        "--rounds", str(rounds),
+        "--timeout", str(per_call_timeout),
+    ]
     if model:
         cmd.extend(["--model", model])
     try:
@@ -282,18 +293,27 @@ def _run_doc_refinement(workdir: str, rounds: int = 7, model: str = "") -> dict[
             cmd,
             capture_output=True,
             text=True,
-            timeout=600,
+            timeout=total_timeout,
         )
         output = (result.stdout or "") + (result.stderr or "")
         dialog_path = os.path.join(workdir, "docs", "uddybning_dialog.md")
         return {
             "success": result.returncode == 0,
             "exit_code": result.returncode,
+            "rounds_run": rounds,
+            "per_call_timeout": per_call_timeout,
+            "total_timeout": total_timeout,
             "output": output[-2000:],
             "dialog_path": dialog_path if os.path.isfile(dialog_path) else None,
         }
     except subprocess.TimeoutExpired:
-        return {"success": False, "error": "Refinement script timeout (>600s)"}
+        return {
+            "success": False,
+            "error": f"Refinement script timeout (>{total_timeout}s = {total_timeout // 60} min for {rounds} rounds)",
+            "rounds_run": rounds,
+            "per_call_timeout": per_call_timeout,
+            "total_timeout": total_timeout,
+        }
     except Exception as e:
         return {"success": False, "error": f"Refinement script fejl: {e}"}
 
