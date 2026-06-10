@@ -691,10 +691,13 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 
 **Symptom:** Session `bc3b4f38` — StarBrowser's BUG-001. Analysis phase LLM called `locate(name='create_application')` — returned Agenten symbols (`Agent.__init__`, `Agent._count_tasks`, etc.) instead of StarBrowser symbols. LLM wasted 2 iterations searching wrong project, hit 3 consecutive tool failures → dedup-escape triggered.
 
-**Root cause:** `locate` and `list_symbols` use `agent_core.py`'s `base_dir` which defaults to `os.getcwd()` (Agenten root). When a session from StarBrowser is loaded, `base_dir` wasn't updated to StarBrowser's directory. The session's `file_chunks` contained StarBrowser files but `locate` searched `C:\Dev\Agenten`.
+**Root cause:** `locate` and `list_symbols`'s global symbol index (`_GLOBAL_SYMBOL_INDEX`) was built at import time from `os.getcwd()` (Agenten root). When sessions from other projects are loaded, those projects' symbols were never indexed. `_ensure_workdir_indexed()` depended on `AGENT_WORKDIR` env var which wasn't set.
 
-**Fix:** Workdir-aware session loading — `load_session()` in the StarBrowser repo should set `agent.base_dir` to the session's workdir. Not yet implemented in Agenten core (this is a usage-pattern issue: the StarBrowser repo's `api_server.py` clone should pass the correct workdir).
+**Fix (3 parts):**
+1. **`_resolve_workdir()`** (`agent_files.py:99-104`): New function — checks `AGENT_WORKDIR` env, falls back to CWD.
+2. **`auto_detect_workdir(file_chunks, prompt)`** (`agent_files.py:107-150`): New function — scans session prompt for traceback paths like `C:\Dev\StarBrowser\starbrowser\main.py` and file_chunks content for absolute paths. Auto-sets `AGENT_WORKDIR` and re-indexes symbols.
+3. **Session load calls** (`api_server.py:509,1421`): Both `load_session()` and stream session setup now call `auto_detect_workdir()` after restoring file_chunks.
 
-**Workaround:** Set `AGENT_WORKDIR` environment variable before loading sessions from other projects.
+**Result:** When a session contains tracebacks or code referencing files outside Agenten's directory, the system auto-detects the workdir and indexes that project's symbols. No manual `AGENT_WORKDIR` setup needed.
 
-**Files:** N/A — requires per-deployment config. Documented for awareness.
+**Files:** `agent_files.py:99-150`, `api_server.py:509-510,1421-1422`

@@ -96,13 +96,75 @@ def _is_safe_path(base_dir: str, target_path: str) -> bool:
         return False
 
 
+def _resolve_workdir() -> str:
+    """Return the effective workdir: AGENT_WORKDIR env, or auto-detect from cwd."""
+    env_workdir = os.environ.get('AGENT_WORKDIR', '')
+    if env_workdir:
+        return os.path.abspath(env_workdir)
+    return os.path.abspath('.')
+
+
+def auto_detect_workdir(file_chunks: dict | None = None, prompt: str = "") -> str | None:
+    """Detect workdir from prompt tracebacks or file_chunks content.
+
+    Scans prompt for file paths like ``C:\\Dev\\StarBrowser\\starbrowser\\main.py``
+    and file_chunks content for absolute paths.  If found, sets
+    ``AGENT_WORKDIR`` env var, re-indexes, and returns the directory.
+    """
+    cwd = os.path.abspath('.')
+    cwd_norm = os.path.normcase(cwd)
+    agenten_dir = os.path.normcase(os.path.dirname(os.path.abspath(__file__)))
+    detected: set[str] = set()
+
+    def _check_path(path: str) -> None:
+        try:
+            path = path.strip().strip('"\'')
+            abspath = os.path.abspath(path)
+            if os.path.exists(abspath):
+                parent = os.path.dirname(abspath)
+            elif os.path.exists(os.path.dirname(path)):
+                parent = os.path.dirname(path)
+            else:
+                return
+            parent_norm = os.path.normcase(parent)
+            if parent_norm != cwd_norm and parent_norm != agenten_dir:
+                detected.add(parent)
+        except Exception:
+            pass
+
+    if prompt:
+        for match in re.finditer(r'(C:[/\\][^\s\r\n]{10,}\.py)', prompt):
+            _check_path(match.group(1))
+
+    if file_chunks:
+        for chunks in file_chunks.values():
+            if not isinstance(chunks, list):
+                continue
+            for chunk in (chunks or []):
+                if not isinstance(chunk, str):
+                    continue
+                for match in re.finditer(r'(C:[/\\][^\s\r\n]{10,}\.py)', chunk):
+                    _check_path(match.group(1))
+
+    if not detected:
+        return None
+
+    workdir = min(detected, key=len)
+    os.environ['AGENT_WORKDIR'] = workdir
+    _ensure_workdir_indexed()
+    return workdir
+
+
 def _resolve_path(path: str) -> str:
-    """Resolve a path relative to AGENT_WORKDIR when set, otherwise relative to CWD."""
+    """Resolve a path relative to the workdir when outside Agenten cwd, otherwise relative to cwd."""
     if os.path.isabs(path):
         return os.path.abspath(path)
-    workdir = os.environ.get('AGENT_WORKDIR', '')
-    if workdir:
-        return os.path.abspath(os.path.join(workdir, path))
+    workdir = _resolve_workdir()
+    cwd = os.path.abspath('.')
+    if os.path.normcase(workdir) != os.path.normcase(cwd):
+        joined = os.path.abspath(os.path.join(workdir, path))
+        if os.path.exists(joined):
+            return joined
     return os.path.abspath(path)
 
 
@@ -595,16 +657,21 @@ def _scan_dir_into_index(dir_path: str, index: dict) -> None:
 
 
 def _build_global_symbol_index() -> dict[str, list[Any]]:
-    """build global symbol index from CWD."""
+    """Build global symbol index from CWD + AGENT_WORKDIR if different."""
     index = {}
-    _scan_dir_into_index('.', index)
+    cwd = os.path.abspath('.')
+    _scan_dir_into_index(cwd, index)
+    workdir = _resolve_workdir()
+    if os.path.normcase(workdir) != os.path.normcase(cwd):
+        _scan_dir_into_index(workdir, index)
     return index
 
 
 def _ensure_workdir_indexed() -> None:
-    """Ensure AGENT_WORKDIR .py files are included in the global symbol index."""
-    workdir = os.environ.get('AGENT_WORKDIR', '')
-    if workdir:
+    """Ensure workdir .py files are included in the global symbol index."""
+    workdir = _resolve_workdir()
+    cwd = os.path.abspath('.')
+    if os.path.normcase(workdir) != os.path.normcase(cwd):
         _scan_dir_into_index(workdir, _GLOBAL_SYMBOL_INDEX)
 
 _GLOBAL_SYMBOL_INDEX = _build_global_symbol_index()

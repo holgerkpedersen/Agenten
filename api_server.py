@@ -506,6 +506,8 @@ def load_session(session_id: str) -> Any:
                 agent.llm.set_model(session_data["execute_model"])
         with agent.images_lock:
             agent.images = _normalize_images(session_data.get("images", []))
+        from agent_files import auto_detect_workdir
+        auto_detect_workdir(session_data.get("file_chunks"), session_data.get("original_prompt", ""))
         return jsonify({"success": True, "session": session_data})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
@@ -1416,6 +1418,8 @@ def execute_stream() -> Any:
                 stream_agent.tool_registry.lang = stream_agent.lang
             if session_data.get("file_chunks"):
                 stream_agent.file_chunks = session_data["file_chunks"]
+                from agent_files import auto_detect_workdir
+                auto_detect_workdir(session_data["file_chunks"], session_data.get("original_prompt", ""))
             stream_agent.images = _normalize_images(session_data.get("images", []))
             if session_data.get("template"):
                 stream_agent.active_template = session_data["template"]
