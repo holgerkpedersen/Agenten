@@ -1397,8 +1397,36 @@ async function markTaskDone(path, status) {
     if (status === 'pending') {
         node.status = 'pending';
         node.result = null;
+        const parentPaths = [];
+        if (path) {
+            const parts = path.split('.');
+            for (let i = parts.length - 1; i > 0; i--) {
+                parentPaths.push(parts.slice(0, i).join('.'));
+            }
+            parentPaths.push('');
+        }
+        for (const pPath of parentPaths) {
+            const pNode = pPath === '' ? currentTree : getNodeByPath(currentTree, pPath);
+            if (pNode && pNode.status === 'done') {
+                pNode.status = 'pending';
+                pNode.result = null;
+            }
+        }
         updateTreeDisplay();
-        addLogEntry('INFO', `Opgave nulstillet: ${node.name}`, `(sti: ${path})`);
+        addLogEntry('INFO', `Opgave nulstillet: ${node.name}`, `(sti: ${path}${parentPaths.length ? ' + parents: ' + parentPaths.join(', ') : ''})`);
+        const sessionId = currentSessionId || document.getElementById('sessionSelect')?.value;
+        for (const pPath of parentPaths) {
+            const pNode = pPath === '' ? currentTree : getNodeByPath(currentTree, pPath);
+            if (pNode && pNode.status === 'pending' && sessionId) {
+                try {
+                    await fetch('/api/update-task-status', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({session_id: sessionId, task_path: pPath, status: 'pending'}),
+                    });
+                } catch (e) { /* best-effort */ }
+            }
+        }
         await saveCurrentSession();
         return;
     }
