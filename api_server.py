@@ -1687,8 +1687,8 @@ def update_task_status() -> Any:
 
     if not session_id:
         return jsonify({"success": False, "error": "Ingen session"}), 400
-    if new_status not in ("done", "skipped"):
-        return jsonify({"success": False, "error": "Status skal v\u00e6re 'done' eller 'skipped'"}), 400
+    if new_status not in ("done", "skipped", "pending"):
+        return jsonify({"success": False, "error": "Status skal v\u00e6re 'done', 'skipped' eller 'pending'"}), 400
 
     # Resolve agent -- prefer stream agent if active
     stream_agent = agent

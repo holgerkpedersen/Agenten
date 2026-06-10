@@ -1287,6 +1287,8 @@ function renderTree(node, path = []) {
         html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="${_('btn_edit')}" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="${_('btn_delete')}" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="${_('btn_add_child')}" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
     } else if (node.status !== 'done' && node.status !== 'skipped') {
         html += `<span style="margin-left:8px;white-space:nowrap;"><button onclick="markTaskDone('${pathStr}','done')" title="Mark\u00e9r som fuldf\u00f8rt" style="padding:1px 6px;font-size:10px;background:#22c55e;border:none;border-radius:3px;color:white;cursor:pointer;">\u2713 F\u00e6rdig</button> <button onclick="markTaskDone('${pathStr}','skipped')" title="Spring over" style="padding:1px 6px;font-size:10px;background:#64748b;border:none;border-radius:3px;color:white;cursor:pointer;">\u23ed Spring</button></span>`;
+    } else {
+        html += `<span style="margin-left:8px;"><button onclick="markTaskDone('${pathStr}','pending')" title="Nulstil til afventende" style="padding:1px 6px;font-size:10px;background:#f59e0b;border:none;border-radius:3px;color:white;cursor:pointer;">\u21bb Reset</button></span>`;
     }
     html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>${criteriaHtml}${phaseCheckHtml}`;
     if (node.children && node.children.length > 0) { 
@@ -1388,8 +1390,18 @@ function addTreeChild(path) {
 }
 
 async function markTaskDone(path, status) {
-    const label = status === 'done' ? 'Fuldf\u00f8rt' : 'Sprunget over';
-    if (!confirm(`Mark\u00e9r "${getNodeByPath(currentTree, path)?.name}" som ${label}?`)) return;
+    const label = status === 'done' ? 'Fuldf\u00f8rt' : (status === 'skipped' ? 'Sprunget over' : 'Nulstillet');
+    const node = getNodeByPath(currentTree, path);
+    if (!node) return;
+    if (status !== 'pending' && !confirm(`Mark\u00e9r "${node.name}" som ${label}?`)) return;
+    if (status === 'pending') {
+        node.status = 'pending';
+        node.result = null;
+        updateTreeDisplay();
+        addLogEntry('INFO', `Opgave nulstillet: ${node.name}`, `(sti: ${path})`);
+        await saveCurrentSession();
+        return;
+    }
     const sessionId = currentSessionId || document.getElementById('sessionSelect')?.value;
     try {
         const resp = await fetch('/api/update-task-status', {
