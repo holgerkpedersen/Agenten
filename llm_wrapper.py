@@ -332,7 +332,8 @@ class LMStudioWrapper:
             os.makedirs(req_dir, exist_ok=True)
             ts = int(time.time() * 1000)
             sess = os.environ.get('AGENT_SESSION_ID', 'unknown')
-            req_path = os.path.join(req_dir, f"{sess}_{ts}.json")
+            req_path = os.path.join(req_dir, f"{sess}_{ts}_request.json")
+            resp_path = os.path.join(req_dir, f"{sess}_{ts}_response.json")
             try:
                 with open(req_path, 'w', encoding='utf-8') as rf:
                     json.dump(body, rf, ensure_ascii=False, indent=2, default=str)
@@ -351,13 +352,22 @@ class LMStudioWrapper:
                     log.error("HTTP %s: %s", response.status_code, err_body)
                 except Exception as e:
                     log.warning("Failed to read error body: %s", e)
+                try:
+                    with open(resp_path, 'w', encoding='utf-8') as ef:
+                        json.dump({"http_status": response.status_code, "error": response.text[:2000]}, ef, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
                 yield f"[ERROR: HTTP {response.status_code}]"
                 return
             tool_calls_acc = {}
+            accumulated_text = ""
+            accumulated_reasoning = ""
+            raw_chunks = []
             for line in response.iter_lines():
                 if line:
                     try:
                         line_str = line.decode("utf-8")
+                        raw_chunks.append(line_str)
                         if line_str.startswith("data: "):
                             data = line_str[6:]
                             if data != "[DONE]":
@@ -368,7 +378,10 @@ class LMStudioWrapper:
                                     reasoning = delta.get("reasoning_content") or ""
                                     if reasoning:
                                         self._pending_reasoning = (self._pending_reasoning or "") + reasoning
+                                        accumulated_reasoning += reasoning
                                     if text or reasoning:
+                                        if text:
+                                            accumulated_text += text
                                         yield text or reasoning
                                     tool_calls_list = delta.get("tool_calls")
                                     if tool_calls_list:
@@ -406,13 +419,49 @@ class LMStudioWrapper:
                     except (json.JSONDecodeError, UnicodeDecodeError) as e:
                         log.error("Parse error in stream: %s", e)
                         continue
+            try:
+                resp_dump = {
+                    "accumulated_text": accumulated_text,
+                    "accumulated_reasoning": accumulated_reasoning,
+                    "tool_calls": [
+                        {
+                            "id": tc.get("id"),
+                            "function": {
+                                "name": tc.get("function", {}).get("name", ""),
+                                "arguments": tc.get("function", {}).get("arguments", "")
+                            }
+                        }
+                        for tc in self._pending_tool_calls
+                    ],
+                    "raw_chunks_count": len(raw_chunks),
+                    "raw_chunks": raw_chunks
+                }
+                with open(resp_path, 'w', encoding='utf-8') as respf:
+                    json.dump(resp_dump, respf, ensure_ascii=False, indent=2, default=str)
+            except Exception as resp_dump_err:
+                log.debug("Could not save LLM response to %s: %s", resp_path, resp_dump_err)
         except requests.exceptions.Timeout:
             self._stream_timeout = min(self._stream_timeout * 2, self._stream_timeout_max)
             log.warning("Stream timeout after %ss — next timeout will be %ss", stream_timeout, self._stream_timeout)
+            try:
+                with open(resp_path, 'w', encoding='utf-8') as tf:
+                    json.dump({"error": f"Timeout after {stream_timeout}s"}, tf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
             yield f"\n[ERROR: Timeout after {stream_timeout}s — ingen data i 30s]"
         except requests.exceptions.ConnectionError:
+            try:
+                with open(resp_path, 'w', encoding='utf-8') as cf:
+                    json.dump({"error": f"Cannot connect to LM Studio at {self.base_url}"}, cf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
             yield f"\n[ERROR: Cannot connect to LM Studio at {self.base_url}]"
         except Exception as e:
+            try:
+                with open(resp_path, 'w', encoding='utf-8') as exf:
+                    json.dump({"error": str(e)}, exf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
             yield f"\n[ERROR: {str(e)}]"
         else:
             if self._stream_timeout != config.LLM_STREAM_TIMEOUT:
