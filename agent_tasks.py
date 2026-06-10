@@ -1611,6 +1611,12 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             f" Brug <<<DONE>>> eller skift v\u00e6rkt\u00f8j.]")
                         agent._log("SYSTEM", "Same-tool-loop escape",
                                    f"{consecutive_same_tool}x {tool_name} in a row{tip}")
+                        if tool_name in READ_ONLY_TOOLS and tool_name != "read_issue":
+                            current = list(agent.tool_registry.active_tools or [])
+                            pruned = [t for t in current if t not in READ_ONLY_TOOLS or t == "read_issue"]
+                            agent.tool_registry.set_active_tools(pruned)
+                            agent._log("SYSTEM", "Read-tools removed",
+                                       f"LLM called {tool_name} 3x — pruned read tools. Remaining: {pruned}")
                         consecutive_same_tool = 0
                 else:
                     consecutive_same_tool = 0
