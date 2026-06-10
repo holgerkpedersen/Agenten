@@ -57,8 +57,8 @@ FOLDER_SCAN_MAX_FILES = 20
 FOLDER_SCAN_MAX_DEPTH = 2
 
 # LLM defaults (used by Agent.__init__)
-MAX_TOKENS = 16000
-MAX_CONVERSATION_CHARS = 32000
+MAX_TOKENS = 32000
+MAX_CONVERSATION_CHARS = 64000
 
 # LLM connection
 # LM_HOST / LM_PORT: host and port for LM Studio (e.g. localhost:1234).
@@ -93,7 +93,7 @@ MAX_PR_TASK_ITERATIONS = 10   # max turns for PR/git workflow tasks
 NATIVE_TOOLS = True  # Use OpenAI native function calling when available
 
 # Message size limits (chars) — prevents "too much context" errors to LM Studio
-MAX_MESSAGE_CHARS = 20000  # hard cap on total message body sent per LLM call
+MAX_MESSAGE_CHARS = 60000  # hard cap on total message body sent per LLM call (raised from 20000 to preserve full conversation history)
 
 # File context limits — prevent LM Studio HTTP timeout from large payloads
 MAX_FILE_CONTEXT_CHARS = 4000  # max chars per file in initial system prompt (agent can read_chunk for more)
