@@ -1333,6 +1333,10 @@ def execute_stream() -> Any:
     stream_agent.decompose_llm = agent.decompose_llm
     stream_agent.searcher = agent.searcher
     stream_agent._session_id = current_session_id or "unknown"
+    if current_session_id:
+        os.environ['AGENT_SESSION_ID'] = current_session_id
+    else:
+        os.environ.pop('AGENT_SESSION_ID', None)
 
     log.info("Execute stream - session: %s", current_session_id)
     if current_session_id:
