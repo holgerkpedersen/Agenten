@@ -1733,7 +1733,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         is_python = filepath.endswith(".py") if filepath else False
                         in_chunks = filepath and any(
                             filepath.endswith(k.replace("file_", "", 1))
-                            for k in agent.file_chunks.keys()
+                            for k in (agent.file_chunks or {}).keys()
                         ) if hasattr(agent, 'file_chunks') else False
                         if not is_python and not in_chunks and filepath:
                             try:
