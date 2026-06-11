@@ -1728,19 +1728,36 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 if tool_name == "edit_file" and args_val.get("old_text") and not args_val.get("symbol"):
                     old_text = args_val["old_text"]
                     if not _old_text_was_in_prior_result(old_text, messages):
-                        result_str = (
-                            f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: old_text blev ikke fundet i "
-                            f"nogen tidligere læseresultat. Du skal læse filen FØRST med "
-                            f"read_chunk eller locate, og derefter kopiere den præcise tekst "
-                            f"som old_text. Prøv igen."
-                        )
-                        result = {"success": False, "error": "old_text not in prior read results"}
-                        agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
-                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
-                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
-                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
-                        continue
+                        # Auto-read non-Python files not in file_chunks (can't use read_location/read_chunk)
+                        filepath = args_val.get("path", "")
+                        is_python = filepath.endswith(".py") if filepath else False
+                        in_chunks = filepath and any(
+                            filepath.endswith(k.replace("file_", "", 1))
+                            for k in agent.file_chunks.keys()
+                        ) if hasattr(agent, 'file_chunks') else False
+                        if not is_python and not in_chunks and filepath:
+                            try:
+                                with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                                    content = f.read()
+                                auto_msg = f"[Auto-read {filepath}]\n{content}"
+                                messages.append({"role": "tool", "tool_call_id": f"auto-{hash(filepath)}", "content": auto_msg})
+                            except (OSError, IOError):
+                                pass
+                        # Re-check after auto-read
+                        if not _old_text_was_in_prior_result(old_text, messages):
+                            result_str = (
+                                f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: old_text blev ikke fundet i "
+                                f"nogen tidligere læseresultat. Du skal læse filen FØRST med "
+                                f"read_chunk eller locate, og derefter kopiere den præcise tekst "
+                                f"som old_text. Prøv igen."
+                            )
+                            result = {"success": False, "error": "old_text not in prior read results"}
+                            agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                            agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                            messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                            yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                            yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                            continue
                 agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                 result = agent.tool_registry.execute(tool_name, args_val)
                 result_str = json.dumps(result, ensure_ascii=False)
