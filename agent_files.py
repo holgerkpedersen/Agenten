@@ -531,6 +531,22 @@ def read_chunk(agent: Any, chunk: str, index: int) -> dict[str, Any]:
         chunk = "file_" + chunk
     chunks = agent.file_chunks.get(chunk)
     if not chunks:
+        # Fallback: try reading the file directly from disk for non-Python files
+        # not pre-loaded into file_chunks (e.g. .md, .json, .txt, .html)
+        filepath = original
+        if not os.path.isabs(filepath):
+            workdir = getattr(agent, '_workdir', None) or os.getcwd()
+            filepath = os.path.join(workdir, filepath)
+        if os.path.isfile(filepath) and not filepath.endswith('.py'):
+            try:
+                with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+                # Store in file_chunks for future reads
+                agent.file_chunks[chunk] = [content]
+                agent._log("READ", f"Læst fil direkte: {original}", f"{len(content)} tegn")
+                return {"success": True, "chunk": chunk, "index": 1, "total": 1, "content": content}
+            except (OSError, IOError) as e:
+                return {"success": False, "error": f"Kunne ikke læse filen '{original}': {e}"}
         available = [k.replace("file_", "", 1) for k in agent.file_chunks.keys()] or ["ingen"]
         return {"success": False, "error": f"Ukendt chunk: '{original}'. Tilg\u00e6ngelige filer: {available}. Brug 'list_chunks' for at se alle."}
     if index < 1 or index > len(chunks):

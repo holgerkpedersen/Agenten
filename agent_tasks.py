@@ -1745,12 +1745,30 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                                 pass
                         # Re-check after auto-read
                         if not _old_text_was_in_prior_result(old_text, messages):
-                            result_str = (
-                                f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: old_text blev ikke fundet i "
-                                f"nogen tidligere læseresultat. Du skal læse filen FØRST med "
-                                f"read_chunk eller locate, og derefter kopiere den præcise tekst "
-                                f"som old_text. Prøv igen."
-                            )
+                            # Include actual file content so LLM can see what's there
+                            _actual_content = ""
+                            try:
+                                _fp = args_val.get("path", "")
+                                if _fp and os.path.exists(_fp):
+                                    with open(_fp, 'r', encoding='utf-8', errors='replace') as _f:
+                                        _actual_content = _f.read()
+                            except (OSError, IOError):
+                                pass
+                            if _actual_content:
+                                result_str = (
+                                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: old_text blev ikke fundet i "
+                                    f"filen. Her er filens nuværende indhold:\n"
+                                    f"--- START AF FIL ---\n{_actual_content}\n--- SLUT AF FIL ---\n"
+                                    f"Brug teksten ovenfor som old_text. Kopier den præcise tekst "
+                                    f"du vil erstatte, og sæt den som old_text. Prøv igen."
+                                )
+                            else:
+                                result_str = (
+                                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: old_text blev ikke fundet i "
+                                    f"nogen tidligere læseresultat. Du skal læse filen FØRST med "
+                                    f"read_chunk eller locate, og derefter kopiere den præcise tekst "
+                                    f"som old_text. Prøv igen."
+                                )
                             result = {"success": False, "error": "old_text not in prior read results"}
                             agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                             agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
