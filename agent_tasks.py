@@ -1649,7 +1649,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         and tool_name == "write_file"
                     )
                     if consecutive_same_tool >= 3 and not is_greenfield_write:
-                        alt_tools = [t for t in agent.tool_registry.active_tools
+                        _active = agent.tool_registry.active_tools or []
+                        alt_tools = [t for t in _active
                                      if t not in ("read_issue", "locate", "read_location", "list_symbols")][:5]
                         tip = f" Pr\u00f8v: {', '.join(alt_tools)}." if alt_tools else ""
                         _add_user_msg(messages,
@@ -1675,8 +1676,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     consecutive_dedups += 1
                     _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. G\u00e5 videre eller brug <<<DONE>>>.")
                     if consecutive_dedups >= 3:
+                        _active = agent.tool_registry.active_tools or []
                         write_tools = [t for t in ("write_file", "edit_file")
-                                       if t in agent.tool_registry.active_tools]
+                                       if t in _active]
                         if write_tools:
                             reminder = (
                                 f"[SYSTEM: Du er i en l\u00f8kke med identiske resultater. "
@@ -1692,8 +1694,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 if tool_name in READ_ONLY_TOOLS:
                     consecutive_reads += 1
                     if consecutive_reads >= 5:
+                        _active = agent.tool_registry.active_tools or []
                         write_tools = [t for t in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import")
-                                       if t in agent.tool_registry.active_tools]
+                                       if t in _active]
                         if write_tools:
                             _add_user_msg(messages, (
                                 f"[SYSTEM: Du har lavet {consecutive_reads} l\u00e6sekald i tr\u00e6k uden at skrive noget. "
@@ -1802,8 +1805,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 if isinstance(result, dict) and not result.get("success"):
                     consecutive_failures += 1
                     if consecutive_failures >= 3:
+                        _active = agent.tool_registry.active_tools or []
                         alt_tools = [t for t in ("list_symbols", "list_chunks", "read_chunk", "write_file", "edit_file")
-                                     if t in agent.tool_registry.active_tools and t != tool_name]
+                                     if t in _active and t != tool_name]
                         tip = ""
                         if alt_tools:
                             tip = f" Pr\u00f8v i stedet: {', '.join(alt_tools)}."
