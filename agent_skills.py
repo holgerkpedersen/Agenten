@@ -12,6 +12,7 @@ TEMPLATE_TOOLS = {
     "kodeanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "write_file", "create_issue", "create_refactor_issue"],
     "diffanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "git_diff", "git_log", "create_issue", "create_refactor_issue"],
     "fri": None,
+    "one-shot": None,
     "agenten": [
         "list_chunks",
         "read_location",
@@ -396,6 +397,11 @@ def get_templates(agent: Any) -> dict[str, dict[str, str | None]]:
         "fri": {
             "name": t(K.T_FRI, agent.lang),
             "prompt": t(K.TP_FRI, agent.lang).replace("{lang_instruction}", lang_instr).replace("{criteria_instr}", criteria_instr),
+            "fallback": None
+        },
+        "one-shot": {
+            "name": t(K.T_ONE_SHOT, agent.lang),
+            "prompt": t(K.TP_ONE_SHOT, agent.lang).replace("{lang_instruction}", lang_instr),
             "fallback": None
         },
         "agenten": {

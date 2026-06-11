@@ -20,6 +20,7 @@ class K(StrEnum):
     T_TESTGENERERING   = "templates.testgenerering"
     T_ISSUE_HANDLER    = "templates.issue_handler"
     T_SELVFORBEDRING   = "templates.selvforbedring"
+    T_ONE_SHOT         = "templates.one-shot"
 
     # === Template prompts ===
     TP_RESUME          = "template_prompts.resume"
@@ -35,6 +36,7 @@ class K(StrEnum):
     TP_TESTGENERERING   = "template_prompts.testgenerering"
     TP_ISSUE_HANDLER    = "template_prompts.issue_handler"
     TP_SELVFORBEDRING   = "template_prompts.selvforbedring"
+    TP_ONE_SHOT         = "template_prompts.one-shot"
 
     # === Template fallback sections ===
     TF_FRI             = "template_fallback.fri"

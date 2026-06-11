@@ -1033,6 +1033,14 @@ class Agent:
         self._file_context_str = file_context
         self.full_prompt_with_context = prompt + file_context
 
+        # One-shot: skip decomposition entirely — single task with all tools
+        if template == "one-shot":
+            tree = TaskTree(prompt)
+            tree.root.add_child(TaskNode(prompt))
+            self.task_tree = tree
+            self._log("INFO", t(K.LOG_USING_TEMPLATE, self.lang), "One-shot: 1 opgave (ingen nedbrydning)")
+            return self.task_tree_to_dict()
+
         if template and template != "fri" and template_config.get("fallback"):
             tree = TaskTree(prompt)
             for section in template_config["fallback"]:

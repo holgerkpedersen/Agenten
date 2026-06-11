@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 class TestTemplateTools:
     def test_all_templates_have_entry(self):
         from agent_skills import TEMPLATE_TOOLS
-        expected = {"resume", "kodeanalyse", "diffanalyse", "fri",
+        expected = {"resume", "kodeanalyse", "diffanalyse", "fri", "one-shot",
                     "agenten", "programmering", "python-arkitektur",
                     "billedanalyse", "bugfix", "refactor", "testgenerering",
                     "issue_handler", "selvforbedring"}
@@ -14,6 +14,10 @@ class TestTemplateTools:
     def test_fri_is_none(self):
         from agent_skills import TEMPLATE_TOOLS
         assert TEMPLATE_TOOLS["fri"] is None
+
+    def test_one_shot_is_none(self):
+        from agent_skills import TEMPLATE_TOOLS
+        assert TEMPLATE_TOOLS["one-shot"] is None
 
     def test_resume_tools(self):
         from agent_skills import TEMPLATE_TOOLS
