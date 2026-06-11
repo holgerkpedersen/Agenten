@@ -1889,6 +1889,9 @@ if __name__ == "__main__":
         os.environ['AGENT_WORKDIR'] = workdir_abs
         log.info("Arbejdsmappe: %s", workdir_abs)
         session_manager = SessionManager(storage_dir=os.path.join(workdir_abs, 'sessions'))
+    else:
+        # Clear stale AGENT_WORKDIR from previous session
+        os.environ.pop('AGENT_WORKDIR', None)
 
     _sessions_dir = session_manager.storage_dir
     started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
