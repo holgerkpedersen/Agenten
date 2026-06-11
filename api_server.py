@@ -1887,11 +1887,13 @@ if __name__ == "__main__":
     if args.workdir:
         workdir_abs = os.path.abspath(args.workdir)
         os.environ['AGENT_WORKDIR'] = workdir_abs
+        os.environ['AGENT_WORKDIR_LOCKED'] = '1'  # prevent auto_detect_workdir from overriding
         log.info("Arbejdsmappe: %s", workdir_abs)
         session_manager = SessionManager(storage_dir=os.path.join(workdir_abs, 'sessions'))
     else:
         # Clear stale AGENT_WORKDIR from previous session
         os.environ.pop('AGENT_WORKDIR', None)
+        os.environ.pop('AGENT_WORKDIR_LOCKED', None)
 
     _sessions_dir = session_manager.storage_dir
     started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
