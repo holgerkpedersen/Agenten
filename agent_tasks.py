@@ -372,12 +372,14 @@ def _count_fix_attempts(agent: Any, called_tools: dict[str, int]) -> str | None:
 
 
 def _ensure_done_tool(agent: Any) -> None:
-    """Tilf\u00f8j 'done' til active_tools hvis NATIVE_TOOLS er sl\u00e5et til."""
+    """Tilføj 'done' til active_tools hvis NATIVE_TOOLS er slået til."""
     if not config.NATIVE_TOOLS:
         return
-    current = list(agent.tool_registry.active_tools) if agent.tool_registry.active_tools is not None else []
-    if "done" not in current:
-        agent.tool_registry.set_active_tools(current + ["done"])
+    # active_tools=None means ALL tools — done is already registered, so nothing to do
+    if agent.tool_registry.active_tools is None:
+        return
+    if "done" not in agent.tool_registry.active_tools:
+        agent.tool_registry.set_active_tools(agent.tool_registry.active_tools + ["done"])
 
 
 def _validate_done_completion(
