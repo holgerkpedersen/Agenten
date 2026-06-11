@@ -1395,6 +1395,7 @@ function editTreeNode(path) {
         node.name = newName.trim().substring(0, 80);
         updateTreeDisplay();
         addLogEntry('INFO', _('task_renamed'), node.name);
+        saveCurrentSession();
     }
 }
 
@@ -1413,6 +1414,7 @@ function deleteTreeNode(path) {
     const deleted = parent.children.splice(idx, 1)[0];
     updateTreeDisplay();
     addLogEntry('INFO', _('task_deleted'), deleted?.name || '');
+    saveCurrentSession();
 }
 
 function addTreeChild(path) {
@@ -1424,6 +1426,7 @@ function addTreeChild(path) {
         parent.children.push({ name: name.trim().substring(0, 80), status: 'pending', children: [], result: null });
         updateTreeDisplay();
         addLogEntry('INFO', _('task_added'), name);
+        saveCurrentSession();
     }
 }
 
@@ -2726,6 +2729,9 @@ async function executeWithStream() {
     }
     
     stopStream();
+    
+    // Save current tree state before execution
+    await saveCurrentSession();
     
     document.getElementById('replyInput').style.display = 'inline-block';
     document.getElementById('replyBtn').style.display = 'inline-block';
