@@ -149,9 +149,10 @@ def auto_detect_workdir(file_chunks: dict | None = None, prompt: str = "") -> st
     if not detected:
         return None
 
-    # Don't override an explicitly set --workdir
-    if os.environ.get('AGENT_WORKDIR_LOCKED'):
-        return os.environ.get('AGENT_WORKDIR') or min(detected, key=len)
+    # Only set AGENT_WORKDIR if it was explicitly provided at startup
+    # (--workdir flag). Otherwise, keep workdir as CWD (Agenten).
+    if not os.environ.get('AGENT_WORKDIR'):
+        return None
 
     workdir = min(detected, key=len)
     os.environ['AGENT_WORKDIR'] = workdir
