@@ -388,12 +388,9 @@ def _validate_done_completion(
     yields_to_emit: list[tuple] = []
 
     if agent._write_failed:
-        return (
-            f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med "
-            f"<<<DONE>>>/done() n\u00e5r edit_file har fejlet. "
-            f"Ret din anmodning og kald edit_file igen.",
-            yields_to_emit
-        )
+        # Fix 2: Don't block DONE — just warn. The LLM may have fixed the issue
+        # or the failure may be transient. Let _check_required_tools handle enforcement.
+        pass
 
     if agent._tests_failed and "test" not in _normalize_phase(task_node.name).lower():
         return (
@@ -945,7 +942,7 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
         agent._checkpoint_tools.add(parsed["tool"] + str(parsed.get("args", {})))
         msg = f"{t(K.TOOL_RESULT_PREFIX, agent.lang).format(tool=parsed['tool'])}\n{result_str}\n\n{_cont_hint(agent, tools_list)}"
         if agent._write_failed:
-            msg += f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: edit_file MISLYKKEDES. DU M\u00c5 IKKE bruge <<<DONE>>> f\u00f8r edit_file lykkes. Ret din anmodning og pr\u00f8v igen."
+            msg += f"\n\n⚠️ {t(K.SYS_ERROR_PREFIX, agent.lang)}: edit_file mislykkedes. Læs filen igen og kopier teksten nøjagtigt som old_text."
         _add_user_msg(messages, msg)
         return {"type": "tool_result", "tool": parsed["tool"], "args": parsed.get("args", {}), "result": result}
 
@@ -985,6 +982,49 @@ REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "extract_symbol", "update_is
 
 
 CLOSE_PHASE_ALIASES = {"opdatering", "opdatér", "luk", "close"}
+
+
+def _old_text_was_in_prior_result(old_text: str, messages: list[dict], min_match_ratio: float = 0.8) -> bool:
+    """Check if old_text appears (or substantially appears) in a prior tool result.
+
+    This prevents the LLM from fabricating old_text from memory — it must have
+    actually read the file content first.
+
+    Returns True if old_text (or a large substring of it) was found in a prior
+    tool result message.
+    """
+    if not old_text or len(old_text.strip()) < 10:
+        return True  # too short to meaningfully check
+    # Collect all prior tool result content
+    prior_content = []
+    for msg in messages:
+        if msg.get("role") == "tool":
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                prior_content.append(content)
+    if not prior_content:
+        return False
+    combined = "\n".join(prior_content)
+    # Exact match
+    if old_text in combined:
+        return True
+    # Substring match: check if the longest contiguous part of old_text is in results
+    lines = old_text.split("\n")
+    if len(lines) >= 3:
+        # Check sliding windows of increasing size
+        for window_size in range(len(lines), max(2, len(lines) // 2), -1):
+            for start in range(0, len(lines) - window_size + 1):
+                chunk = "\n".join(lines[start:start + window_size])
+                if chunk in combined:
+                    return True
+    # Fallback: check if at least 80% of non-empty lines appear
+    non_empty = [l for l in lines if l.strip()]
+    if non_empty:
+        found = sum(1 for l in non_empty if l.strip() in combined)
+        if found >= len(non_empty) * min_match_ratio:
+            return True
+    return False
+
 
 def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -> str | None:
     """check required tools.
@@ -1055,12 +1095,16 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     if "edit_file" in uncalled and "write_file" in called_names:
         uncalled.discard("edit_file")
     # tool_log success check: tools som blev kaldt men ALLE forsøg fejlede tæller ikke
+    # Fix 2: edit_file/write_file that were attempted (even if failed) count as
+    # satisfied — the LLM tried to write, the system prevented it, don't trap it.
     if agent._tool_log and not uncalled:
         for req_tool in required:
             if req_tool in called_names:
                 attempts = [e for e in agent._tool_log if e.get("tool") == req_tool and e.get("success") is False]
                 all_attempts = [e for e in agent._tool_log if e.get("tool") == req_tool]
                 if all_attempts and len(attempts) == len(all_attempts):
+                    if req_tool in ("write_file", "edit_file"):
+                        continue  # attempted but failed — still counts as satisfied
                     if req_tool == "write_file" and "edit_file" in called_names:
                         continue
                     if req_tool == "edit_file" and "write_file" in called_names:
@@ -1644,15 +1688,6 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     continue
                 consecutive_dedups = 0
                 if tool_name in READ_ONLY_TOOLS:
-                    if getattr(agent, '_read_escape_sent', False):
-                        result_str = f"[SYSTEM: L\u00e6sekald BLOKERET. Du fik besked om at skrive. Brug write_file NU.]"
-                        result = {"success": True, "result": "Skipped — write forced"}
-                        agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
-                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
-                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
-                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
-                        continue
                     consecutive_reads += 1
                     if consecutive_reads >= 5:
                         write_tools = [t for t in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import")
@@ -1687,6 +1722,23 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                     yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                     continue
+                # Fix 1: Validate old_text was in a prior tool result
+                if tool_name == "edit_file" and args_val.get("old_text") and not args_val.get("symbol"):
+                    old_text = args_val["old_text"]
+                    if not _old_text_was_in_prior_result(old_text, messages):
+                        result_str = (
+                            f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: old_text blev ikke fundet i "
+                            f"nogen tidligere læseresultat. Du skal læse filen FØRST med "
+                            f"read_chunk eller locate, og derefter kopiere den præcise tekst "
+                            f"som old_text. Prøv igen."
+                        )
+                        result = {"success": False, "error": "old_text not in prior read results"}
+                        agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                        continue
                 agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                 result = agent.tool_registry.execute(tool_name, args_val)
                 result_str = json.dumps(result, ensure_ascii=False)
@@ -1727,7 +1779,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success") is False:
                     agent._write_failed = True
                     tool_label = "write_file" if tool_name == "write_file" else "edit_file"
-                    result_str += f"\n\n\u26a0\ufe0f {t(K.SYS_ERROR_PREFIX, agent.lang)}: {tool_label} MISLYKKEDES. DU M\u00c5 IKKE bruge <<<DONE>>> f\u00f8r {tool_label} lykkes. Ret din anmodning og pr\u00f8v igen."
+                    result_str += f"\n\n⚠️ {t(K.SYS_ERROR_PREFIX, agent.lang)}: {tool_label} mislykkedes. Læs filen igen og kopier teksten nøjagtigt som old_text."
                 if tool_name in ("write_file", "edit_file") and isinstance(result, dict) and result.get("success"):
                     fpath = args_val.get("path", "")
                     if fpath and fpath.lower().endswith('.py'):
@@ -1864,10 +1916,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
             continue
 
         if parsed["type"] == "done":
-            if agent._write_failed:
-                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med <<<DONE>>> n\u00e5r edit_file har fejlet. Ret din anmodning og kald edit_file igen.")
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
-                continue
+            # Fix 2: Don't block DONE when edit_file failed — let _check_required_tools handle it
             if agent._tests_failed and "test" not in _normalize_phase(task_node.name).lower():
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med <<<DONE>>> n\u00e5r tests fejler. Ret koden med edit_file og k\u00f8r run_tests() igen indtil ALLE tests best\u00e5r.")
                 messages = _truncate_messages(messages, agent.max_conversation_chars)

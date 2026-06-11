@@ -532,23 +532,23 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
              "edit_file",
-             "Rediger en eksisterende fil. Tre tilstande:\n"
-              "1) AST+LLM (BEDST til .py): Angiv symbol='funktionsnavn' + requirements='hvad skal ændres'. "
-              "Systemet finder funktionen via AST, forbedrer den med LLM, erstatter, og kører tests. Ingen old_text/new_text nødvendig.\n"
-              "2) AST (hurtig): Angiv symbol='Klasse.metode' + new_text=HELE den nye funktion. "
-              "Systemet erstatter funktionen via AST — old_text ignoreres. "
-              "HVIS metoden ikke findes men klassen gør, auto-tilføjes metoden i klassen.\n"
-              "3) Search-and-replace: Angiv old_text (PRÆCIS tekst fra filen — kopieret direkte, IKKE omskrevet) + new_text. "
-              "Søgeteksten skal være en 1:1 byte-kopi af filindholdet.\n\n"
-              "Import-regel: alle import-sætninger hører i toppen af filen, ALDRIG inde i funktioner/klasser. "
-              "Læs funktionen med locate(name='funktionsnavn') FØRST for at se den nøjagtige nuværende kode.",
-            ["path", "old_text", "new_text"],
-            lambda path, old_text="", new_text="", symbol=None, requirements="", test_path="": git_ops.edit_file(
-                path=path, old_text=old_text, new_text=new_text,
-                expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path))),
-                symbol=symbol, requirements=requirements, test_path=test_path, llm=self.llm,
-            ),
-            optional_params=["symbol", "requirements", "test_path"]
+             "Rediger en eksisterende fil.\n\n"
+              "WORKFLOW (BEDST):\n"
+              "1. Læs koden: locate(name='funktionsnavn') eller read_chunk(filepath, start, end)\n"
+              "2. Kopier old_text PRÆCIS fra læseresultatet (IKKE fra hukommelsen)\n"
+              "3. Angiv new_text med din ændring\n\n"
+              "STI til .py-filer (hurtig):\n"
+              "Angiv symbol='funktionsnavn' + requirements='hvad skal ændres'. "
+              "Systemet finder funktionen via AST, forbedrer den med LLM, og erstatter. "
+              "Ingen old_text/new_text nødvendig.\n\n"
+              "Import-regel: alle import-sætninger hører i toppen af filen, ALDRIG inde i funktioner/klasser.",
+             ["path", "old_text", "new_text"],
+             lambda path, old_text="", new_text="", symbol=None, requirements="", test_path="": git_ops.edit_file(
+                 path=path, old_text=old_text, new_text=new_text,
+                 expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path))),
+                 symbol=symbol, requirements=requirements, test_path=test_path, llm=self.llm,
+             ),
+             optional_params=["symbol", "requirements", "test_path"]
         ))
         self.tool_registry.register(Tool(
             "write_file",
