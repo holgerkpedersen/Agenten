@@ -4,7 +4,8 @@
     "source": "Code audit",
     "total": 179,
     "updated": "2026-05-30",
-    "format": "C-A-S-E (Context, Action, Symptoms, Environment)"
+    "format": "C-A-S-E (Context, Action, Symptoms, Environment)",
+    "total_risks": 6
   },
   "issues": [
     {
@@ -2172,6 +2173,148 @@
       "status": "resolved",
       "related": [],
       "resolution_note": "Auto-generated junk — incorrect line counts, duplicate format. Marked resolved."
+    }
+  ],
+  "active_risks": [
+    {
+      "id": "STAB-001",
+      "title": "False auto-resolution can mark issues resolved without real code movement or edits",
+      "type": "stability",
+      "category": "agent-tasks",
+      "severity": "critical",
+      "status": "open",
+      "context": "Tests pass while target files stay unchanged.",
+      "action": "Keep final checks requiring actual file edits and moved code before resolving refactor tasks.",
+      "symptoms": [
+        "Requires regression coverage before marking stable."
+      ],
+      "environment": "Windows, Python 3.12, local Agenten development workflow",
+      "affected_files": [
+        "agent_tasks.py",
+        "agent_phase_checks.py"
+      ],
+      "prevention_test": "Run a failing-refactor test where tests pass but api_server.py is unchanged; assert issue stays unresolved.",
+      "tags": [
+        "llm",
+        "tools",
+        "tests"
+      ]
+    },
+    {
+      "id": "STAB-002",
+      "title": "Implementation/refactor phases can finish as successful without required write tools",
+      "type": "stability",
+      "category": "agent-tasks",
+      "severity": "critical",
+      "status": "open",
+      "context": "LLM workflows may use only read/list tools and still declare done.",
+      "action": "Track active_tools versus called_tools by phase and fail implementation when required edit/write categories are missing.",
+      "symptoms": [
+        "Requires regression coverage before marking stable."
+      ],
+      "environment": "Windows, Python 3.12, local Agenten development workflow",
+      "affected_files": [
+        "agent_tasks.py"
+      ],
+      "prevention_test": "Force a read-only implementation attempt; assert final status is failed/retryable rather than successful.",
+      "tags": [
+        "tools",
+        "llm"
+      ]
+    },
+    {
+      "id": "STAB-003",
+      "title": "Session/SSE state remains fragile under stale messages or concurrent stream edges",
+      "type": "stability",
+      "category": "api-concurrency",
+      "severity": "high",
+      "status": "open",
+      "context": "SSE streams can still receive late events after a task ends or reconnect.",
+      "action": "Add stream/session IDs to messages and ignore superseded UI updates safely.",
+      "symptoms": [
+        "Requires regression coverage before marking stable."
+      ],
+      "environment": "Windows, Python 3.12, local Agenten development workflow",
+      "affected_files": [
+        "api_server.py",
+        "static/index.html"
+      ],
+      "prevention_test": "Simulate late SSE events after completion; assert tree/log state is ignored or safely overridden.",
+      "tags": [
+        "session",
+        "concurrency",
+        "frontend"
+      ]
+    },
+    {
+      "id": "STAB-004",
+      "title": "File-safety rules must continue to block secrets and parser crashes in LLM context",
+      "type": "stability",
+      "category": "file-system",
+      "severity": "critical",
+      "status": "open",
+      "context": "Tools may still attempt outside paths, .env reads, binary files, or non-Python parser calls.",
+      "action": "Keep realpath allowlists, secret scans before prompts, binary skipping, and clear errors for markdown/txt locate/read_location/list_symbols.",
+      "symptoms": [
+        "Requires regression coverage before marking stable."
+      ],
+      "environment": "Windows, Python 3.12, local Agenten development workflow",
+      "affected_files": [
+        "agent_files.py",
+        "git_ops.py"
+      ],
+      "prevention_test": "Call read/list tools with ../, .env, images, and markdown; assert rejection and no secret leakage.",
+      "tags": [
+        "file-system",
+        "security",
+        "windows"
+      ]
+    },
+    {
+      "id": "STAB-005",
+      "title": "Tests can leak globals, sessions, or model backend state across runs",
+      "type": "stability",
+      "category": "tests",
+      "severity": "high",
+      "status": "open",
+      "context": "Test fixtures may use real sessions/model calls or leaked globals if reset order changes.",
+      "action": "Reset shared globals in fixtures and mock model APIs during testing.",
+      "symptoms": [
+        "Requires regression coverage before marking stable."
+      ],
+      "environment": "Windows, Python 3.12, local Agenten development workflow",
+      "affected_files": [
+        "tests/test_api.py",
+        "tests/test_sse_streaming.py"
+      ],
+      "prevention_test": "Run selected tests in different orders; assert no real HTTP/model calls or session leakage occur by default.",
+      "tags": [
+        "tests",
+        "session"
+      ]
+    },
+    {
+      "id": "STAB-006",
+      "title": "LLM/backend/image/tool-call edge cases need deterministic failure handling",
+      "type": "stability",
+      "category": "llm-backend",
+      "severity": "medium",
+      "status": "open",
+      "context": "Null tool calls, HTTP 400s, unsupported image types, or bad model URLs can still crash tasks.",
+      "action": "Normalize backend errors into structured failures and reject unsupported image/model combinations early.",
+      "symptoms": [
+        "Requires regression coverage before marking stable."
+      ],
+      "environment": "Windows, Python 3.12, local Agenten development workflow",
+      "affected_files": [
+        "llm_wrapper.py",
+        "tools.py"
+      ],
+      "prevention_test": "Mock null tool_calls, HTTP 400, unsupported image type, and non-local URL; assert clean structured failures.",
+      "tags": [
+        "llm",
+        "networking"
+      ]
     }
   ]
 }

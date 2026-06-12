@@ -3168,23 +3168,42 @@ function sortIssues(col) {
     renderIssuesTable();
 }
 
+function joinIssueValues(value) {
+    if (!value) return '';
+    return Array.isArray(value) ? value.join(', ') : String(value);
+}
+
+function issueSearchText(issue) {
+    return ['id','title','type','status','severity','description','context','symptoms','action','location','impact','proposed_fix','acceptance_criteria','tags','affected_files']
+        .map(k => joinIssueValues((issue || {})[k]))
+        .join(' ')
+        .toLowerCase();
+}
+
+function normalizeIssueList(issues) {
+    return (issues || []).map(issue => {
+        const normalized = {...issue};
+        if (!normalized.description && normalized.context) normalized.description = normalized.context;
+        if (!normalized.location) normalized.location = joinIssueValues(normalized.affected_files);
+        if (!normalized.proposed_fix) normalized.proposed_fix = normalized.action || '';
+        if (!normalized.acceptance_criteria) normalized.acceptance_criteria = normalized.prevention_test || '';
+        return normalized;
+    });
+}
+
 function renderIssuesTable() {
     const content = document.getElementById('issuesContent');
     let filtered = issuesData;
     if (issuesFilter) {
         const f = issuesFilter.toLowerCase();
-        filtered = issuesData.filter(issue =>
-            ['id','title','type','status','severity','description','location'].some(k =>
-                (issue[k] || '').toLowerCase().includes(f)
-            )
-        );
+        filtered = issuesData.filter(issue => issueSearchText(issue).includes(f));
     }
     const col = issuesSort.column;
     if (col) {
         const d = issuesSort.dir === 'asc' ? 1 : -1;
         filtered.sort((a, b) => {
-            const va = (a[col] || '').toString().toLowerCase();
-            const vb = (b[col] || '').toString().toLowerCase();
+            const va = joinIssueValues(a[col]).toLowerCase();
+            const vb = joinIssueValues(b[col]).toLowerCase();
             return va < vb ? -d : va > vb ? d : 0;
         });
     }
@@ -3197,6 +3216,8 @@ function renderIssuesTable() {
         <th onclick="sortIssues('id')" style="cursor:pointer;user-select:none;">ID${arrow('id')}</th>
         <th onclick="sortIssues('title')" style="cursor:pointer;user-select:none;">${_('issues_table_title')}${arrow('title')}</th>
         <th onclick="sortIssues('type')" style="cursor:pointer;user-select:none;">${_('issues_table_type')}${arrow('type')}</th>
+        <th onclick="sortIssues('category')" style="cursor:pointer;user-select:none;">Kategori${arrow('category')}</th>
+        <th onclick="sortIssues('tags')" style="cursor:pointer;user-select:none;">Tags${arrow('tags')}</th>
         <th onclick="sortIssues('status')" style="cursor:pointer;user-select:none;">${_('issues_table_status')}${arrow('status')}</th>
         <th onclick="sortIssues('severity')" style="cursor:pointer;user-select:none;">${_('issues_table_priority')}${arrow('severity')}</th>
         <th></th><th></th>

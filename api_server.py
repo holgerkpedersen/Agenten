@@ -1816,6 +1816,30 @@ def list_issues() -> Any:
         return jsonify({"success": True, "meta": {"total": 0}, "issues": []})
     with open(issues_path, encoding="utf-8") as f:
         data = json.load(f)
+    meta = data.setdefault("meta", {})
+    all_issue_count = len(data.get("issues", [])) + len(data.get("active_risks", []))
+    meta["total_all_issues"] = all_issue_count
+
+    def issue_values_to_string(values):
+        if isinstance(values, (list, tuple, set)):
+            return ", ".join(str(value) for value in values)
+        return str(values or "")
+
+    all_issues = [dict(issue) for issue in data.get("issues", [])]
+    for risk in data.get("active_risks", []):
+        normalized = dict(risk)
+        if "description" not in normalized and normalized.get("context"):
+            normalized["description"] = normalized["context"]
+        if "location" not in normalized:
+            normalized["location"] = issue_values_to_string(normalized.get("affected_files") or [])
+        if "impact" not in normalized and normalized.get("type") == "stability":
+            normalized["impact"] = "Active stability risk that needs regression coverage before marking stable."
+        if "proposed_fix" not in normalized and normalized.get("action"):
+            normalized["proposed_fix"] = normalized["action"]
+        if "acceptance_criteria" not in normalized and normalized.get("prevention_test"):
+            normalized["acceptance_criteria"] = normalized["prevention_test"]
+        all_issues.append(normalized)
+    data["all_issues"] = all_issues
     return jsonify({"success": True, **data})
 
 @app.route("/api/issues/<issue_id>", methods=["DELETE"])

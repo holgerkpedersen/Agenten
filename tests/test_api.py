@@ -141,6 +141,23 @@ class TestAPIRoot:
         assert "meta" in data
         assert data["success"] is True
 
+    def test_list_issues_includes_active_risks(self, client):
+        resp = client.get("/api/issues")
+        assert resp.status_code == 200
+        import json
+        data = json.loads(resp.data)
+        issues_by_id = {issue["id"]: issue for issue in data.get("issues", [])}
+        risks_by_id = {risk["id"]: risk for risk in data.get("active_risks", [])}
+        all_issues_by_id = {issue["id"]: issue for issue in data.get("all_issues", [])}
+        assert issues_by_id
+        assert risks_by_id.get("STAB-001")
+        assert "STAB-001" in all_issues_by_id
+        assert set(issues_by_id).issubset(all_issues_by_id)
+        active_risk = all_issues_by_id["STAB-001"]
+        assert active_risk.get("description") == active_risk.get("context")
+        assert "agent_tasks.py" in ",".join(active_risk.get("affected_files", []))
+        assert set(data.get("meta", {}).get("summary_by_active_risk_severity", {})).issubset({"critical", "high", "medium", "low"})
+
     def test_delete_nonexistent_issue(self, client):
         resp = client.delete("/api/issues/DOESNOTEXIST")
         assert resp.status_code == 404
