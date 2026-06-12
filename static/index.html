@@ -3295,6 +3295,8 @@ async function createNewIssue() {
                 location: document.getElementById('ni_location').value.trim(),
                 description: document.getElementById('ni_description').value.trim(),
                 acceptance_criteria: document.getElementById('ni_acceptance').value.trim(),
+                impact: 'Active stability risk that needs regression coverage before marking stable.',
+                proposed_fix: 'Undersøg roden og implementér forebyggende test.',
             }),
         });
         const data = await resp.json();
