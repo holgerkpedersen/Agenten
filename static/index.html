@@ -582,7 +582,10 @@
             vertical-align: top;
         }
         .issues-table tr:hover { background: var(--input-bg); }
-        .issues-scroll { overflow-y: auto; flex: 1; padding: 8px; }
+        .issues-scroll { overflow: auto; flex: 1; padding: 8px; }
+        .issues-scroll table { min-width: 700px; }
+        .issues-table th:nth-last-child(-n+2),
+        .issues-table td:nth-last-child(-n+2) { white-space: nowrap; width: 1px; }
         .issue-severity-critical { color: var(--danger); font-weight: bold; }
         .issue-severity-high { color: var(--warning); font-weight: bold; }
         .issue-severity-medium { color: var(--accent); }
