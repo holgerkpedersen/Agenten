@@ -715,7 +715,8 @@
     <div class="issues-modal">
         <div class="issues-header">
             <h2 id="issuesModalTitle">${_('issues_title')}</h2>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button id="arToggleBtn" onclick="toggleAutoResearch()" style="background:var(--btn-secondary);border:1px solid var(--border);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;color:var(--text-muted);">🔬</button>
                 <button id="niToggleBtn" onclick="showNewIssueForm()" style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;">➕ Nyt issue</button>
                 <button class="issues-close" onclick="closeIssuesPanel()">✕</button>
             </div>
@@ -3342,6 +3343,11 @@ function showIssuesPanel() {
     filterBar.style.display = 'block';
     filterInput.value = '';
     modal.style.display = 'flex';
+    // Load autoresearch status
+    fetch('/api/autoresearch/status')
+        .then(r => r.json())
+        .then(s => updateARButton(s.autoresearch_enabled))
+        .catch(() => {});
     fetch('/api/issues')
         .then(r => r.json())
         .then(data => {
@@ -3366,7 +3372,39 @@ document.addEventListener('input', function(e) {
 
 function closeIssuesPanel() {
     document.getElementById('issuesModal').style.display = 'none';
-    document.getElementById('issuesFilterBar').style.display = 'none';
+}
+
+async function toggleAutoResearch() {
+    try {
+        const resp = await fetch('/api/autoresearch/status');
+        const status = await resp.json();
+        const currently = status.autoresearch_enabled;
+        const toggle = await fetch('/api/autoresearch/toggle', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({enabled: !currently}),
+        });
+        const result = await toggle.json();
+        updateARButton(result.autoresearch_enabled);
+        addLogEntry('INFO', `Auto-research ${result.autoresearch_enabled ? 'aktiveret' : 'deaktiveret'}`, '');
+    } catch(e) {
+        console.warn('Auto-research toggle fejlede:', e);
+    }
+}
+
+function updateARButton(enabled) {
+    const btn = document.getElementById('arToggleBtn');
+    if (enabled) {
+        btn.textContent = '🔬 ON';
+        btn.style.background = 'var(--accent)';
+        btn.style.color = '#fff';
+        btn.style.borderColor = 'var(--accent)';
+    } else {
+        btn.textContent = '🔬';
+        btn.style.background = 'var(--btn-secondary)';
+        btn.style.color = 'var(--text-muted)';
+        btn.style.borderColor = 'var(--border)';
+    }
 }
 
 function toggleIssueDetail(row) {
