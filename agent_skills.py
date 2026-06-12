@@ -344,14 +344,18 @@ SECTION_INSTRUCTIONS = {
         "Pull request": "TRIN 1: Brug github_create_pr() med title og body.\\nTRIN 2: Bekr\u00e6ft at PR'en er oprettet.\\nAfslut med <<<DONE>>>.",
     },
 }
-
-
 def refresh_skills(agent: Any) -> None:
     """refresh skills.
     
     Args:
-        agent:"""
-    agent._skills = SkillLoader.load_all(lang=agent.lang)
+        agent: The agent whose skills need to be refreshed
+    """
+    try:
+        agent._skills = SkillLoader.load_all(lang=agent.lang)
+    except Exception as e:
+        # Log the error (assuming there's a logging mechanism available)
+        print(f"Error refreshing skills: {e}")
+        return None
 
 
 def match_skills(agent: Any, prompt: str) -> list[dict[str, Any]]:

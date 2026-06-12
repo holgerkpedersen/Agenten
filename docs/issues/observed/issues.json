@@ -1923,12 +1923,11 @@
       "description": "Auto-research opdagede at fri/test task fejler med short_output (< 100 tegn, ingen tools). Dette tyder på at LLM'en afslutter fasen uden at kalde værktøjer eller producere brugbart output.\n\n**Template:** fri\n**Fase:** test task\n**Fejltype:** short_output\n**Response:** \"Could not complete task automatically.\"\n\n**Formodet årsag:** fri-template har ingen sektionsinstruktioner for test-fasen, så LLM'en ved ikke hvilke værktøjer der skal kaldes.",
       "location": "agent_skills.py:selvforbedring:fri/test task",
       "impact": "Høj: fri-template kan ikke gennemføre test tasks uden at fejle med short_output.",
-      "proposed_fix": "Tilføj SECTION_INSTRUCTIONS for fri/task der eksplicit beder LLM'en om at kalde værktøjer og producere mindst 200 tegn output.",
-      "acceptance_criteria": "fri/test task gennemføres med mindst 200 tegn output og mindst ét værktøjskald.",
-      "status": "resolved",
+      "proposed_fix": "Tilfoej en \"fri\"-noegle til SECTION_INSTRUCTIONS i agent_skills.py (linje 195-331).\n\nPlacering: Efter \"selvforbedring\"-nøglens afsluttende brakets } og foer linjen \"agenten\": {.\n\nIndhold der skal tilfoejes:\n    \"fri\": {\n        \"Test\": \"Kald værktøjer og producér mindst 200 tegn output.\",\n    },\n\nSektionen skal indeholde praecis denne \"Test\"-nøgle. Brug edit_file(path=\"agent_skills.py\", old_text='...', new_text='...') med search-and-replace. Kopier omkring 3 linjer for og efter indsaettelsespunktet for at sikre praecis match.",
+      "acceptance_criteria": "SECTION_INSTRUCTIONS indeholder en \"fri\"-nøgle med en \"Test\"-sektion. 739 tests består.",
+      "status": "open",
       "created_at": "2026-06-12T13:30:00",
-      "updated_at": "2026-06-12T17:41:54",
-      "resolution_note": "Tilføjede SECTION_INSTRUCTIONS til fri/test task i agent_skills.py for at sikre værktøjskald og et minimumsudgang på 200 tegn, hvilket løser short_output fejlen."
+      "updated_at": "2026-06-12T17:41:54"
     }
   ],
   "active_risks": [
