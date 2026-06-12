@@ -2,7 +2,7 @@
   "meta": {
     "generated": "2026-05-26",
     "source": "Code audit",
-    "total": 164,
+    "total": 159,
     "updated": "2026-05-30",
     "format": "C-A-S-E (Context, Action, Symptoms, Environment)",
     "total_risks": 6
@@ -55,18 +55,6 @@
       "environment": "Windows, Python 3.12, Git",
       "status": "resolved",
       "resolution_note": "Fixed 2026-05-26: bare except replaced with except Exception + logging, concurrent write locks added to session/skill/git files, thread-safe agent.images with Lock"
-    },
-    {
-      "id": "BUG-005",
-      "title": "execution_status global mutated without lock",
-      "type": "bug",
-      "severity": "medium",
-      "context": "Fil: api_server.py:check_api_key, 659-687. Global `execution_status = {'running': False, 'progress': 0, 'current_task': '', 'log': []}` i api_server.py:44 muteres af execute_without_stream (lines 659-687). Kan tilgås af concurrent requests.",
-      "action": "Beskytt med threading.Lock ved alle reads og writes til execution_status. Successkriterie: execution_status er trådsikker.",
-      "symptoms": "Forældet eller corrupted execution status ved concurrent brug. Kan tilgås af concurrent requests..",
-      "environment": "Windows, Python 3.12",
-      "status": "resolved",
-      "resolution_note": "Fixed 2026-05-26: BUG-005 added execution_status_lock to api_server.py, BUG-006 moved SUBPROCESS_TIMEOUT and MAX_TOOL_CALLS to config.py"
     },
     {
       "id": "BUG-006",
@@ -137,18 +125,6 @@
       "action": "Valider at path resolver indenfor projektets mappe (brug _is_safe_path eller os.path.commonpath). Successkriterie: write_file/edit_file afviser paths udenfor projektets mappe.",
       "symptoms": "En LLM der hallucinerer kan overskrive systemfiler udenfor projektets mappe. LLM hallucination kan skrive til vilkårlige filsystem locations..",
       "environment": "Windows, Python 3.12, LM Studio, pytest, Git",
-      "status": "resolved",
-      "resolution_note": "Fixed 2026-05-26: SEC-005 added _is_safe_path check to write_file/edit_file in git_ops.py, ARC-001 removed dead _run_pytest/_read_issue/_update_issue_status from agent_core.py"
-    },
-    {
-      "id": "ARC-001",
-      "title": "Dead code in agent_core.py — _read_issue, _update_issue_status, _run_pytest",
-      "type": "architecture",
-      "severity": "medium",
-      "context": "Fil: agent_core.py:Agent._register_tools. agent_core.py har tre metoder der duplikerer module-funktioner men aldrig kaldes: _read_issue (line 260), _update_issue_status (line 272), _run_pytest (line 248). Tool registry bruger agent_issues versions.",
-      "action": "Slet de tre døde metoder fra agent_core.py. Successkriterie: Ingen døde _read_issue/_update_issue_status/_run_pytest i agent_core.py.",
-      "symptoms": "Vedligeholdelsesbyrde: ændringer skal laves begge steder. Forvirring ved onboarding. Tool registry bruger agent_issues versions..",
-      "environment": "Windows, Python 3.12, pytest, Git",
       "status": "resolved",
       "resolution_note": "Fixed 2026-05-26: SEC-005 added _is_safe_path check to write_file/edit_file in git_ops.py, ARC-001 removed dead _run_pytest/_read_issue/_update_issue_status from agent_core.py"
     },
@@ -307,18 +283,6 @@
       "environment": "Windows, Python 3.12, LM Studio",
       "status": "resolved",
       "resolution_note": "2026-05-26: Added os.path.splitdrive() guard to detect Windows drive letters before colon-splitting."
-    },
-    {
-      "id": "BUG-011",
-      "title": "SSE execute_stream uses global current_session_id — race condition on concurrent requests",
-      "type": "bug",
-      "severity": "critical",
-      "context": "Fil: api_server.py:_rate_limit, 1111, 1205-1215. api_server.py: current_session_id is a module-level global. execute_stream() generate() closure references the global, which can be mutated by other concurrent request handlers between iterations.",
-      "action": "Capture current_session_id into a local variable before the generate() closure captures it. Successkriterie: generate() closure uses a locally-captured session_id, not the global. No race condition on session save.",
-      "symptoms": "Concurrent requests can save session data to the wrong session file, corrupting both users' data. Hard to reproduce. execute_stream() generate() closure references the global, which can be mutated by other concurrent request handlers between iterations..",
-      "environment": "Windows, Python 3.12",
-      "status": "resolved",
-      "resolution_note": "2026-05-26: Captured current_session_id to local 'session_id' variable in execute_stream() before generate() closure. generate() now closes over the stable local."
     },
     {
       "id": "SEC-007",
@@ -513,18 +477,6 @@
       "resolution_note": "Fikset ValueError ved EOF uden newline i edit_file funktionen."
     },
     {
-      "id": "BUG-020",
-      "title": "api_server.py active_streams dict accessed without lock",
-      "type": "bug",
-      "severity": "high",
-      "context": "Fil: api_server.py:79, 678, 1166. api_server.py:79,678,1166: active_streams dict is read/written by concurrent request handlers (execute_stream and stop_execution) without threading.Lock. Possible KeyError or wrong stream being stopped.",
-      "action": "Add threading.Lock for all active_streams accesses.",
-      "symptoms": "Concurrent stream stop requests can cause KeyError or stop the wrong stream. Possible KeyError or wrong stream being stopped..",
-      "environment": "Windows, Python 3.12",
-      "status": "resolved",
-      "resolution_note": "Koden er opdateret og indeholder nu `active_streams_lock` som beskytter alle adgang til `active_streams`-ordbogen i både `stop_execution` (linje ~678) og `execute_stream` (linje ~1166). Der er ingen ubeskyttede læs/skriv operationer fundet. Fejlen er dermed rettet."
-    },
-    {
       "id": "BUG-021",
       "title": "api_server.py preview_export TOCTOU crash on deleted file",
       "type": "bug",
@@ -571,18 +523,6 @@
       "environment": "Windows, Python 3.12, Flask, LM Studio, Git",
       "status": "resolved",
       "resolution_note": "Fixed 2026-05-26: Replaced all print() calls (81 across 12 files) with Python logging module — configurable console + file handlers via config.setup_logging()."
-    },
-    {
-      "id": "MNT-008",
-      "title": "llm_wrapper.py IMAGE_FORMATS dead code",
-      "type": "maintainability",
-      "severity": "high",
-      "context": "Fil: llm_wrapper.py:LMStudioWrapper._get_cache_key. llm_wrapper.py:47-53: IMAGE_FORMATS class variable maps model prefixes to format types, but _image_url and _image_part never reference it. All images sent as data: URL regardless of model. Dead code.",
-      "action": "Either use IMAGE_FORMATS in _image_url/_image_part, or remove it and update AGENTS.md.",
-      "symptoms": "Misleading code. AGENTS.md documents Gemma-specific image handling that doesn't match actual code. All images sent as data: URL regardless of model. Dead code..",
-      "environment": "Windows, Python 3.12, LM Studio",
-      "status": "resolved",
-      "resolution_note": "Fixed 2026-05-26: IMAGE_FORMATS retained as documented model reference; VISION_KEYWORDS + _supports_vision() added as actively-used equivalent that actually guards _to_messages()."
     },
     {
       "id": "BUG-023",
