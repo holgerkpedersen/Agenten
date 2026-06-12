@@ -8,7 +8,7 @@ class TestTemplateTools:
         expected = {"resume", "kodeanalyse", "diffanalyse", "fri", "one-shot",
                     "agenten", "programmering", "python-arkitektur",
                     "billedanalyse", "bugfix", "refactor", "testgenerering",
-                    "issue_handler", "selvforbedring"}
+                    "issue_handler", "selvforbedring", "autoresearch"}
         assert set(TEMPLATE_TOOLS.keys()) == expected
 
     def test_fri_is_none(self):

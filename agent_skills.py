@@ -48,6 +48,13 @@ TEMPLATE_TOOLS = {
         "git_status", "git_diff", "git_commit", "git_push",
         "git_create_branch", "git_checkout",
     ],
+    "autoresearch": [
+        "read_location", "list_chunks", "list_files", "list_symbols", "locate",
+        "edit_file", "write_file", "run_tests",
+        "create_issue", "create_refactor_issue",
+        "git_status", "git_diff", "git_commit", "git_checkout",
+        "read_issue",
+    ],
 }
 
 # Per-template, per-phase iteration limits (LLM conversation turns).

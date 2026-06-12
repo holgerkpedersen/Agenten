@@ -13,6 +13,7 @@ import agent_git
 import agent_files
 import agent_issues
 import agent_phase_checks
+import agent_autoresearch
 import config
 from typing import Any, Generator
 
@@ -1501,6 +1502,8 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
             agent._seq.save()
     if task_node.status == "failed":
         agent._log("INFO", t(K.LOG_TASK_FAILED, agent.lang), task_node.name)
+        agent_autoresearch.trigger_if_needed(
+            agent, task_node, called_tools, full_response, messages)
     else:
         agent._log("INFO", t(K.LOG_TASK_DONE, agent.lang), task_node.name)
     agent._evolve_if_needed()

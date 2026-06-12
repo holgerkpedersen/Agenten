@@ -1,6 +1,6 @@
 ---
 name: agenten_hello_projektet
-keywords: [agenten, hello, projektet, fil, roden, indholdet, holger, opret]
+keywords: [agenten, hello, projektet, roden, indholdet, fil, holger, hej]
 action_types: [github, write]
 description: SkillFlow-generated — 8 tasks: Opret en hello.md fil i roden af C:\Agenten projektet. Indholdet skal være "Hej ...
 base: false

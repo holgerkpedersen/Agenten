@@ -1,6 +1,6 @@
 ---
-name: projektet_indholdet_agenten
-keywords: [projektet, indholdet, agenten, hello, fil, roden, holger, opret]
+name: fil_projektet_hello
+keywords: [fil, projektet, hello, agenten, indholdet, roden, holger, hej]
 action_types: [github, write]
 description: SkillFlow-generated — 8 tasks: Opret en hello.md fil i roden af C:\Agenten projektet. Indholdet skal være "Hej ...
 base: false
@@ -8,7 +8,7 @@ min_score: 1
 rubrics: [{"id":"code_written","desc":"Implementerede med write_file eller edit_file","check":"tool_used:write_file or tool_used:edit_file"}, {"id":"github_used","desc":"Brugte GitHub-værktøjer","check":"tool_used:github_create_pr or tool_used:github_create_issue or tool_used:github_list_repos"}]
 ---
 
-## Projektet Indholdet Agenten
+## Fil Projektet Hello
 
 Auto-generated skill based on 8 similar unmatched tasks.
 
@@ -21,7 +21,7 @@ Auto-generated skill based on 8 similar unmatched tasks.
 
 ### Instructions
 
-1. **Analyze the request**: Identify the specific files, components, or areas involved. Tasks in this category typically relate to: **projektet, indholdet, agenten, hello, roden**.
+1. **Analyze the request**: Identify the specific files, components, or areas involved. Tasks in this category typically relate to: **projektet, hello, agenten, indholdet, roden**.
 2. **Gather context**: Load relevant files and data needed to complete the task.
 3. **Plan the approach**: Outline the changes or analysis needed based on the gathered context.
 4. **Execute**: Make the changes or perform the analysis.
