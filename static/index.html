@@ -2827,7 +2827,13 @@ async function executeWithStream() {
                 if (llmBox) llmBox.innerHTML = `<div style="color:#60a5fa;">🎬 ${_('N_tasks').replace('{n}', data.total_tasks)}</div>`;
                 addLogEntry('INFO', _('streaming_started'), _('N_tasks').replace('{n}', data.total_tasks));
                 break;
-                
+
+            case 'retry':
+                addLogEntry('WARNING', `🔄 Genforsøg ${data.attempt}/${data.max} for "${data.task}"`, '');
+                const retryTask = document.getElementById('currentTask');
+                if (retryTask) retryTask.innerHTML = `📌 ${escapeHtml(data.task)} <span style="color:#f59e0b;">🔄 forsøg ${data.attempt}/${data.max}</span>`;
+                break;
+
             case 'task_start':
                  const currentTask = document.getElementById('currentTask');
                  let taskHtml = `📌 ${escapeHtml(data.task)}`;

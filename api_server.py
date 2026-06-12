@@ -1205,6 +1205,71 @@ def _check_client(agent: Any) -> bool:
     return agent.stop_requested
 
 
+def _extract_retry_context(node: Any, agent: Any, full_response: str) -> dict:
+    """Extract failure context for retry.
+
+    Captures what went wrong, what tools were called,
+    and relevant log entries so the next attempt can learn.
+    """
+    tool_log = getattr(agent, "_tool_log", []) or []
+    phase_tools = [t for t in tool_log
+                   if t.get("phase", "").lower() == (node.name or "").lower()]
+
+    called_tools = {}
+    for t in phase_tools:
+        tname = t.get("tool", "")
+        key = tname + str(t.get("args", {}))
+        called_tools[key] = called_tools.get(key, 0) + 1
+
+    called_names = {k.split("{")[0] for k in called_tools}
+    active = set(agent.tool_registry.active_tools or []) if hasattr(agent, 'tool_registry') else set()
+    required_action = {"edit_file", "write_file", "update_issue_status"}
+    needed = active & required_action
+    uncalled = needed - called_names
+
+    return {
+        "phase": node.name,
+        "failure_reason": full_response[:300],
+        "called_tools": list(called_names),
+        "uncalled_tools": list(uncalled),
+        "tool_count": len(phase_tools),
+        "all_messages": [],  # Would require messages from solve_task_stream
+    }
+
+
+def _build_retry_lessons(context: dict, agent: Any) -> str:
+    """Build a 'Lessons Learned' prompt section from a failed attempt."""
+    lessons = []
+    lessons.append("⚠️  TIDLIGERE FORSØG MISLYKKEDES")
+    lessons.append(f"Årsag: {context.get('failure_reason', 'Ukendt')[:200]}")
+    lessons.append("")
+
+    uncalled = context.get("uncalled_tools", [])
+    if uncalled:
+        lessons.append("VÆRKTØJER DER SKULLE HAVE VÆRET KALDT:")
+        lessons.append(f"- {', '.join(uncalled)}")
+        if "edit_file" in uncalled:
+            lessons.append("  Brug edit_file med symbol= parameter (AST-tilstand).")
+            lessons.append("  Eksempel: edit_file(path='fil.py', symbol='funktionsnavn', new_text='...')")
+        if "write_file" in uncalled:
+            lessons.append("  Brug write_file til at oprette nye filer.")
+        if "update_issue_status" in uncalled:
+            lessons.append("  Brug update_issue_status til at markere issue som løst.")
+        lessons.append("")
+
+    called = context.get("called_tools", [])
+    if called:
+        lessons.append("VÆRKTØJER DER BLEV KALDT (men ikke nok):")
+        lessons.append(f"- {', '.join(called)}")
+        lessons.append("")
+
+    lessons.append("INSTRUKTION:")
+    lessons.append("Lær af fejlen ovenfor. Sørg for at kalde ALLE påkrævede værktøjer.")
+    lessons.append("Brug <<<DONE>>> først når fasen er fuldført med de rigtige værktøjskald.")
+
+    return "\n".join(lessons)
+
+
 def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: list[int], task_context_prompt: str, show_thinking: bool, ui_lang: str, current_session_id: str | None) -> Generator[str, None, None]:
     """execute with stream.
     
@@ -1298,25 +1363,49 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
 
     node.status = "running"
     full_response = ""
-    for event in agent.solve_task_stream(node, task_context_prompt):
-        if _check_client(agent):
-            return
-        if event["type"] == "chunk":
-            full_response += event["chunk"]
-            yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']})}\n\n"
-        elif event["type"] == "tool_call":
-            yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
-        elif event["type"] == "tool_result":
-            yield f"data: {json.dumps({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']})}\n\n"
-        elif event["type"] == "log":
-            yield f"data: {json.dumps({'type': 'log', 'log': event['log']})}\n\n"
-        elif event["type"] == "done":
-            full_response = event["result"]
-    if not full_response:
-        full_response = t(K.UI_TASK_RESULT_PREFIX, ui_lang) + ": " + node.name
-    if node.status == "running":
-        node.status = "done"
-    node.result = full_response
+
+    _MAX_RETRIES = 3
+    retry_contexts = []
+
+    for retry_attempt in range(_MAX_RETRIES + 1):
+        if retry_attempt > 0:
+            if _check_client(agent):
+                return
+            lessons = _build_retry_lessons(retry_contexts[-1], agent)
+            improved_prompt = lessons + "\n\n" + task_context_prompt
+            agent._log("INFO", f"Genforsøg {retry_attempt}/{_MAX_RETRIES} for {node.name}",
+                       f"Forrige fejl: {retry_contexts[-1].get('failure_reason','?')}")
+            yield f"data: {json.dumps({'type': 'retry', 'task': node.name, 'attempt': retry_attempt, 'max': _MAX_RETRIES})}\n\n"
+
+        full_response = ""
+        for event in agent.solve_task_stream(node, improved_prompt if retry_attempt > 0 else task_context_prompt):
+            if _check_client(agent):
+                return
+            if event["type"] == "chunk":
+                full_response += event["chunk"]
+                yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']})}\n\n"
+            elif event["type"] == "tool_call":
+                yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
+            elif event["type"] == "tool_result":
+                yield f"data: {json.dumps({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']})}\n\n"
+            elif event["type"] == "log":
+                yield f"data: {json.dumps({'type': 'log', 'log': event['log']})}\n\n"
+            elif event["type"] == "done":
+                full_response = event["result"]
+
+        if not full_response:
+            full_response = t(K.UI_TASK_RESULT_PREFIX, ui_lang) + ": " + node.name
+        if node.status == "running":
+            node.status = "done"
+        node.result = full_response
+
+        if node.status == "failed" and retry_attempt < _MAX_RETRIES:
+            context = _extract_retry_context(node, agent, full_response)
+            retry_contexts.append(context)
+            node.status = "pending"
+            continue
+        break
+
     if _check_client(agent):
         return
     completed[0] += 1
