@@ -1821,6 +1821,44 @@ def list_templates() -> Any:
         }
     return jsonify({"success": True, "templates": public})
 
+
+@app.route("/api/autoresearch/events/<research_id>", methods=["GET"])
+def autoresearch_events(research_id: str) -> Any:
+    """Return autoresearch events since a timestamp."""
+    since = request.args.get("since", "0")
+    try:
+        since_f = float(since)
+    except (ValueError, TypeError):
+        since_f = 0.0
+    events = agent_autoresearch.get_events(research_id, since_f)
+    return jsonify({"success": True, "events": events})
+
+
+@app.route("/api/autoresearch/sessions", methods=["GET"])
+def autoresearch_sessions() -> Any:
+    """Return active autoresearch sessions."""
+    sessions = agent_autoresearch.get_active_sessions()
+    return jsonify({"success": True, "sessions": sessions})
+
+
+@app.route("/api/autoresearch/<research_id>/pause", methods=["POST"])
+def autoresearch_pause(research_id: str) -> Any:
+    """Pause a running autoresearch session."""
+    ok = agent_autoresearch.pause_session(research_id)
+    if ok:
+        return jsonify({"success": True, "status": "paused"})
+    return jsonify({"success": False, "error": "Session not found or not running"}), 404
+
+
+@app.route("/api/autoresearch/<research_id>/resume", methods=["POST"])
+def autoresearch_resume(research_id: str) -> Any:
+    """Resume a paused autoresearch session."""
+    ok = agent_autoresearch.resume_session(research_id)
+    if ok:
+        return jsonify({"success": True, "status": "running"})
+    return jsonify({"success": False, "error": "Session not found or not paused"}), 404
+
+
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:
     """list issues."""

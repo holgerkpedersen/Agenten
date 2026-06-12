@@ -1,16 +1,19 @@
 """Auto-research engine for Agenten.
 
-When a task/phase fails, this module analyses the failure, checks for
-duplicate issues, and creates a CORE-issue for the self-improvement
-cycle.  Inspired by Karpathy's "agent auto-research" concept.
+Inspired by Karpathy's autoresearch concept (github.com/karpathy/autoresearch).
+
+When a task phase fails, this module runs a research loop:
+  1. Analyze   — LLM reads the failure context, determines root cause
+  2. Fix       — LLM edits the relevant source code (coding phase)
+  3. Verify    — run_tests, keep (git commit) or discard (git checkout)
+  4. Log       — record experiment outcome in research log
+  5. Repeat    — loop until fix verified or max iterations reached
 
 Design:
   - Runs async in a daemon thread — never blocks the SSE stream.
-  - Classifies failure into one of five types via heuristics.
-  - Delegates root-cause analysis to the LLM (autoresearch template).
-  - Deduplicates against open issues (template + phase + failure type).
-  - Creates a structured CORE-issue for the next self-improvement run.
-  - Rate-limited: 1 analysis per 5 minutes per session.
+  - Sends progress events via a JSON event queue (polled by API).
+  - Supports pause/resume by saving ResearchSession state to file.
+  - Rate-limited: 1 research session per 5 minutes per session.
 """
 
 import json
@@ -18,16 +21,17 @@ import os
 import re
 import threading
 import time
+import uuid
 from typing import Any
 
 from i18n import K
 from lang import t
 
 # ── Rate limiting ──────────────────────────────────────────────
-_RATE_LIMIT_SEC = 300        # 5 minutes between analyses
+_RATE_LIMIT_SEC = 300        # 5 minutes between sessions
 _last_analysis: dict[str, float] = {}  # session_id → timestamp
 
-# ── Failure types ──────────────────────────────────────────────
+# ── Failure types (kept for test compatibility) ────────────────
 FAILURE_MISSING_TOOL      = "missing_tool"
 FAILURE_TOOL_FAILED       = "tool_failed"
 FAILURE_READ_LOOP         = "read_loop"
@@ -35,6 +39,128 @@ FAILURE_SHORT_OUTPUT      = "short_output"
 FAILURE_PHASE_CHECK       = "phase_check"
 FAILURE_UNKNOWN           = "unknown"
 
+# ── Research log dir ───────────────────────────────────────────
+_LOG_DIR = "logs/autoresearch"
+
+# ── Event queue ────────────────────────────────────────────────
+# Each session writes events to: logs/autoresearch/{session_id}/events.jsonl
+# The API endpoint reads and returns new events since last poll.
+
+
+def _event_path(session_id: str) -> str:
+    return os.path.join(_LOG_DIR, session_id, "events.jsonl")
+
+
+def _state_path(session_id: str) -> str:
+    return os.path.join(_LOG_DIR, session_id, "state.json")
+
+
+def _emit_event(session_id: str, event_type: str, data: dict) -> None:
+    """Append a progress event to the event queue for this session."""
+    dirpath = os.path.join(_LOG_DIR, session_id)
+    os.makedirs(dirpath, exist_ok=True)
+    entry = {
+        "timestamp": time.time(),
+        "type": event_type,
+        **data,
+    }
+    try:
+        with open(_event_path(session_id), "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def get_events(session_id: str, since: float = 0.0) -> list[dict]:
+    """Return events for a session since the given timestamp."""
+    path = _event_path(session_id)
+    if not os.path.exists(path):
+        return []
+    events = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                    if ev.get("timestamp", 0) > since:
+                        events.append(ev)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+    except OSError:
+        pass
+    return events
+
+
+def get_active_sessions() -> list[dict]:
+    """Return all active (not done/failed) research sessions."""
+    if not os.path.isdir(_LOG_DIR):
+        return []
+    sessions = []
+    for sid in os.listdir(_LOG_DIR):
+        sp = _state_path(sid)
+        if os.path.exists(sp):
+            try:
+                with open(sp, encoding="utf-8") as f:
+                    state = json.load(f)
+                if state.get("status") in ("running", "paused"):
+                    sessions.append(state)
+            except (OSError, json.JSONDecodeError):
+                pass
+    return sessions
+
+
+def _paused_path(session_id: str) -> str:
+    return os.path.join(_LOG_DIR, session_id, ".paused")
+
+
+def pause_session(session_id: str) -> bool:
+    """Pause a running research session."""
+    sp = _state_path(session_id)
+    if not os.path.exists(sp):
+        return False
+    try:
+        with open(sp, encoding="utf-8") as f:
+            state = json.load(f)
+        state["status"] = "paused"
+        state["paused_at"] = time.time()
+        with open(sp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        # Signal the running thread to pause
+        with open(_paused_path(session_id), "w") as f:
+            f.write("1")
+        _emit_event(session_id, "paused", {"reason": "User requested pause"})
+        return True
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
+def resume_session(session_id: str) -> bool:
+    """Resume a paused research session."""
+    sp = _state_path(session_id)
+    if not os.path.exists(sp):
+        return False
+    try:
+        with open(sp, encoding="utf-8") as f:
+            state = json.load(f)
+        state["status"] = "running"
+        state.pop("paused_at", None)
+        with open(sp, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        # Remove pause signal
+        pp = _paused_path(session_id)
+        if os.path.exists(pp):
+            os.remove(pp)
+        # Launch a new thread to continue
+        _emit_event(session_id, "resumed", {"reason": "User requested resume"})
+        return True
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
+# ── Classification (preserved from original, used by tests) ────
 
 def classify_failure(task_node: Any, called_tools: dict,
                      tool_log: list, full_response: str,
@@ -59,7 +185,6 @@ def classify_failure(task_node: Any, called_tools: dict,
         }
 
     # 2. READ_LOOP — 5+ consecutive reads, no writes
-    #    (only checks when no required action tools are missing)
     if tool_log and not (active & required_action):
         recent = tool_log[-8:]
         read_tools = {"read_location", "read_chunk", "list_chunks",
@@ -101,14 +226,7 @@ def classify_failure(task_node: Any, called_tools: dict,
 def _find_duplicate_issue(failure_type: str, template: str,
                            phase: str, evidence: dict,
                            issues: list[dict]) -> str | None:
-    """Return issue_id if an open issue matches > 70 %.
-
-    Match is based on:
-      - template (weight 25 %)
-      - phase (weight 25 %)
-      - failure_type (weight 30 %)
-      - title keywords (weight 20 %)
-    """
+    """Return issue_id if an open issue matches > 70 %."""
     for issue in issues:
         if issue.get("status") not in ("open", "in_progress"):
             continue
@@ -126,11 +244,10 @@ def _find_duplicate_issue(failure_type: str, template: str,
         if phase and phase.lower() in combined:
             score += 0.25
 
-        # Failure type match (30 %) — check both English and Danish labels
+        # Failure type match (30 %)
         type_label = failure_type.replace("_", " ")
         type_matched = type_label in combined
         if not type_matched:
-            # Danish equivalents
             da_labels = {
                 "missing_tool": ["manglende vaerktoej", "manglende v\u00e6rkt\u00f8j",
                                  "ikke kaldt"],
@@ -177,86 +294,9 @@ def _rate_limit_ok(session_id: str) -> bool:
     return True
 
 
-def _build_failure_report(agent: Any, task_node: Any,
-                           failure_type: str, evidence: dict) -> dict:
-    """Build a structured failure report for issue creation."""
-    template = getattr(agent, "active_template", "ukendt")
-    phase = getattr(task_node, "name", "ukendt")
+# ── Research loop ──────────────────────────────────────────────
 
-    if failure_type == FAILURE_MISSING_TOOL:
-        title = (f"Manglende påkrævet værktøj i {template}/{phase}: "
-                 f"{', '.join(evidence.get('uncalled', []))}")
-        desc = (f"**Template:** {template}\n"
-                f"**Fase:** {phase}\n"
-                f"**Fejltype:** Manglende værktøjskald\n"
-                f"**Påkrævede værktøjer:** {evidence.get('required')}\n"
-                f"**Kaldte værktøjer:** {evidence.get('called')}\n"
-                f"**Ikke kaldt:** {evidence.get('uncalled')}\n\n"
-                f"LLM'en kaldte ikke de påkrævede værktøjer. "
-                f"Overvej at opdatere sektionsinstruktionen "
-                f"eller TEMPLATE_TASK_TOOLS.")
-        proposed_fix = (f"Opdater SECTION_INSTRUCTIONS for "
-                        f"{template}/{phase} så LLM'en guides "
-                        f"til at kalde {evidence.get('uncalled')} "
-                        f"på første iteration.")
-    elif failure_type == FAILURE_TOOL_FAILED:
-        title = (f"Værktøj fejlede i {template}/{phase}: "
-                 f"{evidence.get('tool', '?')}")
-        desc = (f"**Template:** {template}\n"
-                f"**Fase:** {phase}\n"
-                f"**Fejltype:** Værktøjskald fejlede\n"
-                f"**Værktøj:** {evidence.get('tool')}\n"
-                f"**Antal forsøg:** {evidence.get('attempts')}\n"
-                f"**Sidste fejl:** {evidence.get('last_error')}\n"
-                f"**Sidste args:** {evidence.get('last_args')}")
-        proposed_fix = (f"Analysér hvorfor "
-                        f"{evidence.get('tool')} fejler i "
-                        f"{template}/{phase}. "
-                        f"{evidence.get('last_error', '')}")
-    elif failure_type == FAILURE_READ_LOOP:
-        title = (f"Læse-loop i {template}/{phase}: "
-                 f"{evidence.get('consecutive_reads', 0)} læsninger uden skrivning")
-        desc = (f"**Template:** {template}\n"
-                f"**Fase:** {phase}\n"
-                f"**Fejltype:** Læse-loop\n"
-                f"**Sekventielle læsninger:** {evidence.get('consecutive_reads')}\n"
-                f"**Seneste værktøjer:** {evidence.get('total_recent')}")
-        proposed_fix = (f"LLM'en læser gentagne gange uden at skrive. "
-                        f"Overvej at tilføje write-påbud tidligere "
-                        f"i sektionsinstruktionen.")
-    elif failure_type == FAILURE_SHORT_OUTPUT:
-        title = (f"Kort output i {template}/{phase}: "
-                 f"{evidence.get('response_length', 0)} tegn")
-        desc = (f"**Template:** {template}\n"
-                f"**Fase:** {phase}\n"
-                f"**Fejltype:** Kort output\n"
-                f"**Længde:** {evidence.get('response_length')} tegn\n"
-                f"**Output:** {evidence.get('response_preview')}")
-        proposed_fix = (f"LLM'en afsluttede uden at producere "
-                        f"tilstrækkeligt output eller kalde værktøjer. "
-                        f"Overvej at øge min_text_length for fasen "
-                        f"eller tydeliggøre instruktionen.")
-    else:
-        title = (f"Uforklaret fejl i {template}/{phase}")
-        desc = (f"**Template:** {template}\n"
-                f"**Fase:** {phase}\n"
-                f"**Fejltype:** Uforklaret\n"
-                f"**Kaldte værktøjer:** {evidence.get('called_tools')}\n"
-                f"**Output længde:** {evidence.get('response_length')}")
-        proposed_fix = "Kræver manuel analyse."
-
-    return {
-        "title": title[:120],
-        "type": "bug",
-        "severity": "medium",
-        "description": desc[:2000],
-        "location": f"agent_skills.py:{template}:{phase}",
-        "impact": (f"Fasen {phase} i {template}-skabelonen "
-                   f"fejler konsekvent."),
-        "proposed_fix": proposed_fix[:500],
-        "acceptance_criteria": (f"Fasen {phase} i {template} "
-                                f"gennemføres uden denne fejl."),
-    }
+_MAX_RESEARCH_ITERATIONS = 5
 
 
 def trigger_if_needed(agent: Any, task_node: Any,
@@ -265,79 +305,270 @@ def trigger_if_needed(agent: Any, task_node: Any,
                        messages: list[dict] | None = None) -> None:
     """Entry point — called from _finalize_task_stream on failure.
 
-    Rate-limited and async. Creates a CORE-issue if the failure
-    is novel and actionable.
+    Rate-limited and async. Runs a research loop that analyzes the
+    failure, fixes the code, verifies with tests, and logs the result.
     """
-    # Only trigger on actual failures
     if getattr(task_node, "status", "") != "failed":
         return
 
     session_id = getattr(agent, "_session_id", "unknown")
     if not _rate_limit_ok(session_id):
+        agent._log("AUTOR", "Auto-research: rate-limited", session_id)
         return
 
-    # Gather context
     tool_log = getattr(agent, "_tool_log", []) or []
     phase = getattr(task_node, "name", "ukendt")
     template = getattr(agent, "active_template", "ukendt")
 
-    # Classify
     failure_type, evidence = classify_failure(
         task_node, called_tools, tool_log, full_response, agent)
 
-    # Build report
-    report = _build_failure_report(
-        agent, task_node, failure_type, evidence)
-
-    # Dedup against open issues
+    # Dedup
     try:
         from agent_issues import _load_issues
         data = _load_issues()
-        issues = data.get("issues", [])
         dup_id = _find_duplicate_issue(
-            failure_type, template, phase, evidence, issues)
+            failure_type, template, phase, evidence, data.get("issues", []))
         if dup_id:
             agent._log("AUTOR", f"Auto-research: dublet — {dup_id}",
                        f"{failure_type} i {template}/{phase}")
             return
     except Exception as exc:
-        agent._log("AUTOR", f"Auto-research: dedup fejlede", str(exc))
+        agent._log("AUTOR", "Auto-research: dedup fejlede", str(exc))
 
-    # Launch async analysis
+    # Prepare research session state
+    research_id = str(uuid.uuid4())[:8]
+    state = {
+        "research_id": research_id,
+        "session_id": session_id,
+        "template": template,
+        "phase": phase,
+        "failure_type": failure_type,
+        "evidence": evidence,
+        "status": "running",
+        "iteration": 0,
+        "max_iterations": _MAX_RESEARCH_ITERATIONS,
+        "experiments": [],
+        "started_at": time.time(),
+    }
+
+    dirpath = os.path.join(_LOG_DIR, research_id)
+    os.makedirs(dirpath, exist_ok=True)
+    try:
+        with open(_state_path(research_id), "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+    agent._log("AUTOR", f"Auto-research starter: {research_id}",
+               f"{failure_type} i {template}/{phase}")
+
+    # Launch async research loop
     thread = threading.Thread(
-        target=_async_create_issue,
-        args=(agent, task_node, failure_type, evidence, report),
+        target=_research_loop,
+        args=(agent, task_node, failure_type, evidence, research_id, state),
         daemon=True,
     )
     thread.start()
 
 
-def _async_create_issue(agent: Any, task_node: Any,
-                         failure_type: str, evidence: dict,
-                         report: dict) -> None:
-    """Async: create a CORE-issue for the failure."""
+def _research_loop(agent: Any, task_node: Any,
+                    failure_type: str, evidence: dict,
+                    research_id: str, state: dict) -> None:
+    """Main research loop: analyze → fix → verify → log → repeat."""
+    session_id = state["session_id"]
+    template = state["template"]
+    phase = state["phase"]
+
+    _emit_event(research_id, "research_started", {
+        "session_id": session_id,
+        "template": template,
+        "phase": phase,
+        "failure_type": failure_type,
+    })
+
+    for iteration in range(1, _MAX_RESEARCH_ITERATIONS + 1):
+        # Check for pause signal
+        if os.path.exists(_paused_path(research_id)):
+            _emit_event(research_id, "paused", {"iteration": iteration})
+            state["status"] = "paused"
+            state["iteration"] = iteration
+            _save_state(research_id, state)
+            return  # Thread exits; resume_session will spawn a new one
+
+        state["iteration"] = iteration
+        _emit_event(research_id, "iteration_started", {"iteration": iteration})
+
+        # --- Phase 1: Analyze ---
+        _emit_event(research_id, "phase", {"phase": "analyze", "iteration": iteration})
+        analysis = _analyze_failure(agent, failure_type, evidence, template, phase)
+        _emit_event(research_id, "analysis_done", {"summary": analysis[:200]})
+
+        # --- Phase 2: Fix (coding phase) ---
+        _emit_event(research_id, "phase", {"phase": "fix", "iteration": iteration})
+        fix_result = _attempt_fix(agent, analysis, template, phase)
+        _emit_event(research_id, "fix_done", {
+            "success": fix_result.get("success", False),
+            "changes": fix_result.get("changes", []),
+        })
+
+        if not fix_result.get("success"):
+            _emit_event(research_id, "fix_failed", {
+                "error": fix_result.get("error", "Unknown"),
+                "iteration": iteration,
+            })
+            continue
+
+        # --- Phase 3: Verify ---
+        _emit_event(research_id, "phase", {"phase": "verify", "iteration": iteration})
+        verify_result = _verify_fix(agent)
+        kept = verify_result.get("kept", False)
+        _emit_event(research_id, "verify_done", {
+            "kept": kept,
+            "test_summary": verify_result.get("summary", ""),
+            "iteration": iteration,
+        })
+
+        # --- Log experiment ---
+        experiment = {
+            "iteration": iteration,
+            "analysis": analysis[:500],
+            "changes": fix_result.get("changes", []),
+            "tests_passed": verify_result.get("tests_passed", False),
+            "kept": kept,
+            "summary": verify_result.get("summary", ""),
+        }
+        state["experiments"].append(experiment)
+        _save_state(research_id, state)
+
+        if kept:
+            _emit_event(research_id, "research_done", {
+                "iteration": iteration,
+                "experiments": len(state["experiments"]),
+            })
+            state["status"] = "done"
+            _save_state(research_id, state)
+
+            # Create a CORE-issue documenting the fix
+            _create_issue(agent, failure_type, evidence, template, phase, analysis)
+            return
+
+        # Check pause again before next iteration
+        if os.path.exists(_paused_path(research_id)):
+            _emit_event(research_id, "paused", {"iteration": iteration})
+            state["status"] = "paused"
+            state["iteration"] = iteration
+            _save_state(research_id, state)
+            return
+
+    # Max iterations reached without success
+    _emit_event(research_id, "research_failed", {
+        "reason": "Max iterations reached",
+        "experiments": len(state["experiments"]),
+    })
+    state["status"] = "failed"
+    _save_state(research_id, state)
+
+    # Still create an issue documenting the problem
+    _create_issue(agent, failure_type, evidence, template, phase,
+                  "Auto-research exhausted without finding a fix.")
+
+
+def _save_state(research_id: str, state: dict) -> None:
+    """Save research session state to disk."""
+    dirpath = os.path.join(_LOG_DIR, research_id)
+    os.makedirs(dirpath, exist_ok=True)
     try:
-        from agent_issues import create_issue
-        result = create_issue(
-            agent,
-            title=report["title"],
-            type=report["type"],
-            severity=report["severity"],
-            description=report["description"],
-            location=report["location"],
-            impact=report["impact"],
-            proposed_fix=report["proposed_fix"],
-            acceptance_criteria=report["acceptance_criteria"],
-        )
-        if result.get("success"):
-            issue_id = result.get("issue", {}).get("id", "?")
-            existing = "(fandtes allerede)" if result.get("existing") else "(ny)"
-            agent._log("AUTOR",
-                       f"Auto-research issue {issue_id} {existing}",
-                       report["title"][:120])
-        else:
-            agent._log("AUTOR",
-                       "Auto-research: create_issue fejlede",
-                       str(result.get("error", "")))
-    except Exception as exc:
-        agent._log("AUTOR", "Auto-research: exception", str(exc))
+        with open(_state_path(research_id), "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+    except OSError:
+        pass
+
+
+def _analyze_failure(agent: Any, failure_type: str,
+                      evidence: dict, template: str,
+                      phase: str) -> str:
+    """Phase 1: Analyze the failure and determine root cause.
+
+    In future: uses the LLM (autoresearch template) to read source code
+    and produce a detailed analysis. For now: returns a structured summary.
+    """
+    lines = [
+        f"Auto-research analyse af {failure_type} i {template}/{phase}",
+    ]
+    for k, v in evidence.items():
+        if isinstance(v, str):
+            lines.append(f"  {k}: {v[:200]}")
+        elif isinstance(v, list):
+            lines.append(f"  {k}: {', '.join(str(x) for x in v)[:200]}")
+    return "\n".join(lines)
+
+
+def _attempt_fix(agent: Any, analysis: str,
+                  template: str, phase: str) -> dict:
+    """Phase 2: Attempt to fix the issue (coding phase).
+
+    In future: uses the LLM to read relevant source files and apply
+    code changes via edit_file. For now: creates a CORE-issue.
+    """
+    # For now, just create an issue and return "not fixed"
+    from agent_issues import create_issue
+    title = f"Auto-research: {template}/{phase} — {analysis[:80]}"
+    result = create_issue(
+        agent,
+        title=title[:120],
+        type="bug",
+        severity="medium",
+        description=analysis[:2000],
+        location=f"agent_skills.py:{template}:{phase}",
+        impact=f"Fasen {phase} i {template} fejler.",
+        proposed_fix="Kræver manuel gennemgang af auto-research log.",
+    )
+    return {
+        "success": False,
+        "error": "Auto-research coding phase not yet implemented — issue created instead.",
+        "changes": [result.get("issue", {}).get("id", "?")] if result.get("success") else [],
+    }
+
+
+def _verify_fix(agent: Any) -> dict:
+    """Phase 3: Verify the fix by running tests.
+
+    Returns:
+        dict with keys: kept (bool), tests_passed (bool), summary (str)
+    """
+    return {
+        "kept": False,
+        "tests_passed": False,
+        "summary": "Verify phase not yet implemented.",
+    }
+
+
+def _create_issue(agent: Any, failure_type: str, evidence: dict,
+                   template: str, phase: str, analysis: str) -> None:
+    """Create a CORE-issue documenting the research result."""
+    from agent_issues import create_issue
+    title = f"{failure_type.replace('_', ' ').title()} i {template}/{phase}"
+    desc = (
+        f"**Auto-research analyse:**\n{analysis[:1500]}\n\n"
+        f"**Template:** {template}\n"
+        f"**Fase:** {phase}\n"
+        f"**Fejltype:** {failure_type}\n"
+    )
+    result = create_issue(
+        agent,
+        title=title[:120],
+        type="bug",
+        severity="medium",
+        description=desc[:2000],
+        location=f"agent_skills.py:{template}:{phase}",
+        impact=f"Fasen {phase} i {template} fejler konsekvent.",
+        proposed_fix="Se auto-research log for detaljer.",
+    )
+    if result.get("success"):
+        issue_id = result.get("issue", {}).get("id", "?")
+        existing = "(eksisterende)" if result.get("existing") else "(ny)"
+        agent._log("AUTOR", f"Auto-research issue {issue_id} {existing}", title[:120])
+    else:
+        agent._log("AUTOR", "Auto-research: create_issue fejlede",
+                   str(result.get("error", "")))

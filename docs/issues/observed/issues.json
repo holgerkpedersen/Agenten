@@ -2,7 +2,7 @@
   "meta": {
     "generated": "2026-05-26",
     "source": "Code audit",
-    "total": 159,
+    "total": 160,
     "updated": "2026-05-30",
     "format": "C-A-S-E (Context, Action, Symptoms, Environment)",
     "total_risks": 6
@@ -1913,6 +1913,18 @@
       "impact": "Fasen sub task i fri-skabelonen fejler konsekvent.",
       "proposed_fix": "LLM'en afsluttede uden at producere tilstrækkeligt output eller kalde værktøjer. Overvej at øge min_text_length for fasen eller tydeliggøre instruktionen.",
       "acceptance_criteria": "Fasen sub task i fri gennemføres uden denne fejl.",
+      "status": "open"
+    },
+    {
+      "id": "BUG-097",
+      "title": "Auto-research: fri/test task — Auto-research analyse af short_output i fri/test task\n  response_preview: Could ",
+      "type": "bug",
+      "severity": "medium",
+      "description": "Auto-research analyse af short_output i fri/test task\n  response_preview: Could not complete task automatically.",
+      "location": "agent_skills.py:fri:test task",
+      "impact": "Fasen test task i fri fejler.",
+      "proposed_fix": "Kræver manuel gennemgang af auto-research log.",
+      "acceptance_criteria": "",
       "status": "open"
     }
   ],

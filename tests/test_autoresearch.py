@@ -1,4 +1,4 @@
-"""Tests for agent_autoresearch.py — classification, dedup, and issue creation."""
+"""Tests for agent_autoresearch.py — classification, dedup, research loop."""
 
 from unittest.mock import MagicMock, patch
 
@@ -17,7 +17,6 @@ def mock_agent():
 
 @pytest.fixture
 def mock_agent_readonly():
-    """Agent fixture with only read tools — Analyse/Laes phase."""
     agent = MagicMock()
     agent.active_template = "kodeanalyse"
     agent._session_id = "test-session-123"
@@ -31,7 +30,6 @@ def mock_agent_readonly():
 
 @pytest.fixture
 def mock_agent_fix():
-    """Agent fixture with read/write tools — Fix phase."""
     agent = MagicMock()
     agent.active_template = "issue_handler"
     agent._session_id = "test-session-123"
@@ -148,39 +146,45 @@ class TestFindDuplicateIssue:
         assert dup is None
 
 
-class TestBuildFailureReport:
-    def test_missing_tool_report(self):
-        from agent_autoresearch import _build_failure_report, FAILURE_MISSING_TOOL
-        agent = MagicMock(); agent.active_template = "issue_handler"
-        task_node = MagicMock(); task_node.name = "Luk Issue"
-        report = _build_failure_report(
-            agent, task_node, FAILURE_MISSING_TOOL,
+class TestAnalyzeFailure:
+    def test_returns_structured_summary(self):
+        from agent_autoresearch import _analyze_failure
+        agent = MagicMock()
+        result = _analyze_failure(
+            agent, "missing_tool",
             {"required": ["update_issue_status"],
-             "called": ["read_issue"], "uncalled": ["update_issue_status"]})
-        assert "update_issue_status" in report["title"]
-        assert "issue_handler" in report["location"]
+             "called": ["read_issue"], "uncalled": ["update_issue_status"]},
+            "issue_handler", "Luk Issue")
+        assert "missing_tool" in result
+        assert "issue_handler" in result
+        assert "Luk Issue" in result
+        assert "update_issue_status" in result
 
-    def test_tool_failed_report(self):
-        from agent_autoresearch import _build_failure_report, FAILURE_TOOL_FAILED
-        agent = MagicMock(); agent.active_template = "bugfix"
-        task_node = MagicMock(); task_node.name = "Implementering"
-        report = _build_failure_report(
-            agent, task_node, FAILURE_TOOL_FAILED,
-            {"tool": "edit_file", "attempts": 3,
-             "last_error": "old_text not found",
-             "last_args": "{'path': 'test.py'}"})
-        assert "edit_file" in report["title"]
-        assert "bugfix" in report["location"]
 
-    def test_unknown_report(self):
-        from agent_autoresearch import _build_failure_report, FAILURE_UNKNOWN
-        agent = MagicMock(); agent.active_template = "refactor"
-        task_node = MagicMock(); task_node.name = "Ekstraher"
-        report = _build_failure_report(
-            agent, task_node, FAILURE_UNKNOWN,
-            {"called_tools": [], "response_length": 0})
-        assert "Uforklaret" in report["title"]
-        assert "manuel analyse" in report["proposed_fix"]
+class TestCreateIssue:
+    def test_creates_issue(self, mock_agent):
+        from agent_autoresearch import _create_issue
+        with patch("agent_issues.create_issue") as mock_create:
+            mock_create.return_value = {
+                "success": True, "issue": {"id": "CORE-042"}, "existing": False}
+            _create_issue(mock_agent, "missing_tool",
+                          {"uncalled": ["edit_file"]},
+                          "issue_handler", "Luk Issue",
+                          "Analysis summary here")
+            mock_create.assert_called_once()
+            args = mock_create.call_args
+            assert args[1]["title"] is not None
+            assert args[1]["description"] is not None
+
+    def test_handles_failure(self, mock_agent):
+        from agent_autoresearch import _create_issue
+        with patch("agent_issues.create_issue") as mock_create:
+            mock_create.return_value = {"success": False, "error": "bang"}
+            _create_issue(mock_agent, "missing_tool",
+                          {"uncalled": ["x"]},
+                          "issue_handler", "Luk Issue",
+                          "analysis")
+            mock_create.assert_called_once()
 
 
 class TestTriggerIfNeeded:
@@ -210,48 +214,62 @@ class TestTriggerIfNeeded:
                      "description": "**Template:** issue_handler\n**Fase:** Luk Issue"},
                 ]
             }
-            with patch("agent_autoresearch._async_create_issue") as mock_create:
+            with patch("agent_autoresearch._research_loop") as mock_loop:
                 trigger_if_needed(mock_agent, mock_task_node,
                                   {"read_issue{}": 1}, "", [])
-                mock_create.assert_not_called()
+                mock_loop.assert_not_called()
 
-    def test_creates_issue_on_novel_failure(self, mock_agent, mock_task_node):
+    def test_starts_research_on_novel_failure(self, mock_agent, mock_task_node):
         from agent_autoresearch import trigger_if_needed
         with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
              patch("agent_issues._load_issues") as mock_load:
             mock_load.return_value = {"issues": []}
-            with patch("agent_autoresearch._async_create_issue") as mock_create:
+            with patch("agent_autoresearch._research_loop") as mock_loop:
                 trigger_if_needed(mock_agent, mock_task_node,
                                   {"read_issue{}": 1}, "", [])
-                mock_create.assert_called_once()
+                mock_loop.assert_called_once()
 
 
-class TestAsyncCreateIssue:
-    def test_creates_issue_successfully(self, mock_agent):
-        from agent_autoresearch import _async_create_issue
-        report = {"title": "t", "type": "bug", "severity": "medium",
-                  "description": "d", "location": "l", "impact": "i",
-                  "proposed_fix": "f", "acceptance_criteria": "a"}
-        with patch("agent_issues.create_issue") as mock_create:
-            mock_create.return_value = {
-                "success": True, "issue": {"id": "CORE-042"}, "existing": False}
-            _async_create_issue(mock_agent, MagicMock(), "missing_tool",
-                                 {"uncalled": ["edit_file"]}, report)
-            mock_create.assert_called_once_with(
-                mock_agent, title="t", type="bug", severity="medium",
-                description="d", location="l", impact="i",
-                proposed_fix="f", acceptance_criteria="a")
+class TestEventQueue:
+    def test_emit_and_read_events(self):
+        from agent_autoresearch import _emit_event, get_events, _LOG_DIR
+        import os, json, time
+        rid = "test-event-queue-001"
+        # Clean up
+        path = os.path.join(_LOG_DIR, rid)
+        if os.path.exists(path):
+            import shutil
+            shutil.rmtree(path)
 
-    def test_handles_create_failure(self, mock_agent):
-        from agent_autoresearch import _async_create_issue
-        report = {"title": "t", "type": "bug", "severity": "m",
-                  "description": "d", "location": "l", "impact": "i",
-                  "proposed_fix": "f", "acceptance_criteria": "a"}
-        with patch("agent_issues.create_issue") as mock_create:
-            mock_create.return_value = {"success": False, "error": "bang"}
-            _async_create_issue(mock_agent, MagicMock(), "missing_tool",
-                                 {"uncalled": ["x"]}, report)
-            mock_create.assert_called_once()
+        _emit_event(rid, "test_event", {"msg": "hello"})
+        time.sleep(0.05)
+
+        events = get_events(rid)
+        assert len(events) == 1
+        assert events[0]["type"] == "test_event"
+        assert events[0]["msg"] == "hello"
+
+        # Test since filter
+        events_since = get_events(rid, since=time.time() + 10)
+        assert len(events_since) == 0
+
+    def test_get_active_sessions(self):
+        from agent_autoresearch import get_active_sessions, _save_state, _LOG_DIR
+        import os
+        rid = "test-active-session-001"
+        path = os.path.join(_LOG_DIR, rid)
+        if os.path.exists(path):
+            import shutil
+            shutil.rmtree(path)
+
+        _save_state(rid, {
+            "research_id": rid,
+            "status": "running",
+            "template": "test",
+        })
+        sessions = get_active_sessions()
+        assert any(s.get("research_id") == rid for s in sessions)
+        assert all(s.get("status") in ("running", "paused") for s in sessions)
 
 
 class TestRateLimit:
