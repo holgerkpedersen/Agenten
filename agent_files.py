@@ -490,6 +490,22 @@ def read_location(filepath: str, name: str | None = None, line_no: int | None = 
     Returns just the relevant code body, not the entire file.
     Use this instead of read_chunk when you need to see specific code.
     """
+    # Handle LLM quirks: passing "None" as string instead of None
+    if isinstance(name, str) and name.strip().lower() in ("none", "null", "undefined"):
+        name = None
+    # Handle LLM quirks: passing line_no as range string "1-50"
+    if isinstance(line_no, str):
+        line_no = line_no.strip()
+        if "-" in line_no:
+            line_no = int(line_no.split("-")[0].strip())
+        else:
+            try:
+                line_no = int(line_no)
+            except (ValueError, TypeError):
+                line_no = None
+    # Handle LLM quirks: passing line_no as list/tuple
+    if isinstance(line_no, (list, tuple)) and len(line_no) > 0:
+        line_no = int(line_no[0])
     result = locate_code(filepath=filepath, name=name, line_no=line_no)
     if not result.get("success"):
         return result
