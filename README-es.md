@@ -22,6 +22,9 @@ agent_tasks.py        # Ejecución de tareas: solve_task_stream, solve_task, han
 agent_tree.py         # Operaciones de árbol: parse, create_fallback_tree, record_outcome, evolve_if_needed
 agent_files.py        # Operaciones de archivos: lectura/escritura/chunk, escaneo de carpetas (.env excluido)
 agent_skills.py       # Coincidencia de habilidades, constantes de plantillas (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS)
+agent_autoresearch.py # Investigación automática: clasificar fallos, construir solución propuesta, crear issues CORE, reintentar
+agent_phase_checks.py # Comprobaciones deterministas de fase: file_exists, files_from_plan, tool_called, tests_pass
+agent_wta.py          # Arbitraje ponderado de herramientas: rank_tool_calls, puntuación Laplace, análisis de secuencias
 agent_issues.py       # Herramientas de issues: read_issue, update_issue_status, create_issue, detección de tamaño
 agent_git.py          # Flujo de trabajo Git/PR: is_pr_workflow, extract_branch_name, verify_pr_step
 api_server.py         # API Flask: streaming SSE, sesiones, carga de imágenes, versión, endpoint de issues
@@ -45,7 +48,9 @@ i18n.py               # Claves de internacionalización (enum K)
 AGENTS.md             # Base de conocimiento — errores, correcciones, flujo de depuración
 BRUGERVEJLEDNING.md   # Guía de usuario (danés)
 static/index.html     # UI de navegador con paneles de arrastre/redimensión, selector de plantillas, vista previa de imágenes, visor de issues
-tests/                # 384 pruebas (pytest)
+core_analytics.py    # Seguimiento de resultados de herramientas/pruebas, puntos clave, resúmenes
+instructions/        # Instrucciones de sección por plantilla (JSON, 12 plantillas)
+tests/                # 739 pruebas (pytest)
 sessions/             # Persistencia de sesiones JSON (guardar/cargar/eliminar)
 skills/               # Habilidades en markdown con frontmatter
 ```
@@ -73,12 +78,13 @@ Selecciona una plantilla en el menú desplegable antes de la descomposición —
 
 ## 🔧 Herramientas
 
-El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>` (28 herramientas):
+El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>` (35 herramientas):
 
 | Herramienta | Acción |
 |-------------|--------|
 | `list_chunks` | Lista todos los archivos cargados |
 | `read_chunk` | Lee un fragmento de un archivo grande |
+| `locate` | Encuentra la línea actual de función/clase/variable PYTHON vía AST — NO es nombre de herramienta |
 | `write_file` | Crea un NUEVO archivo (rechaza sobrescribir .py existente — usa edit_file) |
 | `edit_file` | Búsqueda y reemplazo en archivos existentes (con verificación de sintaxis) |
 | `list_files` | Lista archivos en un directorio (con filtro de patrón y profundidad máxima) |

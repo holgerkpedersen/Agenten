@@ -22,6 +22,9 @@ agent_tasks.py        # Task execution: solve_task_stream, solve_task, handle_to
 agent_tree.py         # Tree operations: parse, create_fallback_tree, record_outcome, evolve_if_needed
 agent_files.py        # File/chunk operations: read/write/chunk, folder scanning (.env excluded)
 agent_skills.py       # Skill matching, template constants (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS)
+agent_autoresearch.py # Auto-research: classify failures, build proposed_fix, create CORE-issues, retry
+agent_phase_checks.py # Deterministic phase checks: file_exists, files_from_plan, tool_called, tests_pass
+agent_wta.py          # Weighted Tool Arbitration: rank_tool_calls, Laplace scoring, sequence analysis
 agent_issues.py       # Issue tools: read_issue, update_issue_status, create_issue, oversize detection
 agent_git.py          # Git/PR workflow: is_pr_workflow, extract_branch_name, verify_pr_step
 api_server.py         # Flask API: SSE streaming, sessions, image upload, version, issues endpoint
@@ -45,7 +48,9 @@ i18n.py               # Internationalization keys (K enum)
 AGENTS.md             # Knowledge base — bugs, fixes, debugging workflow
 BRUGERVEJLEDNING.md   # User guide (Danish)
 static/index.html     # Browser UI with drag/resize panels, template dropdown, image preview, issues viewer
-tests/                # 432 tests (pytest, all pass in 3.6s)
+core_analytics.py    # Tool/test outcome tracking, hotspots, summaries
+instructions/        # Section instructions per template (JSON, 12 templates)
+tests/                # 739 tests (pytest, all pass in 11s)
 sessions/             # JSON session persistence (save/load/delete)
 skills/               # Skills in markdown with frontmatter
 ```
@@ -73,13 +78,13 @@ Select a template from the dropdown before decomposition — the LLM receives fi
 
 ## 🔧 Tools
 
-The agent can perform system operations via `<<<TOOL>>>` markers (29 tools):
+The agent can perform system operations via `<<<TOOL>>>` markers (35 tools):
 
 | Tool | Action |
 |------|--------|
 | `list_chunks` | List all loaded files |
 | `read_chunk` | Read a chunk of a large file |
-| `locate` | Find current line of function/class via AST |
+| `locate` | Find current line of PYTHON function/class/variable via AST — NOT tool name |
 | `write_file` | Create NEW file (rejects existing .py files — use edit_file) |
 | `edit_file` | Search-and-replace in existing files (with syntax check) |
 | `list_files` | List files in a directory (with file type filter and max depth) |
@@ -223,7 +228,7 @@ Flask API (api_server.py)
 - **Session persistence fix**: `current_session_id` leak between test files fixed, `_save_session_data` debounce removed (always saves at SSE end), tree serialization now includes `result` field
 - **Phase checks & auto-advance**: Deterministic success criteria for phases. System auto-completes when all modules exist or plan is written.
 - **Refactor template iteration limits**: Higher budget (15-12 iterations) to handle large refactor workloads.
-- **432 tests**: pytest suite covering all modules (all pass in 3.6s)
+- **739 tests**: pytest suite covering all modules (all pass in 11s)
 
 ## 📋 Requirements
 

@@ -22,6 +22,9 @@ agent_tasks.py        # 任务执行：solve_task_stream, solve_task, handle_too
 agent_tree.py         # 树操作：parse, create_fallback_tree, record_outcome, evolve_if_needed
 agent_files.py        # 文件/块操作：读/写/分块、文件夹扫描（.env 已排除）
 agent_skills.py       # 技能匹配、模板常量（TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS）
+agent_autoresearch.py # 自动研究：分类失败、构建建议修复、创建CORE-issue、重试
+agent_phase_checks.py # 确定性阶段检查：file_exists, files_from_plan, tool_called, tests_pass
+agent_wta.py          # 加权工具仲裁：rank_tool_calls, 拉普拉斯评分, 序列分析
 agent_issues.py       # Issue工具：read_issue, update_issue_status, create_issue, 文件大小检测
 agent_git.py          # Git/PR工作流：is_pr_workflow, extract_branch_name, verify_pr_step
 api_server.py         # Flask API：SSE流、会话、图片上传、版本、issues端点
@@ -45,7 +48,9 @@ i18n.py               # 国际化键（K 枚举）
 AGENTS.md             # 知识库 — 错误、修复、调试工作流
 BRUGERVEJLEDNING.md   # 用户指南（丹麦语）
 static/index.html     # 浏览器UI：拖拽/调整面板、模板下拉、图片预览、issues查看器
-tests/                # 384 项测试（pytest）
+core_analytics.py    # 工具/测试结果追踪、热点、摘要
+instructions/        # 按模板的章节指令（JSON，12个模板）
+tests/                # 739 项测试（pytest）
 sessions/             # JSON 会话持久化（保存/加载/删除）
 skills/               # 带 frontmatter 的 markdown 技能文件
 ```
@@ -73,12 +78,13 @@ skills/               # 带 frontmatter 的 markdown 技能文件
 
 ## 🔧 工具
 
-Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作（28 个工具）：
+Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作（35 个工具）：
 
 | 工具 | 操作 |
 |------|------|
 | `list_chunks` | 列出所有已加载的文件 |
 | `read_chunk` | 读取大文件的一个块 |
+| `locate` | 通过AST查找PYTHON函数/类/变量的当前行 — 非工具名称 |
 | `write_file` | 创建新文件（拒绝覆盖现有 .py — 使用 edit_file） |
 | `edit_file` | 在现有文件中搜索替换（带语法检查） |
 | `list_files` | 列出目录中的文件（支持模式过滤和最大深度） |

@@ -21,7 +21,10 @@ agent_core.py         # Agent-facade: init, tool-registrering, decompose, execut
 agent_tasks.py        # Opgaveudførelse: solve_task_stream, solve_task, handle_tool_call
 agent_tree.py         # Træoperationer: parse, create_fallback_tree, record_outcome, evolve_if_needed
 agent_files.py        # Fil/chunk operationer: read/write/chunk, folder-scanning (.env ekskluderet)
-agent_skills.py       # Skills-matching, skabelon-konstanter (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS)
+agent_skills.py       # Skills-matching, skabelon-konstanter (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS, TEMPLATE_PHASE_ITERATION_LIMITS)
+agent_autoresearch.py # Auto-research: klassificér fejl, byg proposed_fix, opret CORE-issues, genforsøg
+agent_phase_checks.py # Deterministiske fase-checks: file_exists, files_from_plan, tool_called, tests_pass
+agent_wta.py          # Weighted Tool Arbitration: rank_tool_calls, Laplace scoring, sekvensanalyse
 agent_issues.py       # Issue-værktøjer: read_issue, update_issue_status, create_issue, oversize-detektion
 agent_git.py          # Git/PR workflow: is_pr_workflow, extract_branch_name, verify_pr_step
 api_server.py         # Flask API: SSE streaming, sessions, billed-upload, version, issues endpoint
@@ -45,7 +48,9 @@ i18n.py               # Internacionaliserings-nøgler (K enum)
 AGENTS.md             # Knowledge base — bugs, fixes, debugging workflow
 BRUGERVEJLEDNING.md   # Brugervejledning
 static/index.html     # Browser-UI med drag/resize paneler, template dropdown, billed-preview, issues viewer
-tests/                # 384 tests (pytest)
+core_analytics.py     # Tool/test outcome tracking, hotspots, summaries
+instructions/         # Sektionsinstruktioner pr. template (JSON, 12 templates)
+tests/                # 739 tests (pytest)
 sessions/             # Sessioner i JSON-format (gem/indlæs/slet)
 skills/               # Skills i markdown med frontmatter
 ```
@@ -73,13 +78,13 @@ Vælg skabelon i dropdown før nedbrydning — LLM får fastlagte sektioner:
 
 ## 🔧 Værktøjer
 
-Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (29 værktøjer):
+Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (35 værktøjer):
 
 | Værktøj | Handling |
 |---------|----------|
 | `list_chunks` | List alle indlæste filer |
 | `read_chunk` | Læs en chunk af en stor fil |
-| `locate` | Find aktuel linje for funktion/klasse via AST |
+| `locate` | Find aktuel linje for PYTHON funktion/klasse/variabel via AST — IKKE værktøjsnavn (tool) |
 | `write_file` | Opret NY fil (afviser eksisterende .py filer — brug edit_file) |
 | `edit_file` | Search-and-replace i eksisterende filer (med syntax-tjek) |
 | `list_files` | List filer i en mappe (med filter på filtype og max dybde) |
@@ -223,7 +228,7 @@ Flask API (api_server.py)
 - **Session persistence fix**: `current_session_id` læk mellem test-filer fikset, `_save_session_data` debounce fjernet (altid gem ved SSE afslutning), tree serialisering inkluderer nu `result` felt
 - **Phase checks & auto-advance**: Deterministiske succeskriterier for faser. Systemet auto-afslutter når alle moduler findes eller planen er skrevet.
 - **Refactor template iteration limits**: Højere budget (15-12 iterationer) til at håndtere store refaktor arbejdsbelastninger.
-- **432 tests**: pytest suite med test af alle moduler (alle passerer på 3.6s)
+- **739 tests**: pytest suite med test af alle moduler (alle passerer på 11s)
 
 ## 📋 Requirements
 
