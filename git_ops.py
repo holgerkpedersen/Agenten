@@ -568,12 +568,15 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                 }
 
         # Route to edit_file2 pipeline when symbol + requirements (smarter LLM mode for .py files)
+        # Only for functions/classes — variables use the standard AST replacement below.
         if requirements and symbol and path.endswith('.py') and llm:
-            import edit_file2
-            return edit_file2.edit_file2(
-                filepath=path, name=symbol, requirements=requirements,
-                llm=llm, test_path=test_path or None,
-            )
+            loc_check = locate_code(filepath=path, name=symbol)
+            if loc_check.get("success") and loc_check.get("type") != "variable":
+                import edit_file2
+                return edit_file2.edit_file2(
+                    filepath=path, name=symbol, requirements=requirements,
+                    llm=llm, test_path=test_path or None,
+                )
 
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read()

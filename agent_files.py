@@ -493,6 +493,29 @@ def read_location(filepath: str, name: str | None = None, line_no: int | None = 
     result = locate_code(filepath=filepath, name=name, line_no=line_no)
     if not result.get("success"):
         return result
+
+    content = result["body"]
+
+    # Resolve translation keys found in the returned code.
+    # LLM'en ser f.eks. t(K.TP_FRI, agent.lang) men ved ikke hvad K.TP_FRI
+    # eller t() returnerer. Vi tilføjer de faktiske værdier som kommentarer.
+    _t_pattern = re.compile(r't\(K\.(\w+)')
+    t_keys = _t_pattern.findall(content)
+    if t_keys:
+        try:
+            from i18n import K as _K
+            from lang import t as _t
+            resolved = []
+            for key_name in sorted(set(t_keys)):
+                key = getattr(_K, key_name, None)
+                if key:
+                    value = _t(key, 'da')
+                    resolved.append(f"# {key_name} = \"{value[:200]}\"")
+            if resolved:
+                content += "\n\n## Oversættelser fundet i koden:\n" + "\n".join(resolved)
+        except Exception:
+            pass
+
     return {
         "success": True,
         "file": result["file"],
@@ -500,7 +523,7 @@ def read_location(filepath: str, name: str | None = None, line_no: int | None = 
         "type": result["type"],
         "line": result["line"],
         "end_line": result["end_line"],
-        "content": result["body"],
+        "content": content,
         "also_in_file": result.get("also_in_file", ""),
     }
 
