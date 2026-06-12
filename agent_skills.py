@@ -119,11 +119,11 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
 # the current execution model without switching.
 TEMPLATE_PHASE_MODEL_MAP: dict[str, dict[str, str]] = {
     "selvforbedring": {
-        "analyser": "deepseek-v4-pro",
-        "diagnostic\u00e9r": "deepseek-v4-pro",
-        "ret": "minimax-m2.5",
-        "verific\u00e9r": "minimax-m2.5",
-        "commit": "deepseek-v4-pro",
+        "analyser": "",
+        "diagnostic\u00e9r": "",
+        "ret": "",
+        "verific\u00e9r": "",
+        "commit": "",
     },
     "issue_handler": {
         "l\u00e6s": "",
