@@ -1,6 +1,6 @@
 ---
 name: indholdet_fil_roden
-keywords: [indholdet, fil, roden, hello, projektet, agenten, holger, opret]
+keywords: [indholdet, fil, roden, hello, agenten, projektet, holger, opret]
 action_types: [github, write]
 description: SkillFlow-generated — 8 tasks: Opret en hello.md fil i roden af C:\Agenten projektet. Indholdet skal være "Hej ...
 base: false
@@ -21,7 +21,7 @@ Auto-generated skill based on 8 similar unmatched tasks.
 
 ### Instructions
 
-1. **Analyze the request**: Identify the specific files, components, or areas involved. Tasks in this category typically relate to: **indholdet, roden, hello, projektet, agenten**.
+1. **Analyze the request**: Identify the specific files, components, or areas involved. Tasks in this category typically relate to: **indholdet, roden, hello, agenten, projektet**.
 2. **Gather context**: Load relevant files and data needed to complete the task.
 3. **Plan the approach**: Outline the changes or analysis needed based on the gathered context.
 4. **Execute**: Make the changes or perform the analysis.

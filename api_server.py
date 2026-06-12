@@ -1859,6 +1859,32 @@ def autoresearch_resume(research_id: str) -> Any:
     return jsonify({"success": False, "error": "Session not found or not paused"}), 404
 
 
+@app.route("/api/autoresearch/toggle", methods=["POST"])
+def autoresearch_toggle() -> Any:
+    """Enable or disable autoresearch."""
+    data = request.json or {}
+    enabled = bool(data.get("enabled", False))
+    agent.autoresearch_enabled = enabled
+    agent._log("AUTOR", f"Auto-research {'aktiveret' if enabled else 'deaktiveret'}", "")
+    return jsonify({"success": True, "autoresearch_enabled": enabled})
+
+
+@app.route("/api/autoresearch/status", methods=["GET"])
+def autoresearch_status() -> Any:
+    """Return whether autoresearch is enabled."""
+    return jsonify({
+        "success": True,
+        "autoresearch_enabled": getattr(agent, "autoresearch_enabled", False),
+    })
+
+
+@app.route("/api/autoresearch/run/<issue_id>", methods=["POST"])
+def autoresearch_run(issue_id: str) -> Any:
+    """Manually start autoresearch for an issue."""
+    agent_autoresearch.start_research_for_issue(agent, issue_id)
+    return jsonify({"success": True, "issue_id": issue_id})
+
+
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:
     """list issues."""

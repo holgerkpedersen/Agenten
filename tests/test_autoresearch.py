@@ -222,12 +222,14 @@ class TestTriggerIfNeeded:
     def test_starts_research_on_novel_failure(self, mock_agent, mock_task_node):
         from agent_autoresearch import trigger_if_needed
         with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
-             patch("agent_issues._load_issues") as mock_load:
-            mock_load.return_value = {"issues": []}
-            with patch("agent_autoresearch._research_loop") as mock_loop:
-                trigger_if_needed(mock_agent, mock_task_node,
-                                  {"read_issue{}": 1}, "", [])
-                mock_loop.assert_called_once()
+             patch("agent_issues._load_issues") as mock_load, \
+             patch("agent_issues.create_issue") as mock_create_issue, \
+             patch("agent_autoresearch.start_research_for_issue") as mock_start:
+            mock_load.return_value = {"issues": [], "meta": {"total": 0}}
+            mock_create_issue.return_value = {"success": True, "issue": {"id": "CORE-999"}}
+            trigger_if_needed(mock_agent, mock_task_node,
+                              {"read_issue{}": 1}, "", [])
+            mock_start.assert_called_once_with(mock_agent, "CORE-999")
 
 
 class TestEventQueue:
