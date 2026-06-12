@@ -3,6 +3,7 @@
 import json as _json
 import os
 import re
+import time
 import sys
 import subprocess
 from typing import Any
@@ -187,10 +188,12 @@ def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note:
         status:
         resolution_note:"""
     data = _load_issues()
+    now = time.strftime("%Y-%m-%dT%H:%M:%S")
     # Search in regular issues first
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
             issue["status"] = status
+            issue["updated_at"] = now
             if resolution_note:
                 issue["resolution_note"] = resolution_note
             for ref_id, ref_note in _resolve_referenced_issues(agent, data, issue, status, resolution_note):
@@ -207,6 +210,7 @@ def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note:
     for risk in data.get("active_risks", []):
         if risk.get("id", "").lower() == issue_id.lower():
             risk["status"] = status
+            risk["updated_at"] = now
             if resolution_note:
                 risk["resolution_note"] = resolution_note
             _save_issues(data)
@@ -321,6 +325,7 @@ def create_issue(agent: Any, title: str, type: str = "bug", severity: str = "med
             return {"success": True, "issue": i, "existing": True}
 
     issue_id = _next_issue_id(data, type)
+    now = time.strftime("%Y-%m-%dT%H:%M:%S")
     issue = {
         "id": issue_id,
         "title": title,
@@ -332,6 +337,8 @@ def create_issue(agent: Any, title: str, type: str = "bug", severity: str = "med
         "proposed_fix": proposed_fix,
         "acceptance_criteria": acceptance_criteria,
         "status": "open",
+        "created_at": now,
+        "updated_at": now,
     }
     data["issues"].append(issue)
     data["meta"]["total"] = len(data["issues"])

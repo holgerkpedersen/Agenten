@@ -3246,6 +3246,8 @@ function renderIssuesTable() {
         const efix = escapeHtml(issue.proposed_fix);
         const eaccept = escapeHtml(issue.acceptance_criteria);
         const eresolution = escapeHtml(issue.resolution_note);
+        const ecreated = issue.created_at ? escapeHtml(issue.created_at.replace('T', ' ').substring(0, 16)) : '';
+        const eupdated = issue.updated_at ? escapeHtml(issue.updated_at.replace('T', ' ').substring(0, 16)) : '';
         const sevClass = `issue-severity-${issue.severity || 'low'}`;
         const statusClass = `issue-status-${issue.status || 'open'}`;
         const typeClass = `issue-type-${issue.type || 'bug'}`;
@@ -3260,6 +3262,8 @@ function renderIssuesTable() {
                     <div style="margin-top:4px;"><strong>${_('issues_proposed_fix')}</strong> ${efix || '—'}</div>
                     ${eaccept ? `<div style="margin-top:4px;"><strong>${_('issues_acceptance')}</strong> ${eaccept}</div>` : ''}
                     ${eresolution ? `<div style="margin-top:4px;color:var(--success);"><strong>${_('issues_resolution')}</strong> ${eresolution}</div>` : ''}
+                    ${ecreated ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted);"><strong>Oprettet:</strong> ${ecreated}</div>` : ''}
+                    ${eupdated ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted);"><strong>Ændret:</strong> ${eupdated}</div>` : ''}
                     <button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="margin-top:8px;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
                         ${_('issues_use_as_task')}
                     </button>
