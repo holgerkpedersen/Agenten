@@ -982,6 +982,8 @@ btn_edit: 'Rediger',
     issues_detail_location: 'Location:',
     issues_detail_impact: 'Impact:',
     issues_detail_fix: 'Foreslået fix:',
+    issues_created_at: 'Oprettet:',
+    issues_updated_at: 'Ændret:',
 };
 
 async function loadLang(lang) {
@@ -3262,8 +3264,8 @@ function renderIssuesTable() {
                     <div style="margin-top:4px;"><strong>${_('issues_proposed_fix')}</strong> ${efix || '—'}</div>
                     ${eaccept ? `<div style="margin-top:4px;"><strong>${_('issues_acceptance')}</strong> ${eaccept}</div>` : ''}
                     ${eresolution ? `<div style="margin-top:4px;color:var(--success);"><strong>${_('issues_resolution')}</strong> ${eresolution}</div>` : ''}
-                    ${ecreated ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted);"><strong>Oprettet:</strong> ${ecreated}</div>` : ''}
-                    ${eupdated ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted);"><strong>Ændret:</strong> ${eupdated}</div>` : ''}
+                    ${ecreated ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted);"><strong>${_('issues_created_at')}</strong> ${ecreated}</div>` : ''}
+                    ${eupdated ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted);"><strong>${_('issues_updated_at')}</strong> ${eupdated}</div>` : ''}
                     <button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="margin-top:8px;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
                         ${_('issues_use_as_task')}
                     </button>

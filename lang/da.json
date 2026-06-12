@@ -468,6 +468,8 @@
     "issues_detail_location": "Location:",
     "issues_detail_impact": "Impact:",
     "issues_detail_fix": "Foreslået fix:",
+    "issues_created_at": "Oprettet:",
+    "issues_updated_at": "Ændret:"
     "issues_table_title": "Titel",
     "issues_table_type": "Type",
     "issues_table_status": "Status",

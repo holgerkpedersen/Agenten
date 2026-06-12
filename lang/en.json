@@ -468,6 +468,8 @@
     "issues_detail_location": "Location:",
     "issues_detail_impact": "Impact:",
     "issues_detail_fix": "Proposed fix:",
+    "issues_created_at": "Created:",
+    "issues_updated_at": "Updated:"
     "issues_table_title": "Title",
     "issues_table_type": "Type",
     "issues_table_status": "Status",

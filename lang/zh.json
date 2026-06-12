@@ -468,6 +468,8 @@
     "issues_detail_location": "Location:",
     "issues_detail_impact": "Impact:",
     "issues_detail_fix": "建议修复：",
+    "issues_created_at": "创建时间：",
+    "issues_updated_at": "更新时间："
     "issues_table_title": "标题",
     "issues_table_type": "类型",
     "issues_table_status": "状态",
