@@ -1097,6 +1097,11 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
         uncalled.discard("write_file")
     if "edit_file" in uncalled and "write_file" in called_names:
         uncalled.discard("edit_file")
+    # For selvforbedring/ret: create_issue is an acceptable alternative to edit_file
+    # — the LLM documents the needed fix instead of applying it directly.
+    if template == "selvforbedring" and "ret" in phase:
+        if "edit_file" in uncalled and "create_issue" in called_names:
+            uncalled.discard("edit_file")
     # tool_log success check: tools som blev kaldt men ALLE forsøg fejlede tæller ikke
     # Fix 2: edit_file/write_file that were attempted (even if failed) count as
     # satisfied — the LLM tried to write, the system prevented it, don't trap it.
