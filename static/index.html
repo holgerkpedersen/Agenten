@@ -655,21 +655,9 @@
         
         <div class="toolbar-row">
             <span class="toolbar-label" id="templateLabel">Skabelon</span>
-            <select id="templateSelect" class="toolbar-select" onchange="onTemplateChange(this.value)">
-                <option value="fri">🌳 Fri nedbrydning</option>
-                <option value="one-shot">⚡ Én opgave</option>
-                <option value="resume">📄 Resumé</option>
-                <option value="kodeanalyse">🔍 Kodeanalyse</option>
-                <option value="diffanalyse">📊 Diff-analyse</option>
-                <option value="agenten">🔀 PR Agenten</option>
-                <option value="programmering">💻 Programmeringsopgave</option>
-                <option value="python-arkitektur">🏗️ Python Arkitektur</option>
-                <option value="billedanalyse">🖼️ Billedanalyse</option>
-                <option value="bugfix">🐛 Bugfix (TDD)</option>
-                <option value="refactor">🔧 Refaktorering</option>
-                <option value="testgenerering">🧪 Testgenerering</option>
-                <option value="issue_handler">🔷 Issue Håndtering</option>
-            </select>
+            <select id="templateSelect" class="toolbar-select" onchange="onTemplateChange(this.value)"></select>
+            <div id="templateDescription" style="font-size:11px;color:var(--text-secondary);margin-top:4px;line-height:1.4;padding:4px 8px;background:var(--input-bg);border-radius:4px;display:none;"></div>
+        </div>
             <div id="templateDescription" style="font-size:11px;color:var(--text-secondary);margin-top:4px;line-height:1.4;padding:4px 8px;background:var(--input-bg);border-radius:4px;display:none;"></div>
         </div>
         
@@ -1201,6 +1189,7 @@ function toggleTheme() {
 }
 
 function onTemplateChange(template) {
+    try { localStorage.setItem('agenten_template', template); } catch(e) {}
     const descDiv = document.getElementById('templateDescription');
     const key = 'template_description_' + template;
     const desc = _(key);
@@ -1218,6 +1207,30 @@ function switchTemplate(template) {
     onTemplateChange(template);
     addLogEntry('INFO', 'Skiftede skabelon', `til '${template}' — gentag nedbrydning`);
     loadPhaseChecks(template);
+}
+
+async function loadTemplates() {
+    try {
+        const resp = await fetch('/api/templates');
+        const data = await resp.json();
+        if (!data.success) return;
+        const sel = document.getElementById('templateSelect');
+        sel.innerHTML = '';
+        const saved = localStorage.getItem('agenten_template');
+        let selectedValue = saved || 'fri';
+        for (const [key, tpl] of Object.entries(data.templates)) {
+            if (tpl.internal) continue;
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = tpl.name;
+            if (key === selectedValue) opt.selected = true;
+            sel.appendChild(opt);
+        }
+        if (!sel.value) sel.value = 'fri';
+        onTemplateChange(sel.value);
+    } catch(e) {
+        console.warn('Kunne ikke hente skabeloner:', e);
+    }
 }
 
 // Apply saved theme on load
@@ -3423,6 +3436,7 @@ async function deleteIssue(issueId) {
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     createPanels();
+    loadTemplates();
     refreshSessions();
     checkFolderStatus();
     checkWorkdirStatus();

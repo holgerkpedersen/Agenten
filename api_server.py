@@ -1808,6 +1808,19 @@ def update_task_status() -> Any:
     return jsonify({"success": True, "task": node.name, "status": node.status, "path": task_path})
 
 
+@app.route("/api/templates", methods=["GET"])
+def list_templates() -> Any:
+    """Return public template list for the UI dropdown."""
+    templates = agent_skills.get_templates(agent)
+    internal = {"autoresearch"}
+    public = {}
+    for key, tpl in templates.items():
+        public[key] = {
+            "name": tpl.get("name", key),
+            "internal": key in internal,
+        }
+    return jsonify({"success": True, "templates": public})
+
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:
     """list issues."""
