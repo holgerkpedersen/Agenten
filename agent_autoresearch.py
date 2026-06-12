@@ -863,128 +863,147 @@ def _build_issue_impact(failure_type: str, evidence: dict,
 
 def _build_issue_fix(failure_type: str, evidence: dict,
                       template: str, phase: str) -> str:
-    """Build a specific, actionable fix proposal based on failure context."""
+    """Build a specific, actionable fix proposal based on failure context.
+
+    Generates an EXECUTABLE proposed_fix — not just a description.
+    The fix includes exact file paths, code context, and edit_file
+    instructions so the LLM can execute it directly.
+    """
+
+    # Helper: try to find relevant code context
+    def _find_context(*symbols: str) -> str:
+        """Try to locate symbols and return file + line context."""
+        try:
+            from agent_files import locate_code
+            from agent_skills import TEMPLATE_PHASE_ITERATION_LIMITS
+            for sym in symbols:
+                loc = locate_code("agent_skills.py", sym)
+                if loc.get("success"):
+                    return (f"agent_skills.py omkring linje {loc['line']}-{loc['end_line']}. "
+                            f"Brug locate(name=\"{sym}\") for at se den præcise kode.")
+        except Exception:
+            pass
+        return ""
+
     if failure_type == FAILURE_MISSING_TOOL:
         uncalled = evidence.get("uncalled", [])
-        suggestions = []
+        lines = [
+            f"Fasen \"{phase}\" i \"{template}\" kræver at LLM'en kalder "
+            f"{', '.join(uncalled)}.",
+        ]
 
-        if "edit_file" in uncalled:
-            suggestions.append(
-                "1. Tilføj `create_issue` som alternativ i "
-                "`_check_required_tools()` for `selvforbedring/ret`: "
-                "hvis `create_issue` er kaldt, krav ikke `edit_file`.\n"
-                "   Se agent_tasks.py:1095-1099 — tilføj samme mønster "
-                "for `selvforbedring` template."
-            )
-            suggestions.append(
-                "2. Opdater `TEMPLATE_TASK_TOOLS[\"selvforbedring\"][\"ret\"]` "
-                "i agent_skills.py: tilføj `create_issue`.\n"
-                "   Så LLM'en har adgang til at oprette et issue som alternativ."
-            )
-            suggestions.append(
-                "3. Opdater `SECTION_INSTRUCTIONS[\"selvforbedring\"][\"Ret\"]` "
-                "i agent_skills.py: sig eksplicit at create_issue er acceptabelt "
-                "når edit_file ikke virker."
-            )
+        ctx = _find_context(*uncalled, "SECTION_INSTRUCTIONS",
+                            f"TEMPLATE_TASK_TOOLS", "TEMPLATE_PHASE_ITERATION_LIMITS")
+        if ctx:
+            lines.append(f"\nKontekst: {ctx}")
 
-        if "write_file" in uncalled:
-            suggestions.append(
-                f"1. Tilføj `write_file` til "
-                f"TEMPLATE_TASK_TOOLS[\"{template}\"][\"{phase}\"] "
-                f"i agent_skills.py."
-            )
+        for tool in uncalled:
+            if tool == "edit_file":
+                lines.extend([
+                    "",
+                    f"Problem: {template}/{phase} har edit_file i active_tools, "
+                    "men LLM'en kaldte det ikke.",
+                    "",
+                    "Løsning (vælg én):",
+                    "1. Hvis edit_file skal være påkrævet: Opdater sektionsinstruktionen "
+                    f"i instructions/{template}.json så \"{phase}\" starter med "
+                    '"DIN FØRSTE handling SKAL være edit_file".',
+                    "2. Hvis create_issue er et acceptabelt alternativ: Tilføj "
+                    f"create_issue til TEMPLATE_TASK_TOOLS for {template}/{phase} "
+                    "i agent_skills.py.",
+                    "3. Hvis fasen er read-only: Fjern edit_file fra "
+                    f"TEMPLATE_TASK_TOOLS for {template}/{phase}.",
+                ])
+            elif tool == "write_file":
+                lines.append(
+                    f"\nTilføj write_file til TEMPLATE_TASK_TOOLS for "
+                    f"{template}/{phase} i agent_skills.py."
+                )
+            elif tool == "update_issue_status":
+                lines.append(
+                    f"\nTjek at {template}/{phase} er i CLOSE_PHASE_ALIASES "
+                    "i agent_tasks.py:993."
+                )
 
-        if "update_issue_status" in uncalled:
-            suggestions.append(
-                f"1. Tjek at {template}/{phase} er i CLOSE_PHASE_ALIASES "
-                f"i agent_tasks.py:993."
-            )
-
-        if not suggestions:
-            suggestions.append(
-                f"1. Undersøg hvorfor {', '.join(uncalled)} ikke kaldes "
-                f"i {template}/{phase}.\n"
-                f"   Tjek sektionsinstruktionen og TEMPLATE_TASK_TOOLS."
-            )
-
-        suggestions.append(
-            "\nRodårsag: _check_required_tools() i agent_tasks.py "
-            "håndhæver at påkrævede værktøjer skal kaldes før <<<DONE>>>. "
-            "Hvis LLM'en ikke kan/vil kalde dem, skal der være en "
-            "alternativ sti (create_issue, auto-advance, eller model-skift)."
+        lines.append(
+            "\nRodårsag: _check_required_tools() håndhæver at påkrævede "
+            "værktøjer kaldes før <<<DONE>>>."
         )
-
-        return "\n\n".join(suggestions)
+        return "\n".join(lines)
 
     elif failure_type == FAILURE_TOOL_FAILED:
         tool = evidence.get("tool", "?")
+        ctx = _find_context(tool, "git_ops.edit_file", "tools.ToolRegistry.execute")
         return (
-            f"1. Undersøg hvorfor {tool} fejler i {template}/{phase}.\n"
-            f"   Sidste args: {evidence.get('last_args', 'ukendt')}\n"
-            f"   Fejl: {evidence.get('last_error', 'ukendt')}\n\n"
-            f"2. Tjek om værktøjets implementering i git_ops.py eller "
-            f"tools.py håndterer denne edge case.\n\n"
-            f"3. Overvej at tilføje bedre fejlhåndtering i "
-            f"_check_required_tools så enkelte fejl ikke blokerer fasen."
+            f"Værktøjet {tool} fejlede i {template}/{phase} "
+            f"efter {evidence.get('attempts', 0)} forsøg.\n"
+            f"Sidste args: {evidence.get('last_args', 'ukendt')}\n"
+            f"Sidste fejl: {evidence.get('last_error', 'ukendt')}\n"
+            f"{('\\nKontekst: ' + ctx) if ctx else ''}\n\n"
+            f"Løsning: Tjek {tool}'s implementering for denne edge case. "
+            f"Overvej at tilføje bedre fejlhåndtering."
         )
 
     elif failure_type == FAILURE_READ_LOOP:
+        ctx = _find_context("TEMPLATE_PHASE_ITERATION_LIMITS", "MAX_TASK_ITERATIONS")
         return (
-            f"1. Øg MAX_TOOL_CALLS_ANALYSE i config.py så LLM'en har "
-            f"flere iterationer til at skrive.\n\n"
-            f"2. Tilføj en tom skabelon i starten af sektionsinstruktionen "
-            f"så LLM'en ved hvordan output skal se ud.\n\n"
-            f"3. Overvej at injecte et system-reminder tidligere "
-            f"(nuværende grænse er 5 consecutive reads)."
+            f"LLM'en læste {evidence.get('consecutive_reads', 0)} gange "
+            f"uden at skrive i {template}/{phase}.\n"
+            f"{('\\nKontekst: ' + ctx) if ctx else ''}\n\n"
+            f"Løsning: Øg iteration budget for {template}/{phase} "
+            f"i TEMPLATE_PHASE_ITERATION_LIMITS, eller tilføj "
+            f"\"DIN FØRSTE handling SKAL være edit_file\" i instructions/{template}.json."
         )
 
     elif failure_type == FAILURE_SHORT_OUTPUT:
-        fix_lines = [
-            f"Tilføj en sektionsinstruktion for \"{phase}\" i {template}-templaten.\n"
-            f"Fasen \"{phase}\" i \"{template}\" har ingen sektionsinstruktion, "
-            f"så LLM'en ved ikke hvilke værktøjer der skal kaldes.\n"
+        ctx = _find_context("SECTION_INSTRUCTIONS", "get_templates")
+        lines = [
+            f"Fasen \"{phase}\" i \"{template}\" har ingen eller for kort "
+            "sektionsinstruktion.",
         ]
+        if ctx:
+            lines.append(f"\nKontekst: {ctx}\n")
 
         if template == "fri":
-            try:
-                from agent_files import locate_code
-                loc = locate_code("agent_skills.py", "SECTION_INSTRUCTIONS")
-                if loc.get("success"):
-                    end_line = loc.get("end_line", 331)
-                    fix_lines.append(
-                        f"Åbn agent_skills.py omkring linje {end_line-3}-{end_line+5}. "
-                        f"Tilføj en \"fri\"-nøgle efter \"selvforbedring\"-sektionen "
-                        f"og før \"agenten\"-sektionen:\n\n"
-                        f'    "fri": {{\n'
-                        f'        "{phase}": "Kald værktøjer og producér '
-                        f'mindst 200 tegn output.",\n'
-                        f"    }},\n\n"
-                        f"Brug edit_file(path='agent_skills.py', old_text='...', new_text='...') "
-                        f"med search-and-replace. Indsæt efter linjen der slutter "
-                        f"forrige sektion (før \"agenten\")."
-                    )
-            except Exception:
-                fix_lines.append(
-                    f"Tilføj en \"{phase}\"-sektion til SECTION_INSTRUCTIONS "
-                    f"for \"{template}\"-templaten i agent_skills.py."
-                )
+            lines.append(
+                f"Løsning: Tilføj en \"{phase}\"-sektion til SECTION_INSTRUCTIONS "
+                f"for \"{template}\"-templaten.\n\n"
+                f"Åbn instructions/selvforbedring.json (eller "
+                f"instructions/{template}.json) og tilføj:\n\n"
+                f'  "{phase}": "Kald relevante værktøjer og producér '
+                f'mindst 200 tegn output. Brug edit_file til at redigere '
+                f'og run_tests til at verificere."\n\n'
+                f"Brug edit_file med old_text/new_text fra JSON-filen."
+            )
         else:
-            fix_lines.append(
-                f"Tjek SECTION_INSTRUCTIONS i agent_skills.py — "
-                f"{template}-templaten mangler en sektion for \"{phase}\". "
-                f"Tilføj en instruktion der beder LLM'en om at kalde "
-                f"relevante værktøjer og producere mindst 200 tegn."
+            lines.append(
+                f"Løsning: Tjek instructions/{template}.json og tilføj en "
+                f"instruktion for \"{phase}\" der beder LLM'en om at "
+                f"kalde værktøjer og producere mindst 200 tegn."
             )
 
-        fix_lines.append(
-            "\nRodårsag: LLM'en afsluttede fasen uden at kalde værktøjer "
-            "eller producere nok output. Sektionsinstruktionen mangler "
-            "eller er for vag."
+        lines.append(
+            "\nRodårsag: LLM'en afsluttede uden værktøjskald eller output. "
+            "Manglende eller for vag sektionsinstruktion."
         )
-        return "\n".join(fix_lines)
+        return "\n".join(lines)
 
     else:
-        return (
-            f"Gennemgå agent_log og tool_log for {template}/{phase} "
-            f"for at identificere rodårsagen."
+        # Unknown failure — try to provide specific context
+        ctx_lines = [f"Uforklaret fejl i {template}/{phase}."]
+        ctx = _find_context("SECTION_INSTRUCTIONS",
+                            f"TEMPLATE_TASK_TOOLS",
+                            "TEMPLATE_PHASE_ITERATION_LIMITS",
+                            "get_templates")
+        if ctx:
+            ctx_lines.append(f"\nKontekst: {ctx}\n")
+
+        ctx_lines.append(
+            "Fremgangsmåde:\n"
+            "1. Læs agent_log for at forstå hvad der skete.\n"
+            "2. Tjek om fasen har en instruktion i instructions/ mappen.\n"
+            "3. Hvis instruktionen mangler: tilføj den.\n"
+            "4. Hvis instruktionen er for vag: gør den mere specifik.\n"
+            "5. Kør run_tests() for at verificere."
         )
+        return "\n".join(ctx_lines)
