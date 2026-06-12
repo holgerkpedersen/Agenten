@@ -3218,7 +3218,6 @@ function renderIssuesTable() {
         <th onclick="sortIssues('title')" style="cursor:pointer;user-select:none;">${_('issues_table_title')}${arrow('title')}</th>
         <th onclick="sortIssues('type')" style="cursor:pointer;user-select:none;">${_('issues_table_type')}${arrow('type')}</th>
         <th onclick="sortIssues('category')" style="cursor:pointer;user-select:none;">Kategori${arrow('category')}</th>
-        <th onclick="sortIssues('tags')" style="cursor:pointer;user-select:none;">Tags${arrow('tags')}</th>
         <th onclick="sortIssues('status')" style="cursor:pointer;user-select:none;">${_('issues_table_status')}${arrow('status')}</th>
         <th onclick="sortIssues('severity')" style="cursor:pointer;user-select:none;">${_('issues_table_priority')}${arrow('severity')}</th>
         <th></th><th></th>
@@ -3256,7 +3255,6 @@ function renderIssuesTable() {
             </td>
             <td><span class="issue-type ${typeClass}">${etype}</span></td>
             <td>${escapeHtml(issue.category || issue.type || '')}</td>
-            <td>${escapeHtml(Array.isArray(issue.tags) ? issue.tags.join(', ') : issue.tags || '')}</td>
             <td><span class="${statusClass}">${estatus}</span></td>
             <td><span class="${sevClass}">${eseverity}</span></td>
             <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">${_('issues_run')}</button></td>
