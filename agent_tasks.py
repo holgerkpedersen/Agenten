@@ -1122,7 +1122,7 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     return None
 
 
-ISSUE_ID_PATTERN = re.compile(r'(BUG|SEC|ARC|MNT|PRF|TST|REFAC)-\d+', re.IGNORECASE)
+ISSUE_ID_PATTERN = re.compile(r'(BUG|SEC|ARC|MNT|PRF|TST|REFAC|STAB)-\d+', re.IGNORECASE)
 
 
 def _extract_issue_id(text: str) -> str | None:

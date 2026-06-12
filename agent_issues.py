@@ -119,11 +119,12 @@ def run_pytest(test_path: str = "") -> dict[str, Any]:
 
 def read_issue(issue_id: str, include_hints: bool = False) -> dict[str, Any]:
     """read issue.
-    
+
     Args:
         issue_id:
         include_hints:"""
     data = _load_issues()
+    # Search in regular issues first
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
             result = {"success": True, "issue": dict(issue)}
@@ -137,7 +138,17 @@ def read_issue(issue_id: str, include_hints: bool = False) -> dict[str, Any]:
                 for key in ("proposed_fix", "resolution_note", "acceptance_criteria"):
                     result["issue"].pop(key, None)
             return result
-    available = [i["id"] for i in data.get("issues", [])]
+    # Search in active_risks (STAB-* etc.)
+    for risk in data.get("active_risks", []):
+        if risk.get("id", "").lower() == issue_id.lower():
+            risk_data = dict(risk)
+            risk_data.setdefault("acceptance_criteria", "")
+            risk_data.setdefault("description", risk_data.get("context", ""))
+            risk_data.setdefault("location", ", ".join(risk_data.get("affected_files", [])))
+            risk_data.setdefault("impact", "")
+            risk_data.setdefault("proposed_fix", risk_data.get("action", ""))
+            return {"success": True, "issue": risk_data, "from_risk": True}
+    available = [i["id"] for i in data.get("issues", [])] + [r["id"] for r in data.get("active_risks", [])]
     return {"success": False, "error": f"Issue '{issue_id}' not found. Available: {available}"}
 
 
@@ -168,13 +179,14 @@ def _resolve_referenced_issues(agent: Any, data: dict[str, Any], issue: dict[str
 
 def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note: str = "") -> dict[str, Any]:
     """update issue status.
-    
+
     Args:
         agent:
         issue_id:
         status:
         resolution_note:"""
     data = _load_issues()
+    # Search in regular issues first
     for issue in data.get("issues", []):
         if issue.get("id", "").lower() == issue_id.lower():
             issue["status"] = status
@@ -190,6 +202,17 @@ def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note:
             if status == "resolved":
                 agent.issue_resolved = True
             return {"success": True, "issue": issue, "status": status}
+    # Search in active_risks (STAB-* etc.)
+    for risk in data.get("active_risks", []):
+        if risk.get("id", "").lower() == issue_id.lower():
+            risk["status"] = status
+            if resolution_note:
+                risk["resolution_note"] = resolution_note
+            _save_issues(data)
+            agent._log("INFO", f"Risk {issue_id} \u2192 {status}", resolution_note[:200])
+            if status == "resolved":
+                agent.issue_resolved = True
+            return {"success": True, "issue": risk, "status": status}
     return {"success": False, "error": f"Issue '{issue_id}' not found."}
 
 
