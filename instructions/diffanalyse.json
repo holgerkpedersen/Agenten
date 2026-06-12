@@ -1,0 +1,7 @@
+{
+  "Oversigt": "Skriv afsnittet 'Oversigt': beskriv hvad diff'en indeholder af ændringer.",
+  "Risikovurdering": "Skriv afsnittet 'Risikovurdering': vurder risikoen (høj/middel/lav) for hver ændret fil.",
+  "Brydende ændringer": "Skriv afsnittet 'Brydende ændringer': identificér breaking changes og bagudkompatibilitet.",
+  "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder ændringernes kvalitet og konsistens.",
+  "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå forbedringer til diff'en."
+}

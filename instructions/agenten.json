@@ -1,0 +1,6 @@
+{
+  "Branch": "TRIN 1: Kald git_current_branch() for at se hvilken branch du er på.\\nTRIN 2: Brug git_create_branch('feature/xxx') for at oprette en ny branch.\\nTRIN 3: Bekræft med git_current_branch().\\nAfslut med <<<DONE>>>.",
+  "Commit": "TRIN 1: Brug git_status() og git_diff() for at se ændringer.\\nTRIN 2: Stage med git_add_all().\\nTRIN 3: Commit med git_commit('besked').\\nAfslut med <<<DONE>>>.",
+  "Push": "TRIN 1: Brug git_push() for at skubbe til remote.\\nTRIN 2: Bekræft med git_remote_status().\\nAfslut med <<<DONE>>>.",
+  "Pull request": "TRIN 1: Brug github_create_pr() med title og body.\\nTRIN 2: Bekræft at PR'en er oprettet.\\nAfslut med <<<DONE>>>."
+}

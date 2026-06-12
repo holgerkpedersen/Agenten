@@ -1,10 +1,48 @@
 """Skill templates and tool mappings for Agent."""
 
+import json
+import os
 import re
 from typing import Any
 from lang import t
 from i18n import K
 from skill_loader import SkillLoader
+
+
+_INSTRUCTIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instructions")
+
+
+def _load_section_instructions() -> dict[str, dict[str, str]]:
+    """Load section instructions from instructions/*.json files.
+
+    Each file is named ``{template}.json`` and contains a flat dict of
+    phase_name → instruction_text.  Falls back to `_HARDCODED_INSTRUCTIONS_DATA`
+    when a template file is missing, so adding a new template never breaks.
+    """
+    if not os.path.isdir(_INSTRUCTIONS_DIR):
+        return dict(_HARDCODED_INSTRUCTIONS_DATA)
+
+    result = {}
+    all_templates = set(_HARDCODED_INSTRUCTIONS_DATA.keys())
+    for fname in os.listdir(_INSTRUCTIONS_DIR):
+        if not fname.endswith(".json"):
+            continue
+        key = fname[:-5]
+        all_templates.add(key)
+        fpath = os.path.join(_INSTRUCTIONS_DIR, fname)
+        try:
+            with open(fpath, encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                result[key] = data
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    for template in all_templates:
+        if template not in result and template in _HARDCODED_INSTRUCTIONS_DATA:
+            result[template] = _HARDCODED_INSTRUCTIONS_DATA[template]
+
+    return result
 
 
 TEMPLATE_TOOLS = {
@@ -199,7 +237,7 @@ TEMPLATE_TASK_TOOLS = {
     },
 }
 
-SECTION_INSTRUCTIONS = {
+_HARDCODED_INSTRUCTIONS_DATA = {
     "resume": {
         "Overblik": "Skriv afsnittet 'Overblik': beskriv filens form\u00e5l, struktur og hovedindhold.",
         "N\u00f8glepunkter": "Skriv afsnittet 'N\u00f8glepunkter': fremh\u00e6v de vigtigste tekniske detaljer, features og arkitektur.",
@@ -345,6 +383,9 @@ SECTION_INSTRUCTIONS = {
         "Pull request": "TRIN 1: Brug github_create_pr() med title og body.\\nTRIN 2: Bekr\u00e6ft at PR'en er oprettet.\\nAfslut med <<<DONE>>>.",
     },
 }
+SECTION_INSTRUCTIONS = _load_section_instructions()
+
+
 def refresh_skills(agent: Any) -> None:
     """refresh skills.
     
