@@ -22,7 +22,7 @@ def _resolve_path(path: str) -> str:
     return os.path.abspath(path)
 
 
-_file_lock = threading.Lock()
+_file_lock = threading.RLock()
 _BASE_DIR = os.path.realpath(os.path.dirname(os.path.abspath(__file__)))
 
 _STDLIB_MODULES = {
@@ -378,7 +378,6 @@ def _check_post_write(path: str, content: str, result: dict[str, Any]) -> dict[s
 import os
 import ast
 from typing import Any
-
 def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, Any]:
     """write file.
     
@@ -395,7 +394,7 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
     dirname = os.path.dirname(path)
     if dirname:
         os.makedirs(dirname, exist_ok=True)
-        
+    
     # Check for secret files
     secret_files = ['.env', '.secret', '.credentials', '.key', '.token']
     filename = os.path.basename(path)
@@ -412,7 +411,7 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
                 "success": False,
                 "error": f"Filen findes allerede: {path}. Brug edit_file til at redigere eksisterende filer, eller brug overwrite=true for at erstatte den."
             }
-            
+        
         if os.path.exists(path) and overwrite == True:
             existing_size = os.path.getsize(path)
             new_size = len(content)
@@ -426,7 +425,7 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
                         f"Brug edit_file til at redigere, eller overwrite=\"force\" for at tvinge overskrivning."
                     )
                 }
-                
+            
             if existing_size > 500 and new_size < existing_size // 10:
                 return {
                     "success": False,
@@ -441,7 +440,7 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
         if path.endswith(('.md', '.markdown', '.txt', '.rst')):
             if not content.strip():
                 return {"success": False, "error": f"Kan ikke skrive tomme filer: {path}"}
-            
+        
         if path.endswith('.py'):
             try:
                 ast.parse(content)
@@ -452,11 +451,11 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
                     "line": e.lineno,
                     "msg": e.msg
                 }
-                
+        
         with _file_lock:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
-                
+            
             result = {"success": True, "path": os.path.abspath(path), "chars": len(content)}
             _check_post_write(path, content, result)
             return result

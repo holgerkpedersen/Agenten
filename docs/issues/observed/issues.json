@@ -2008,7 +2008,7 @@
       "type": "stability",
       "category": "file-system",
       "severity": "critical",
-      "status": "open",
+      "status": "resolved",
       "context": "Tools may still attempt outside paths, .env reads, binary files, or non-Python parser calls.",
       "action": "Keep realpath allowlists, secret scans before prompts, binary skipping, and clear errors for markdown/txt locate/read_location/list_symbols.",
       "symptoms": [
@@ -2024,7 +2024,9 @@
         "file-system",
         "security",
         "windows"
-      ]
+      ],
+      "updated_at": "2026-06-12T23:40:51",
+      "resolution_note": "File-safety rules were implemented to block secrets and parser crashes in LLM context. This includes realpath allowlists, secret scans before prompts, binary skipping, and clear errors for markdown/txt locate/read_location/list_symbols. All regression tests pass."
     },
     {
       "id": "STAB-005",
