@@ -82,6 +82,7 @@ ISSUE_TYPE_PREFIXES = {
     "refactor": "REFAC",
     "feature": "FTR",
     "self": "CORE",
+    "stability": "STAB",
 }
 
 
