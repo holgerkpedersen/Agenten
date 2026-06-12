@@ -221,16 +221,22 @@ For SEC-013 (Path Traversal):
 
 
 
+
+
+
+
 <!-- skillflow:known_failures -->
 ### Kendte Fejlmønstre
 
-Opdateret: 2026-06-12 13:57
+Opdateret: 2026-06-12 14:00
 
 **Hyppige fejl ved brug af denne skill:**
 - 
 - Læste issue med read_issue før handling
 
 {% end skillflow:known_failures %}
+
+
 
 
 

@@ -3187,6 +3187,7 @@ function normalizeIssueList(issues) {
         if (!normalized.location) normalized.location = joinIssueValues(normalized.affected_files);
         if (!normalized.proposed_fix) normalized.proposed_fix = normalized.action || '';
         if (!normalized.acceptance_criteria) normalized.acceptance_criteria = normalized.prevention_test || '';
+        if (!normalized.category) normalized.category = normalized.type || '';
         return normalized;
     });
 }
@@ -3254,6 +3255,8 @@ function renderIssuesTable() {
                 </div>
             </td>
             <td><span class="issue-type ${typeClass}">${etype}</span></td>
+            <td>${escapeHtml(issue.category || issue.type || '')}</td>
+            <td>${escapeHtml(Array.isArray(issue.tags) ? issue.tags.join(', ') : issue.tags || '')}</td>
             <td><span class="${statusClass}">${estatus}</span></td>
             <td><span class="${sevClass}">${eseverity}</span></td>
             <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">${_('issues_run')}</button></td>
@@ -3324,7 +3327,7 @@ function showIssuesPanel() {
     fetch('/api/issues')
         .then(r => r.json())
         .then(data => {
-            issuesData = data.issues || [];
+            issuesData = normalizeIssueList(data.all_issues || data.issues || []);
             issuesSort = { column: null, dir: 'asc' };
             issuesFilter = '';
             renderIssuesTable();
