@@ -1536,23 +1536,27 @@ async function approveAutoResearch(path, phaseEnc) {
         const data = await resp.json();
         if (data.success && data.issue) {
             const issueId = data.issue_id;
-            addLogEntry('AUTOR', `CORE-issue ${issueId} oprettet — starter Selvforbedring`, '');
-            // Indlæs issue i prompt og skift til selvforbedring
+            // Vælg template baseret på kompleksitet:
+            // - proposed_fix under 300 tegn = simpelt fix → one-shot
+            // - proposed_fix over 300 tegn = komplekst → selvforbedring
+            const proposedFix = (data.issue.proposed_fix || '').length;
+            const useTemplate = proposedFix < 300 ? 'one-shot' : 'selvforbedring';
+            addLogEntry('AUTOR', `CORE-issue ${issueId} oprettet — starter ${useTemplate}`, '');
+            // Indlæs issue i prompt og skift til valgt template
             const encoded = encodeURIComponent(JSON.stringify(data.issue)).replace(/'/g, '%27');
             useIssueAsTask(encoded);
-            // Skift template til selvforbedring
+            // Skift template
             const sel = document.getElementById('templateSelect');
             for (const opt of sel.options) {
-                if (opt.value === 'selvforbedring') {
-                    sel.value = 'selvforbedring';
-                    onTemplateChange('selvforbedring');
+                if (opt.value === useTemplate) {
+                    sel.value = useTemplate;
+                    onTemplateChange(useTemplate);
                     break;
                 }
             }
             // Nedbryd og udfør automatisk
             setTimeout(() => {
                 decompose();
-                // Vent på nedbrydning, så udfør
                 setTimeout(() => executeWithStream(), 3000);
             }, 500);
         } else {
