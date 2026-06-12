@@ -702,8 +702,8 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     else:
         user_guidance += t(K.DONE_CONTINUATION, agent.lang).format(DONE_MARKER=agent.tool_registry.DONE_MARKER)
     if not chunk_hint and tools_list:
-        read_only = all(t not in ('write_file',) for t in agent.tool_registry.active_tools or [])
-        if read_only and not agent.images and not agent.file_chunks:
+        has_any_write = any(t in ('write_file', 'edit_file', 'extract_symbol', 'remove_symbol', 'add_import') for t in agent.tool_registry.active_tools or [])
+        if not has_any_write and not agent.images and not agent.file_chunks:
             user_guidance += "\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
     has_write = any(t in ('write_file', 'edit_file') for t in (agent.tool_registry.active_tools or []))
     if has_write:
