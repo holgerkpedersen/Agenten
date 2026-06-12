@@ -733,17 +733,19 @@ def _create_issue(agent: Any, failure_type: str, evidence: dict,
                    template: str, phase: str, analysis: str) -> str | None:
     """Create a CORE-issue documenting the research result.
     
+    Generates a specific, actionable issue based on failure type
+    and evidence - not a generic template.
+    
     Returns:
         The issue_id if created, or None on failure.
     """
     from agent_issues import create_issue
-    title = f"{failure_type.replace('_', ' ').title()} i {template}/{phase}"
-    desc = (
-        f"**Auto-research analyse:**\n{analysis[:1500]}\n\n"
-        f"**Template:** {template}\n"
-        f"**Fase:** {phase}\n"
-        f"**Fejltype:** {failure_type}\n"
-    )
+
+    title = _build_issue_title(failure_type, evidence, template, phase)
+    desc = _build_issue_description(failure_type, evidence, template, phase, analysis)
+    impact = _build_issue_impact(failure_type, evidence, template, phase)
+    proposed_fix = _build_issue_fix(failure_type, evidence, template, phase)
+
     result = create_issue(
         agent,
         title=title[:120],
@@ -751,8 +753,8 @@ def _create_issue(agent: Any, failure_type: str, evidence: dict,
         severity="medium",
         description=desc[:2000],
         location=f"agent_skills.py:selvforbedring:{template}/{phase}",
-        impact=f"Fasen {phase} i {template} fejler konsekvent.",
-        proposed_fix="Se auto-research log for detaljer.",
+        impact=impact[:300],
+        proposed_fix=proposed_fix[:500],
     )
     if result.get("success"):
         issue_id = result.get("issue", {}).get("id", "?")
@@ -763,3 +765,181 @@ def _create_issue(agent: Any, failure_type: str, evidence: dict,
         agent._log("AUTOR", "Auto-research: create_issue fejlede",
                    str(result.get("error", "")))
         return None
+
+
+def _build_issue_title(failure_type: str, evidence: dict,
+                        template: str, phase: str) -> str:
+    """Build a specific title based on failure context."""
+    if failure_type == FAILURE_MISSING_TOOL:
+        uncalled = evidence.get("uncalled", [])
+        return (f"Manglende {', '.join(uncalled)} i {template}/{phase} "
+                f"— LLM kaldte ikke påkrævet værktøj")
+    elif failure_type == FAILURE_TOOL_FAILED:
+        tool = evidence.get("tool", "?")
+        return (f"Værktøj {tool} fejlede i {template}/{phase} "
+                f"— alle {evidence.get('attempts', 0)} forsøg slog fejl")
+    elif failure_type == FAILURE_READ_LOOP:
+        return (f"Læse-loop i {template}/{phase} "
+                f"— {evidence.get('consecutive_reads', 0)} reads uden write")
+    elif failure_type == FAILURE_SHORT_OUTPUT:
+        return (f"Kort output i {template}/{phase} "
+                f"— {evidence.get('response_length', 0)} tegn, ingen tools")
+    else:
+        return f"Uforklaret fejl i {template}/{phase}"
+
+
+def _build_issue_description(failure_type: str, evidence: dict,
+                               template: str, phase: str,
+                               analysis: str) -> str:
+    """Build a detailed description with specific context."""
+    lines = [f"## Auto-research analyse: {failure_type.replace('_', ' ')}"]
+    lines.append(f"**Skabelon:** {template}  |  **Fase:** {phase}")
+    lines.append("")
+
+    if failure_type == FAILURE_MISSING_TOOL:
+        lines.append("### Hvad skete der?")
+        lines.append(f"LLM'en kaldte IKKE de påkrævede værktøjer: "
+                     f"{', '.join(evidence.get('uncalled', []))}.")
+        lines.append(f"Kaldte værktøjer: {', '.join(evidence.get('called', []))}.")
+        lines.append(f"Aktive værktøjer i fasen: {', '.join(evidence.get('required', []))}.")
+        lines.append("")
+        lines.append("### Hvorfor er dette et problem?")
+        lines.append("Fasen kan ikke fuldføres uden at det påkrævede værktøj kaldes. "
+                     "Systemet afviser <<<DONE>>> når _check_required_tools fejler.")
+        lines.append("")
+        lines.append("### Mulige årsager")
+        lines.append("- LLM'en forstår ikke instruktionen (sektionsinstruktionen er uklar)")
+        lines.append("- Modellen nægter at kalde skriveværktøjer (kendt begrænsning)")
+        lines.append("- Fasen mangler write-tools i TEMPLATE_TASK_TOOLS")
+        lines.append("- Der mangler en alternativ sti (create_issue i stedet for edit_file)")
+
+    elif failure_type == FAILURE_TOOL_FAILED:
+        tool = evidence.get("tool", "?")
+        lines.append("### Hvad skete der?")
+        lines.append(f"Værktøjet {tool} blev kaldt {evidence.get('attempts', 0)} "
+                     f"gange men fejlede hver gang.")
+        lines.append(f"Sidste fejl: {evidence.get('last_error', 'ukendt')}")
+        lines.append(f"Sidste args: {evidence.get('last_args', 'ukendt')}")
+        lines.append("")
+        lines.append("### Analyse")
+        lines.append("Tool-fejl kan skyldes ugyldige argumenter, manglende "
+                     "rettigheder, eller en bug i værktøjets implementering.")
+
+    elif failure_type == FAILURE_READ_LOOP:
+        lines.append("### Hvad skete der?")
+        lines.append(f"LLM'en lavede {evidence.get('consecutive_reads', 0)} "
+                     "læsekald i træk uden at skrive noget.")
+        lines.append("")
+        lines.append("### Analyse")
+        lines.append("LLM'en mangler kontekst til at skrive. "
+                     "Overvej at øge iteration budget eller give en tom skabelon.")
+    else:
+        lines.append("### Hvad skete der?")
+        lines.append(f"Kaldte værktøjer: {evidence.get('called_tools', [])}")
+        lines.append(f"Output længde: {evidence.get('response_length', 0)}")
+        lines.append("")
+        lines.append(analysis[:500])
+
+    return "\n".join(lines)
+
+
+def _build_issue_impact(failure_type: str, evidence: dict,
+                         template: str, phase: str) -> str:
+    """Build impact description."""
+    if failure_type == FAILURE_MISSING_TOOL:
+        uncalled = evidence.get("uncalled", [])
+        return (f"Fasen {phase} i {template} kan ikke gennemføres fordi "
+                f"LLM'en ikke kalder {', '.join(uncalled)}. "
+                f"Dette blokerer hele selvforbedrings-cyklussen.")
+    elif failure_type == FAILURE_TOOL_FAILED:
+        return (f"Værktøjet {evidence.get('tool', '?')} fejler i "
+                f"{template}/{phase}. Alle forsøg på at bruge det slog fejl.")
+    elif failure_type == FAILURE_READ_LOOP:
+        return (f"LLM'en læser uden at skrive i {template}/{phase}, "
+                f"hvilket spilder iterationer og fører til timeout.")
+    else:
+        return f"Fasen {phase} i {template} fejler af uforklarede årsager."
+
+
+def _build_issue_fix(failure_type: str, evidence: dict,
+                      template: str, phase: str) -> str:
+    """Build a specific, actionable fix proposal based on failure context."""
+    if failure_type == FAILURE_MISSING_TOOL:
+        uncalled = evidence.get("uncalled", [])
+        suggestions = []
+
+        if "edit_file" in uncalled:
+            suggestions.append(
+                "1. Tilføj `create_issue` som alternativ i "
+                "`_check_required_tools()` for `selvforbedring/ret`: "
+                "hvis `create_issue` er kaldt, krav ikke `edit_file`.\n"
+                "   Se agent_tasks.py:1095-1099 — tilføj samme mønster "
+                "for `selvforbedring` template."
+            )
+            suggestions.append(
+                "2. Opdater `TEMPLATE_TASK_TOOLS[\"selvforbedring\"][\"ret\"]` "
+                "i agent_skills.py: tilføj `create_issue`.\n"
+                "   Så LLM'en har adgang til at oprette et issue som alternativ."
+            )
+            suggestions.append(
+                "3. Opdater `SECTION_INSTRUCTIONS[\"selvforbedring\"][\"Ret\"]` "
+                "i agent_skills.py: sig eksplicit at create_issue er acceptabelt "
+                "når edit_file ikke virker."
+            )
+
+        if "write_file" in uncalled:
+            suggestions.append(
+                f"1. Tilføj `write_file` til "
+                f"TEMPLATE_TASK_TOOLS[\"{template}\"][\"{phase}\"] "
+                f"i agent_skills.py."
+            )
+
+        if "update_issue_status" in uncalled:
+            suggestions.append(
+                f"1. Tjek at {template}/{phase} er i CLOSE_PHASE_ALIASES "
+                f"i agent_tasks.py:993."
+            )
+
+        if not suggestions:
+            suggestions.append(
+                f"1. Undersøg hvorfor {', '.join(uncalled)} ikke kaldes "
+                f"i {template}/{phase}.\n"
+                f"   Tjek sektionsinstruktionen og TEMPLATE_TASK_TOOLS."
+            )
+
+        suggestions.append(
+            "\nRodårsag: _check_required_tools() i agent_tasks.py "
+            "håndhæver at påkrævede værktøjer skal kaldes før <<<DONE>>>. "
+            "Hvis LLM'en ikke kan/vil kalde dem, skal der være en "
+            "alternativ sti (create_issue, auto-advance, eller model-skift)."
+        )
+
+        return "\n\n".join(suggestions)
+
+    elif failure_type == FAILURE_TOOL_FAILED:
+        tool = evidence.get("tool", "?")
+        return (
+            f"1. Undersøg hvorfor {tool} fejler i {template}/{phase}.\n"
+            f"   Sidste args: {evidence.get('last_args', 'ukendt')}\n"
+            f"   Fejl: {evidence.get('last_error', 'ukendt')}\n\n"
+            f"2. Tjek om værktøjets implementering i git_ops.py eller "
+            f"tools.py håndterer denne edge case.\n\n"
+            f"3. Overvej at tilføje bedre fejlhåndtering i "
+            f"_check_required_tools så enkelte fejl ikke blokerer fasen."
+        )
+
+    elif failure_type == FAILURE_READ_LOOP:
+        return (
+            f"1. Øg MAX_TOOL_CALLS_ANALYSE i config.py så LLM'en har "
+            f"flere iterationer til at skrive.\n\n"
+            f"2. Tilføj en tom skabelon i starten af sektionsinstruktionen "
+            f"så LLM'en ved hvordan output skal se ud.\n\n"
+            f"3. Overvej at injecte et system-reminder tidligere "
+            f"(nuværende grænse er 5 consecutive reads)."
+        )
+
+    else:
+        return (
+            f"Gennemgå agent_log og tool_log for {template}/{phase} "
+            f"for at identificere rodårsagen."
+        )
