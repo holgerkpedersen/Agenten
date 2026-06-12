@@ -205,6 +205,13 @@ def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note:
             agent._log("INFO", f"Issue {issue_id} \u2192 {status}", resolution_note[:200])
             if status == "resolved":
                 agent.issue_resolved = True
+                # Opdater sessions der refererer til dette CORE-issue
+                try:
+                    from agent_autoresearch import _update_sessions_for_core_resolution
+                    _update_sessions_for_core_resolution(issue_id,
+                        getattr(agent, "_session_id", "ukendt"))
+                except Exception:
+                    pass
             return {"success": True, "issue": issue, "status": status}
     # Search in active_risks (STAB-* etc.)
     for risk in data.get("active_risks", []):

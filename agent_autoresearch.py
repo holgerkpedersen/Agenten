@@ -408,6 +408,9 @@ def trigger_if_needed(agent: Any, task_node: Any,
     # Create a CORE-issue documenting the failure and start research
     issue_id = _create_issue(agent, failure_type, evidence, template, phase, "")
     if issue_id:
+        _save_core_reference(session_id, issue_id, template, phase, failure_type)
+        agent._log("AUTOR", f"Oprettede {issue_id} — original session: {session_id[:12]}",
+                   f"{template}/{phase} fejlede med {failure_type}")
         start_research_for_issue(agent, issue_id)
 
 
@@ -1007,3 +1010,86 @@ def _build_issue_fix(failure_type: str, evidence: dict,
             "5. Kør run_tests() for at verificere."
         )
         return "\n".join(ctx_lines)
+
+
+def _save_core_reference(session_id: str, core_id: str,
+                          template: str, phase: str,
+                          failure_type: str) -> None:
+    """Gem en reference i den originale session så CORE-issue kan spores tilbage.
+
+    Skriver direkte til session JSON-filen for at sikre at referencen
+    overlever selv hvis sessionen ikke gemmes normalt.
+    """
+    if not session_id or session_id == "unknown":
+        return
+    sess_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions")
+    path = os.path.join(sess_dir, f"{session_id}.json")
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        log = data.setdefault("agent_log", [])
+        log.append({
+            "timestamp": time.time(),
+            "level": "CORE",
+            "message": f"Oprettede {core_id} for fejl i {template}/{phase}",
+            "detail": f"failure_type={failure_type}",
+        })
+        data.setdefault("core_issues", []).append({
+            "id": core_id,
+            "template": template,
+            "phase": phase,
+            "failure_type": failure_type,
+            "created": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        })
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def _update_sessions_for_core_resolution(core_id: str, resolution_session: str) -> None:
+    """Når et CORE-issue resolves, opdater alle sessions der refererer til det.
+
+    Scannner sessions-mappen for JSON-filer med core_issues referencer.
+    """
+    if not core_id:
+        return
+    sess_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions")
+    if not os.path.isdir(sess_dir):
+        return
+    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+    for fname in os.listdir(sess_dir):
+        if not fname.endswith(".json"):
+            continue
+        path = os.path.join(sess_dir, fname)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            continue
+        refs = data.get("core_issues", [])
+        if not refs:
+            continue
+        updated = False
+        for ref in refs:
+            if ref.get("id", "").upper() == core_id.upper():
+                if not ref.get("resolved"):
+                    ref["resolved"] = now
+                    ref["resolved_by"] = resolution_session
+                    updated = True
+                break
+        if updated:
+            log = data.setdefault("agent_log", [])
+            log.append({
+                "timestamp": time.time(),
+                "level": "CORE",
+                "message": f"{core_id} er resolved af session {resolution_session[:12]}",
+                "detail": "",
+            })
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
