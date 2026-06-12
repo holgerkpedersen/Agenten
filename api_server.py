@@ -21,6 +21,7 @@ from agent_files import _is_safe_path
 from agent_phase_checks import TEMPLATE_PHASE_CHECKS
 from config import get_logger
 import agent_issues
+import agent_autoresearch
 
 
 log = get_logger(__name__)
@@ -1917,43 +1918,115 @@ def autoresearch_all_sessions() -> Any:
 def autoresearch_run_from_phase() -> Any:
     """Start auto-research from a failed phase in the tree.
 
-    Creates a CORE-issue and starts a research loop for it.
-    Called when user clicks 🔬 Auto in the tree UI.
+    Analyzes the session context (agent_log, tool_log, task tree)
+    to classify the failure and create a targeted CORE-issue,
+    then loads it into the current session with selvforbedring.
     """
     data = request.json or {}
     phase = data.get("phase", "ukendt")
     template = data.get("template", "ukendt")
     prompt = data.get("prompt", "")
 
-    # Build failure context for issue creation
+    # Gather session context
+    tool_log = getattr(agent, "_tool_log", []) or []
+    agent_log = getattr(agent, "agent_log", []) or []
+
+    # Filter logs for the failed phase
+    phase_logs = [e for e in agent_log
+                  if phase.lower() in str(e.get("message", "")).lower()
+                  or phase.lower() in str(e.get("detail", "")).lower()]
+    phase_tools = [t for t in tool_log
+                   if t.get("phase", "").lower() == phase.lower()]
+
+    # Classify the failure based on tool_log evidence
+    called_tools = {}
+    for t in phase_tools:
+        tname = t.get("tool", "")
+        args = t.get("args", {})
+        key = tname + str(args)
+        called_tools[key] = called_tools.get(key, 0) + 1
+
     failure_type = agent_autoresearch.FAILURE_UNKNOWN
     evidence = {
-        "called_tools": [],
+        "called_tools": list({k.split("{")[0] for k in called_tools}),
+        "tool_count": len(phase_tools),
+        "failed_count": sum(1 for t in phase_tools if not t.get("success")),
+        "agent_log_phase": [e.get("message", "") for e in phase_logs[-5:]],
         "response_length": len(prompt or ""),
     }
 
-    agent._log("AUTOR", f"Auto-research startet fra UI for {template}/{phase}", "")
+    # Classify using heuristics similar to classify_failure
+    required_action = {"edit_file", "write_file", "update_issue_status"}
+    called_names = {k.split("{")[0] for k in called_tools}
+    active = set(getattr(agent, "tool_registry", None) and
+                 (agent.tool_registry.active_tools or []) or [])
+    needed = active & required_action
+    uncalled = needed - called_names
+    if uncalled:
+        failure_type = agent_autoresearch.FAILURE_MISSING_TOOL
+        evidence["required"] = list(needed)
+        evidence["uncalled"] = list(uncalled)
 
-    # Create CORE issue and start research
-    issue_id = agent_autoresearch._create_issue(
-        agent, failure_type, evidence, template, phase,
-        f"Bruger startede auto-research fra UI for {template}/{phase}.\nPrompt: {prompt[:200]}"
+    # Check for tool failures
+    tool_fails = {}
+    for t in phase_tools:
+        tn = t.get("tool", "")
+        if not t.get("success"):
+            tool_fails.setdefault(tn, {"count": 0, "errors": []})
+            tool_fails[tn]["count"] += 1
+            tool_fails[tn]["errors"].append(t.get("error", "") or str(t.get("args", "")))
+    if tool_fails:
+        failure_type = agent_autoresearch.FAILURE_TOOL_FAILED
+        evidence["tool_failures"] = {
+            tn: {"attempts": v["count"], "last_error": v["errors"][-1][:200]}
+            for tn, v in tool_fails.items()
+        }
+
+    # Check for read-loop
+    recent = phase_tools[-8:]
+    read_tools = {"read_location", "read_chunk", "list_chunks",
+                   "list_files", "list_symbols", "locate", "read_issue"}
+    reads = sum(1 for e in recent if e.get("tool") in read_tools)
+    writes = sum(1 for e in recent if e.get("tool") in required_action)
+    if reads >= 5 and writes == 0 and not uncalled:
+        failure_type = agent_autoresearch.FAILURE_READ_LOOP
+        evidence["consecutive_reads"] = reads
+
+    agent._log("AUTOR", f"Auto-research: {failure_type} i {template}/{phase}",
+               f"{len(phase_tools)} tools, {reads} reads, {writes} writes")
+
+    # Create CORE issue with full session context
+    analysis = (
+        f"**Session kontekst for {template}/{phase}**\n\n"
+        f"**Fejltype:** {failure_type}\n"
+        f"**Tool calls i fasen:** {len(phase_tools)}\n"
+        f"**Heraf fejlede:** {evidence.get('failed_count', 0)}\n"
+        f"**Læsekald:** {reads}\n"
+        f"**Skrivekald:** {writes}\n\n"
+        f"**Phase logs ({len(phase_logs)}):**\n" +
+        "\n".join(f"- {e.get('message','')[:100]}" for e in phase_logs[-3:]) +
+        f"\n\n**Prompt:** {prompt[:300]}"
     )
 
-    research_id = None
+    issue_id = agent_autoresearch._create_issue(
+        agent, failure_type, evidence, template, phase, analysis
+    )
+
+    issue_data = None
     if issue_id:
-        agent_autoresearch.start_research_for_issue(agent, issue_id)
-        # Get the research_id from the latest active session
-        sessions = agent_autoresearch.get_active_sessions()
-        for s in sessions:
-            if s.get("issue_id") == issue_id:
-                research_id = s.get("research_id")
-                break
+        try:
+            from agent_issues import _load_issues as _li
+            for i in _li().get("issues", []):
+                if i.get("id") == issue_id:
+                    issue_data = i
+                    break
+        except Exception:
+            pass
 
     return jsonify({
         "success": bool(issue_id),
         "issue_id": issue_id,
-        "research_id": research_id,
+        "issue": issue_data,
     })
 
 

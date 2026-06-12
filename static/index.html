@@ -1520,8 +1520,7 @@ async function markTaskDone(path, status) {
 async function approveAutoResearch(path, phaseEnc) {
     const phaseName = decodeURIComponent(phaseEnc);
     const template = document.getElementById('templateSelect').value;
-    const prompt = document.getElementById('promptInput').value;
-    if (!confirm(`🔬 Start auto-research for "${phaseName}"?\n\n→ Opretter CORE-issue\n→ Starter selvforbedring automatisk\n\nGodkend?`)) return;
+    if (!confirm(`🔬 Start auto-research for "${phaseName}"?\n\n→ Opretter CORE-issue\n→ Starter Selvforbedring automatisk\n\nGodkend?`)) return;
     try {
         addLogEntry('INFO', `🔬 Auto-research startet for "${phaseName}"`, '');
         const resp = await fetch('/api/autoresearch/run-from-phase', {
@@ -1531,16 +1530,31 @@ async function approveAutoResearch(path, phaseEnc) {
                 session_id: currentSessionId,
                 phase: phaseName,
                 template: template,
-                prompt: prompt,
+                prompt: document.getElementById('promptInput').value,
             }),
         });
         const data = await resp.json();
-        if (data.success) {
-            const issue = data.issue_id || '?';
-            addLogEntry('AUTOR', `CORE-issue ${issue} oprettet — research starter`, phaseName);
-            if (data.research_id) {
-                addLogEntry('AUTOR', `Research session: ${data.research_id}`, '');
+        if (data.success && data.issue) {
+            const issueId = data.issue_id;
+            addLogEntry('AUTOR', `CORE-issue ${issueId} oprettet — starter Selvforbedring`, '');
+            // Indlæs issue i prompt og skift til selvforbedring
+            const encoded = encodeURIComponent(JSON.stringify(data.issue)).replace(/'/g, '%27');
+            useIssueAsTask(encoded);
+            // Skift template til selvforbedring
+            const sel = document.getElementById('templateSelect');
+            for (const opt of sel.options) {
+                if (opt.value === 'selvforbedring') {
+                    sel.value = 'selvforbedring';
+                    onTemplateChange('selvforbedring');
+                    break;
+                }
             }
+            // Nedbryd og udfør automatisk
+            setTimeout(() => {
+                decompose();
+                // Vent på nedbrydning, så udfør
+                setTimeout(() => executeWithStream(), 3000);
+            }, 500);
         } else {
             addLogEntry('ERROR', 'Auto-research fejlede', data.error || 'Ukendt fejl');
         }
