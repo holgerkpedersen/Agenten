@@ -110,6 +110,13 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
         "Fix": 12,
         "Luk Issue": 4,
     },
+    "selvforbedring": {
+        "Analyser": 6,
+        "Diagnostic\u00e9r": 6,
+        "Ret": 15,
+        "Verific\u00e9r": 8,
+        "Commit": 4,
+    },
 }
 
 # Per-template, per-phase model overrides. Phases not listed keep the
@@ -317,7 +324,15 @@ SECTION_INSTRUCTIONS = {
     "selvforbedring": {
         "Analyser": "TRIN 1: L\u00e6s CORE-issue med read_issue() \u2014 forst\u00e5 hvilken funktion/omr\u00e5de har h\u00f8jest fejlrate.\nTRIN 2: Brug list_symbols() p\u00e5 den angivne source-fil for at se ALLE symboler.\nTRIN 3: L\u00e6s den fejlende kode med read_location() eller locate() \u2014 forst\u00e5 hvad koden g\u00f8r og hvorfor den fejler.\nTRIN 4: Afslut med <<<DONE>>> n\u00e5r du har l\u00e6st nok til at forst\u00e5 problemet.\n\nBrug KUN l\u00e6sev\u00e6rkt\u00f8jer \u2014 redig\u00e9r INGENTING.",
         "Diagnostic\u00e9r": "TRIN 1: K\u00f8r run_tests() for at se hvilke tests der fejler \u2014 bekr\u00e6ft fejlm\u00f8nsteret.\nTRIN 2: L\u00e6s koden grundigt med read_location() \u2014 identific\u00e9r den pr\u00e6cise rod\u00e5rsag.\nTRIN 3: Afslut med <<<DONE>>> n\u00e5r du forst\u00e5r HVAD der skal rettes og HVORDAN.\n\nBrug KUN l\u00e6sev\u00e6rkt\u00f8jer \u2014 redig\u00e9r INGENTING.",
-        "Ret": "\U0001f525 AST-BASERET REDIGERING: Brug KUN edit_file med symbol= parameter \u2014 ALDRIG old_text search-and-replace. Dette g\u00e6lder is\u00e6r for api_server.py, agent_core.py og agent_tasks.py.\n\n\u26a0\ufe0f SIKKERHED: K\u00f8r run_tests() EFTER hver eneste edit_file. Hvis tests fejler, brug git checkout -- <fil> for at fortryde og pr\u00f8v igen.\n\nHVIS redigering ikke er mulig (edit_file fejler eller du ikke kan \u00e6ndre koden direkte): Opret et issue med create_issue() der dokumenterer pr\u00e6cis hvad der skal rettes, hvorfor, og hvordan. Brug type=\"self\" s\u00e5 det bliver et CORE-issue. Afslut derefter med <<<DONE>>> \u2014 systemet vil h\u00e5ndtere fixet i n\u00e6ste cyklus.\n\nAfvent ikke \u2014 redig\u00e9r nu.",
+        "Ret": "DIN F\u00d8RSTE handling SKAL v\u00e6re edit_file(path='<fil>', symbol='<funktionsnavn>', new_text='<hele den nye funktion>')\n\n"
+              "TRIN 1: L\u00e6s funktionen du skal \u00e6ndre med locate(name='<funktionsnavn>') \u2014 kopier koden PR\u00c6CIST.\n"
+              "TRIN 2: Brug edit_file med symbol=parameter (AST-tilstand) \u2014 ALDRIG old_text search-and-replace.\n"
+              "TRIN 3: K\u00f8r run_tests() for at verificere \u2014 ALLE tests SKAL best\u00e5.\n"
+              "TRIN 4: Hvis tests fejler: ret med edit_file og genk\u00f8r.\n"
+              "TRIN 5: N\u00e5r alle tests best\u00e5r: afslut med <<<DONE>>>.\n\n"
+              "\u26a0\ufe0f SIKKERHED: K\u00f8r run_tests() EFTER hver edit_file. Hvis tests fejler, brug git checkout -- <fil> for at fortryde.\n\n"
+              "HVIS edit_file ikke virker (f.eks. symbolet er en variabel): brug edit_file med old_text/new_text i stedet. "
+              "L\u00e6s filen, kopier den PR\u00c6CISE tekst der skal udskiftes som old_text.",
         "Verific\u00e9r": "K\u00f8r HELE testsuiten med run_tests(). ALLE tests SKAL best\u00e5. Hvis tests fejler, g\u00e5 tilbage til Ret-fasen og ret med edit_file. N\u00e5r alle tests best\u00e5r, opdater issue-status til 'resolved' med update_issue_status() og skriv pr\u00e6cis resolution_note.",
         "Commit": "TRIN 1: Brug git_create_branch('self-improve/CORE-xxx') for at oprette en branch.\nTRIN 2: Brug git_status() og git_diff() for at se hvad der er \u00e6ndret.\nTRIN 3: Brug git_commit() med en beskrivende commit-message.\nTRIN 4: Brug git_push() for at skubbe til remote.\nAfslut med <<<DONE>>>.",
     },

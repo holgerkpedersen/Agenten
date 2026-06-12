@@ -1223,8 +1223,15 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
     # Deterministic phase check (template-defined file existence criteria).
     # Only run after a successful productive tool call — no point
     # auto-completing when the tool itself failed (e.g. update_issue_status
-    # with a non-existent issue ID).
+    # with a non-existent issue ID, or edit_file via edit_file2 where the
+    # symbol wasn't found but still returned success=True).
     tool_failed = isinstance(tool_result, dict) and not tool_result.get("success")
+    # edit_file via edit_file2 pipeline can return success=True even when
+    # extraction failed (extract_error). Check for real changes.
+    if not tool_failed and tool_name == "edit_file":
+        has_changes = isinstance(tool_result, dict) and tool_result.get("lines_changed", 0) > 0
+        if not has_changes:
+            tool_failed = True
     if not tool_failed:
         PRODUCTIVE_TOOLS = {"write_file", "edit_file", "run_tests", "update_issue_status"}
         if tool_name in PRODUCTIVE_TOOLS:
