@@ -938,6 +938,51 @@ def _build_issue_fix(failure_type: str, evidence: dict,
             f"(nuværende grænse er 5 consecutive reads)."
         )
 
+    elif failure_type == FAILURE_SHORT_OUTPUT:
+        fix_lines = [
+            f"Tilføj en sektionsinstruktion for \"{phase}\" i {template}-templaten.\n"
+            f"Fasen \"{phase}\" i \"{template}\" har ingen sektionsinstruktion, "
+            f"så LLM'en ved ikke hvilke værktøjer der skal kaldes.\n"
+        ]
+
+        if template == "fri":
+            try:
+                from agent_files import locate_code
+                loc = locate_code("agent_skills.py", "SECTION_INSTRUCTIONS")
+                if loc.get("success"):
+                    end_line = loc.get("end_line", 331)
+                    fix_lines.append(
+                        f"Åbn agent_skills.py omkring linje {end_line-3}-{end_line+5}. "
+                        f"Tilføj en \"fri\"-nøgle efter \"selvforbedring\"-sektionen "
+                        f"og før \"agenten\"-sektionen:\n\n"
+                        f'    "fri": {{\n'
+                        f'        "{phase}": "Kald værktøjer og producér '
+                        f'mindst 200 tegn output.",\n'
+                        f"    }},\n\n"
+                        f"Brug edit_file(path='agent_skills.py', old_text='...', new_text='...') "
+                        f"med search-and-replace. Indsæt efter linjen der slutter "
+                        f"forrige sektion (før \"agenten\")."
+                    )
+            except Exception:
+                fix_lines.append(
+                    f"Tilføj en \"{phase}\"-sektion til SECTION_INSTRUCTIONS "
+                    f"for \"{template}\"-templaten i agent_skills.py."
+                )
+        else:
+            fix_lines.append(
+                f"Tjek SECTION_INSTRUCTIONS i agent_skills.py — "
+                f"{template}-templaten mangler en sektion for \"{phase}\". "
+                f"Tilføj en instruktion der beder LLM'en om at kalde "
+                f"relevante værktøjer og producere mindst 200 tegn."
+            )
+
+        fix_lines.append(
+            "\nRodårsag: LLM'en afsluttede fasen uden at kalde værktøjer "
+            "eller producere nok output. Sektionsinstruktionen mangler "
+            "eller er for vag."
+        )
+        return "\n".join(fix_lines)
+
     else:
         return (
             f"Gennemgå agent_log og tool_log for {template}/{phase} "
