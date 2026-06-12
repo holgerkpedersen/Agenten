@@ -552,7 +552,7 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "locate",
-            "Find en funktion/metode/klasse i en Python-fil via AST. Brug name='funktionsnavn' for at søge på tværs af ALLE .py-filer. Brug name='Klassnavn.metode' for metoder. Brug filepath='fil.py' for at begrænse søgningen til én fil. Returnerer linjenummer, typen, funktionens fulde kode (body), og en 'also_in_file'-liste over ANDRE symboler i filen.",
+            "Find en PYTHON funktion/metode/klasse/variabel (def/class/assignment) i Python-filer. name er et PYTHON symbol-navn, IKKE et værktøjsnavn (tool). Brug name='funktionsnavn' for at søge på tværs af ALLE .py-filer. Brug name='Klassenavn.metode' for metoder. Brug filepath='fil.py' for at begrænse søgningen til én fil. Returnerer linjenummer, typen, funktionens fulde kode (body), og en 'also_in_file'-liste over ANDRE symboler i filen.",
             ["name", "filepath"],
             lambda name=None, filepath=None, line_no=None: _resolve_t_keys_in_result(
                 agent_files.locate_code(filepath=filepath, name=name, line_no=line_no)),

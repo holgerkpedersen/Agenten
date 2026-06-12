@@ -717,7 +717,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     tool_hints = {
         "list_symbols": "\n  Brug list_symbols(filepath='fil.py') for at se ALLE symboler i en Python-fil — gør det FØR locate/read_location når du ikke kender symbolnavnene.",
         "read_chunk": "\n  Read_chunk må KUN bruges til IKKE-PYTHON filer (JSON, HTML, TXT, osv.). For .py-filer, brug read_location i stedet.",
-        "locate": "\n  Brug locate(name='funktionsnavn') for at finde en funktion på tværs af ALLE .py-filer (filepath er valgfri). locate returnerer også 'also_in_file'.",
+        "locate": "\n  Brug locate(name='funktionsnavn') for at finde en PYTHON funktion/klasse/variabel på tværs af ALLE .py-filer. name er et Python symbol (def/class/variable), IKKE et værktøjsnavn (tool). locate returnerer også 'also_in_file'.",
         "read_location": "\n  Brug read_location(filepath='fil.py', name='funktionsnavn') for at læse KUN en bestemt funktion/metode/klasse — IKKE hele filen.",
         "write_file": "\n  Brug write_file(path='ny_fil.py', content='...') for at oprette NYE filer der IKKE findes i forvejen. Brug ALDRIG write_file til at erstatte eksisterende filer — brug edit_file i stedet.",
         "edit_file": "\n  Brug edit_file(path='fil.py', old_text='tekst der skal erstattes', new_text='ny tekst') for at redigere EKSISTERENDE filer. Læs filen FØRST med read_chunk, kopier den præcise tekst som old_text. For at TILFØJE en linje: sæt old_text = hele filens indhold, og new_text = det gamle indhold + den nye linje. ERSTAT ALDRIG hele indholdet med kun den nye tekst.",

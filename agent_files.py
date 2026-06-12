@@ -344,36 +344,54 @@ def file_hash(filepath: str) -> str | None:
         return h.hexdigest()
     except (IOError, OSError):
         return None
-
-
 def read_file_content(agent: Any, filepath: str) -> str | None:
     """read file content.
     
     Args:
-        agent:
-        filepath:"""
+        agent: The agent instance
+        filepath: Path to the file to read
+    """
     # Check cache first
     cached_content = _get_cached_file_content(filepath)
     if cached_content is not None:
-        agent._log("DEBUG", f"Using cached content for", os.path.basename(filepath))
+        agent._log("DEBUG", f"Using cached content for {os.path.basename(filepath)}")
         return cached_content
     
     basename = os.path.basename(filepath)
-    if basename in {'.env'}:
+    if basename in {'.env', '.secret', '.key', '.token'}:
         return None
+    
     ext = os.path.splitext(filepath)[1].lower()
-    if ext in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.zip', '.exe', '.dll'}:
+    if ext in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.zip', '.exe', '.dll', '.pdf', '.doc', '.docx'}:
         return None
+    
+    # Handle markdown and text files safely
+    if ext in {'.md', '.markdown', '.txt', '.log', '.csv', '.json', '.yaml', '.yml'}:
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+                if '\x00' in content:
+                    return None
+                if len(content) > CHUNK_SIZE:
+                    content = content[:CHUNK_SIZE] + "\n" + t(K.FILE_TRUNCATED, agent.lang)
+                # Cache the content
+                _cache_file_content(filepath, content)
+                return content
+        except (UnicodeDecodeError, Exception) as e:
+            agent._log("WARNING", f"Kan ikke læse {os.path.basename(filepath)} som tekst", str(e))
+            return None
+    
+    # For other file types, attempt to read as text
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             content = f.read()
-        if '\x00' in content:
-            return None
-        if len(content) > CHUNK_SIZE:
-            content = content[:CHUNK_SIZE] + "\n" + t(K.FILE_TRUNCATED, agent.lang)
-        # Cache the content
-        _cache_file_content(filepath, content)
-        return content
+            if '\x00' in content:
+                return None
+            if len(content) > CHUNK_SIZE:
+                content = content[:CHUNK_SIZE] + "\n" + t(K.FILE_TRUNCATED, agent.lang)
+            # Cache the content
+            _cache_file_content(filepath, content)
+            return content
     except (UnicodeDecodeError, Exception) as e:
         agent._log("WARNING", f"Kan ikke læse {os.path.basename(filepath)} som tekst", str(e))
         return None
