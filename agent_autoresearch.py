@@ -112,6 +112,25 @@ def get_active_sessions() -> list[dict]:
     return sessions
 
 
+def get_all_sessions(limit: int = 50) -> list[dict]:
+    """Return all research sessions (newest first)."""
+    if not os.path.isdir(_LOG_DIR):
+        return []
+    sessions = []
+    for sid in sorted(os.listdir(_LOG_DIR), reverse=True):
+        sp = _state_path(sid)
+        if os.path.exists(sp):
+            try:
+                with open(sp, encoding="utf-8") as f:
+                    state = json.load(f)
+                sessions.append(state)
+                if len(sessions) >= limit:
+                    break
+            except (OSError, json.JSONDecodeError):
+                pass
+    return sessions
+
+
 def _paused_path(session_id: str) -> str:
     return os.path.join(_LOG_DIR, session_id, ".paused")
 
@@ -284,6 +303,55 @@ def _find_duplicate_issue(failure_type: str, template: str,
     return None
 
 
+def _check_filters(agent: Any, issue: dict | None = None,
+                    template: str = "", phase: str = "",
+                    failure_type: str = "") -> bool:
+    """Check whether autoresearch should run based on agent filters.
+
+    Agent can have:
+      agent.autoresearch_enabled = True/False (master switch)
+      agent.autoresearch_filters = {
+          "types": ["bug", "security", ...],       # default: all
+          "templates": ["issue_handler", ...],      # default: all
+          "failure_types": ["missing_tool", ...],   # default: all
+      }
+    """
+    if not getattr(agent, "autoresearch_enabled", False):
+        return False
+
+    filters = getattr(agent, "autoresearch_filters", {}) or {}
+    if not isinstance(filters, dict):
+        filters = {}
+
+    # Filter by issue type
+    allowed_types = filters.get("types", [])
+    if allowed_types and issue:
+        itype = issue.get("type", "")
+        if itype and itype not in allowed_types:
+            return False
+
+    # Filter by template
+    allowed_templates = filters.get("templates", [])
+    if allowed_templates and template:
+        if template not in allowed_templates:
+            return False
+
+    # Filter by failure type
+    allowed_failures = filters.get("failure_types", [])
+    if allowed_failures and failure_type:
+        if failure_type not in allowed_failures:
+            return False
+
+    return True
+    """Check rate limit — max 1 analysis per 5 min per session."""
+    now = time.time()
+    last = _last_analysis.get(session_id, 0)
+    if now - last < _RATE_LIMIT_SEC:
+        return False
+    _last_analysis[session_id] = now
+    return True
+
+
 def _rate_limit_ok(session_id: str) -> bool:
     """Check rate limit — max 1 analysis per 5 min per session."""
     now = time.time()
@@ -300,27 +368,29 @@ def trigger_if_needed(agent: Any, task_node: Any,
                        messages: list[dict] | None = None) -> None:
     """Called from _finalize_task_stream when a task fails.
 
-    Checks autoresearch_enabled, rate-limits, deduplicates, creates
-    a CORE-issue, and starts an autonomous research loop.
+    Checks autoresearch_enabled + filters, rate-limits, deduplicates,
+    creates a CORE-issue, and starts an autonomous research loop.
     """
-    # Only trigger if autoresearch is enabled
-    if not getattr(agent, "autoresearch_enabled", False):
-        return
-
     if getattr(task_node, "status", "") != "failed":
         return
 
     session_id = getattr(agent, "_session_id", "unknown")
-    if not _rate_limit_ok(session_id):
-        agent._log("AUTOR", "Auto-research: rate-limited", session_id)
-        return
 
+    # Gather context for filter check
     tool_log = getattr(agent, "_tool_log", []) or []
     phase = getattr(task_node, "name", "ukendt")
     template = getattr(agent, "active_template", "ukendt")
-
     failure_type, evidence = classify_failure(
         task_node, called_tools, tool_log, full_response, agent)
+
+    # Apply filters
+    if not _check_filters(agent, template=template, phase=phase,
+                          failure_type=failure_type):
+        return
+
+    if not _rate_limit_ok(session_id):
+        agent._log("AUTOR", "Auto-research: rate-limited", session_id)
+        return
 
     # Dedup
     try:
@@ -365,6 +435,12 @@ def start_research_for_issue(agent: Any, issue_id: str) -> None:
             issue = i
             break
     if not issue:
+        return
+
+    # Apply filters
+    if not _check_filters(agent, issue=issue):
+        agent._log("AUTOR", f"Auto-research: filtreret fra — {issue_id}",
+                   issue.get("type", ""))
         return
 
     session_id = getattr(agent, "_session_id", "unknown")

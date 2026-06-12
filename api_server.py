@@ -1885,6 +1885,34 @@ def autoresearch_run(issue_id: str) -> Any:
     return jsonify({"success": True, "issue_id": issue_id})
 
 
+@app.route("/api/autoresearch/filters", methods=["GET", "POST"])
+def autoresearch_filters() -> Any:
+    """Get or set autoresearch filters."""
+    if request.method == "POST":
+        data = request.json or {}
+        current = getattr(agent, "autoresearch_filters", {}) or {}
+        if "types" in data:
+            current["types"] = data["types"]
+        if "templates" in data:
+            current["templates"] = data["templates"]
+        if "failure_types" in data:
+            current["failure_types"] = data["failure_types"]
+        agent.autoresearch_filters = current
+        agent._log("AUTOR", "Auto-research filtre opdateret", str(current))
+    return jsonify({
+        "success": True,
+        "autoresearch_enabled": getattr(agent, "autoresearch_enabled", False),
+        "filters": getattr(agent, "autoresearch_filters", {}),
+    })
+
+
+@app.route("/api/autoresearch/sessions/all", methods=["GET"])
+def autoresearch_all_sessions() -> Any:
+    """Return all research sessions (active + completed)."""
+    sessions = agent_autoresearch.get_all_sessions()
+    return jsonify({"success": True, "sessions": sessions})
+
+
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:
     """list issues."""

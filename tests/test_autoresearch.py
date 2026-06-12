@@ -205,6 +205,7 @@ class TestTriggerIfNeeded:
 
     def test_skips_on_duplicate(self, mock_agent, mock_task_node):
         from agent_autoresearch import trigger_if_needed
+        mock_agent.autoresearch_enabled = True
         with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
              patch("agent_issues._load_issues") as mock_load:
             mock_load.return_value = {
@@ -214,13 +215,14 @@ class TestTriggerIfNeeded:
                      "description": "**Template:** issue_handler\n**Fase:** Luk Issue"},
                 ]
             }
-            with patch("agent_autoresearch._research_loop") as mock_loop:
+            with patch("agent_autoresearch._create_issue") as mock_create:
                 trigger_if_needed(mock_agent, mock_task_node,
                                   {"read_issue{}": 1}, "", [])
-                mock_loop.assert_not_called()
+                mock_create.assert_not_called()
 
     def test_starts_research_on_novel_failure(self, mock_agent, mock_task_node):
         from agent_autoresearch import trigger_if_needed
+        mock_agent.autoresearch_enabled = True
         with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
              patch("agent_issues._load_issues") as mock_load, \
              patch("agent_issues.create_issue") as mock_create_issue, \
