@@ -173,8 +173,8 @@ TEMPLATE_TASK_TOOLS = {
     },
     "issue_handler": {
         "analyse": ["read_issue", "update_issue_status", "run_tests", "read_location", "read_chunk", "list_chunks", "list_files", "locate", "list_symbols", "create_refactor_issue"],
-        "fix": ["read_location", "locate", "edit_file", "write_file", "run_tests"],
-        "luk": ["update_issue_status"],
+        "fix": ["read_issue", "read_location", "locate", "edit_file", "write_file", "run_tests"],
+        "luk": ["update_issue_status", "read_issue"],
     },
 }
 
@@ -266,7 +266,7 @@ SECTION_INSTRUCTIONS = {
              "**Hvis type = bug:** Ret fejlen med edit_file() i AST-tilstand: locate(name='funktionsnavn') → edit_file(path='fil.py', symbol='funktionsnavn', new_text='...'). "
              "Brug ALDRIG search-and-replace til Python-filer medmindre du har set den PRÆCISE tekst med locate().\n\n"
              "Du må IKKE selv markere issue som resolved — det gøres i Luk Issue. Afslut med <<<DONE>>>.",
-        "Luk Issue": "Bekræft at fix'et er implementeret og tests består. DU SKAL opdatere issue-status til 'resolved' med update_issue_status() — output alene lukker ikke issuet. Tilføj en PRÆCIS resolution_note: beskriv HVAD der blev ændret, HVORFOR, og bekræft at ALLE tests består. Afslut med <<<DONE>>>.",
+        "Luk Issue": "DIN FØRSTE OG ENESTE HANDLING: Kald update_issue_status(issue_id='...', status='resolved', resolution_note='...'). Find issue_id med read_issue() hvis du ikke kender den. Tilføj en PRÆCIS resolution_note: beskriv HVAD der blev ændret, HVORFOR, og bekræft at ALLE tests består. Afslut med <<<DONE>>> efter update_issue_status er kaldt.",
         "read": "Read the assigned issue with read_issue(). Understand description, location, impact and proposed_fix. Do NOT read source code or edit files in this step. Use ONLY read_issue(). End with <<<DONE>>>.",
         "læs": "Læs den tildelte issue med read_issue(). Forstå beskrivelse, location, impact og proposed_fix. Du må IKKE læse kildekode eller redigere filer i dette trin. Brug KUN read_issue(). Afslut med <<<DONE>>>.",
         "afklar": "Read issue with read_issue(). Analyze if details are missing — update with update_issue_status() if needed. Read relevant source code with read_chunk() and run run_tests() to verify if the bug still exists. If already fixed: update status to 'resolved'. End with <<<DONE>>>.",
@@ -283,8 +283,8 @@ SECTION_INSTRUCTIONS = {
              "**Bug type:** locate(name) → edit_file(path, symbol=name, new_text='...'). Run run_tests().\n"
              "**Architecture type:** Follow refactor workflow.\n\n"
              "Do NOT mark issue as resolved yourself — done in Close Issue. End with <<<DONE>>>.",
-        "luk": "Verify the fix is implemented and tests pass. YOU MUST update issue status to 'resolved' with update_issue_status() — output alone does NOT close the issue. Add a PRECISE resolution_note: describe WHAT was changed, WHY, and confirm ALL tests pass. End with <<<DONE>>>.",
-        "close issue": "Verify the fix is implemented and tests pass. YOU MUST update issue status to 'resolved' with update_issue_status() — output alone does NOT close the issue. Add a PRECISE resolution_note: describe WHAT was changed, WHY, and confirm ALL tests pass. End with <<<DONE>>>.",
+        "luk": "YOUR FIRST AND ONLY ACTION: Call update_issue_status(issue_id='...', status='resolved', resolution_note='...'). Use read_issue() to find the issue_id if needed. Add a PRECISE resolution_note: describe WHAT was changed, WHY, and confirm ALL tests pass. End with <<<DONE>>> after calling update_issue_status.",
+        "close issue": "YOUR FIRST AND ONLY ACTION: Call update_issue_status(issue_id='...', status='resolved', resolution_note='...'). Use read_issue() to find the issue_id if needed. Add a PRECISE resolution_note: describe WHAT was changed, WHY, and confirm ALL tests pass. End with <<<DONE>>> after calling update_issue_status.",
         "en_fix": "Check issue.type with read_issue(). If the issue already has status 'resolved', do NOT edit any files and end immediately with <<<DONE>>>. Fix the bug with edit_file() — use EXACT text from the file. Run run_tests(). Do NOT mark issue as resolved yourself — that is done in Close Issue. End with <<<DONE>>>.",
         "da_fix": "Tjek issue.type med read_issue(). Hvis issuet har status 'resolved', redigér INGEN filer og afslut straks med <<<DONE>>>.\n\n"
              "**edit_file BRUGSANVISNING:**\n"

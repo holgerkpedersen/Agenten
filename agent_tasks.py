@@ -1105,7 +1105,7 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
                 attempts = [e for e in agent._tool_log if e.get("tool") == req_tool and e.get("success") is False]
                 all_attempts = [e for e in agent._tool_log if e.get("tool") == req_tool]
                 if all_attempts and len(attempts) == len(all_attempts):
-                    if req_tool in ("write_file", "edit_file"):
+                    if req_tool in ("write_file", "edit_file", "update_issue_status"):
                         continue  # attempted but failed — still counts as satisfied
                     if req_tool == "write_file" and "edit_file" in called_names:
                         continue
@@ -1215,18 +1215,22 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
                 return None
 
     # Deterministic phase check (template-defined file existence criteria).
-    # Only run after a productive tool call to avoid infinite loops on read-only.
-    PRODUCTIVE_TOOLS = {"write_file", "edit_file", "run_tests", "update_issue_status"}
-    if tool_name in PRODUCTIVE_TOOLS:
-        try:
-            passed, reason = agent_phase_checks.check_phase_done(
-                agent, task_node, called_tools=called_tools,
-                tool_name=tool_name, full_response=full_response,
-            )
-            if passed:
-                return t(K.PHASE_AUTO_ADVANCED, agent.lang).format(reason=reason)
-        except Exception as _e:
-            agent._log("DEBUG", f"phase check error: {_e}", "")
+    # Only run after a successful productive tool call — no point
+    # auto-completing when the tool itself failed (e.g. update_issue_status
+    # with a non-existent issue ID).
+    tool_failed = isinstance(tool_result, dict) and not tool_result.get("success")
+    if not tool_failed:
+        PRODUCTIVE_TOOLS = {"write_file", "edit_file", "run_tests", "update_issue_status"}
+        if tool_name in PRODUCTIVE_TOOLS:
+            try:
+                passed, reason = agent_phase_checks.check_phase_done(
+                    agent, task_node, called_tools=called_tools,
+                    tool_name=tool_name, full_response=full_response,
+                )
+                if passed:
+                    return t(K.PHASE_AUTO_ADVANCED, agent.lang).format(reason=reason)
+            except Exception as _e:
+                agent._log("DEBUG", f"phase check error: {_e}", "")
 
     return None
 
