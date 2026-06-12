@@ -1916,9 +1916,9 @@
       "status": "open"
     },
     {
-      "id": "BUG-097",
+      "id": "CORE-001",
       "title": "Auto-research: fri/test task — Auto-research analyse af short_output i fri/test task\n  response_preview: Could ",
-      "type": "bug",
+      "type": "self",
       "severity": "medium",
       "description": "Auto-research analyse af short_output i fri/test task\n  response_preview: Could not complete task automatically.",
       "location": "agent_skills.py:fri:test task",
