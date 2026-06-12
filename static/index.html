@@ -1342,7 +1342,12 @@ function renderTree(node, path = []) {
     } else {
         html += `<span style="margin-left:8px;"><button onclick="markTaskDone('${pathStr}','pending')" title="Nulstil til afventende (genk\u00f8r)" style="padding:1px 6px;font-size:10px;background:#f59e0b;border:none;border-radius:3px;color:white;cursor:pointer;">\u21bb Genk\u00f8r</button></span>`;
     }
-    html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span></div>${criteriaHtml}${phaseCheckHtml}`;
+    html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span>`;
+    if (node.status === 'failed') {
+        const phaseEnc = encodeURIComponent(node.name || '');
+        html += ` <button onclick="approveAutoResearch('${pathStr}','${phaseEnc}')" title="Start auto-research for denne fejl" style="margin-left:4px;padding:1px 5px;font-size:10px;background:var(--accent);border:none;border-radius:3px;color:white;cursor:pointer;">🔬 Auto</button>`;
+    }
+    html += `</div>${criteriaHtml}${phaseCheckHtml}`;
     if (node.children && node.children.length > 0) { 
         html += `<div class="tree-children">`; 
         for (let i = 0; i < node.children.length; i++) { 
@@ -1509,6 +1514,38 @@ async function markTaskDone(path, status) {
         }
     } catch (e) {
         alert('Kunne ikke opdatere opgave: ' + e.message);
+    }
+}
+
+async function approveAutoResearch(path, phaseEnc) {
+    const phaseName = decodeURIComponent(phaseEnc);
+    const template = document.getElementById('templateSelect').value;
+    const prompt = document.getElementById('promptInput').value;
+    if (!confirm(`🔬 Start auto-research for "${phaseName}"?\n\n→ Opretter CORE-issue\n→ Starter selvforbedring automatisk\n\nGodkend?`)) return;
+    try {
+        addLogEntry('INFO', `🔬 Auto-research startet for "${phaseName}"`, '');
+        const resp = await fetch('/api/autoresearch/run-from-phase', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                session_id: currentSessionId,
+                phase: phaseName,
+                template: template,
+                prompt: prompt,
+            }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const issue = data.issue_id || '?';
+            addLogEntry('AUTOR', `CORE-issue ${issue} oprettet — research starter`, phaseName);
+            if (data.research_id) {
+                addLogEntry('AUTOR', `Research session: ${data.research_id}`, '');
+            }
+        } else {
+            addLogEntry('ERROR', 'Auto-research fejlede', data.error || 'Ukendt fejl');
+        }
+    } catch (e) {
+        addLogEntry('ERROR', 'Auto-research fejlede', e.message);
     }
 }
 

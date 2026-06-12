@@ -1913,6 +1913,50 @@ def autoresearch_all_sessions() -> Any:
     return jsonify({"success": True, "sessions": sessions})
 
 
+@app.route("/api/autoresearch/run-from-phase", methods=["POST"])
+def autoresearch_run_from_phase() -> Any:
+    """Start auto-research from a failed phase in the tree.
+
+    Creates a CORE-issue and starts a research loop for it.
+    Called when user clicks 🔬 Auto in the tree UI.
+    """
+    data = request.json or {}
+    phase = data.get("phase", "ukendt")
+    template = data.get("template", "ukendt")
+    prompt = data.get("prompt", "")
+
+    # Build failure context for issue creation
+    failure_type = agent_autoresearch.FAILURE_UNKNOWN
+    evidence = {
+        "called_tools": [],
+        "response_length": len(prompt or ""),
+    }
+
+    agent._log("AUTOR", f"Auto-research startet fra UI for {template}/{phase}", "")
+
+    # Create CORE issue and start research
+    issue_id = agent_autoresearch._create_issue(
+        agent, failure_type, evidence, template, phase,
+        f"Bruger startede auto-research fra UI for {template}/{phase}.\nPrompt: {prompt[:200]}"
+    )
+
+    research_id = None
+    if issue_id:
+        agent_autoresearch.start_research_for_issue(agent, issue_id)
+        # Get the research_id from the latest active session
+        sessions = agent_autoresearch.get_active_sessions()
+        for s in sessions:
+            if s.get("issue_id") == issue_id:
+                research_id = s.get("research_id")
+                break
+
+    return jsonify({
+        "success": bool(issue_id),
+        "issue_id": issue_id,
+        "research_id": research_id,
+    })
+
+
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:
     """list issues."""
