@@ -360,7 +360,7 @@ def read_file_content(agent: Any, filepath: str) -> str | None:
     basename = os.path.basename(filepath)
     if basename in {'.env', '.secret', '.key', '.token'}:
         return None
-    
+        
     ext = os.path.splitext(filepath)[1].lower()
     if ext in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.zip', '.exe', '.dll', '.pdf', '.doc', '.docx'}:
         return None

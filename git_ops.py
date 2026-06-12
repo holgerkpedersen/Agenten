@@ -375,32 +375,48 @@ def _check_post_write(path: str, content: str, result: dict[str, Any]) -> dict[s
             if mismatched:
                 result.setdefault('route_warnings', {})[ext] = mismatched
     return result
-
+import os
+import ast
+from typing import Any
 
 def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, Any]:
     """write file.
-
+    
     Args:
         path: File path to write (relative to project root or absolute).
         content: File content as string.
-        overwrite: ``False`` = reject if exists. ``True`` = allow but warn if
-            replacing meaningful content. ``"force"`` or ``"replace"`` = unconditional.
+        overwrite: ``False`` = reject if exists. ``True`` = allow but warn if replacing meaningful content. 
+                   ``"force"`` or ``"replace"`` = unconditional.
     """
     path = _resolve_path(path)
     if not is_safe_location(path):
         return {"success": False, "error": f"Adgang n\u00e6gtet: stien er uden for projektmappen: {path}"}
+    
     dirname = os.path.dirname(path)
     if dirname:
         os.makedirs(dirname, exist_ok=True)
+        
+    # Check for secret files
+    secret_files = ['.env', '.secret', '.credentials', '.key', '.token']
+    filename = os.path.basename(path)
+    if filename in secret_files or any(filename.startswith(prefix) for prefix in ['._', '.git']):
+        return {"success": False, "error": f"Adgang n\u00e6gtet: kan ikke skrive til hemmelige filer: {path}"}
+    
+    # Check for binary files
+    if path.endswith(('.bin', '.exe', '.dll', '.so', '.dylib', '.zip', '.tar', '.gz', '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.bmp')):
+        return {"success": False, "error": f"Adgang n\u00e6gtet: kan ikke skrive til bin\u00e6re filer: {path}"}
+    
     try:
         if os.path.exists(path) and not overwrite:
             return {
                 "success": False,
                 "error": f"Filen findes allerede: {path}. Brug edit_file til at redigere eksisterende filer, eller brug overwrite=true for at erstatte den."
             }
+            
         if os.path.exists(path) and overwrite == True:
             existing_size = os.path.getsize(path)
             new_size = len(content)
+            
             if existing_size > 200 and new_size < 50:
                 return {
                     "success": False,
@@ -410,6 +426,7 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
                         f"Brug edit_file til at redigere, eller overwrite=\"force\" for at tvinge overskrivning."
                     )
                 }
+                
             if existing_size > 500 and new_size < existing_size // 10:
                 return {
                     "success": False,
@@ -419,6 +436,12 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
                         f"Brug edit_file for at bevare indhold, eller overwrite=\"force\" for at tvinge."
                     )
                 }
+        
+        # Handle markdown and text files safely
+        if path.endswith(('.md', '.markdown', '.txt', '.rst')):
+            if not content.strip():
+                return {"success": False, "error": f"Kan ikke skrive tomme filer: {path}"}
+            
         if path.endswith('.py'):
             try:
                 ast.parse(content)
@@ -429,12 +452,15 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
                     "line": e.lineno,
                     "msg": e.msg
                 }
+                
         with _file_lock:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
-        result = {"success": True, "path": os.path.abspath(path), "chars": len(content)}
-        _check_post_write(path, content, result)
-        return result
+                
+            result = {"success": True, "path": os.path.abspath(path), "chars": len(content)}
+            _check_post_write(path, content, result)
+            return result
+            
     except (IOError, OSError) as e:
         return {"success": False, "error": str(e)}
 
