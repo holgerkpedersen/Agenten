@@ -23,6 +23,33 @@ from agent_wta import WTAState, SequenceLearner
 from core_analytics import CoreAnalytics, TOOL_HANDLER_MAP
 import agent_tasks
 import config
+
+
+_LOOKUP_CACHE: dict[str, str | None] = {}
+
+
+def _resolve_t_keys_in_result(result: dict) -> dict:
+    """Resolve t(K.XXX) translations in locate/read_location results."""
+    if result.get("success") and result.get("body"):
+        body = result["body"]
+        import re
+        _t_pattern = re.compile(r't\(K\.(\w+)')
+        t_keys = _t_pattern.findall(body)
+        if t_keys:
+            try:
+                from i18n import K as _K
+                from lang import t as _t
+                resolved = []
+                for key_name in sorted(set(t_keys)):
+                    key = getattr(_K, key_name, None)
+                    if key:
+                        value = _t(key, 'da')
+                        resolved.append(f"# {key_name} = \"{value[:200]}\"")
+                if resolved:
+                    result["body"] = body + "\n\n## Oversættelser:\n" + "\n".join(resolved)
+            except Exception:
+                pass
+    return result
 from config import get_logger
 log = get_logger(__name__)
 import re
@@ -527,7 +554,7 @@ class Agent:
             "locate",
             "Find en funktion/metode/klasse i en Python-fil via AST. Brug name='funktionsnavn' for at søge på tværs af ALLE .py-filer. Brug name='Klassnavn.metode' for metoder. Brug filepath='fil.py' for at begrænse søgningen til én fil. Returnerer linjenummer, typen, funktionens fulde kode (body), og en 'also_in_file'-liste over ANDRE symboler i filen.",
             ["name", "filepath"],
-            lambda name=None, filepath=None, line_no=None: _resolve_t_keys_in_locate(
+            lambda name=None, filepath=None, line_no=None: _resolve_t_keys_in_result(
                 agent_files.locate_code(filepath=filepath, name=name, line_no=line_no)),
             optional_params=["filepath"]
         ))
