@@ -580,5 +580,18 @@
     "rerun_task": "重置为待处理（重新运行）",
     "auto_research": "开始自动研究此错误",
     "skillflow_analysis": "SkillFlow分析",
-    "flow_builder": "Flow Builder - 网络研究"
+    "flow_builder": "Flow Builder - 网络研究",
+    "load": "加载",
+    "save": "保存",
+    "rename": "重命名",
+    "new": "新建",
+    "tools_reset_tree": "重置任务树",
+    "tools_delete_tree": "删除任务树",
+    "tools_preview": "预览",
+    "tools_export_md": "导出 MD",
+    "tools_save_layout": "保存布局",
+    "tools_reset_layout": "重置布局",
+    "tools_github_token": "GitHub 令牌",
+    "issues_title": "问题",
+    "add_image_btn": "添加图片"
 }

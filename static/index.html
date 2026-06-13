@@ -631,11 +631,11 @@
         <div style="display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:8px;">
                 <h1>🤖 Agenten</h1>
-                <button class="collapse-btn" id="headerCollapseBtn" onclick="toggleHeaderCollapse()" title="_('header_collapse')" style="font-size:12px;">▲</button>
+                <button class="collapse-btn" id="headerCollapseBtn" onclick="toggleHeaderCollapse()" data-i18n-title="header_collapse" style="font-size:12px;">▲</button>
             </div>
 <div class="tools-wrapper">
-                <button class="tools-toggle" onclick="toggleTools()" id="toolsMenu" title="_('tools_menu')">⚙️</button>
-                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="_('theme_toggle')">☀️</button>
+                <button class="tools-toggle" onclick="toggleTools()" id="toolsMenu" data-i18n-title="tools_menu">⚙️</button>
+                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" data-i18n-title="theme_toggle">☀️</button>
                 <div class="tools-dropdown" id="toolsDropdown">
                     <label style="display:flex;align-items:center;gap:8px;padding:4px 8px;cursor:pointer;white-space:nowrap;">
                         <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()">
@@ -648,17 +648,17 @@
                         <option value="zh">🇨🇳 中文</option>
                     </select>
                     <hr style="border-color:var(--border);margin:4px 0;">
-                    <button onclick="resetExecution()" id="resetTreeBtn" title="_('reset_tree_status')">🔄 Nulstil træ</button>
-                    <button onclick="deleteTree()" id="deleteTreeBtn" title="_('delete_tree')">🗑 Slet træ</button>
-                    <button onclick="previewMarkdown()" id="previewBtn" title="_('preview_session')">👁 Preview</button>
-                    <button onclick="exportToMarkdown()" id="exportMd" title="_('export_md')">📄 Eksporter MD</button>
-                    <button onclick="saveLayoutToLocal()" id="saveLayoutBtn" title="_('save_layout')">💾 Gem layout</button>
-                    <button onclick="resetLayout()" id="resetLayoutBtn" title="_('reset_layout')">🔄 Reset layout</button>
+                    <button onclick="resetExecution()" id="resetTreeBtn" data-i18n-title="reset_tree_status">🔄 Nulstil træ</button>
+                    <button onclick="deleteTree()" id="deleteTreeBtn" data-i18n-title="delete_tree">🗑 Slet træ</button>
+                    <button onclick="previewMarkdown()" id="previewBtn" data-i18n-title="preview_session">👁 Preview</button>
+                    <button onclick="exportToMarkdown()" id="exportMd" data-i18n-title="export_md">📄 Eksporter MD</button>
+                    <button onclick="saveLayoutToLocal()" id="saveLayoutBtn" data-i18n-title="save_layout">💾 Gem layout</button>
+                    <button onclick="resetLayout()" id="resetLayoutBtn" data-i18n-title="reset_layout">🔄 Reset layout</button>
                     <hr style="border-color:var(--border);margin:4px 0;">
-                    <button onclick="window.open('/skillflow','_blank')" title="_('skillflow_analysis')" style="background:var(--purple-accent);">🧬 SkillFlow</button>
-                    <button onclick="window.open('/flow','_blank')" title="_('flow_builder')">🔍 Flow Builder</button>
-                    <button onclick="setGithubToken()" id="githubTokenBtn" title="_('github_token_setup')">🔑 GitHub Token</button>
-                    <button onclick="showIssuesPanel()" id="issuesBtn" title="_('show_issues')">🐛 Issues</button>
+                    <button onclick="window.open('/skillflow','_blank')" data-i18n-title="skillflow_analysis" style="background:var(--purple-accent);">🧬 SkillFlow</button>
+                    <button onclick="window.open('/flow','_blank')" data-i18n-title="flow_builder">🔍 Flow Builder</button>
+                    <button onclick="setGithubToken()" id="githubTokenBtn" data-i18n-title="github_token_setup">🔑 GitHub Token</button>
+                    <button onclick="showIssuesPanel()" id="issuesBtn" data-i18n-title="show_issues">🐛 Issues</button>
                 </div>
             </div>
         </div>
@@ -671,13 +671,13 @@
             <select id="sessionSelect" class="session-select">
                 <option value="" id="selectSessionOpt">-- Vælg eller opret ny --</option>
             </select>
-            <span id="sessionIdDisplay" style="font-size:11px;color:var(--text-dim);margin-left:6px;user-select:all;cursor:pointer;" title="_('copy_session_id')"></span>
-            <button onclick="refreshSessions()" id="refreshSess" title="_('refresh_sessions')">🔄</button>
-            <button onclick="loadSelectedSession()" id="loadSess" title="_('load_session')">📂 Indlæs</button>
-            <button onclick="saveCurrentSession()" id="saveSess" title="_('save_session')">💾 Gem</button>
-            <button onclick="renameSession()" id="renameSess" title="_('rename_session')">✏️ Omdøb</button>
-            <button onclick="reuseCurrentSession()" id="reuseSess" title="_('reuse_session')">♻️ Genbrug</button>
-            <button onclick="createNewSession()" id="newSess" title="_('new_session')">➕ Ny</button>
+            <span id="sessionIdDisplay" style="font-size:11px;color:var(--text-dim);margin-left:6px;user-select:all;cursor:pointer;" data-i18n-title="copy_session_id"></span>
+            <button onclick="refreshSessions()" id="refreshSess" data-i18n-title="refresh_sessions">🔄</button>
+            <button onclick="loadSelectedSession()" id="loadSess" data-i18n-title="load_session">📂 Indlæs</button>
+            <button onclick="saveCurrentSession()" id="saveSess" data-i18n-title="save_session">💾 Gem</button>
+            <button onclick="renameSession()" id="renameSess" data-i18n-title="rename_session">✏️ Omdøb</button>
+            <button onclick="reuseCurrentSession()" id="reuseSess" data-i18n-title="reuse_session">♻️ Genbrug</button>
+            <button onclick="createNewSession()" id="newSess" data-i18n-title="new_session">➕ Ny</button>
         </div>
         
         <div class="toolbar-row">
@@ -711,7 +711,7 @@
             <span class="toolbar-label" id="promptLabel">Prompt</span>
             <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?" style="flex:1;"></textarea>
             <input type="file" id="imagePicker" style="display:none" accept="image/*" onchange="onImagePicked(event)">
-            <button onclick="document.getElementById('imagePicker').click()" id="imageBtn" style="background:var(--btn-secondary);" title="_('add_image')">🖼</button>
+            <button onclick="document.getElementById('imagePicker').click()" id="imageBtn" style="background:var(--btn-secondary);" data-i18n-title="add_image">🖼</button>
             <button onclick="decompose()" id="decomposeBtn">🌳 Nedbryd</button>
             <button onclick="executeWithStream()" id="executeBtn" style="background:#10b981;">⚡ Udfør</button>
             <input type="text" id="replyInput" placeholder="Svar til LLM..." style="display:none;width:120px;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')sendReply()">
@@ -1098,11 +1098,11 @@ function updateHtmlLabels() {
     if (e('saveLayoutBtn')) e('saveLayoutBtn').textContent  = '💾 ' + _('tools_save_layout');
     if (e('resetLayoutBtn'))e('resetLayoutBtn').textContent = '🔄 ' + _('tools_reset_layout');
     if (e('githubTokenBtn'))e('githubTokenBtn').textContent = '🔑 ' + _('tools_github_token');
-    if (e('refreshSess'))  e('refreshSess').title           = _('refresh');
-    if (e('loadSess'))      e('loadSess').textContent        = '📂 ' + _('load');
-    if (e('saveSess'))     e('saveSess').textContent        = '💾 ' + _('save');
-    if (e('renameSess'))   e('renameSess').textContent      = '✏️ ' + _('rename');
-    if (e('newSess'))      e('newSess').textContent         = '➕ ' + _('new');
+    if (e('refreshSess'))  e('refreshSess').title           = _('refresh_sessions');
+    if (e('loadSess'))      { e('loadSess').textContent  = '📂 ' + _('load');       e('loadSess').title   = _('load_session'); }
+    if (e('saveSess'))     { e('saveSess').textContent  = '💾 ' + _('save');       e('saveSess').title   = _('save_session'); }
+    if (e('renameSess'))   { e('renameSess').textContent= '✏️ ' + _('rename');     e('renameSess').title = _('rename_session'); }
+    if (e('newSess'))      { e('newSess').textContent   = '➕ ' + _('new');        e('newSess').title    = _('new_session'); }
     if (e('sessionsLabel'))e('sessionsLabel').textContent   = _('sessions');
     if (e('templateLabel'))e('templateLabel').textContent   = _('template');
     if (e('llmLangLabel')) e('llmLangLabel').textContent    = _('llm_language');
@@ -1133,6 +1133,7 @@ function updateHtmlLabels() {
         }
     }
     onTemplateChange(document.getElementById('templateSelect')?.value);
+    document.querySelectorAll('[data-i18n-title]').forEach(function(el) { el.title = _(el.dataset.i18nTitle); });
 }
 
 function updatePanelTitles() {
@@ -1375,14 +1376,14 @@ function renderTree(node, path = []) {
     if (treeEditMode) {
         html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="${_('btn_edit')}" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="${_('btn_delete')}" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="${_('btn_add_child')}" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
     } else if (node.status !== 'done' && node.status !== 'skipped') {
-        html += `<span style="margin-left:8px;white-space:nowrap;"><button onclick="markTaskDone('${pathStr}','done')" title="_('keep_result')" style="padding:1px 6px;font-size:10px;background:#22c55e;border:none;border-radius:3px;color:white;cursor:pointer;">\u2713 Bevar</button> <button onclick="markTaskDone('${pathStr}','skipped')" title="_('skip_task')" style="padding:1px 6px;font-size:10px;background:#64748b;border:none;border-radius:3px;color:white;cursor:pointer;">\u23ed Spring</button></span>`;
+        html += `<span style="margin-left:8px;white-space:nowrap;"><button onclick="markTaskDone('${pathStr}','done')" title="${_('keep_result')}" style="padding:1px 6px;font-size:10px;background:#22c55e;border:none;border-radius:3px;color:white;cursor:pointer;">\u2713 Bevar</button> <button onclick="markTaskDone('${pathStr}','skipped')" title="${_('skip_task')}" style="padding:1px 6px;font-size:10px;background:#64748b;border:none;border-radius:3px;color:white;cursor:pointer;">\u23ed Spring</button></span>`;
     } else {
-        html += `<span style="margin-left:8px;"><button onclick="markTaskDone('${pathStr}','pending')" title="_('rerun_task')" style="padding:1px 6px;font-size:10px;background:#f59e0b;border:none;border-radius:3px;color:white;cursor:pointer;">\u21bb Genk\u00f8r</button></span>`;
+        html += `<span style="margin-left:8px;"><button onclick="markTaskDone('${pathStr}','pending')" title="${_('rerun_task')}" style="padding:1px 6px;font-size:10px;background:#f59e0b;border:none;border-radius:3px;color:white;cursor:pointer;">\u21bb Genk\u00f8r</button></span>`;
     }
     html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span>`;
     if (node.status === 'failed') {
         const phaseEnc = encodeURIComponent(node.name || '');
-        html += ` <button onclick="approveAutoResearch('${pathStr}','${phaseEnc}')" title="_('auto_research')" style="margin-left:4px;padding:1px 5px;font-size:10px;background:var(--accent);border:none;border-radius:3px;color:white;cursor:pointer;">🔬 Auto</button>`;
+        html += ` <button onclick="approveAutoResearch('${pathStr}','${phaseEnc}')" title="${_('auto_research')}" style="margin-left:4px;padding:1px 5px;font-size:10px;background:var(--accent);border:none;border-radius:3px;color:white;cursor:pointer;">🔬 Auto</button>`;
     }
     html += `</div>${criteriaHtml}${phaseCheckHtml}`;
     if (node.children && node.children.length > 0) { 

@@ -581,5 +581,18 @@
     "rerun_task": "Nulstil til afventende (genkør)",
     "auto_research": "Start auto-research for denne fejl",
     "skillflow_analysis": "SkillFlow Analyse",
-    "flow_builder": "Flow Builder - Web Research"
+    "flow_builder": "Flow Builder - Web Research",
+    "load": "Indlæs",
+    "save": "Gem",
+    "rename": "Omdøb",
+    "new": "Ny",
+    "tools_reset_tree": "Nulstil træ",
+    "tools_delete_tree": "Slet træ",
+    "tools_preview": "Preview",
+    "tools_export_md": "Eksporter MD",
+    "tools_save_layout": "Gem layout",
+    "tools_reset_layout": "Reset layout",
+    "tools_github_token": "GitHub Token",
+    "issues_title": "Issues",
+    "add_image_btn": "Tilføj billede"
 }

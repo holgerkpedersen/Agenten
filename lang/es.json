@@ -580,5 +580,18 @@
     "rerun_task": "Restablecer a pendiente (re-ejecutar)",
     "auto_research": "Iniciar investigación automática para este error",
     "skillflow_analysis": "Análisis SkillFlow",
-    "flow_builder": "Flow Builder - Investigación Web"
+    "flow_builder": "Flow Builder - Investigación Web",
+    "load": "Cargar",
+    "save": "Guardar",
+    "rename": "Renombrar",
+    "new": "Nueva",
+    "tools_reset_tree": "Restablecer árbol",
+    "tools_delete_tree": "Eliminar árbol",
+    "tools_preview": "Vista previa",
+    "tools_export_md": "Exportar MD",
+    "tools_save_layout": "Guardar diseño",
+    "tools_reset_layout": "Restablecer diseño",
+    "tools_github_token": "Token GitHub",
+    "issues_title": "Issues",
+    "add_image_btn": "Agregar imagen"
 }

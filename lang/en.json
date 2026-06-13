@@ -581,5 +581,18 @@
     "rerun_task": "Reset to pending (rerun)",
     "auto_research": "Start auto-research for this error",
     "skillflow_analysis": "SkillFlow Analysis",
-    "flow_builder": "Flow Builder - Web Research"
+    "flow_builder": "Flow Builder - Web Research",
+    "load": "Load",
+    "save": "Save",
+    "rename": "Rename",
+    "new": "New",
+    "tools_reset_tree": "Reset tree",
+    "tools_delete_tree": "Delete tree",
+    "tools_preview": "Preview",
+    "tools_export_md": "Export MD",
+    "tools_save_layout": "Save layout",
+    "tools_reset_layout": "Reset layout",
+    "tools_github_token": "GitHub Token",
+    "issues_title": "Issues",
+    "add_image_btn": "Add image"
 }
