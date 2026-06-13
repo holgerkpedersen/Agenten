@@ -1012,6 +1012,7 @@ btn_edit: 'Rediger',
     issues_detail_fix: 'Foreslået fix:',
     issues_created_at: 'Oprettet:',
     issues_updated_at: 'Ændret:',
+    reuse: 'Genbrug',
     keep_label: 'Bevar',
     skip_label: 'Spring',
     rerun_label: 'Genkør',
@@ -1091,6 +1092,14 @@ async function redecomposeTree(lang) {
 function updateAllUIText() {
     updatePanelTitles();
     updateHtmlLabels();
+    updatePanelPlaceholders();
+}
+
+function updatePanelPlaceholders() {
+    const treeHint = document.querySelector('#treeContainer > div');
+    if (treeHint) treeHint.textContent = _('click_tree_hint');
+    const llmHint = document.querySelector('#llmContent > div');
+    if (llmHint) llmHint.textContent = _('click_stream_hint');
 }
 
 function updateHtmlLabels() {
@@ -1108,6 +1117,7 @@ function updateHtmlLabels() {
     if (e('saveSess'))     { e('saveSess').textContent  = '💾 ' + _('save');       e('saveSess').title   = _('save_session'); }
     if (e('renameSess'))   { e('renameSess').textContent= '✏️ ' + _('rename');     e('renameSess').title = _('rename_session'); }
     if (e('newSess'))      { e('newSess').textContent   = '➕ ' + _('new');        e('newSess').title    = _('new_session'); }
+    if (e('reuseSess'))    { e('reuseSess').textContent = '♻️ ' + _('reuse');      e('reuseSess').title  = _('reuse_session'); }
     if (e('sessionsLabel'))e('sessionsLabel').textContent   = _('sessions');
     if (e('templateLabel'))e('templateLabel').textContent   = _('template');
     if (e('llmLangLabel')) e('llmLangLabel').textContent    = _('llm_language');

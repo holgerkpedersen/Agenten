@@ -534,7 +534,8 @@
         "skip_label": "Saltar",
         "rerun_label": "Re-ejecutar",
         "show_detail": "mostrar detalle",
-        "hide_detail": "ocultar detalle"
+        "hide_detail": "ocultar detalle",
+        "reuse": "Reutilizar"
     },
     "criteria.decompose": "Especifica los criterios de éxito entre paréntesis después de cada nombre de tarea, ej.: Tarea (criterio1, criterio2)",
     "criteria.header": "Criterios de Éxito",

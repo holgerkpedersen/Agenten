@@ -534,7 +534,8 @@
         "skip_label": "Skip",
         "rerun_label": "Rerun",
         "show_detail": "show detail",
-        "hide_detail": "hide detail"
+        "hide_detail": "hide detail",
+        "reuse": "Reuse"
     },
     "criteria.decompose": "Specify success criteria in parentheses after each task name, e.g.: Task (criterion1, criterion2)",
     "criteria.header": "Success Criteria",
