@@ -322,3 +322,96 @@ class TestGetUiTranslations:
         ui = lang.get_ui_translations("xx")
         assert "title" in ui
         assert ui.get("sessions") == lang.LANG["da"]["ui"]["sessions"]
+
+
+class TestNewToolDescriptions:
+    """Verify the new tool descriptions migrated from agent_core.py."""
+
+    NEW_TOOL_KEYS = [
+        "read_location", "read_chunk", "list_chunks", "list_symbols", "locate",
+        "edit_file", "write_file", "list_files", "add_image",
+        "extract_symbol", "remove_symbol", "add_import", "verify_refactor",
+        "analyze_dependencies", "suggest_module_groups",
+        "run_tests", "run_refinement", "read_issue", "update_issue_status",
+        "create_refactor_issue", "create_issue", "analyze_own_logs",
+    ]
+
+    def test_all_new_tool_keys_in_all_langs(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            tools = lang.LANG[lang_code].get("tools", {})
+            for key in self.NEW_TOOL_KEYS:
+                assert key in tools, f"{lang_code} missing tools.{key}"
+
+    def test_all_new_tool_keys_non_empty(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            tools = lang.LANG[lang_code].get("tools", {})
+            for key in self.NEW_TOOL_KEYS:
+                assert len(tools[key]) > 20, f"{lang_code} tools.{key} too short"
+
+    def test_all_new_agent_tools_in_all_langs(self):
+        agent_keys = [
+            "run_tests", "run_refinement", "read_issue",
+            "update_issue_status", "create_refactor_issue",
+            "create_issue", "analyze_own_logs",
+        ]
+        for lang_code in ["da", "en", "es", "zh"]:
+            tools = lang.LANG[lang_code].get("tools", {})
+            for key in agent_keys:
+                assert key in tools, f"{lang_code} missing tools.{key}"
+
+
+class TestSystemSection:
+    """Verify the new system.* keys migrated from agent_tasks.py."""
+
+    SYSTEM_KEYS = [
+        "available_files", "delegations_header",
+        "same_tool_loop", "dup_result", "dedup_loop",
+        "read_loop", "read_blocked", "issue_resolved",
+        "edit_oldtext_content", "edit_oldtext_noread",
+        "fail_loop", "done_tests_fail",
+        "required_tools_refactor", "required_tools_programming",
+        "auto_resolved", "incomplete_result",
+        "tool_failed_retry", "context_truncated",
+        "no_files_loaded", "read_after_locate",
+    ]
+
+    def test_system_section_exists_in_all_langs(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            section = lang.LANG[lang_code].get("system", {})
+            assert len(section) >= 20, f"{lang_code} system section too small"
+
+    def test_all_system_keys_in_all_langs(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            section = lang.LANG[lang_code].get("system", {})
+            for key in self.SYSTEM_KEYS:
+                assert key in section, f"{lang_code} missing system.{key}"
+
+    def test_all_system_keys_non_empty(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            section = lang.LANG[lang_code].get("system", {})
+            for key in self.SYSTEM_KEYS:
+                assert len(section[key]) > 10, f"{lang_code} system.{key} too short"
+
+    def test_t_resolves_all_system_keys(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            for key in self.SYSTEM_KEYS:
+                result = lang.t(f"system.{key}", lang_code)
+                assert result and not result.startswith("?"), \
+                    f"t('system.{key}', '{lang_code}') failed: {result}"
+
+    def test_t_resolves_all_new_tool_keys(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            for key in TestNewToolDescriptions.NEW_TOOL_KEYS:
+                result = lang.t(f"tools.{key}", lang_code)
+                assert result and not result.startswith("?"), \
+                    f"t('tools.{key}', '{lang_code}') failed: {result}"
+
+    def test_available_files_has_format_placeholder(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            val = lang.t("system.available_files", lang_code)
+            assert "{dir}" in val, f"{lang_code} available_files missing {{dir}}"
+
+    def test_dedup_loop_has_format_placeholder(self):
+        for lang_code in ["da", "en", "es", "zh"]:
+            val = lang.t("system.dedup_loop", lang_code)
+            assert "{tools}" in val, f"{lang_code} dedup_loop missing {{tools}}"
