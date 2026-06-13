@@ -668,6 +668,7 @@
         "tool_failed_retry": "{tool}失败。重新读取文件并精确复制文本作为old_text。",
         "context_truncated": "[... 先前的上下文已截断 ...]",
         "no_files_loaded": "注意：未加载任何文件。您可以直接回答而无需先调用工具。不要询问文件名 — 使用您自己的知识来回答任务。",
-        "read_after_locate": "✅ 注意：您已使用locate读取了此文件中的函数。使用locate(filepath='...', name='other_name')代替read_chunk — 更快。"
+        "read_after_locate": "✅ 注意：您已使用locate读取了此文件中的函数。使用locate(filepath='...', name='other_name')代替read_chunk — 更快。",
+        "use_available_tools": "使用可用工具完成任务。完成后，提供您的结果。"
     }
 }

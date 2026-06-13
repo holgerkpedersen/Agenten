@@ -139,7 +139,7 @@ class ToolRegistry:
         example_tool = active_names[0]
 
         if config.NATIVE_TOOLS:
-            prompt = f"{t('answer_in', self.lang)}. Use the available tools to complete the task. When done, provide your result.\n\n"
+            prompt = f"{t('answer_in', self.lang)}. {t(K.SYS_USE_AVAILABLE_TOOLS, self.lang)}\n\n"
             prompt += t(K.TOOL_SYSTEM_PROMPT_NATIVE, self.lang).format(
                 tools_desc=tools_desc,
                 task=task,

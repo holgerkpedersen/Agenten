@@ -137,6 +137,7 @@ class K(StrEnum):
     SYS_CONTEXT_TRUNCATED               = "system.context_truncated"
     SYS_NO_FILES_LOADED                 = "system.no_files_loaded"
     SYS_READ_AFTER_LOCATE               = "system.read_after_locate"
+    SYS_USE_AVAILABLE_TOOLS             = "system.use_available_tools"
 
     # === Checkpoint messages (PR workflow) ===
     CP_NO_COMMIT    = "checkpoint.no_commit"

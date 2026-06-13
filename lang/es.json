@@ -668,6 +668,7 @@
         "tool_failed_retry": "{tool} falló. Lee el archivo de nuevo y copia el texto exactamente como old_text.",
         "context_truncated": "[... contexto anterior truncado ...]",
         "no_files_loaded": "NOTA: No hay archivos cargados. PUEDES responder directamente sin llamar herramientas primero. NO preguntes por nombres de archivos — usa tu propio conocimiento.",
-        "read_after_locate": "✅ NOTA: Ya has leído función(es) en este archivo con locate. Usa locate(filepath='...', name='otro_nombre') en lugar de read_chunk — es más rápido."
+        "read_after_locate": "✅ NOTA: Ya has leído función(es) en este archivo con locate. Usa locate(filepath='...', name='otro_nombre') en lugar de read_chunk — es más rápido.",
+        "use_available_tools": "Usa las herramientas disponibles para completar la tarea. Cuando termines, proporciona tu resultado."
     }
 }

@@ -669,6 +669,7 @@
         "tool_failed_retry": "{tool} failed. Read the file again and copy the text exactly as old_text.",
         "context_truncated": "[... previous context truncated ...]",
         "no_files_loaded": "NOTE: No files are loaded. You CAN answer directly without calling tools first. Do NOT ask for filenames — use your own knowledge to answer the task.",
-        "read_after_locate": "✅ NOTE: You have already read function(s) in this file with locate. Use locate(filepath='...', name='other_name') instead of read_chunk — it's faster."
+        "read_after_locate": "✅ NOTE: You have already read function(s) in this file with locate. Use locate(filepath='...', name='other_name') instead of read_chunk — it's faster.",
+        "use_available_tools": "Use the available tools to complete the task. When done, provide your result."
     }
 }

@@ -669,6 +669,7 @@
         "tool_failed_retry": "{tool} mislykkedes. Læs filen igen og kopier teksten nøjagtigt som old_text.",
         "context_truncated": "[... tidligere kontekst afkortet ...]",
         "no_files_loaded": "OBS: Ingen filer er indlæst. Du KAN svare direkte uden at kalde værktøjer først. Spørg IKKE efter filnavne — brug din egen viden til at besvare opgaven.",
-        "read_after_locate": "✅ OBS: Du har allerede læst funktion(er) i denne fil med locate. Brug locate(filepath='...', name='andet_navn') i stedet for read_chunk — det er hurtigere."
+        "read_after_locate": "✅ OBS: Du har allerede læst funktion(er) i denne fil med locate. Brug locate(filepath='...', name='andet_navn') i stedet for read_chunk — det er hurtigere.",
+        "use_available_tools": "Brug de tilgængelige værktøjer til at fuldføre opgaven. Når du er færdig, angiv dit resultat."
     }
 }
