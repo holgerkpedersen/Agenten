@@ -446,6 +446,33 @@
         .log-DEBUG { border-left-color: var(--log-debug-border); color: var(--log-debug-text); }
         .log-ERROR { border-left-color: var(--danger); color: var(--log-error-text); }
         .log-LLM { border-left-color: var(--log-llm-border); color: var(--log-llm-text); }
+        .log-WARNING { border-left-color: #f59e0b; color: var(--text-color); }
+        .log-SKILL { border-left-color: #8b5cf6; color: var(--text-color); }
+        .log-VALIDERING { border-left-color: #06b6d4; color: var(--text-color); }
+        .log-SUCCESS { border-left-color: #10b981; color: var(--text-color); }
+        
+        .log-detail-toggle {
+            cursor: pointer;
+            font-size: 10px;
+            color: #64748b;
+            text-decoration: underline dotted;
+            user-select: none;
+        }
+        .log-detail-toggle:hover { color: #94a3b8; }
+        .log-detail-content {
+            display: none;
+            margin: 2px 0 0 12px;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            background: rgba(0,0,0,0.05);
+            border-radius: 3px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-detail-content.open { display: block; }
         
         .history-item {
             background: var(--panel-bg);
@@ -1287,6 +1314,16 @@ function escapeHtml(str) {
     });
 }
 
+function renderLogDetail(detail) {
+    if (!detail) return '';
+    const id = 'ld_' + Math.random().toString(36).slice(2, 8);
+    return `<span class="log-detail-toggle" onclick="
+        var c=document.getElementById('${id}');
+        c.classList.toggle('open');
+        this.textContent=c.classList.contains('open')?'[skjul detail]':'[vis detail]';
+    ">[vis detail]</span><pre id="${id}" class="log-detail-content">${escapeHtml(detail)}</pre>`;
+}
+
 function addLogEntry(level, message, detail) {
     const logBox = document.getElementById('logContent');
     if (!logBox) return;
@@ -1299,7 +1336,7 @@ function addLogEntry(level, message, detail) {
                  String(now.getSeconds()).padStart(2,'0');
     const logHtml = `<div class="log-entry log-${level}">
         <strong>[${time}] ${level}</strong>: ${escapeHtml(message)}<br>
-        <span style="font-size: 10px; color: #64748b;">${escapeHtml(detail || '')}</span>
+        ${renderLogDetail(detail)}
     </div>`;
     logBox.innerHTML += logHtml;
     if (logBox.scrollTop + logBox.clientHeight >= logBox.scrollHeight - 60) {
@@ -2474,7 +2511,7 @@ async function loadSelectedSession() {
                     const time = formatLogTime(log.timestamp);
                     logBox.innerHTML += `<div class="log-entry log-${log.level}">
                         <strong>[${time}] ${log.level}</strong>: ${escapeHtml(log.message)}<br>
-                        <span style="font-size: 10px;">${escapeHtml(log.detail || '')}</span>
+                        ${renderLogDetail(log.detail)}
                     </div>`;
                 }
             }
