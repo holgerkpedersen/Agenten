@@ -202,7 +202,8 @@
         "update_issue_status": "Update the status of an issue in docs/issues/observed/issues.json. Args: issue_id, status ('open'/'in_progress'/'resolved'), resolution_note (optional).",
         "create_refactor_issue": "Create a REFAC-issue in issues.json for a file that is too large. Requires: filepath (file path), line_count (number of lines). Optional: related_issues (list of issue IDs).",
         "create_issue": "Create a new issue in issues.json. ONE issue = ONE specific bug (not multiple endpoints combined). Requires: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location (format: filename:function_name), impact, proposed_fix. acceptance_criteria: describe exactly how the fix is verified (e.g. 'Endpoint returns 403 on ../ in path').",
-        "analyze_own_logs": "Analyze the Agent's own session logs for error patterns and execution history. Args: session_id (UUID, optional — specific session), pattern (search string or regex, optional), max_sessions (number of recent sessions, default 5). Without session_id: overview of recent sessions. With session_id: detailed analysis + error patterns."
+        "analyze_own_logs": "Analyze the Agent's own session logs for error patterns and execution history. Args: session_id (UUID, optional — specific session), pattern (search string or regex, optional), max_sessions (number of recent sessions, default 5). Without session_id: overview of recent sessions. With session_id: detailed analysis + error patterns.",
+        "convert_pdf_html5": "Convert a PDF file to HTML5. Args: pdf_path (path to the PDF file), output_path (optional — path for the output HTML file, defaults to same name with .html)."
     },
     "tool_system_prompt": "You have access to tools. Call them like this:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nWhen done, respond like this:\n{DONE_MARKER}{{\"result\":\"YOUR DETAILED CONCLUSION — NOT just done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Task\n{task}",
     "tool_continuation": "Available: {tools_list}. Use {TOOL_MARKER} or finish with {DONE_MARKER}.",
@@ -287,7 +288,9 @@
         "no_path_given": "No path provided",
         "index_missing": "index.html not found. Please create the file in the static folder.",
         "cannot_create_folder": "Could not create folder: {e}",
-        "layout_not_found": "Layout not found"
+        "layout_not_found": "Layout not found",
+        "access_denied": "Access denied",
+        "binary_file": "Cannot view binary files"
     },
     "ui": {
         "title": "Agenten",

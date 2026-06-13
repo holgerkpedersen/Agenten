@@ -1234,6 +1234,7 @@ let treeEditMode = false;
 let currentTheme = localStorage.getItem('agenten_theme') || 'dark';
 let phaseChecksByTemplate = {};
 let currentTemplate = '';
+let producedFiles = [];
 
 function toggleTheme() {
     currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -1369,6 +1370,51 @@ function addLogEntry(level, message, detail) {
     logBox.innerHTML += logHtml;
     if (logBox.scrollTop + logBox.clientHeight >= logBox.scrollHeight - 60) {
         logBox.scrollTop = logBox.scrollHeight;
+    }
+}
+
+function renderOutputFiles() {
+    const el = document.getElementById('outputFilesContainer');
+    if (!el) return;
+    if (!producedFiles || producedFiles.length === 0) {
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = '';
+    let html = '<div style="margin-top:10px;padding:8px;background:var(--panel-bg);border:1px solid var(--border);border-radius:4px;">';
+    html += `<strong style="font-size:12px;">📄 ${_('output_files') || 'Output Files'}</strong><ul style="margin:5px 0 0;padding-left:18px;">`;
+    for (const f of producedFiles) {
+        const name = f.split(/[/\\]/).pop();
+        html += `<li style="font-size:12px;margin:2px 0;"><a href="#" onclick="viewFile('${escapeHtml(f)}');return false;" style="color:var(--accent);text-decoration:none;">${escapeHtml(name)}</a></li>`;
+    }
+    html += '</ul></div>';
+    el.innerHTML = html;
+}
+
+async function viewFile(path) {
+    try {
+        const resp = await fetch('/api/file/view', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const name = path.split(/[/\\]/).pop();
+            const html = `<div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)this.remove()">
+                <div style="background:var(--bg,#1e1e2e);border-radius:8px;max-width:90vw;max-height:90vh;overflow:auto;padding:20px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+                    <strong>${escapeHtml(name)}</strong>
+                    <a href="#" onclick="this.closest('div[style]').remove()" style="color:var(--text-dim);">✕</a>
+                </div>
+                <pre style="white-space:pre-wrap;font-size:13px;max-height:70vh;overflow:auto;">${escapeHtml(data.content)}</pre>
+                </div></div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+        } else {
+            addLogEntry('ERROR', 'View file', data.error || 'Failed to load file');
+        }
+    } catch(e) {
+        addLogEntry('ERROR', 'View file', e.message);
     }
 }
 
@@ -2098,6 +2144,7 @@ function createPanels() {
                     <div id="currentTask" style="margin-bottom: 8px; font-size: 12px;"></div>
                 </div>
                 <div id="llmContent" class="llm-box"><div style="color: #64748b;"></div></div>
+                <div id="outputFilesContainer"></div>
             `;
         } else if (def.id === 'log') {
             contentDiv.innerHTML = '<div id="logContent" class="log-box"><div style="color: #64748b;"></div></div>';
@@ -2399,6 +2446,9 @@ async function createNewSession() {
             currentTree = null;
             selectedFiles = [];
             loadedFilesContent = [];
+            producedFiles = [];
+            const ofc = document.getElementById('outputFilesContainer');
+            if (ofc) ofc.style.display = 'none';
             document.getElementById('promptInput').value = '';
             document.getElementById('filePathInput').value = '';
             document.getElementById('selectedFilesDisplay').innerHTML = '';
@@ -2853,6 +2903,9 @@ async function deleteTree() {
         return;
     }
     currentTree = null;
+    producedFiles = [];
+    const ofc = document.getElementById('outputFilesContainer');
+    if (ofc) ofc.style.display = 'none';
     await fetch('/api/reset-execution', { method: 'POST' });
     const treeContainer = document.getElementById('treeContainer');
     if (treeContainer) treeContainer.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
@@ -3028,6 +3081,11 @@ async function executeWithStream() {
                         llmBox.scrollTop = llmBox.scrollHeight;
                     }
                 }
+                break;
+
+            case 'output_files':
+                producedFiles = data.files || [];
+                renderOutputFiles();
                 break;
                 
             case 'complete':

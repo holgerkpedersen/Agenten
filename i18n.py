@@ -113,6 +113,7 @@ class K(StrEnum):
     TOOL_UPDATE_ISSUE_STATUS            = "tools.update_issue_status"
     TOOL_CREATE_REFACTOR_ISSUE          = "tools.create_refactor_issue"
     TOOL_CREATE_ISSUE                   = "tools.create_issue"
+    TOOL_CONVERT_PDF                    = "tools.convert_pdf_html5"
     TOOL_ANALYZE_OWN_LOGS               = "tools.analyze_own_logs"
 
     SYS_AVAILABLE_FILES                 = "system.available_files"
@@ -254,6 +255,8 @@ class K(StrEnum):
     ERR_NO_FOLDER           = "errors.no_folder_selected"
     ERR_NO_FILE             = "errors.no_file_received"
     ERR_EMPTY_FILENAME      = "errors.empty_filename"
+    ERR_ACCESS_DENIED       = "errors.access_denied"
+    ERR_BINARY_FILE         = "errors.binary_file"
     ERR_NO_PATH             = "errors.no_path_given"
     ERR_INDEX_MISSING       = "errors.index_missing"
     ERR_CREATE_FOLDER       = "errors.cannot_create_folder"

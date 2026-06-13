@@ -22,6 +22,7 @@ import agent_logs
 from agent_wta import WTAState, SequenceLearner
 from core_analytics import CoreAnalytics, TOOL_HANDLER_MAP
 import agent_tasks
+import agent_pdf
 import config
 
 
@@ -717,6 +718,12 @@ class Agent:
             t(K.TOOL_RUN_REFINEMENT, self.lang),
             ["workdir"],
             lambda workdir, rounds=7, model="": _run_doc_refinement(workdir, rounds, model)
+        ))
+        self.tool_registry.register(Tool(
+            "convert_pdf_html5",
+            t(K.TOOL_CONVERT_PDF, self.lang),
+            ["pdf_path"],
+            lambda pdf_path, output_path="", lang=self.lang: agent_pdf.convert_pdf_to_html5(pdf_path, output_path or None, lang)
         ))
         self.tool_registry.register(Tool(
             "read_issue",

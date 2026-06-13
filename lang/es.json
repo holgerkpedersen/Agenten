@@ -202,7 +202,8 @@
         "update_issue_status": "Actualiza el estado de un issue en docs/issues/observed/issues.json. Args: issue_id, status ('open'/'in_progress'/'resolved'), resolution_note (opcional).",
         "create_refactor_issue": "Crea un REFAC-issue en issues.json para un archivo demasiado grande. Requiere: filepath (ruta), line_count (número de líneas). Opcional: related_issues (lista de IDs).",
         "create_issue": "Crea un nuevo issue en issues.json. UN issue = UN error específico (no múltiples endpoints juntos). Requiere: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location (formato: filename:function_name), impact, proposed_fix. acceptance_criteria: describe exactamente cómo se verifica la solución.",
-        "analyze_own_logs": "Analiza los logs de sesión del Agente para patrones de error e historial de ejecución. Args: session_id (UUID, opcional), pattern (cadena o regex, opcional), max_sessions (sesiones recientes, default 5). Sin session_id: resumen. Con session_id: análisis detallado."
+        "analyze_own_logs": "Analiza los logs de sesión del Agente para patrones de error e historial de ejecución. Args: session_id (UUID, opcional), pattern (cadena o regex, opcional), max_sessions (sesiones recientes, default 5). Sin session_id: resumen. Con session_id: análisis detallado.",
+        "convert_pdf_html5": "Convierte un archivo PDF a HTML5. Args: pdf_path (ruta al archivo PDF), output_path (opcional — ruta para el archivo HTML de salida, por defecto mismo nombre con .html)."
     },
     "tool_system_prompt": "Tienes acceso a herramientas. Llámalas así:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nCuando termines, responde así:\n{DONE_MARKER}{{\"result\":\"TU CONCLUSIÓN DETALLADA — NO solo done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Tarea\n{task}",
     "tool_continuation": "Disponible: {tools_list}. Usa {TOOL_MARKER} o termina con {DONE_MARKER}.",
@@ -287,7 +288,9 @@
         "no_path_given": "No se proporcionó ruta",
         "index_missing": "index.html no encontrado. Crea el archivo en la carpeta static.",
         "cannot_create_folder": "No se pudo crear la carpeta: {e}",
-        "layout_not_found": "Layout no encontrado"
+        "layout_not_found": "Layout no encontrado",
+        "access_denied": "Acceso denegado",
+        "binary_file": "No se pueden mostrar archivos binarios"
     },
     "ui": {
         "title": "Agenten",

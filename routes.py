@@ -76,6 +76,40 @@ def read_file() -> Any:
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+def view_file() -> Any:
+    """View (read) a produced file from disk."""
+    from api_server import agent, BASE_DIR
+    from agent_files import _is_safe_path
+    data = request.json
+    path = data.get("path", "") if data else ""
+    if not path:
+        return jsonify({"success": False, "error": t(K.ERR_NO_PATH, agent.lang)}), 400
+
+    real = os.path.realpath(path) if os.path.exists(path) else os.path.abspath(path)
+    workdir = os.environ.get('AGENT_WORKDIR', '')
+    safe = _is_safe_path(BASE_DIR, path) or _is_safe_path(workdir, path) if workdir else False
+    if not safe:
+        return jsonify({"success": False, "error": t(K.ERR_ACCESS_DENIED, agent.lang)}), 403
+
+    ext = os.path.splitext(path)[1].lower()
+    if ext in {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.pdf', '.exe', '.dll'}:
+        return jsonify({"success": False, "error": t(K.ERR_BINARY_FILE, agent.lang)}), 400
+
+    try:
+        if not os.path.exists(path):
+            return jsonify({"success": False, "error": t(K.ERR_FILE_NOT_FOUND, agent.lang).format(path=path)}), 404
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return jsonify({
+            "success": True,
+            "filename": os.path.basename(path),
+            "content": content,
+            "lines": content.count('\n') + 1,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 def get_current_session() -> Any:
     """Get current session data."""
     from api_server import agent, current_session_id, session_manager

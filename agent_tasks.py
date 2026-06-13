@@ -34,6 +34,27 @@ def _parse_test_summary(result: dict) -> str:
 
 EXECUTION_TIMEOUT = config.EXECUTION_TIMEOUT
 
+_WRITE_TOOLS = frozenset({"write_file", "edit_file", "write_file_section", "convert_pdf_html5"})
+
+
+def _track_produced_file(agent: Any, tool_result: dict) -> None:
+    """Extract file path from a successful write/edit tool result and track it."""
+    tool = tool_result.get("tool", "")
+    if tool not in _WRITE_TOOLS:
+        return
+    result = tool_result.get("result", {})
+    if not isinstance(result, dict) or not result.get("success"):
+        return
+    path = result.get("result") or tool_result.get("args", {}).get("path", "")
+    if not path and isinstance(result, dict):
+        path = result.get("path", "")
+    if path:
+        if not os.path.isabs(path):
+            workdir = os.environ.get("AGENT_WORKDIR", "")
+            base = os.path.abspath(workdir) if workdir else os.path.abspath(".")
+            path = os.path.normpath(os.path.join(base, path))
+        agent._produced_files.add(os.path.abspath(path))
+
 
 def _save_llm_prompt_file(agent: Any, task_name: str, iteration: int, messages: list[dict]) -> str:
     """Save full LLM prompt (all messages) to a file for later inspection."""
@@ -1561,6 +1582,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._current_task_iteration = 0
     agent._non_productive_reminder_sent = False
     agent._tool_log = []
+    agent._produced_files = set()
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -1953,6 +1975,9 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             _report_logs = len(agent.agent_log)
             yield {"type": "tool_call", "tool": tool_result["tool"], "args": tool_result["args"]}
             yield {"type": "tool_result", "tool": tool_result["tool"], "result": tool_result["result"]}
+            _track_produced_file(agent, tool_result)
+            if agent._produced_files:
+                yield {"type": "output_files", "files": sorted(agent._produced_files)}
             if tool_result.get("checkpoint_msg"):
                 yield {"type": "checkpoint", "message": tool_result["checkpoint_msg"], "tool": parsed["tool"]}
             msg = _get_phase_auto_complete_msg(task_node, tool_result.get("tool"), tool_result.get("result"), agent, called_tools=called_tools, full_response=full_response)

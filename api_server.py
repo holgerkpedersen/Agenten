@@ -1400,6 +1400,8 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
                 yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
             elif event["type"] == "tool_result":
                 yield f"data: {json.dumps({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']})}\n\n"
+            elif event["type"] == "output_files":
+                yield f"data: {json.dumps({'type': 'output_files', 'task': node.name, 'files': event['files']})}\n\n"
             elif event["type"] == "log":
                 yield f"data: {json.dumps({'type': 'log', 'log': event['log']})}\n\n"
             elif event["type"] == "done":
@@ -2211,12 +2213,13 @@ def test() -> Any:
 
 
 # ============ REGISTER EXTRACTED ROUTES ============
-from routes import upload_file, read_file, get_current_session
+from routes import upload_file, read_file, view_file, get_current_session
 from api_git import git_backup, git_reset
 from api_skillflow import skillflow_report, skillflow_apply, skillflow_status
 
 app.add_url_rule('/api/file/upload', 'upload_file', upload_file, methods=['POST'])
 app.add_url_rule('/api/file/read', 'read_file', read_file, methods=['POST'])
+app.add_url_rule('/api/file/view', 'view_file', view_file, methods=['POST'])
 app.add_url_rule('/api/sessions/current', 'get_current_session', get_current_session, methods=['GET'])
 app.add_url_rule('/api/git/backup', 'git_backup', git_backup, methods=['POST'])
 app.add_url_rule('/api/git/reset', 'git_reset', git_reset, methods=['POST'])
