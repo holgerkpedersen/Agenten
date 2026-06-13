@@ -2452,14 +2452,26 @@ async function reuseCurrentSession() {
             localStorage.setItem('agenten_llm_lang', s.lang);
             document.getElementById('llmLangSelect').value = s.lang;
         }
+        const reuseResp = await fetch('/api/sessions/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: `♻️ ${(s.name || s.original_prompt || 'Reuse').slice(0, 40)}` })
+        });
+        const reuseData = await reuseResp.json();
+        if (reuseData.success) {
+            currentSessionId = reuseData.session_id;
+        }
+        updateSessionIdDisplay();
         currentTree = null;
         const treeContainer = document.getElementById('treeContainer');
         if (treeContainer) treeContainer.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
         const llmContent = document.getElementById('llmContent');
-        if (llmContent) llmContent.innerHTML = '';
+        if (llmContent) llmContent.innerHTML = `<div style="color:#64748b;">${_('click_stream_hint')}</div>`;
         const logContent = document.getElementById('logContent');
         if (logContent) logContent.innerHTML = '';
         addLogEntry('INFO', _('reuse_done'), `prompt: ${(s.original_prompt || '').slice(0, 60)}...`);
+        refreshSessions();
+        if (currentSessionId) updatePromptHistory(currentSessionId);
         const toast = document.createElement('div');
         toast.textContent = _('reuse_toast');
         toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--accent,#4CAF50);color:#fff;padding:12px 20px;border-radius:8px;z-index:9999;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity .5s';
