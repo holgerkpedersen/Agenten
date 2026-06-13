@@ -631,11 +631,11 @@
         <div style="display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:8px;">
                 <h1>🤖 Agenten</h1>
-                <button class="collapse-btn" id="headerCollapseBtn" onclick="toggleHeaderCollapse()" title="Skjul/vis topmenu" style="font-size:12px;">▲</button>
+                <button class="collapse-btn" id="headerCollapseBtn" onclick="toggleHeaderCollapse()" title="_('header_collapse')" style="font-size:12px;">▲</button>
             </div>
 <div class="tools-wrapper">
-                <button class="tools-toggle" onclick="toggleTools()" id="toolsMenu" title="Flere værktøjer">⚙️</button>
-                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="Skift tema">☀️</button>
+                <button class="tools-toggle" onclick="toggleTools()" id="toolsMenu" title="_('tools_menu')">⚙️</button>
+                <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle" title="_('theme_toggle')">☀️</button>
                 <div class="tools-dropdown" id="toolsDropdown">
                     <label style="display:flex;align-items:center;gap:8px;padding:4px 8px;cursor:pointer;white-space:nowrap;">
                         <input type="checkbox" id="thinkingToggle" onchange="toggleThinkingMode()">
@@ -648,17 +648,17 @@
                         <option value="zh">🇨🇳 中文</option>
                     </select>
                     <hr style="border-color:var(--border);margin:4px 0;">
-                    <button onclick="resetExecution()" id="resetTreeBtn" title="Nulstil alle opgavers status">🔄 Nulstil træ</button>
-                    <button onclick="deleteTree()" id="deleteTreeBtn" title="Slet hele opgavetræet">🗑 Slet træ</button>
-                    <button onclick="previewMarkdown()" id="previewBtn" title="Forhåndsvis session">👁 Preview</button>
-                    <button onclick="exportToMarkdown()" id="exportMd" title="Eksporter til Markdown">📄 Eksporter MD</button>
-                    <button onclick="saveLayoutToLocal()" id="saveLayoutBtn" title="Gem layout permanent">💾 Gem layout</button>
-                    <button onclick="resetLayout()" id="resetLayoutBtn" title="Nulstil layout">🔄 Reset layout</button>
+                    <button onclick="resetExecution()" id="resetTreeBtn" title="_('reset_tree_status')">🔄 Nulstil træ</button>
+                    <button onclick="deleteTree()" id="deleteTreeBtn" title="_('delete_tree')">🗑 Slet træ</button>
+                    <button onclick="previewMarkdown()" id="previewBtn" title="_('preview_session')">👁 Preview</button>
+                    <button onclick="exportToMarkdown()" id="exportMd" title="_('export_md')">📄 Eksporter MD</button>
+                    <button onclick="saveLayoutToLocal()" id="saveLayoutBtn" title="_('save_layout')">💾 Gem layout</button>
+                    <button onclick="resetLayout()" id="resetLayoutBtn" title="_('reset_layout')">🔄 Reset layout</button>
                     <hr style="border-color:var(--border);margin:4px 0;">
-                    <button onclick="window.open('/skillflow','_blank')" title="SkillFlow Analysis" style="background:var(--purple-accent);">🧬 SkillFlow</button>
-                    <button onclick="window.open('/flow','_blank')" title="Flow Builder - Web Research">🔍 Flow Builder</button>
-                    <button onclick="setGithubToken()" id="githubTokenBtn" title="Opsæt GitHub Token">🔑 GitHub Token</button>
-                    <button onclick="showIssuesPanel()" id="issuesBtn" title="Vis alle issues">🐛 Issues</button>
+                    <button onclick="window.open('/skillflow','_blank')" title="_('skillflow_analysis')" style="background:var(--purple-accent);">🧬 SkillFlow</button>
+                    <button onclick="window.open('/flow','_blank')" title="_('flow_builder')">🔍 Flow Builder</button>
+                    <button onclick="setGithubToken()" id="githubTokenBtn" title="_('github_token_setup')">🔑 GitHub Token</button>
+                    <button onclick="showIssuesPanel()" id="issuesBtn" title="_('show_issues')">🐛 Issues</button>
                 </div>
             </div>
         </div>
@@ -671,13 +671,13 @@
             <select id="sessionSelect" class="session-select">
                 <option value="" id="selectSessionOpt">-- Vælg eller opret ny --</option>
             </select>
-            <span id="sessionIdDisplay" style="font-size:11px;color:var(--text-dim);margin-left:6px;user-select:all;cursor:pointer;" title="Klik for at kopiere"></span>
-            <button onclick="refreshSessions()" id="refreshSess" title="Opdater">🔄</button>
-            <button onclick="loadSelectedSession()" id="loadSess" title="Indlæs">📂 Indlæs</button>
-            <button onclick="saveCurrentSession()" id="saveSess" title="Gem">💾 Gem</button>
-            <button onclick="renameSession()" id="renameSess" title="Omdøb">✏️ Omdøb</button>
-            <button onclick="reuseCurrentSession()" id="reuseSess" title="Genbrug prompt og skabelon i ny session">♻️ Genbrug</button>
-            <button onclick="createNewSession()" id="newSess" title="Ny session">➕ Ny</button>
+            <span id="sessionIdDisplay" style="font-size:11px;color:var(--text-dim);margin-left:6px;user-select:all;cursor:pointer;" title="_('copy_session_id')"></span>
+            <button onclick="refreshSessions()" id="refreshSess" title="_('refresh_sessions')">🔄</button>
+            <button onclick="loadSelectedSession()" id="loadSess" title="_('load_session')">📂 Indlæs</button>
+            <button onclick="saveCurrentSession()" id="saveSess" title="_('save_session')">💾 Gem</button>
+            <button onclick="renameSession()" id="renameSess" title="_('rename_session')">✏️ Omdøb</button>
+            <button onclick="reuseCurrentSession()" id="reuseSess" title="_('reuse_session')">♻️ Genbrug</button>
+            <button onclick="createNewSession()" id="newSess" title="_('new_session')">➕ Ny</button>
         </div>
         
         <div class="toolbar-row">
@@ -711,7 +711,7 @@
             <span class="toolbar-label" id="promptLabel">Prompt</span>
             <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?" style="flex:1;"></textarea>
             <input type="file" id="imagePicker" style="display:none" accept="image/*" onchange="onImagePicked(event)">
-            <button onclick="document.getElementById('imagePicker').click()" id="imageBtn" style="background:var(--btn-secondary);" title="Tilføj billede">🖼</button>
+            <button onclick="document.getElementById('imagePicker').click()" id="imageBtn" style="background:var(--btn-secondary);" title="_('add_image')">🖼</button>
             <button onclick="decompose()" id="decomposeBtn">🌳 Nedbryd</button>
             <button onclick="executeWithStream()" id="executeBtn" style="background:#10b981;">⚡ Udfør</button>
             <input type="text" id="replyInput" placeholder="Svar til LLM..." style="display:none;width:120px;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')sendReply()">
@@ -1375,14 +1375,14 @@ function renderTree(node, path = []) {
     if (treeEditMode) {
         html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="${_('btn_edit')}" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="${_('btn_delete')}" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="${_('btn_add_child')}" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
     } else if (node.status !== 'done' && node.status !== 'skipped') {
-        html += `<span style="margin-left:8px;white-space:nowrap;"><button onclick="markTaskDone('${pathStr}','done')" title="Behold resultatet, genk\u00f8r ikke" style="padding:1px 6px;font-size:10px;background:#22c55e;border:none;border-radius:3px;color:white;cursor:pointer;">\u2713 Bevar</button> <button onclick="markTaskDone('${pathStr}','skipped')" title="Spring over uden resultat" style="padding:1px 6px;font-size:10px;background:#64748b;border:none;border-radius:3px;color:white;cursor:pointer;">\u23ed Spring</button></span>`;
+        html += `<span style="margin-left:8px;white-space:nowrap;"><button onclick="markTaskDone('${pathStr}','done')" title="_('keep_result')" style="padding:1px 6px;font-size:10px;background:#22c55e;border:none;border-radius:3px;color:white;cursor:pointer;">\u2713 Bevar</button> <button onclick="markTaskDone('${pathStr}','skipped')" title="_('skip_task')" style="padding:1px 6px;font-size:10px;background:#64748b;border:none;border-radius:3px;color:white;cursor:pointer;">\u23ed Spring</button></span>`;
     } else {
-        html += `<span style="margin-left:8px;"><button onclick="markTaskDone('${pathStr}','pending')" title="Nulstil til afventende (genk\u00f8r)" style="padding:1px 6px;font-size:10px;background:#f59e0b;border:none;border-radius:3px;color:white;cursor:pointer;">\u21bb Genk\u00f8r</button></span>`;
+        html += `<span style="margin-left:8px;"><button onclick="markTaskDone('${pathStr}','pending')" title="_('rerun_task')" style="padding:1px 6px;font-size:10px;background:#f59e0b;border:none;border-radius:3px;color:white;cursor:pointer;">\u21bb Genk\u00f8r</button></span>`;
     }
     html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span>`;
     if (node.status === 'failed') {
         const phaseEnc = encodeURIComponent(node.name || '');
-        html += ` <button onclick="approveAutoResearch('${pathStr}','${phaseEnc}')" title="Start auto-research for denne fejl" style="margin-left:4px;padding:1px 5px;font-size:10px;background:var(--accent);border:none;border-radius:3px;color:white;cursor:pointer;">🔬 Auto</button>`;
+        html += ` <button onclick="approveAutoResearch('${pathStr}','${phaseEnc}')" title="_('auto_research')" style="margin-left:4px;padding:1px 5px;font-size:10px;background:var(--accent);border:none;border-radius:3px;color:white;cursor:pointer;">🔬 Auto</button>`;
     }
     html += `</div>${criteriaHtml}${phaseCheckHtml}`;
     if (node.children && node.children.length > 0) { 
