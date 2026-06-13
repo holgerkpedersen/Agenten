@@ -1962,7 +1962,7 @@
       "type": "stability",
       "category": "agent-tasks",
       "severity": "critical",
-      "status": "open",
+      "status": "resolved",
       "context": "LLM workflows may use only read/list tools and still declare done.",
       "action": "Track active_tools versus called_tools by phase and fail implementation when required edit/write categories are missing.",
       "symptoms": [
@@ -1976,7 +1976,9 @@
       "tags": [
         "tools",
         "llm"
-      ]
+      ],
+      "updated_at": "2026-06-13T11:13:07",
+      "resolution_note": "Implemented tracking of active_tools vs. called_tools by phase. The system now fails implementation if required edit/write tools are missing, preventing successful completion with only read/list tools. All regression tests pass."
     },
     {
       "id": "STAB-003",

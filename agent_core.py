@@ -600,32 +600,32 @@ class Agent:
     def _register_file_tools(self) -> None:
         self.tool_registry.register(Tool(
             "read_location",
-            "Læs KUN en bestemt funktion/metode/klasse vha. AST — IKKE hele filen. Angiv filepath='fil.py' og name='funktionsnavn' (eller name='Klasse.metode'). Returnerer funktionens fulde kode. Brug DENNE i stedet for read_chunk når du skal se specifik kode — meget mere effektivt end at læse hele filen.",
+            t(K.TOOL_READ_LOCATION, self.lang),
             ["filepath", "name"],
             lambda filepath, name=None, line_no=None: agent_files.read_location(filepath=filepath, name=name, line_no=line_no),
             optional_params=["line_no"]
         ))
         self.tool_registry.register(Tool(
             "read_chunk",
-            "Indlæs en chunk af en stor fil. Kræver: file_key (filnavn fra list_chunks), index (1..N). Brug 'list_chunks' først for at se tilgængelige filer og deres chunk-indekser. Brug kun read_chunk HVIS read_location ikke virker (f.eks. ikke-Python filer).",
+            t(K.TOOL_READ_CHUNK, self.lang),
             ["file_key", "index"],
             lambda file_key, index=1: self._read_chunk(file_key, int(index))
         ))
         self.tool_registry.register(Tool(
             "list_chunks",
-            "List alle tilgængelige filer (chunks) som kan læses med read_chunk. Brug DENNE først for at se hvad der er tilgængeligt.",
+            t(K.TOOL_LIST_CHUNKS, self.lang),
             [],
             lambda: self._list_chunks()
         ))
         self.tool_registry.register(Tool(
             "list_symbols",
-            "List ALLE top-level symboler (funktioner, klasser, variabler) i en Python-fil via AST. Returnerer navn, type, linjenummer og signatur for hvert symbol. Brug DENNE før locate/read_location når du ikke kender symbolnavnene i en fil. Kræver: filepath='fil.py'.",
+            t(K.TOOL_LIST_SYMBOLS, self.lang),
             ["filepath"],
             lambda filepath: agent_files.list_symbols(filepath=filepath)
         ))
         self.tool_registry.register(Tool(
             "locate",
-            "Find en PYTHON funktion/metode/klasse/variabel (def/class/assignment) i Python-filer. name er et PYTHON symbol-navn, IKKE et værktøjsnavn (tool). Brug name='funktionsnavn' for at søge på tværs af ALLE .py-filer. Brug name='Klassenavn.metode' for metoder. Brug filepath='fil.py' for at begrænse søgningen til én fil. Returnerer linjenummer, typen, funktionens fulde kode (body), og en 'also_in_file'-liste over ANDRE symboler i filen.",
+            t(K.TOOL_LOCATE, self.lang),
             ["name", "filepath"],
             lambda name=None, filepath=None, line_no=None: _resolve_t_keys_in_result(
                 agent_files.locate_code(filepath=filepath, name=name, line_no=line_no)),
@@ -633,16 +633,7 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
              "edit_file",
-             "Rediger en eksisterende fil.\n\n"
-              "WORKFLOW (BEDST):\n"
-              "1. Læs koden: locate(name='funktionsnavn') eller read_chunk(filepath, start, end)\n"
-              "2. Kopier old_text PRÆCIS fra læseresultatet (IKKE fra hukommelsen)\n"
-              "3. Angiv new_text med din ændring\n\n"
-              "STI til .py-filer (hurtig):\n"
-              "Angiv symbol='funktionsnavn' + requirements='hvad skal ændres'. "
-              "Systemet finder funktionen via AST, forbedrer den med LLM, og erstatter. "
-              "Ingen old_text/new_text nødvendig.\n\n"
-              "Import-regel: alle import-sætninger hører i toppen af filen, ALDRIG inde i funktioner/klasser.",
+             t(K.TOOL_EDIT_FILE, self.lang),
              ["path", "old_text", "new_text"],
              lambda path, old_text="", new_text="", symbol=None, requirements="", test_path="": git_ops.edit_file(
                  path=path, old_text=old_text, new_text=new_text,
@@ -653,29 +644,25 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "write_file",
-            "Opret en NY fil med indhold, eller overskriv en eksisterende med overwrite=true. Brug path='docs/fil.md' for at gemme i docs-mappen. Opretter mappen hvis den ikke findes. Syntestjekker .py filer. Brug overwrite=\"force\" for at tvinge overskrivning af eksisterende indhold.",
+            t(K.TOOL_WRITE_FILE, self.lang),
             ["path", "content"],
             lambda path, content, overwrite=False: git_ops.write_file(path=path, content=content, overwrite=overwrite)
         ))
         self.tool_registry.register(Tool(
             "list_files",
-            "List filer i en mappe. Kræver: path (mappesti, default '.'). Valgfri: pattern (filtype f.eks. '.py'). Valgfri: max_depth (max dybde, default 2). Returnerer filnavne og størrelser.",
+            t(K.TOOL_LIST_FILES, self.lang),
             ["path"],
             lambda path=".", pattern="", max_depth=2: git_ops.list_files(path=path, pattern=pattern or None, max_depth=_safe_int(max_depth, 2))
         ))
         self.tool_registry.register(Tool(
             "add_image",
-            "Tilføj et billede til konteksten. Kræver: path (sti til billedfil). Returnerer MIME-type og størrelse.",
+            t(K.TOOL_ADD_IMAGE, self.lang),
             ["path"],
             lambda path: self._add_image(path)
         ))
         self.tool_registry.register(Tool(
             "extract_symbol",
-            "Flyt en funktion/klasse/variabel fra én .py-fil til en NY .py-fil. "
-            "Systemet finder symbolet via AST, kopierer det (med imports) til target-filen, "
-            "fjerner det fra source-filen, og tilføjer en import i source der peger på target-modulet. "
-            "Kræver: source (kildefil), symbol_name (f.eks. 'UserHandler'), target (målfil, f.eks. 'routes.py'). "
-            "Dette er DETERMINISTISK — bruger IKKE LLM'en. Returnerer detaljer om hvad der blev flyttet.",
+            t(K.TOOL_EXTRACT_SYMBOL, self.lang),
             ["source", "symbol_name", "target"],
             lambda source, symbol_name, target: self.refactoring_engine.move_symbol(
                 source=source, symbol_name=symbol_name, target=target
@@ -683,10 +670,7 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "remove_symbol",
-            "Fjern en funktion/klasse/variabel fra en .py-fil via AST (deterministisk). "
-            "Bruges af Opdatér-fasen til at fjerne kode der allerede er flyttet til et modul. "
-            "Kræver: source (filsti), symbol_name (f.eks. 'UserHandler'). "
-            "Returnerer symbol, linjer fjernet, og resterende symboler i filen.",
+            t(K.TOOL_REMOVE_SYMBOL, self.lang),
             ["source", "symbol_name"],
             lambda source, symbol_name: self.refactoring_engine.remove_symbol(
                 source=source, symbol_name=symbol_name
@@ -694,10 +678,7 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "add_import",
-            "Tilføj 'from module import symbol' til en .py-fil (deterministisk). "
-            "Bruges af Opdatér-fasen når en symbol er flyttet til et modul — tilføj importen i den originale fil. "
-            "Kræver: source (filsti), module (modulnavn uden .py), symbol (symbolnavn). "
-            "Kræver IKKE at symbolet findes — systemet tilføjer blot import-linjen hvis den ikke allerede findes.",
+            t(K.TOOL_ADD_IMPORT, self.lang),
             ["source", "module", "symbol"],
             lambda source, module, symbol: self.refactoring_engine.add_import(
                 source=source, module=module, symbol=symbol
@@ -705,30 +686,20 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "verify_refactor",
-            "Verificér at en .py-fil er syntaktisk gyldig efter refactoring. "
-            "Kræver: source (filsti). Returnerer success, antal linjer og symboler. "
-            "Bruges efter extract_symbol/remove_symbol/add_import for at bekræfte at filen ikke er korrupt.",
+            t(K.TOOL_VERIFY_REFACTOR, self.lang),
             ["source"],
             lambda source: self.refactoring_engine.verify_refactor(source=source)
         ))
         self.tool_registry.register(Tool(
             "analyze_dependencies",
-            "Analysér ALLE top-level-symboler i en .py-fil og kortlæg afhængigheder mellem dem. "
-            "For hvert symbol vises: (1) hvilke andre symboler i samme fil det afhænger af, "
-            "(2) hvilke imports det bruger, (3) hvilke decorators det har. "
-            "Giver et komplet afhængighedsgraf over filen — BRUG DET FØRST for at planlægge modulopdeling. "
-            "Kræver: source (filsti).",
+            t(K.TOOL_ANALYZE_DEPENDENCIES, self.lang),
             ["source"],
             lambda source: self.refactoring_engine.analyze_dependencies(source=source)
         ))
         self.tool_registry.register(Tool(
             "suggest_module_groups",
-            "Foreslå modulopdeling baseret på afhængighedsgrafen. "
-            "Bruger Tarjan's SCC-algoritme til at finde symboler der SKAL være sammen (cirkulære afhængigheder). "
-            "Returnerer grupper af symboler sorteret efter linjenummer, med markering af SCC-grupper. "
-            "Kræver: source (filsti), max_group_size (valgfri, default 5). "
-            "BRUG EFTER analyze_dependencies når du skal beslutte modulgrænser.",
-            ["source"],
+            t(K.TOOL_SUGGEST_MODULE_GROUPS, self.lang),
+["source"],
             lambda source, max_group_size=5: self.refactoring_engine.suggest_module_groups(
                 source=source, max_group_size=max_group_size
             )
@@ -737,31 +708,31 @@ class Agent:
     def _register_agent_tools(self) -> None:
         self.tool_registry.register(Tool(
             "run_tests",
-            "Kør pytest og returner resultat. Args: test_path (valgfri). Eksempel: run_tests(test_path='tests/test_tools.py::TestToolExecution')",
+            t(K.TOOL_RUN_TESTS, self.lang),
             ["test_path"],
             lambda test_path="": agent_issues.run_pytest(test_path)
         ))
         self.tool_registry.register(Tool(
             "run_refinement",
-            "Kør iterativ doc-refinement: læs docs/*.md, identificer mangler, lad LLM svare, gem dialog i docs/uddybning_dialog.md. Args: workdir (absolut sti til projekt med docs/), rounds (max antal iterationer, default 7), model (valgfri - default auto-select stærkeste loaded).",
+            t(K.TOOL_RUN_REFINEMENT, self.lang),
             ["workdir"],
             lambda workdir, rounds=7, model="": _run_doc_refinement(workdir, rounds, model)
         ))
         self.tool_registry.register(Tool(
             "read_issue",
-            "L\u00e6s et issue fra docs/issues/observed/issues.json. Args: issue_id (f.eks. 'BUG-003'), include_hints (valgfri boolean, default false \u2014 s\u00e6t til true for at se proposed_fix).",
+            t(K.TOOL_READ_ISSUE, self.lang),
             ["issue_id"],
             lambda issue_id, include_hints=False: agent_issues.read_issue(issue_id, include_hints)
         ))
         self.tool_registry.register(Tool(
             "update_issue_status",
-            "Opdater status på et issue i docs/issues/observed/issues.json. Args: issue_id, status ('open'/'in_progress'/'resolved'), resolution_note (valgfri).",
+            t(K.TOOL_UPDATE_ISSUE_STATUS, self.lang),
             ["issue_id", "status"],
             lambda issue_id, status="resolved", resolution_note="": agent_issues.update_issue_status(self, issue_id, status, resolution_note)
         ))
         self.tool_registry.register(Tool(
             "create_refactor_issue",
-            "Opret et REFAC-issue i issues.json for en fil der er for stor. Kræver: filepath (filsti), line_count (antal linjer). Valgfri: related_issues (liste af issue-IDs).",
+            t(K.TOOL_CREATE_REFACTOR_ISSUE, self.lang),
             ["filepath", "line_count"],
             lambda filepath, line_count, related_issues="": agent_issues.create_refactor_issue(self, filepath, int(line_count), (related_issues.split(",") if isinstance(related_issues, str) else related_issues) if related_issues else None)
         ))
@@ -774,14 +745,14 @@ class Agent:
         ))
         self.tool_registry.register(Tool(
             "create_issue",
-            "Opret et nyt issue i issues.json. ÉT issue = ÉN specifik fejl (ikke flere endpoints samlet). Kræver: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location (format: filnavn:funktionsnavn), impact, proposed_fix. acceptance_criteria: beskriv præcist hvordan fixet verificeres (f.eks. 'Endpoint returnerer 403 ved ../ i stien').",
+            t(K.TOOL_CREATE_ISSUE, self.lang),
             ["title", "type", "severity", "description", "location", "impact", "proposed_fix", "acceptance_criteria"],
             lambda title, type="bug", severity="medium", description="", location="", impact="", proposed_fix="", acceptance_criteria="": agent_issues.create_issue(self, title=title, type=type, severity=severity, description=description, location=location, impact=impact, proposed_fix=proposed_fix, acceptance_criteria=acceptance_criteria)
         ))
         self.tool_registry.register(Tool(
             "analyze_own_logs",
-            "Analyser Agentens egne session-logs for fejlm\u00f8nstre og eksekveringshistorik. Args: session_id (UUID, valgfri \u2014 specifik session), pattern (s\u00f8gestreng eller regex, valgfri), max_sessions (antal seneste sessioner, default 5). Uden session_id: oversigt over seneste sessioner. Med session_id: detaljeret analyse + error patterns.",
-            ["session_id", "pattern", "max_sessions"],
+            t(K.TOOL_ANALYZE_OWN_LOGS, self.lang),
+["session_id", "pattern", "max_sessions"],
             lambda session_id="", pattern="", max_sessions="5": agent_logs.analyze_own_logs(session_id=session_id, pattern=pattern, max_sessions=int(max_sessions) if max_sessions else 5)
         ))
 
