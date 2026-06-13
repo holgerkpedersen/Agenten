@@ -557,7 +557,8 @@
         "rerun_label": "Re-ejecutar",
         "show_detail": "mostrar detalle",
         "hide_detail": "ocultar detalle",
-        "reuse": "Reutilizar"
+        "reuse": "Reutilizar",
+        "connecting": "Conectando al flujo..."
     },
     "criteria.decompose": "Especifica los criterios de éxito entre paréntesis después de cada nombre de tarea, ej.: Tarea (criterio1, criterio2)",
     "criteria.header": "Criterios de Éxito",

@@ -557,7 +557,8 @@
         "rerun_label": "Genkør",
         "show_detail": "vis detalje",
         "hide_detail": "skjul detalje",
-        "reuse": "Genbrug"
+        "reuse": "Genbrug",
+        "connecting": "Forbinder til streaming..."
     },
     "criteria.decompose": "Angiv succeskriterier i parentes efter hvert opgavenavn, f.eks.: Opgave (kriterie1, kriterie2)",
     "criteria.header": "Success-kriterier",

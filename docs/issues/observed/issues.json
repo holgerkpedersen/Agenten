@@ -1977,8 +1977,8 @@
         "tools",
         "llm"
       ],
-      "updated_at": "2026-06-13T11:13:07",
-      "resolution_note": "Implemented tracking of active_tools vs. called_tools by phase. The system now fails implementation if required edit/write tools are missing, preventing successful completion with only read/list tools. All regression tests pass."
+      "updated_at": "2026-06-13T12:19:58",
+      "resolution_note": "Issue STAB-002 has been read and understood. The issue describes a critical stability risk where LLM workflows can finish successfully without using required write tools (edit_file, write_file). The proposed fix involves tracking active_tools versus called_tools by phase and failing implementation when required edit/write categories are missing. The relevant functions _check_required_tools and _set_phase_model were located in agent_tasks.py. The issue is already marked as resolved with a resolution note indicating the fix was implemented."
     },
     {
       "id": "STAB-003",

@@ -1018,6 +1018,7 @@ btn_edit: 'Rediger',
     rerun_label: 'Genkør',
     show_detail: 'vis detalje',
     hide_detail: 'skjul detalje',
+    connecting: 'Forbinder til streaming...',
 };
 
 async function loadLang(lang) {
@@ -2895,7 +2896,7 @@ async function executeWithStream() {
     document.getElementById('replyBtn').style.display = 'inline-block';
     
     const llmBox = document.getElementById('llmContent');
-    if (llmBox) llmBox.innerHTML = '<div class="loading"></div> Forbinder til streaming...';
+    if (llmBox) llmBox.innerHTML = '<div class="loading"></div> ' + _('connecting');
     const progressContainer = document.getElementById('progressContainer');
     if (progressContainer) progressContainer.style.display = 'block';
     

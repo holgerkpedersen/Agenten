@@ -557,7 +557,8 @@
         "rerun_label": "重新运行",
         "show_detail": "显示详情",
         "hide_detail": "隐藏详情",
-        "reuse": "重用"
+        "reuse": "重用",
+        "connecting": "正在连接流..."
     },
     "criteria.decompose": "在每个任务名称后的括号内指定成功标准，例如：任务 (标准1, 标准2)",
     "criteria.header": "成功标准",
