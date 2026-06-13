@@ -2067,7 +2067,7 @@ function createPanels() {
                     <button onclick="removePanel('${def.id}')" title="${_('remove_panel')}">×</button>
                 </div>
             </div>
-            <div class="panel-content" id="${def.id}Content">
+            <div class="panel-content" id="${def.id}Panel">
                 <div style="color: #64748b;">${_('panel_placeholder').replace('{panel}', def.title)}</div>
             </div>
             <div class="resize-handle"></div>
@@ -2076,7 +2076,7 @@ function createPanels() {
         container.appendChild(panel);
         panels[def.id] = panel;
         
-        const contentDiv = document.getElementById(`${def.id}Content`);
+        const contentDiv = document.getElementById(`${def.id}Panel`);
         if (def.id === 'tree') {
             contentDiv.innerHTML = '<div id="treeContainer" class="tree-container"><div style="color: #64748b;"></div></div>';
         } else if (def.id === 'llm') {
