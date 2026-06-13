@@ -1272,6 +1272,7 @@ async function loadTemplates() {
         }
         if (!sel.value) sel.value = 'fri';
         onTemplateChange(sel.value);
+        updateHtmlLabels();
     } catch(e) {
         console.warn('Kunne ikke hente skabeloner:', e);
     }
