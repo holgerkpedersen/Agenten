@@ -554,7 +554,7 @@ def _build_chunk_hint(agent: Any) -> str:
             total = len(agent.file_chunks[key])
             display = key.replace("file_", "", 1)
             parts.append(f"\n  {display} ({total} chunk{'s' if total > 1 else ''})")
-        base_dir = os.path.abspath('.')
+        base_dir = os.environ.get("AGENT_WORKDIR", "") or os.path.abspath('.')
         hint = f"\n\n## TILG\u00c6NGELIGE FILER (projektmappe: {base_dir})"
         hint += "".join(parts)
         hint += "\n\n  Brug list_symbols(filepath='fil.py') for at se ALLE symboler (funktioner, klasser, variabler) i en Python-fil — g\u00f8r det F\u00d8R locate/read_location n\u00e5r du ikke kender symbolnavnene."
