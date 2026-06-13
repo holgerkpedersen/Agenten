@@ -2431,6 +2431,8 @@ async function reuseCurrentSession() {
         if (treeContainer) treeContainer.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
         const llmContent = document.getElementById('llmContent');
         if (llmContent) llmContent.innerHTML = '';
+        const logContent = document.getElementById('logContent');
+        if (logContent) logContent.innerHTML = '';
         addLogEntry('INFO', 'Session genbrugt', `prompt: ${(s.original_prompt || '').slice(0, 60)}...`);
         const toast = document.createElement('div');
         toast.textContent = '✅ Prompt og skabelon genbrugt — klik "Nedbryd" for at fortsætte';
