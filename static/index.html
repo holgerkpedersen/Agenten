@@ -2394,20 +2394,20 @@ async function createNewSession() {
 
 async function reuseCurrentSession() {
     if (!currentSessionId) {
-        addLogEntry('ERROR', 'Ingen session at genbruge', 'Vælg eller opret en session f\u00f8rst');
+        addLogEntry('ERROR', _('reuse_no_session'), _('select_session_first'));
         return;
     }
     try {
-        addLogEntry('INFO', 'Genbruger session', `Henter ${currentSessionId.slice(0, 12)}...`);
+        addLogEntry('INFO', _('reuse_fetching').replace('{id}', currentSessionId.slice(0, 12)));
         const resp = await fetch(`/api/sessions/load/${currentSessionId}`);
         if (!resp.ok) {
             const errBody = await resp.text().catch(() => '');
-            addLogEntry('ERROR', `HTTP ${resp.status} ved genbrug`, errBody.slice(0, 200));
+            addLogEntry('ERROR', _('reuse_http_error').replace('{status}', resp.status), errBody.slice(0, 200));
             return;
         }
         const data = await resp.json();
         if (!data.success || !data.session) {
-            addLogEntry('ERROR', 'Kunne ikke indl\u00e6se session', '');
+            addLogEntry('ERROR', _('reuse_load_failed'), '');
             return;
         }
         const s = data.session;
@@ -2426,6 +2426,16 @@ async function reuseCurrentSession() {
             document.getElementById('templateSelect').value = s.template;
             onTemplateChange(s.template);
         }
+        if (s.ui_lang) {
+            currentLang = s.ui_lang;
+            localStorage.setItem('agenten_lang', s.ui_lang);
+            await loadLang(s.ui_lang);
+        }
+        if (s.lang) {
+            currentLLMLang = s.lang;
+            localStorage.setItem('agenten_llm_lang', s.lang);
+            document.getElementById('llmLangSelect').value = s.lang;
+        }
         currentTree = null;
         const treeContainer = document.getElementById('treeContainer');
         if (treeContainer) treeContainer.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
@@ -2433,14 +2443,14 @@ async function reuseCurrentSession() {
         if (llmContent) llmContent.innerHTML = '';
         const logContent = document.getElementById('logContent');
         if (logContent) logContent.innerHTML = '';
-        addLogEntry('INFO', 'Session genbrugt', `prompt: ${(s.original_prompt || '').slice(0, 60)}...`);
+        addLogEntry('INFO', _('reuse_done'), `prompt: ${(s.original_prompt || '').slice(0, 60)}...`);
         const toast = document.createElement('div');
-        toast.textContent = '✅ Prompt og skabelon genbrugt — klik "Nedbryd" for at fortsætte';
+        toast.textContent = _('reuse_toast');
         toast.style.cssText = 'position:fixed;bottom:20px;right:20px;background:var(--accent,#4CAF50);color:#fff;padding:12px 20px;border-radius:8px;z-index:9999;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity .5s';
         document.body.appendChild(toast);
         setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
     } catch(e) {
-        addLogEntry('ERROR', 'Fejl ved genbrug', String(e));
+        addLogEntry('ERROR', _('reuse_error'), String(e));
     }
 }
 

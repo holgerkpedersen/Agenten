@@ -510,6 +510,7 @@ def load_session(session_id: str) -> Any:
         from agent_files import auto_detect_workdir
         auto_detect_workdir(session_data.get("file_chunks"), session_data.get("original_prompt", ""))
         # Re-validate prompt against current code — append fresh VALIDERING entry
+        agent.lang = session_data.get("lang", agent.lang)
         prompt_text = session_data.get("original_prompt", "") or ""
         if prompt_text:
             from agent_core import _validate_prompt_against_code
