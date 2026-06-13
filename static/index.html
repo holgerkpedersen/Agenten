@@ -689,8 +689,8 @@
         <div class="toolbar-row" id="issueRow" style="display:none;">
             <span class="toolbar-label" id="issuesLabel">🐛 Issues</span>
             <select id="issueSelect" class="toolbar-select" style="flex:1;" onchange="onIssueSelected(this.value)"></select>
-            <button onclick="loadIssue()" id="loadIssueBtn" style="background:var(--btn-secondary);font-size:12px;padding:4px 8px;">📋 Indlæs</button>
-            <button onclick="toggleIssueRow()" style="background:var(--danger);font-size:12px;padding:4px 8px;">✕</button>
+            <button onclick="loadIssue()" id="loadIssueBtn" data-i18n-title="load_issue" style="background:var(--btn-secondary);font-size:12px;padding:4px 8px;">📋 Indlæs</button>
+            <button onclick="toggleIssueRow()" style="background:var(--danger);font-size:12px;padding:4px 8px;" data-i18n-title="close_issue_row">✕</button>
         </div>
         <div class="toolbar-row">
             <span class="toolbar-label" id="llmLangLabel">🤖 LLM Sprog</span>
@@ -712,19 +712,19 @@
             <textarea id="promptInput" rows="2" placeholder="Indtast en opgave f.eks.:&#10;Hvordan ved jeg at 2 + 2 er 4?" style="flex:1;"></textarea>
             <input type="file" id="imagePicker" style="display:none" accept="image/*" onchange="onImagePicked(event)">
             <button onclick="document.getElementById('imagePicker').click()" id="imageBtn" style="background:var(--btn-secondary);" data-i18n-title="add_image">🖼</button>
-            <button onclick="decompose()" id="decomposeBtn">🌳 Nedbryd</button>
-            <button onclick="executeWithStream()" id="executeBtn" style="background:#10b981;">⚡ Udfør</button>
+            <button onclick="decompose()" id="decomposeBtn" data-i18n-title="decompose_btn">🌳 Nedbryd</button>
+            <button onclick="executeWithStream()" id="executeBtn" data-i18n-title="execute_btn" style="background:#10b981;">⚡ Udfør</button>
             <input type="text" id="replyInput" placeholder="Svar til LLM..." style="display:none;width:120px;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')sendReply()">
-            <button onclick="sendReply()" id="replyBtn" style="display:none;background:var(--accent);color:white;">✉</button>
-            <button onclick="stopStream()" id="stopBtn" style="background:#ef4444;">⏹ Stop</button>
-            <button onclick="undoBackup()" id="undoBtn" style="display:none;background:#f59e0b;color:white;">↶ Fortryd</button>
+            <button onclick="sendReply()" id="replyBtn" data-i18n-title="reply_btn" style="display:none;background:var(--accent);color:white;">✉</button>
+            <button onclick="stopStream()" id="stopBtn" data-i18n-title="stop_exec" style="background:#ef4444;">⏹ Stop</button>
+            <button onclick="undoBackup()" id="undoBtn" data-i18n-title="undo_btn" style="display:none;background:#f59e0b;color:white;">↶ Fortryd</button>
         </div>
         <div id="imagePreview" style="display:none; gap:4px; flex-wrap:wrap; margin:2px 0;"></div>
         <div style="display:flex;align-items:center;gap:8px;margin:2px 0;">
             <input type="text" id="filePathInput" placeholder="Vælg fil(er)" style="flex:1;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);font-size:12px;" readonly>
             <input type="file" id="filePicker" style="display:none" multiple onchange="onFilePicked(event)">
-            <button onclick="document.getElementById('filePicker').click()" id="browseBtn" style="background:var(--btn-secondary);font-size:12px;padding:4px 8px;">📂</button>
-            <button onclick="readFiles()" id="readFileBtn" style="background:var(--purple-accent);font-size:12px;padding:4px 8px;">📖</button>
+            <button onclick="document.getElementById('filePicker').click()" id="browseBtn" data-i18n-title="browse_files" style="background:var(--btn-secondary);font-size:12px;padding:4px 8px;">📂</button>
+            <button onclick="readFiles()" id="readFileBtn" data-i18n-title="read_selected" style="background:var(--purple-accent);font-size:12px;padding:4px 8px;">📖</button>
             <span id="fileSectionToggle" style="cursor:pointer;color:var(--accent);font-size:11px;white-space:nowrap;" onclick="toggleFileSection()">▶ Vis filer</span>
         </div>
         <div id="fileSection" style="display:none;">
@@ -743,9 +743,9 @@
         <div class="issues-header">
             <h2 id="issuesModalTitle">${_('issues_title')}</h2>
             <div style="display:flex;gap:8px;align-items:center;">
-                <button id="arToggleBtn" onclick="toggleAutoResearch()" style="background:var(--btn-secondary);border:1px solid var(--border);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;color:var(--text-muted);">🔬</button>
-                <button id="niToggleBtn" onclick="showNewIssueForm()" style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;">➕ Nyt issue</button>
-                <button class="issues-close" onclick="closeIssuesPanel()">✕</button>
+                <button id="arToggleBtn" data-i18n-title="ar_toggle" onclick="toggleAutoResearch()" style="background:var(--btn-secondary);border:1px solid var(--border);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;color:var(--text-muted);">🔬</button>
+                <button id="niToggleBtn" data-i18n-title="new_issue_btn" onclick="showNewIssueForm()" style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;">➕ Nyt issue</button>
+                <button class="issues-close" onclick="closeIssuesPanel()" data-i18n-title="close_modal">✕</button>
             </div>
         </div>
         <div id="newIssueForm" style="display:none;padding:12px 16px;border-bottom:1px solid var(--border);">
@@ -773,8 +773,8 @@
                 <textarea id="ni_acceptance" placeholder="Acceptance criteria" rows="2" style="grid-column:1/3;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--input-bg);color:var(--text);resize:vertical;font-family:inherit;font-size:13px;"></textarea>
             </div>
             <div style="margin-top:8px;display:flex;gap:8px;">
-                <button id="niSaveBtn" onclick="createNewIssue()" style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;">💾 Gem issue</button>
-                <button id="niCancelBtn" onclick="cancelNewIssue()" style="background:var(--btn-secondary);border:1px solid var(--border);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text);">Annuller</button>
+                <button id="niSaveBtn" data-i18n-title="save_issue_btn" onclick="createNewIssue()" style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;">💾 Gem issue</button>
+                <button id="niCancelBtn" data-i18n-title="cancel_btn" onclick="cancelNewIssue()" style="background:var(--btn-secondary);border:1px solid var(--border);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text);">Annuller</button>
                 <span id="ni_status" style="font-size:12px;color:var(--text-muted);align-self:center;"></span>
             </div>
         </div>
@@ -1782,7 +1782,7 @@ async function renderImagePreview() {
                 <div style="font-size:10px;color:var(--text-muted);text-align:center;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${img.filename || ''}</div>
             </div>`
         ).join('');
-        el.innerHTML += `<button onclick="clearImages()" style="background:var(--btn-secondary);font-size:11px;padding:4px 10px;border-radius:6px;align-self:center;">Ryd alle</button>`;
+        el.innerHTML += `<button onclick="clearImages()" style="background:var(--btn-secondary);font-size:11px;padding:4px 10px;border-radius:6px;align-self:center;" title="${_('clear_images')}">Ryd alle</button>`;
     } catch (e) {}
 }
 
@@ -2047,9 +2047,9 @@ function createPanels() {
                     <h3>${def.title}</h3>
                 </div>
                 <div class="panel-controls">
-                    <button onclick="toggleMinimize('${def.id}')">−</button>
-                    <button onclick="toggleMaximize('${def.id}')">□</button>
-                    <button onclick="removePanel('${def.id}')">×</button>
+                    <button onclick="toggleMinimize('${def.id}')" title="${_('minimize_panel')}">−</button>
+                    <button onclick="toggleMaximize('${def.id}')" title="${_('maximize_panel')}">□</button>
+                    <button onclick="removePanel('${def.id}')" title="${_('remove_panel')}">×</button>
                 </div>
             </div>
             <div class="panel-content" id="${def.id}Content">
@@ -3229,8 +3229,8 @@ async function previewMarkdown() {
             <div style="background:var(--panel-header);padding:15px 20px;display:flex;justify-content:space-between;align-items:center;border-radius:16px 16px 0 0;">
                 <h2 style="margin:0;color:var(--text);">📊 ${_('preview_title')}</h2>
                 <div style="display:flex;gap:10px;">
-                    <button onclick="downloadFromPreview()" style="background:#10b981;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;">💾 Download MD</button>
-                    <button onclick="closePreview()" style="background:#ef4444;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;">✕ Luk</button>
+                    <button onclick="downloadFromPreview()" style="background:#10b981;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;" title="${_('download_md')}">💾 Download MD</button>
+                    <button onclick="closePreview()" style="background:#ef4444;border:none;padding:8px 16px;border-radius:8px;color:white;cursor:pointer;" title="${_('close_preview')}">✕ Luk</button>
                 </div>
             </div>
             <div id="previewContent" style="flex:1;overflow:auto;padding:20px 30px;color:var(--text);background:var(--bg);" class="rendered-markdown">
@@ -3375,7 +3375,7 @@ function renderIssuesTable() {
                     ${eresolution ? `<div style="margin-top:4px;color:var(--success);"><strong>${_('issues_resolution')}</strong> ${eresolution}</div>` : ''}
                     ${ecreated ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted);"><strong>${_('issues_created_at')}</strong> ${ecreated}</div>` : ''}
                     ${eupdated ? `<div style="margin-top:4px;font-size:10px;color:var(--text-muted);"><strong>${_('issues_updated_at')}</strong> ${eupdated}</div>` : ''}
-                    <button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="margin-top:8px;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
+                    <button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="margin-top:8px;background:var(--accent);color:white;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px;" title="${_('use_as_task')}">
                         ${_('issues_use_as_task')}
                     </button>
                 </div>
@@ -3384,7 +3384,7 @@ function renderIssuesTable() {
             <td>${escapeHtml(issue.category || issue.type || '')}</td>
             <td><span class="${statusClass}">${estatus}</span></td>
             <td><span class="${sevClass}">${eseverity}</span></td>
-            <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;">${_('issues_run')}</button></td>
+            <td><button onclick="event.stopPropagation();useIssueAsTask('${issueEnc}')" style="background:var(--accent);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap;" title="${_('use_as_task')}">${_('issues_run')}</button></td>
             <td><button onclick="event.stopPropagation();deleteIssue('${eid}')" style="background:var(--danger);color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;" title="${_('issues_delete_title')}">${_('issues_delete')}</button></td>
         </tr>`;
     }
