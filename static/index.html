@@ -1016,8 +1016,8 @@ btn_edit: 'Rediger',
     keep_label: 'Bevar',
     skip_label: 'Spring',
     rerun_label: 'Genkør',
-    show_detail: 'vis detail',
-    hide_detail: 'skjul detail',
+    show_detail: 'vis detalje',
+    hide_detail: 'skjul detalje',
 };
 
 async function loadLang(lang) {
@@ -1093,6 +1093,16 @@ function updateAllUIText() {
     updatePanelTitles();
     updateHtmlLabels();
     updatePanelPlaceholders();
+    updateLogDetailToggles();
+}
+
+function updateLogDetailToggles() {
+    document.querySelectorAll('.log-detail-toggle').forEach(function(el) {
+        var pre = el.nextElementSibling;
+        if (pre && pre.classList.contains('log-detail-content')) {
+            el.textContent = '[' + (pre.classList.contains('open') ? _('hide_detail') : _('show_detail')) + ']';
+        }
+    });
 }
 
 function updatePanelPlaceholders() {

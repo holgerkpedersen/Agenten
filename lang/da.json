@@ -533,8 +533,8 @@
         "keep_label": "Bevar",
         "skip_label": "Spring",
         "rerun_label": "Genkør",
-        "show_detail": "vis detail",
-        "hide_detail": "skjul detail",
+        "show_detail": "vis detalje",
+        "hide_detail": "skjul detalje",
         "reuse": "Genbrug"
     },
     "criteria.decompose": "Angiv succeskriterier i parentes efter hvert opgavenavn, f.eks.: Opgave (kriterie1, kriterie2)",
