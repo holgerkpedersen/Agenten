@@ -203,7 +203,8 @@
         "create_refactor_issue": "Opret et REFAC-issue i issues.json for en fil der er for stor. Kræver: filepath (filsti), line_count (antal linjer). Valgfri: related_issues (liste af issue-IDs).",
         "create_issue": "Opret et nyt issue i issues.json. ÉT issue = ÉN specifik fejl (ikke flere endpoints samlet). Kræver: title, type (bug/security/architecture/testing/performance/maintainability), severity (low/medium/high/critical), description, location (format: filnavn:funktionsnavn), impact, proposed_fix. acceptance_criteria: beskriv præcist hvordan fixet verificeres (f.eks. 'Endpoint returnerer 403 ved ../ i stien').",
         "analyze_own_logs": "Analyser Agentens egne session-logs for fejlmønstre og eksekveringshistorik. Args: session_id (UUID, valgfri — specifik session), pattern (søgestreng eller regex, valgfri), max_sessions (antal seneste sessioner, default 5). Uden session_id: oversigt over seneste sessioner. Med session_id: detaljeret analyse + error patterns.",
-        "convert_pdf_html5": "Konverter en PDF-fil til HTML5. Args: pdf_path (stien til PDF-filen), output_path (valgfri — sti til output HTML-fil, default: samme navn med .html)."
+        "convert_pdf_html5": "Konverter en PDF-fil til HTML5. Args: pdf_path (stien til PDF-filen), output_path (valgfri — sti til output HTML-fil, default: samme navn med .html).",
+        "search_web": "Søg på internettet via DuckDuckGo. Args: query (søgestreng), num_results (valgfri — antal resultater, default 3)."
     },
     "tool_system_prompt": "Du har adgang til værktøjer. Kald dem sådan:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nNår færdig, svar sådan:\n{DONE_MARKER}{{\"result\":\"DIN DETALJEREDE KONKLUSION — IKKE bare done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Opgave\n{task}",
     "tool_continuation": "Tilgængelige: {tools_list}. Brug {TOOL_MARKER} eller afslut {DONE_MARKER}.",

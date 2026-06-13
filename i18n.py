@@ -114,6 +114,7 @@ class K(StrEnum):
     TOOL_CREATE_REFACTOR_ISSUE          = "tools.create_refactor_issue"
     TOOL_CREATE_ISSUE                   = "tools.create_issue"
     TOOL_CONVERT_PDF                    = "tools.convert_pdf_html5"
+    TOOL_SEARCH_WEB                     = "tools.search_web"
     TOOL_ANALYZE_OWN_LOGS               = "tools.analyze_own_logs"
 
     SYS_AVAILABLE_FILES                 = "system.available_files"

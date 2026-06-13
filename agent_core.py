@@ -734,6 +734,12 @@ class Agent:
             lambda pdf_path, output_path="", lang=self.lang: agent_pdf.convert_pdf_to_html5(pdf_path, output_path or None, lang)
         ))
         self.tool_registry.register(Tool(
+            "search_web",
+            t(K.TOOL_SEARCH_WEB, self.lang),
+            ["query"],
+            lambda query, num_results=3: self.searcher.search(query, int(num_results))
+        ))
+        self.tool_registry.register(Tool(
             "read_issue",
             t(K.TOOL_READ_ISSUE, self.lang),
             ["issue_id"],

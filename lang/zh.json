@@ -203,7 +203,8 @@
         "create_refactor_issue": "在issues.json中为过大的文件创建REFAC问题。需要：filepath（文件路径），line_count（行数）。可选：related_issues（问题ID列表）。",
         "create_issue": "在issues.json中创建新问题。一个问题 = 一个具体错误（不是多个端点合并）。需要：title，type，severity，description，location（格式：filename:function_name），impact，proposed_fix。acceptance_criteria：精确描述如何验证修复。",
         "analyze_own_logs": "分析Agent自身的会话日志以查找错误模式和执行历史。参数：session_id（UUID，可选），pattern（搜索字符串或正则，可选），max_sessions（最近会话数，默认5）。无session_id：最近会话概览。有session_id：详细分析+错误模式。",
-        "convert_pdf_html5": "将PDF文件转换为HTML5。参数：pdf_path（PDF文件路径），output_path（可选 — 输出HTML文件路径，默认为同名.html文件）。"
+        "convert_pdf_html5": "将PDF文件转换为HTML5。参数：pdf_path（PDF文件路径），output_path（可选 — 输出HTML文件路径，默认为同名.html文件）。",
+        "search_web": "通过DuckDuckGo搜索网络。参数：query（搜索字符串），num_results（可选 — 结果数量，默认3）。"
     },
     "tool_system_prompt": "你可以使用工具。像这样调用它们：\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\n完成后，像这样回复：\n{DONE_MARKER}{{\"result\":\"你的详细结论 — 不仅仅是done\"}}{END_MARKER}\n\n{tools_desc}\n\n## 任务\n{task}",
     "tool_continuation": "可用：{tools_list}。使用 {TOOL_MARKER} 或用 {DONE_MARKER} 完成。",
