@@ -509,6 +509,17 @@ def load_session(session_id: str) -> Any:
             agent.images = _normalize_images(session_data.get("images", []))
         from agent_files import auto_detect_workdir
         auto_detect_workdir(session_data.get("file_chunks"), session_data.get("original_prompt", ""))
+        # Re-validate prompt against current code — append fresh VALIDERING entry
+        prompt_text = session_data.get("original_prompt", "") or ""
+        if prompt_text:
+            from agent_core import _validate_prompt_against_code
+            note = _validate_prompt_against_code(agent, prompt_text)
+            fresh_logs = list(agent.agent_log)  # _validate_prompt_against_code appends to agent
+            agent.agent_log = []
+            existing_timestamps = {e.get("timestamp") for e in (session_data.get("agent_log") or [])}
+            session_data["agent_log"] = (session_data.get("agent_log") or []) + [
+                e for e in fresh_logs if e.get("timestamp") not in existing_timestamps
+            ]
         return jsonify({"success": True, "session": session_data})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
