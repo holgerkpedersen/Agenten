@@ -2350,6 +2350,7 @@ async function refreshSessions() {
             select.innerHTML = '';
             const ph = document.createElement('option');
             ph.value = '';
+            ph.id = 'selectSessionOpt';
             ph.textContent = _('select_session') || '-- Select or create new --';
             select.appendChild(ph);
             if (data.sessions && data.sessions.length > 0) {
