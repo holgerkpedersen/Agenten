@@ -642,5 +642,27 @@
     "tools_save_layout": "Guardar diseño",
     "tools_reset_layout": "Restablecer diseño",
     "tools_github_token": "Token GitHub",
-    "issues_title": "Issues"
+    "issues_title": "Issues",
+    "system": {
+        "available_files": "\n\n## ARCHIVOS DISPONIBLES (proyecto: {dir})",
+        "delegations_header": "\n\n## DELEGACIONES\nAlgunas funciones en los archivos cargados son stubs que solo reenvían a otro archivo.",
+        "same_tool_loop": "[SYSTEM: Has llamado a '{tool}' {count} veces seguidas.{tip} Usa <<<DONE>>> o cambia de herramienta.]",
+        "dup_result": "Ya tienes este resultado. Continúa o usa <<<DONE>>>.",
+        "dedup_loop": "[SYSTEM: Estás en un bucle con resultados idénticos. DEJA de leer. USA una herramienta que ESCRIBA: {tools}. Explica POR QUÉ no puedes escribir — ¿qué te falta?]",
+        "read_loop": "[SYSTEM: Has hecho {count} llamadas de lectura seguidas sin escribir nada. DEJA de leer. USA una herramienta que ESCRIBA: {tools}. Explica POR QUÉ sigues leyendo — ¿qué te falta?]",
+        "read_blocked": "[SYSTEM: Lecturas bloqueadas. Usa {tools}.]",
+        "issue_resolved": "BLOQUEADO — el issue ya está marcado como resuelto. NO edites archivos. Usa <<<DONE>>> para finalizar, o reabre el issue con update_issue_status('<id>', 'open') primero.",
+        "edit_oldtext_content": "old_text no se encontró en el archivo. Aquí está el contenido actual:\n--- INICIO DEL ARCHIVO ---\n{content}\n--- FIN DEL ARCHIVO ---\nUsa el texto de arriba como old_text. Copia el texto exacto a reemplazar y establécelo como old_text. Intenta de nuevo.",
+        "edit_oldtext_noread": "old_text no se encontró en ningún resultado de lectura anterior. Debes leer el archivo PRIMERO con read_chunk o locate, luego copiar el texto exacto como old_text. Intenta de nuevo.",
+        "fail_loop": "[SYSTEM: {count} llamadas a herramientas seguidas fallaron.{tip}]",
+        "done_tests_fail": "NO PUEDES finalizar con <<<DONE>>> cuando las pruebas fallan. Arregla el código con edit_file y ejecuta run_tests() de nuevo hasta que TODAS pasen.",
+        "required_tools_refactor": "ERROR: No has llamado a write_file, edit_file, extract_symbol, remove_symbol o add_import en {count} iteraciones. Refactor requiere que ESCRIBAS código. Usa write_file para nuevos módulos o edit_file para actualizar.",
+        "required_tools_programming": "ERROR: No has llamado a write_file o edit_file en {count} iteraciones. Programación requiere que ESCRIBAS código y diseño. Usa write_file para crear archivos. Deja de leer y empieza a escribir.",
+        "auto_resolved": "Auto-resuelto: El análisis concluyó que el error ya está solucionado. {source}",
+        "incomplete_result": "⚠️ ADVERTENCIA: Este resultado parece incompleto. Considera ejecutar la tarea de nuevo con un prompt más claro.",
+        "tool_failed_retry": "{tool} falló. Lee el archivo de nuevo y copia el texto exactamente como old_text.",
+        "context_truncated": "[... contexto anterior truncado ...]",
+        "no_files_loaded": "NOTA: No hay archivos cargados. PUEDES responder directamente sin llamar herramientas primero. NO preguntes por nombres de archivos — usa tu propio conocimiento.",
+        "read_after_locate": "✅ NOTA: Ya has leído función(es) en este archivo con locate. Usa locate(filepath='...', name='otro_nombre') en lugar de read_chunk — es más rápido."
+    }
 }

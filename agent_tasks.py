@@ -846,10 +846,10 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     dup_count = called_tools.get(tool_key, 0)
     called_tools[tool_key] = dup_count + 1
     if dup_count >= 1:
-        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. Gå videre eller brug <<<DONE>>>.")
+        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
         return None
     if parsed["tool"] in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
-        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redigér IKKE filer. Brug <<<DONE>>> for at afslutte, eller genåbn issuet med update_issue_status('<id>', 'open') først.")
+        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_ISSUE_RESOLVED, agent.lang)}")
         return None
 
     # In test phases, force write_file as the first tool call — block reads before write
@@ -1047,19 +1047,14 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
             iteration = getattr(agent, "_current_task_iteration", 0)
             if iteration >= 3 and not getattr(agent, "_non_productive_reminder_sent", False):
                 agent._non_productive_reminder_sent = True
-                return ("FEJL: Du har ikke kaldt write_file, edit_file, extract_symbol, remove_symbol eller add_import i "
-                        f"{iteration} iterationer. Refactor kræver at du SKRIVER kode. "
-                        "Brug write_file for nye moduler eller edit_file for at opdatere api_server.py.")
-    elif template == "programming" and task_name:
+                return t(K.SYS_REQUIRED_TOOLS_REFACTOR, agent.lang, count=iteration)
         programming_writing_phases = ("arkitekturdesign", "implementeringsplan", "kodeimplementering")
         has_written = any(k in (called_tools or {}) for k in called_tools if k.startswith("write_file") or k.startswith("edit_file"))
         if any(k in _normalize_phase(task_name).lower() for k in programming_writing_phases) and not has_written:
             iteration = getattr(agent, "_current_task_iteration", 0)
             if iteration >= 5 and not getattr(agent, "_non_productive_reminder_sent", False):
                 agent._non_productive_reminder_sent = True
-                return ("FEJL: Du har ikke kaldt write_file eller edit_file i "
-                        f"{iteration} iterationer. Programming kræver at du SKRIVER kode og design. "
-                        "Brug write_file til at oprette filer (arkitektur, plan, kode). Stop med at læse og begynd at skrive.")
+                return t(K.SYS_REQUIRED_TOOLS_PROGRAMMING, agent.lang, count=iteration)
     available = set(agent.tool_registry.active_tools or [])
     required = available & REQUIRED_ACTION_TOOLS
     if not required:
@@ -1477,7 +1472,7 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                 if issue_id:
                     agent._log("INFO", f"Auto-resolving {issue_id} \u2014 bug already fixed per analysis", source_text[:200])
                     agent_issues.update_issue_status(agent, issue_id, "resolved",
-                        f"Auto-resolved: Analyse konkluderede at fejlen allerede er løst. {source_text[:200]}")
+                        t(K.SYS_AUTO_RESOLVED, agent.lang, source=source_text[:200]))
                     agent._log("INFO", f"Auto-resolved {issue_id}", "Remaining phases will be skipped")
 
         if getattr(agent, '_needs_resolve_persist', False):
@@ -1693,7 +1688,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 called_tools[tool_key] = dup_count + 1
                 if dup_count >= 1:
                     consecutive_dedups += 1
-                    _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du har allerede dette resultat. G\u00e5 videre eller brug <<<DONE>>>.")
+                    _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
                     if consecutive_dedups >= 3:
                         _active = agent.tool_registry.active_tools or []
                         write_tools = [t for t in ("write_file", "edit_file")
@@ -1786,10 +1781,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                                 )
                             else:
                                 result_str = (
-                                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: old_text blev ikke fundet i "
-                                    f"nogen tidligere læseresultat. Du skal læse filen FØRST med "
-                                    f"read_chunk eller locate, og derefter kopiere den præcise tekst "
-                                    f"som old_text. Prøv igen."
+f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)}"
                                 )
                             result = {"success": False, "error": "old_text not in prior read results"}
                             agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))

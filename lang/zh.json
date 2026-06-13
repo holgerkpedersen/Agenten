@@ -642,5 +642,27 @@
     "tools_save_layout": "保存布局",
     "tools_reset_layout": "重置布局",
     "tools_github_token": "GitHub 令牌",
-    "issues_title": "问题"
+    "issues_title": "问题",
+    "system": {
+        "available_files": "\n\n## 可用文件（项目：{dir}）",
+        "delegations_header": "\n\n## 委托\n一些已加载文件中的函数是仅转发到另一个文件的存根。",
+        "same_tool_loop": "[SYSTEM: 您已连续调用'{tool}'{count}次。{tip}使用<<<DONE>>>或切换工具。]",
+        "dup_result": "您已有此结果。继续或使用<<<DONE>>>。",
+        "dedup_loop": "[SYSTEM: 您陷入了重复结果的循环。停止读取。使用能写入的工具：{tools}。解释为什么无法写入 — 缺少什么？]",
+        "read_loop": "[SYSTEM: 您已连续进行{count}次读取调用而未写入任何内容。停止读取。使用能写入的工具：{tools}。解释为什么继续读取 — 缺少什么？]",
+        "read_blocked": "[SYSTEM: 读取调用已被阻止。使用{tools}。]",
+        "issue_resolved": "已阻止 — 该问题已标记为已解决。不要编辑文件。使用<<<DONE>>>完成，或先使用update_issue_status('<id>', 'open')重新打开问题。",
+        "edit_oldtext_content": "在文件中未找到old_text。以下是文件的当前内容：\n--- 文件开始 ---\n{content}\n--- 文件结束 ---\n使用上面的文本作为old_text。复制要替换的确切文本并设置为old_text。重试。",
+        "edit_oldtext_noread": "在任何先前的读取结果中未找到old_text。您必须先用read_chunk或locate读取文件，然后将确切的文本复制为old_text。重试。",
+        "fail_loop": "[SYSTEM: 连续{count}次工具调用失败。{tip}]",
+        "done_tests_fail": "测试失败时不能使用<<<DONE>>>完成。使用edit_file修复代码，然后重新运行run_tests()直到所有测试通过。",
+        "required_tools_refactor": "错误：您在{count}次迭代中未调用write_file、edit_file、extract_symbol、remove_symbol或add_import。重构要求您编写代码。使用write_file创建新模块或使用edit_file更新。",
+        "required_tools_programming": "错误：您在{count}次迭代中未调用write_file或edit_file。编程要求您编写代码和设计。使用write_file创建文件。停止阅读，开始编写。",
+        "auto_resolved": "自动解决：分析得出结论，错误已修复。{source}",
+        "incomplete_result": "⚠️ 警告：此结果似乎不完整。考虑使用更清晰的提示重新运行任务。",
+        "tool_failed_retry": "{tool}失败。重新读取文件并精确复制文本作为old_text。",
+        "context_truncated": "[... 先前的上下文已截断 ...]",
+        "no_files_loaded": "注意：未加载任何文件。您可以直接回答而无需先调用工具。不要询问文件名 — 使用您自己的知识来回答任务。",
+        "read_after_locate": "✅ 注意：您已使用locate读取了此文件中的函数。使用locate(filepath='...', name='other_name')代替read_chunk — 更快。"
+    }
 }

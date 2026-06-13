@@ -643,5 +643,27 @@
     "tools_save_layout": "Save layout",
     "tools_reset_layout": "Reset layout",
     "tools_github_token": "GitHub Token",
-    "issues_title": "Issues"
+    "issues_title": "Issues",
+    "system": {
+        "available_files": "\n\n## AVAILABLE FILES (project: {dir})",
+        "delegations_header": "\n\n## DELEGATIONS\nSome functions in the loaded files are stubs that only forward to another file.",
+        "same_tool_loop": "[SYSTEM: You have called '{tool}' {count} times in a row.{tip} Use <<<DONE>>> or switch tools.]",
+        "dup_result": "You already have this result. Continue or use <<<DONE>>>.",
+        "dedup_loop": "[SYSTEM: You are in a loop with identical results. STOP reading. USE a tool that WRITES: {tools}. Explain WHY you can't write — what are you missing?]",
+        "read_loop": "[SYSTEM: You have made {count} read calls in a row without writing anything. STOP reading. USE a tool that WRITES: {tools}. Explain WHY you keep reading — what are you missing?]",
+        "read_blocked": "[SYSTEM: Read calls blocked. Use {tools}.]",
+        "issue_resolved": "BLOCKED — the issue is already marked as resolved. Do NOT edit files. Use <<<DONE>>> to finish, or reopen the issue with update_issue_status('<id>', 'open') first.",
+        "edit_oldtext_content": "old_text was not found in the file. Here is the file's current content:\n--- START OF FILE ---\n{content}\n--- END OF FILE ---\nUse the text above as old_text. Copy the exact text you want to replace and set it as old_text. Try again.",
+        "edit_oldtext_noread": "old_text was not found in any previous read result. You must read the file FIRST with read_chunk or locate, then copy the exact text as old_text. Try again.",
+        "fail_loop": "[SYSTEM: {count} tool calls in a row failed.{tip}]",
+        "done_tests_fail": "You CANNOT finish with <<<DONE>>> when tests fail. Fix the code with edit_file and run run_tests() again until ALL tests pass.",
+        "required_tools_refactor": "ERROR: You have not called write_file, edit_file, extract_symbol, remove_symbol or add_import in {count} iterations. Refactor requires you to WRITE code. Use write_file for new modules or edit_file to update api_server.py.",
+        "required_tools_programming": "ERROR: You have not called write_file or edit_file in {count} iterations. Programming requires you to WRITE code and design. Use write_file to create files (architecture, plan, code). Stop reading and start writing.",
+        "auto_resolved": "Auto-resolved: Analysis concluded that the error is already fixed. {source}",
+        "incomplete_result": "⚠️ WARNING: This result appears incomplete. Consider running the task again with a clearer prompt.",
+        "tool_failed_retry": "{tool} failed. Read the file again and copy the text exactly as old_text.",
+        "context_truncated": "[... previous context truncated ...]",
+        "no_files_loaded": "NOTE: No files are loaded. You CAN answer directly without calling tools first. Do NOT ask for filenames — use your own knowledge to answer the task.",
+        "read_after_locate": "✅ NOTE: You have already read function(s) in this file with locate. Use locate(filepath='...', name='other_name') instead of read_chunk — it's faster."
+    }
 }

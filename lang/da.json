@@ -643,5 +643,27 @@
     "tools_save_layout": "Gem layout",
     "tools_reset_layout": "Reset layout",
     "tools_github_token": "GitHub Token",
-    "issues_title": "Issues"
+    "issues_title": "Issues",
+    "system": {
+        "available_files": "\n\n## TILGÆNGELIGE FILER (projektmappe: {dir})",
+        "delegations_header": "\n\n## DELEGERINGER\nNogle funktioner i de indlæste filer er stubs, der kun videresender til en anden fil.",
+        "same_tool_loop": "[SYSTEM: Du har kaldt '{tool}' {count} gange i træk.{tip} Brug <<<DONE>>> eller skift værktøj.]",
+        "dup_result": "Du har allerede dette resultat. Gå videre eller brug <<<DONE>>>.",
+        "dedup_loop": "[SYSTEM: Du er i en løkke med identiske resultater. STOP med at læse. BRUG et værktøj der SKRIVER: {tools}. Forklar HVORFOR du ikke kan skrive — hvad mangler du?]",
+        "read_loop": "[SYSTEM: Du har lavet {count} læsekald i træk uden at skrive noget. STOP med at læse. BRUG et værktøj der SKRIVER: {tools}. Forklar HVORFOR du bliver ved med at læse — hvad mangler du?]",
+        "read_blocked": "[SYSTEM: Læsekald blokeret. Brug {tools}.]",
+        "issue_resolved": "BLOCKERET — issuet er allerede markeret som resolved. Redigér IKKE filer. Brug <<<DONE>>> for at afslutte, eller genåbn issuet med update_issue_status('<id>', 'open') først.",
+        "edit_oldtext_content": "old_text blev ikke fundet i filen. Her er filens nuværende indhold:\n--- START AF FIL ---\n{content}\n--- SLUT AF FIL ---\nBrug teksten ovenfor som old_text. Kopier den præcise tekst du vil erstatte, og sæt den som old_text. Prøv igen.",
+        "edit_oldtext_noread": "old_text blev ikke fundet i nogen tidligere læseresultat. Du skal læse filen FØRST med read_chunk eller locate, og derefter kopiere den præcise tekst som old_text. Prøv igen.",
+        "fail_loop": "[SYSTEM: {count} værktøjskald i træk fejlede.{tip}]",
+        "done_tests_fail": "DU KAN IKKE afslutte med <<<DONE>>> når tests fejler. Ret koden med edit_file og kør run_tests() igen indtil ALLE tests består.",
+        "required_tools_refactor": "FEJL: Du har ikke kaldt write_file, edit_file, extract_symbol, remove_symbol eller add_import i {count} iterationer. Refactor kræver at du SKRIVER kode. Brug write_file for nye moduler eller edit_file for at opdatere api_server.py.",
+        "required_tools_programming": "FEJL: Du har ikke kaldt write_file eller edit_file i {count} iterationer. Programming kræver at du SKRIVER kode og design. Brug write_file til at oprette filer (arkitektur, plan, kode). Stop med at læse og begynd at skrive.",
+        "auto_resolved": "Auto-resolved: Analyse konkluderede at fejlen allerede er løst. {source}",
+        "incomplete_result": "⚠️ ADVARSEL: Dette resultat ser ufuldstændigt ud. Overvej at køre opgaven igen med en tydeligere prompt.",
+        "tool_failed_retry": "{tool} mislykkedes. Læs filen igen og kopier teksten nøjagtigt som old_text.",
+        "context_truncated": "[... tidligere kontekst afkortet ...]",
+        "no_files_loaded": "OBS: Ingen filer er indlæst. Du KAN svare direkte uden at kalde værktøjer først. Spørg IKKE efter filnavne — brug din egen viden til at besvare opgaven.",
+        "read_after_locate": "✅ OBS: Du har allerede læst funktion(er) i denne fil med locate. Brug locate(filepath='...', name='andet_navn') i stedet for read_chunk — det er hurtigere."
+    }
 }
