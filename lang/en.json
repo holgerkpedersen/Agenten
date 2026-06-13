@@ -529,7 +529,12 @@
         "remove_panel": "Remove panel",
         "download_md": "Download as Markdown",
         "close_preview": "Close preview",
-        "use_as_task": "Use as task"
+        "use_as_task": "Use as task",
+        "keep_label": "Keep",
+        "skip_label": "Skip",
+        "rerun_label": "Rerun",
+        "show_detail": "show detail",
+        "hide_detail": "hide detail"
     },
     "criteria.decompose": "Specify success criteria in parentheses after each task name, e.g.: Task (criterion1, criterion2)",
     "criteria.header": "Success Criteria",

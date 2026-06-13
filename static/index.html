@@ -1321,8 +1321,8 @@ function renderLogDetail(detail) {
     return `<span class="log-detail-toggle" onclick="
         var c=document.getElementById('${id}');
         c.classList.toggle('open');
-        this.textContent=c.classList.contains('open')?'[skjul detail]':'[vis detail]';
-    ">[vis detail]</span><pre id="${id}" class="log-detail-content">${escapeHtml(detail)}</pre>`;
+        this.textContent=c.classList.contains('open')?'[${_('hide_detail')}]':'[${_('show_detail')}]';
+    ">[${_('show_detail')}]</span><pre id="${id}" class="log-detail-content">${escapeHtml(detail)}</pre>`;
 }
 
 function addLogEntry(level, message, detail) {
@@ -1376,9 +1376,9 @@ function renderTree(node, path = []) {
     if (treeEditMode) {
         html += `<span style="margin-right:8px;"><button onclick="editTreeNode('${pathStr}')" title="${_('btn_edit')}" style="padding:2px 6px;font-size:10px;">✏️</button><button onclick="deleteTreeNode('${pathStr}')" title="${_('btn_delete')}" style="padding:2px 6px;font-size:10px;background:#ef4444;">🗑</button><button onclick="addTreeChild('${pathStr}')" title="${_('btn_add_child')}" style="padding:2px 6px;font-size:10px;background:#10b981;">➕</button></span>`;
     } else if (node.status !== 'done' && node.status !== 'skipped') {
-        html += `<span style="margin-left:8px;white-space:nowrap;"><button onclick="markTaskDone('${pathStr}','done')" title="${_('keep_result')}" style="padding:1px 6px;font-size:10px;background:#22c55e;border:none;border-radius:3px;color:white;cursor:pointer;">\u2713 Bevar</button> <button onclick="markTaskDone('${pathStr}','skipped')" title="${_('skip_task')}" style="padding:1px 6px;font-size:10px;background:#64748b;border:none;border-radius:3px;color:white;cursor:pointer;">\u23ed Spring</button></span>`;
+        html += `<span style="margin-left:8px;white-space:nowrap;"><button onclick="markTaskDone('${pathStr}','done')" title="${_('keep_result')}" style="padding:1px 6px;font-size:10px;background:#22c55e;border:none;border-radius:3px;color:white;cursor:pointer;">\u2713 ${_('keep_label')}</button> <button onclick="markTaskDone('${pathStr}','skipped')" title="${_('skip_task')}" style="padding:1px 6px;font-size:10px;background:#64748b;border:none;border-radius:3px;color:white;cursor:pointer;">\u23ed ${_('skip_label')}</button></span>`;
     } else {
-        html += `<span style="margin-left:8px;"><button onclick="markTaskDone('${pathStr}','pending')" title="${_('rerun_task')}" style="padding:1px 6px;font-size:10px;background:#f59e0b;border:none;border-radius:3px;color:white;cursor:pointer;">\u21bb Genk\u00f8r</button></span>`;
+        html += `<span style="margin-left:8px;"><button onclick="markTaskDone('${pathStr}','pending')" title="${_('rerun_task')}" style="padding:1px 6px;font-size:10px;background:#f59e0b;border:none;border-radius:3px;color:white;cursor:pointer;">\u21bb ${_('rerun_label')}</button></span>`;
     }
     html += `📌 ${escapeHtml(node.name)} <span class="task-status ${statusClass}">${statusText}</span>`;
     if (node.status === 'failed') {

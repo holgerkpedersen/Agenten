@@ -529,7 +529,12 @@
         "remove_panel": "Fjern panel",
         "download_md": "Download som Markdown",
         "close_preview": "Luk forhåndsvisning",
-        "use_as_task": "Brug som opgave"
+        "use_as_task": "Brug som opgave",
+        "keep_label": "Bevar",
+        "skip_label": "Spring",
+        "rerun_label": "Genkør",
+        "show_detail": "vis detail",
+        "hide_detail": "skjul detail"
     },
     "criteria.decompose": "Angiv succeskriterier i parentes efter hvert opgavenavn, f.eks.: Opgave (kriterie1, kriterie2)",
     "criteria.header": "Success-kriterier",

@@ -529,7 +529,12 @@
         "remove_panel": "Eliminar panel",
         "download_md": "Descargar como Markdown",
         "close_preview": "Cerrar vista previa",
-        "use_as_task": "Usar como tarea"
+        "use_as_task": "Usar como tarea",
+        "keep_label": "Conservar",
+        "skip_label": "Saltar",
+        "rerun_label": "Re-ejecutar",
+        "show_detail": "mostrar detalle",
+        "hide_detail": "ocultar detalle"
     },
     "criteria.decompose": "Especifica los criterios de éxito entre paréntesis después de cada nombre de tarea, ej.: Tarea (criterio1, criterio2)",
     "criteria.header": "Criterios de Éxito",

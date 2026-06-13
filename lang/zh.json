@@ -529,7 +529,12 @@
         "remove_panel": "移除面板",
         "download_md": "下载为Markdown",
         "close_preview": "关闭预览",
-        "use_as_task": "用作任务"
+        "use_as_task": "用作任务",
+        "keep_label": "保留",
+        "skip_label": "跳过",
+        "rerun_label": "重新运行",
+        "show_detail": "显示详情",
+        "hide_detail": "隐藏详情"
     },
     "criteria.decompose": "在每个任务名称后的括号内指定成功标准，例如：任务 (标准1, 标准2)",
     "criteria.header": "成功标准",
