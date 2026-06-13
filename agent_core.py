@@ -105,7 +105,11 @@ def _auto_load_issue_files(agent: Agent, prompt: str, template: str | None, file
             for filename in filenames:
                 if not filename.endswith('.py'):
                     continue
-                for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
+                workdir = os.environ.get('AGENT_WORKDIR', '')
+                probe_paths = [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]
+                if workdir:
+                    probe_paths.append(os.path.join(workdir, filename))
+                for path in probe_paths:
                     if os.path.exists(path):
                         content = agent._read_file_content(path)
                         if content:
@@ -129,7 +133,11 @@ def _auto_load_location_file(agent: Agent, prompt: str) -> None:
     for filename in filenames:
         if not filename.endswith('.py'):
             continue
-        for path in [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]:
+        workdir = os.environ.get('AGENT_WORKDIR', '')
+        probe_paths = [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]
+        if workdir:
+            probe_paths.append(os.path.join(workdir, filename))
+        for path in probe_paths:
             if os.path.exists(path):
                 try:
                     content = agent._read_file_content(path)
