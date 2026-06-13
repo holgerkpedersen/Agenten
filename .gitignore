@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Temp / logs
+debug_out.txt
+*.log
+
 # Session data
 sessions/
 
