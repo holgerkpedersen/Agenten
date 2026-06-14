@@ -2,8 +2,8 @@
   "meta": {
     "generated": "2026-05-26",
     "source": "Code audit",
-    "total": 160,
-    "updated": "2026-05-30",
+    "total": 169,
+    "updated": "2026-06-14",
     "format": "C-A-S-E (Context, Action, Symptoms, Environment)",
     "total_risks": 6
   },
@@ -1928,6 +1928,105 @@
       "status": "open",
       "created_at": "2026-06-12T13:30:00",
       "updated_at": "2026-06-12T17:41:54"
+    },
+    {
+      "id": "BUG-097",
+      "title": "Duplikeret JSON parsing cascade i tools.py — 3 identiske try/except/json.loads blokke",
+      "type": "bug",
+      "severity": "high",
+      "context": "Fil: tools.py:197-215 (tool_match), tools.py:232-240 (loose_tool), tools.py:249-257 (execute). Tre steder i kodebasen har identisk 3-lags JSON parsing: json.loads → raw_decode → escaped newlines → raw_decode. Den escaped-newline normalisering `.replace('\\r\\n', '\\\\n')` osv. er også duplikeret. tools.py:88-103 har en fjerde delvis kopi.",
+      "action": "Ekstraher `_parse_json_robust(raw: str) -> tuple[dict | None, str | None]` der returnerer (data, error_message). Kald den fra alle 4 steder. Successkriterie: Én funktion håndterer al JSON parsing. Alle 761 tests passerer.",
+      "symptoms": "Ændringer i parsing-logik skal laves 3-4 steder. Risiko for at én sti opdateres men ikke de andre. Den escaped-newline normalisering er også duplikeret..",
+      "environment": "Windows, Python 3.12, LM Studio",
+      "status": "open"
+    },
+    {
+      "id": "BUG-098",
+      "title": "Hallucineret værktøjsnavn tuple duplikeret 3 steder i tools.py",
+      "type": "bug",
+      "severity": "medium",
+      "context": "Fil: tools.py:217, 243, 263. Tuplen `(\"navn\", \"name\", \"nombre\", \"名称\")` er hardcoded 3 gange i parse_response og execute metoderne. Hvis et nyt hallucineret navn tilføjes, skal det opdateres alle 3 steder.",
+      "action": "Definér modul-level konstant `_HALLUCINATED_TOOL_NAMES = frozenset({\"navn\", \"name\", \"nombre\", \"名称\"})` og reference den i alle 3 checks. Successkriterie: Én definition. Alle 3 checks bruger konstanten.",
+      "symptoms": "Nyt hallucineret navn skal tilføjes 3 steder. Risiko for inkonsistens. Hvis et nyt hallucineret navn tilføjes, skal det opdateres alle 3 steder..",
+      "environment": "Windows, Python 3.12, LM Studio",
+      "status": "open"
+    },
+    {
+      "id": "BUG-099",
+      "title": "selvforbedring nøgle duplikeret i TEMPLATE_PHASE_ITERATION_LIMITS — første blok er dead code",
+      "type": "bug",
+      "severity": "medium",
+      "context": "Fil: agent_skills.py:132-138 (første blok) og agent_skills.py:151-157 (anden blok). `\"selvforbedring\"` forekommer som dict-key to gange i samme literal. I Python overskriver den anden blok den første. Første blok: Ret=12. Anden blok: Ret=15. Forskellen er kritisk — hvis nogen ændrer den anden blok, vil den første blok stadig foreslå forkerte værdier.",
+      "action": "Fjern den første duplikerede nøgle (linje 132-138). Behold kun den anden blok med korrekte værdier. Successkriterie: Kun én `\"selvforbedring\"` key i TEMPLATE_PHASE_ITERATION_LIMITS.",
+      "symptoms": "Hvis nogen senere redigerer \"første\" blok, tror de at de ændrer værdierne — men ændringen har ingen effekt. Første blok: Ret=12. Anden blok: Ret=15. Forskellen er kritisk..",
+      "environment": "Windows, Python 3.12",
+      "status": "open"
+    },
+    {
+      "id": "ARC-020",
+      "title": "Issue ID regex defineret 3 steder med forskellige formater — STAB mangler i 2 af 3",
+      "type": "architecture",
+      "severity": "high",
+      "context": "Fil: agent_core.py:89, agent_issues.py:164, agent_tasks.py:1146. Tre regex patterns leder efter issue IDs men er forskellige: agent_core.py og agent_issues.py har `(BUG-\\d+|SEC-\\d+|TST-\\d+|ARC-\\d+|PRF-\\d+|MNT-\\d+|REFAC-\\d+)`. agent_tasks.py har kompileret `re.compile(r'(BUG|SEC|ARC|MNT|PRF|TST|REFAC|STAB)-\\d+', re.IGNORECASE)` — inkluderer STAB og case-insensitive. De to andre mangler STAB- understøttelse.",
+      "action": "Definér `ISSUE_ID_PATTERN` i agent_issues.py (eller en ny shared constants.py), importér den alle 3 steder. Inkludér STAB og brug re.IGNORECASE. Successkriterie: Én definition. Alle 3 forbrugere får STAB-understøttelse.",
+      "symptoms": "STAB-xxx issues genkendes ikke af agent_core.py og agent_issues.py. LLM kan ikke auto-loade filer for STAB issues. De to andre mangler STAB- understøttelse..",
+      "environment": "Windows, Python 3.12",
+      "status": "open"
+    },
+    {
+      "id": "ARC-021",
+      "title": "Native vs text-mode tool handling duplikeret i agent_tasks.py — 4 identiske logikblokke",
+      "type": "architecture",
+      "severity": "high",
+      "context": "Fil: agent_tasks.py:_handle_tool_call (linje 855-971) vs solve_task_stream native tool path (linje 1659-1930). Fire identiske logikstykker er duplikeret: (a) run_tests resultat-logning, (b) locate result tracking, (c) read_chunk 'already located' hint, (d) write_file/edit_file state management (reset _current_task_iteration). Hver blok er 10-30 linjer identisk kode.",
+      "action": "Refaktorer `_handle_tool_call` til at fungere for både text-mode og native tool calls. Kald den fra native tool path i stedet for at duplikere logikken. Successkriterie: Native tool path kalder `_handle_tool_call` for resultatbehandling. Alle 4 duplikerede blokke fjernet.",
+      "symptoms": "Bugs i én sti (f.eks. state management) rettes ikke i den anden sti. Høj risiko for regression. Hver blok er 10-30 linjer identisk kode..",
+      "environment": "Windows, Python 3.12",
+      "status": "open"
+    },
+    {
+      "id": "ARC-022",
+      "title": "Workdir resolution implementeret 5 forskellige gange på tværs af kodebasen",
+      "type": "architecture",
+      "severity": "medium",
+      "context": "Fil: agent_files.py:99-104 (_resolve_workdir), git_ops.py:15-22 (_resolve_path), agent_files.py:163-173 (_resolve_path), agent_issues.py:33-40 (_get_issues_path), agent_pdf.py:24-43 (_resolve_pdf_path). Fem funktioner implementerer hver sin version af \"resolvér sti relativt til AGENT_WORKDIR\". Hver håndterer edge cases forskelligt (absolute paths, Windows drive letters, relative paths).",
+      "action": "Opret en enkelt `resolve_workdir_path(path: str) -> str` i et delt modul (agent_files.py). Brug den alle 5 steder. Successkriterie: Én funktion. Alle 5 kaldere bruger den. Ens opførsel på tværs.",
+      "symptoms": "Forskellig opførsel afhængig af hvilken funktion der kaldes. En bugfix i én implementering overses i de andre. Hver håndterer edge cases forskelligt..",
+      "environment": "Windows, Python 3.12",
+      "status": "open"
+    },
+    {
+      "id": "MNT-017",
+      "title": "data.get(\"issues\", []) gentaget 8+ gange i agent_issues.py",
+      "type": "maintainability",
+      "severity": "low",
+      "context": "Fil: agent_issues.py:71, 97, 130, 174, 193, 200, 240, 320. Mønsteret `data.get(\"issues\", [])` bruges 8+ gange på tværs af funktioner: read_issue, update_issue_status, create_issue, create_refactor_issue, _load_issues, _resolve_referenced_issues.",
+      "action": "Definér `def _get_issues_list(data: dict) -> list:` der returnerer `data.setdefault(\"issues\", [])`. Brug den alle steder. Successkriterie: Alle 8+ kald erstattet med `_get_issues_list(data)`.",
+      "symptoms": "Hvis issues-nøglen i JSON ændres (f.eks. til \"items\"), skal 8+ steder opdateres. Høj vedligeholdelsesomkostning. Mønsteret `data.get(\"issues\", [])` bruges 8+ gange..",
+      "environment": "Windows, Python 3.12",
+      "status": "open"
+    },
+    {
+      "id": "MNT-018",
+      "title": "\"GitHub API netvaerksfejl\" hardcoded 5 gange i github_wrapper.py",
+      "type": "maintainability",
+      "severity": "low",
+      "context": "Fil: github_wrapper.py:53, 74, 94, 115, 136. Den eksakte fejlbesked \"GitHub API netvaerksfejl\" er hardcoded i alle 5 GitHub API metoder (create_repo, create_issue, create_pr, list_repos, get_repo).",
+      "action": "Definér modul-level konstant `_NETWORK_ERROR = \"GitHub API netvaerksfejl\"` og reference den alle 5 steder. Successkriterie: Én definition. Alle 5 metoder bruger konstanten.",
+      "symptoms": "Hvis fejlbeskeden skal ændres (f.eks. oversættes til engelsk), skal 5 steder opdateres. Høj risiko for at én overses. Den eksakte fejlbesked er hardcoded i alle 5 metoder..",
+      "environment": "Windows, Python 3.12, Git",
+      "status": "open"
+    },
+    {
+      "id": "MNT-019",
+      "title": "_ensure_done_tool kaldt redundantly i alle branches af set_task_tools",
+      "type": "maintainability",
+      "severity": "low",
+      "context": "Fil: agent_tasks.py:497, 510, 521, 526. `_ensure_done_tool(agent)` kaldes inde i hver if/elif/else branch i set_task_tools, plus én gang efter loopet. Funktionen kunne kaldes én gang før return.",
+      "action": "Fjern de 3 redundante kald. Behold kun kaldet efter alle branches er håndteret. Successkriterie: `_ensure_done_tool` kaldes præcis én gang i set_task_tools.",
+      "symptoms": "Hvis _ensure_done_tools logik ændres, skal den stadig kun kaldes én gang. De ekstra kald er støj i koden. Funktionen kunne kaldes én gang før return..",
+      "environment": "Windows, Python 3.12",
+      "status": "open"
     }
   ],
   "active_risks": [
