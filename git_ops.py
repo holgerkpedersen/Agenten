@@ -711,27 +711,19 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                 try:
                     ast.parse(new_content)
                 except SyntaxError as e:
-                    if symbol:
-                        normalized_new = _normalize_indentation(new_text, search)
-                        if normalized_new != new_text:
-                            normalized_content = content.replace(exact_old, normalized_new, 1)
-                            try:
-                                ast.parse(normalized_content)
-                                new_text = normalized_new
-                                new_content = normalized_content
-                            except SyntaxError as e2:
-                                return {
-                                    "success": False,
-                                    "error": f"Syntaksfejl på linje {e2.lineno}: {e2.msg}",
-                                    "line": e2.lineno,
-                                    "msg": e2.msg
-                                }
-                        else:
+                    normalized_new = _normalize_indentation(new_text, search)
+                    if normalized_new != new_text:
+                        normalized_content = content.replace(exact_old, normalized_new, 1)
+                        try:
+                            ast.parse(normalized_content)
+                            new_text = normalized_new
+                            new_content = normalized_content
+                        except SyntaxError as e2:
                             return {
                                 "success": False,
-                                "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
-                                "line": e.lineno,
-                                "msg": e.msg
+                                "error": f"Syntaksfejl på linje {e2.lineno}: {e2.msg}",
+                                "line": e2.lineno,
+                                "msg": e2.msg
                             }
                     else:
                         return {
