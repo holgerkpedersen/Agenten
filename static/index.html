@@ -1647,26 +1647,9 @@ async function approveAutoResearch(path, phaseEnc) {
         const data = await resp.json();
         if (data.success && data.issue) {
             const issueId = data.issue_id;
-            // Auto-research kører altid med one-shot (proposed_fix = instruktion)
-            const useTemplate = 'one-shot';
-            addLogEntry('AUTOR', `CORE-issue ${issueId} oprettet — starter ${useTemplate}`, '');
-            // Indlæs issue i prompt og skift til valgt template
-            const encoded = encodeURIComponent(JSON.stringify(data.issue)).replace(/'/g, '%27');
-            useIssueAsTask(encoded);
-            // Skift template
-            const sel = document.getElementById('templateSelect');
-            for (const opt of sel.options) {
-                if (opt.value === useTemplate) {
-                    sel.value = useTemplate;
-                    onTemplateChange(useTemplate);
-                    break;
-                }
-            }
-            // Nedbryd og udfør automatisk
-            setTimeout(() => {
-                decompose();
-                setTimeout(() => executeWithStream(), 3000);
-            }, 500);
+            addLogEntry('AUTOR', `CORE-issue ${issueId} oprettet — analyser færdig. Træet er ikke ændret.`, '');
+            addLogEntry('INFO', `🔬 Auto-research færdig — find ${issueId} i issue-panelet`, '');
+            refreshIssues();
         } else {
             addLogEntry('ERROR', 'Auto-research fejlede', data.error || 'Ukendt fejl');
         }
