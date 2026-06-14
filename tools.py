@@ -55,7 +55,7 @@ class Tool:
 
         self.optional_params = sig_optional
         if optional_params:
-            self.optional_params |= set(optional_params)
+            self.optional_params = set(optional_params)
 
     def to_prompt_desc(self) -> str:
         """to prompt desc."""

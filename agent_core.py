@@ -644,12 +644,12 @@ class Agent:
              "edit_file",
              t(K.TOOL_EDIT_FILE, self.lang),
              ["path", "old_text", "new_text"],
-             lambda path, old_text="", new_text="", symbol=None, requirements="", test_path="": git_ops.edit_file(
-                 path=path, old_text=old_text, new_text=new_text,
-                 expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path))),
-                 symbol=symbol, requirements=requirements, test_path=test_path, llm=self.llm,
-             ),
-             optional_params=["symbol", "requirements", "test_path"]
+              lambda path, old_text="", new_text="", symbol=None, test_path="": git_ops.edit_file(
+                  path=path, old_text=old_text, new_text=new_text,
+                  expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path))),
+                  symbol=symbol, test_path=test_path, llm=self.llm,
+              ),
+              optional_params=["symbol", "test_path"]
         ))
         self.tool_registry.register(Tool(
             "write_file",

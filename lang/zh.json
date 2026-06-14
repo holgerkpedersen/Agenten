@@ -186,7 +186,7 @@
         "list_chunks": "列出所有可用文件（块），可使用read_chunk读取。先使用此工具查看可用内容。",
         "list_symbols": "通过AST列出Python文件中ALL顶级符号（函数、类、变量）。返回每个符号的名称、类型、行号和签名。在不知道文件中符号名称时，在locate/read_location之前使用此工具。需要：filepath='fil.py'。",
         "locate": "在Python文件中查找PYTHON函数/方法/类/变量（def/class/assignment）。name是PYTHON符号名称，而非工具名称。使用name='function_name'在所有.py文件中搜索。使用name='ClassName.method'搜索方法。使用filepath='fil.py'限制搜索范围。返回行号、类型、函数的完整代码以及其他符号的列表。",
-        "edit_file": "编辑现有文件。\n\n最佳工作流程：\n1. 读取代码：locate(name='function_name')或read_chunk(filepath, start, end)\n2. 从读取结果中精确复制old_text（而非从记忆中）\n3. 提供包含更改的new_text\n\n.py文件的快捷方式：\n提供symbol='function_name' + requirements='要更改的内容'。系统通过AST查找函数，用LLM改进并替换。无需old_text/new_text。\n\n导入规则：所有import语句必须在文件顶部，永远不要在函数/类内部。",
+        "edit_file": "编辑现有文件。\n\n最佳工作流程：\n1. 读取代码：locate(name='function_name')或read_chunk(filepath, start, end)\n2. 从读取结果中精确复制old_text（而非从记忆中）\n3. 提供包含更改的new_text\n\n.py文件的快捷方式：\n提供symbol='function_name' + new_text='完整函数'以替换现有函数。\n提供symbol='new_function' + new_text='def new_function(...):\\n    ...'以在文件末尾创建新函数。\n\n导入规则：所有import语句必须在文件顶部，永远不要在函数/类内部。",
         "write_file": "创建新文件并写入内容，或使用overwrite=true覆盖现有文件。使用path='docs/file.md'保存到docs文件夹。自动创建不存在的文件夹。对.py文件进行语法检查。使用overwrite=\\u201cforce\\u201d强制覆盖。",
         "list_files": "列出目录中的文件。需要：path（目录路径，默认'.'）。可选：pattern（文件类型，如'.py'）。可选：max_depth（最大深度，默认2）。返回文件名和大小。",
         "add_image": "添加图像到上下文。需要：path（图像文件路径）。返回MIME类型和大小。",

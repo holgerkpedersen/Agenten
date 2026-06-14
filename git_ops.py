@@ -610,6 +610,7 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
         # Normalize to \n-only for consistent byte positions (BUG-076 fix)
         content = content.replace('\r\n', '\n').replace('\r', '\n')
 
+        _symbol_created = False
         if symbol:
             if not new_text:
                 return {"success": False, "error": "new_text is required when using symbol."}
@@ -665,8 +666,9 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                 new_content = '\n'.join(lines_list)
             else:
                 # Symbol not found → create new symbol at end of file
-                dedented = textwrap.dedent(new_text)
-                new_content = content + '\n' + dedented + '\n'
+                text_to_append = textwrap.dedent(new_text) if path.endswith('.py') else new_text
+                new_content = content + '\n' + text_to_append + '\n'
+                _symbol_created = True
         elif old_text:
             search = old_text.replace('\r\n', '\n').replace('\r', '\n')
             count = content.count(search)
@@ -755,8 +757,10 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
             "path": os.path.abspath(path),
             "chars_before": len(content),
             "chars_after": len(new_content),
-            "lines_changed": content.count('\n') - new_content.count('\n')
+            "lines_changed": content.count('\n') - new_content.count('\n'),
         }
+        if _symbol_created:
+            result["action"] = "created"
 
         _check_post_write(path, new_content, result)
 
