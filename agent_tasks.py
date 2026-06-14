@@ -1692,7 +1692,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         and "kodeimplementering" in (task_node.name or "").lower()
                         and tool_name == "write_file"
                     )
-                    if consecutive_same_tool >= 3 and not is_greenfield_write:
+                    if consecutive_same_tool >= 5 and not is_greenfield_write:
                         _active = agent.tool_registry.active_tools or []
                         alt_tools = [t for t in _active
                                      if t not in ("read_issue", "locate", "read_location", "list_symbols")][:5]
@@ -1702,12 +1702,6 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             f" Brug <<<DONE>>> eller skift v\u00e6rkt\u00f8j.]")
                         agent._log("SYSTEM", "Same-tool-loop escape",
                                    f"{consecutive_same_tool}x {tool_name} in a row{tip}")
-                        if tool_name in READ_ONLY_TOOLS and tool_name != "read_issue":
-                            current = list(agent.tool_registry.active_tools or [])
-                            pruned = [t for t in current if t not in READ_ONLY_TOOLS or t == "read_issue"]
-                            agent.tool_registry.set_active_tools(pruned)
-                            agent._log("SYSTEM", "Read-tools removed",
-                                       f"LLM called {tool_name} 3x — pruned read tools. Remaining: {pruned}")
                         consecutive_same_tool = 0
                 else:
                     consecutive_same_tool = 0

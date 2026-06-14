@@ -653,6 +653,8 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 
 **Hvad mangler:** Hvis LLM ignorerer read-loop escape (ses i log som "STOP med at læse" + alligevel endnu et read), er der ingen mekanisme til at tvinge den til at skrive. En mulig forbedring: bryd loopet og inject write-påbud som system-role i stedet for user-role.
 
+**Opdatering 2026-06-14:** Read-loop escape fjernet. Tidligere pruned systemet ALLE read-tools efter 3x samme værktøj (selv med forskellige funktionsnavne). Nu: advarsel ved 5x, men værktøjer forbliver tilgængelige. LLM kan altid læse mere hvis nødvendigt — advarsel er nok til at bryde loopet.
+
 **Monitorering:** Brug SkillFlow `/skillflow` rapporten til at følge success rate over tid.
 
 ## WTA: select_winner fjernet, rank_tool_calls tilføjet
