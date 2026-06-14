@@ -716,4 +716,14 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 
 **Usage for BUG-097:** Instead of `edit_file(path='tools.py', old_text='class ToolRegistry:\n...')`, use `add_method(filepath='tools.py', class_name='ToolRegistry', method_code='def _parse_json_robust(self, raw, default_error_message=None):\n    ...')`.
 
-**Files:** `git_ops.py:812-940`, `agent_core.py:688-712`, `agent_tasks.py:1005`, `llm_wrapper.py:17-94,486-499`, `i18n.py:102-103`, `lang/*.json:tools.add_method
+**Files:** `git_ops.py:812-940`, `agent_core.py:688-712`, `agent_tasks.py:1005`, `llm_wrapper.py:17-94,486-499`, `i18n.py:102-103`, `lang/*.json:tools.add_method`
+
+### 57. `edit_file` indentation normalization for `old_text` path (`git_ops.py:710-742`)
+
+**Symptom:** LLM copies `new_text` from `locate` result (0-space indent) but file has 4-space indent. `edit_file` with `old_text` finds a match via fuzzy pattern, replaces with `new_text` at wrong indent → "Syntaksfejl: unindent does not match any outer indentation level".
+
+**Root cause:** `_normalize_indentation(new_text, search)` was only called when `symbol` was set (`git_ops.py:714`). The `old_text` path (no symbol) returned syntax error immediately without trying indentation normalization.
+
+**Fix:** Removed `if symbol:` condition — `_normalize_indentation` now runs for ALL `.py` edits when `ast.parse` fails, regardless of whether `old_text` or `symbol` was used.
+
+**Files:** `git_ops.py:710-742`
