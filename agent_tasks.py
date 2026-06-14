@@ -1118,25 +1118,23 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     if template == "selvforbedring" and "ret" in phase:
         if "edit_file" in uncalled and "create_issue" in called_names:
             uncalled.discard("edit_file")
-    # tool_log success check: tools som blev kaldt men ALLE forsøg fejlede tæller ikke
-    # Fix 2: edit_file/write_file that were attempted (even if failed) count as
-    # satisfied — the LLM tried to write, the system prevented it, don't trap it.
+    # tool_log success check: tools where ALL attempts failed due to LLM error
+    # do NOT count as satisfied — only system blocks (hash, path safety) are excused.
     if agent._tool_log and not uncalled:
         for req_tool in required:
             if req_tool in called_names:
                 attempts = [e for e in agent._tool_log if e.get("tool") == req_tool and e.get("success") is False]
                 all_attempts = [e for e in agent._tool_log if e.get("tool") == req_tool]
                 if all_attempts and len(attempts) == len(all_attempts):
-                    if req_tool in ("write_file", "edit_file", "update_issue_status"):
-                        continue  # attempted but failed — still counts as satisfied
-                    if req_tool == "write_file" and "edit_file" in called_names:
-                        continue
-                    if req_tool == "edit_file" and "write_file" in called_names:
-                        continue
-                    if req_tool == "write_file" and "extract_symbol" in called_names:
-                        continue
-                    if req_tool == "extract_symbol" and "write_file" in called_names:
-                        continue
+                    # All attempts failed — check if system-blocked or LLM error
+                    system_blocked = any(
+                        "HARD BLOCK" in str(e.get("error", ""))
+                        or "Adgang n\u00e6gtet" in str(e.get("error", ""))
+                        for e in all_attempts
+                    )
+                    if system_blocked:
+                        continue  # system prevented — still counts as satisfied
+                    # LLM error — add back to uncalled (must try differently)
                     uncalled.add(req_tool)
     if uncalled:
         return t(K.LOG_REQUIRED_TOOLS_MISSING, agent.lang).format(tools=", ".join(sorted(uncalled)))
@@ -1682,6 +1680,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     current_name = str(args_val.get("name", ""))
                     if current_name and current_name != last_name_arg:
                         consecutive_same_tool = 0
+                        consecutive_reads = 0
                         last_name_arg = current_name
 
                 if tool_name == last_tool_name:
