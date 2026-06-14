@@ -703,3 +703,17 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 **Result:** When a session contains tracebacks or code referencing files outside Agenten's directory, the system auto-detects the workdir and indexes that project's symbols. No manual `AGENT_WORKDIR` setup needed.
 
 **Files:** `agent_files.py:99-150`, `api_server.py:509-510,1421-1422`
+
+### 56. `add_method`/`add_function` — AST-based symbol insertion tools
+
+**Symptom:** LLM must send the entire class TWICE in `edit_file` arguments (`old_text` + `new_text` = 1000+ lines with complex escaping). Escaping errors in the JSON arguments cause "unterminated string literal" SyntaxErrors. The LLM can't escape `"`, `"""`, `\\n` properly in 4500+ token tool calls.
+
+**Fix (2 new tools + 1 code improvement):**
+1. **`add_method(filepath, class_name, method_code)`** in `git_ops.py:812`: Uses `ast.parse` to find the class, inserts `method_code` at the class's `end_lineno`. Normalizes indentation to 4 spaces. Syntax-checks the result. LLM only generates the new method (10-30 lines), not the whole class.
+2. **`add_function(filepath, function_code, [after_symbol])`** in `git_ops.py:870`: Same AST-based approach for module-level functions. Inserts at end of file or after a named symbol.
+3. **`REQUIRED_ACTION_TOOLS`** (`agent_tasks.py:1005`): Extended to include `add_method`, `add_function`, `remove_symbol`, `add_import` so `_check_required_tools` enforces them.
+4. **4-tier JSON recovery** (`llm_wrapper.py:17-94`): When the LLM's tool call arguments fail `json.loads`, the new chain tries: `raw_decode` (truncated JSON) → `_repair_json_control_chars` (fixes actual `\n` in strings — #1 LLM error) → `_salvage_json_args` (regex extraction for truly broken JSON) → `{}` (last resort).
+
+**Usage for BUG-097:** Instead of `edit_file(path='tools.py', old_text='class ToolRegistry:\n...')`, use `add_method(filepath='tools.py', class_name='ToolRegistry', method_code='def _parse_json_robust(self, raw, default_error_message=None):\n    ...')`.
+
+**Files:** `git_ops.py:812-940`, `agent_core.py:688-712`, `agent_tasks.py:1005`, `llm_wrapper.py:17-94,486-499`, `i18n.py:102-103`, `lang/*.json:tools.add_method
