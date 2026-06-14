@@ -407,7 +407,9 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
         return {"success": False, "error": f"Adgang n\u00e6gtet: kan ikke skrive til bin\u00e6re filer: {path}"}
     
     try:
-        if os.path.exists(path) and not overwrite:
+        # tests/temp/ is a scratch directory — always allow overwrite
+        is_scratch = "\\tests\\temp\\" in path or "/tests/temp/" in path
+        if os.path.exists(path) and not overwrite and not is_scratch:
             return {
                 "success": False,
                 "error": f"Filen findes allerede: {path}. Brug edit_file til at redigere eksisterende filer, eller brug overwrite=true for at erstatte den."
