@@ -711,7 +711,7 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                 try:
                     ast.parse(new_content)
                 except SyntaxError as e:
-                    normalized_new = _normalize_indentation(new_text, search)
+                    normalized_new = _normalize_indentation(new_text, exact_old)
                     if normalized_new != new_text:
                         normalized_content = content.replace(exact_old, normalized_new, 1)
                         try:

@@ -1938,7 +1938,9 @@
       "action": "Ekstraher `_parse_json_robust(raw: str) -> tuple[dict | None, str | None]` der returnerer (data, error_message). Kald den fra alle 4 steder. Successkriterie: Én funktion håndterer al JSON parsing. Alle 761 tests passerer.",
       "symptoms": "Ændringer i parsing-logik skal laves 3-4 steder. Risiko for at én sti opdateres men ikke de andre. Den escaped-newline normalisering er også duplikeret..",
       "environment": "Windows, Python 3.12, LM Studio",
-      "status": "open"
+      "status": "resolved",
+      "updated_at": "2026-06-14T23:36:16",
+      "resolution_note": "JSON parsing cascade i ToolRegistry.parse_response/execute er centraliseret via _parse_json_robust, og verifikation viser tests passerer."
     },
     {
       "id": "BUG-098",
