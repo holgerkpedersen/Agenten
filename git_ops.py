@@ -4,6 +4,7 @@ import ast
 import os
 import re
 import subprocess
+import textwrap
 
 import threading
 from typing import Any
@@ -663,7 +664,9 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                 lines_list.insert(insert_at, new_method_block)
                 new_content = '\n'.join(lines_list)
             else:
-                return {"success": False, "error": f"Symbol '{symbol}' not found in {path}. Use old_text/new_text instead."}
+                # Symbol not found → create new symbol at end of file
+                dedented = textwrap.dedent(new_text)
+                new_content = content + '\n' + dedented + '\n'
         elif old_text:
             search = old_text.replace('\r\n', '\n').replace('\r', '\n')
             count = content.count(search)
