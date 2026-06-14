@@ -195,24 +195,9 @@ class ToolRegistry:
 
         if tool_match:
             raw = tool_match.group(1)
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                try:
-                    data, idx = json.JSONDecoder().raw_decode(raw)
-                    if idx < len(raw) and raw[idx:].strip() and not all(c in ']})>' for c in raw[idx:].strip()):
-                        raise ValueError("Trailing content after JSON")
-                except (json.JSONDecodeError, ValueError):
-                    escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
-                    try:
-                        data = json.loads(escaped)
-                    except json.JSONDecodeError:
-                        try:
-                            data, idx = json.JSONDecoder().raw_decode(escaped)
-                            if idx < len(escaped) and escaped[idx:].strip() and not all(c in ']})>' for c in escaped[idx:].strip()):
-                                raise ValueError("Trailing content after JSON")
-                        except (json.JSONDecodeError, ValueError):
-                            return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
+            data, err = _parse_json_robust(raw)
+            if data is None:
+                return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
             tool_name = data.get("tool", "")
             if tool_name.lower() in ("navn", "name", "nombre", "名称"):
                 names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
@@ -226,22 +211,15 @@ class ToolRegistry:
         if self.TOOL_MARKER in response and self.END_MARKER not in response:
             return {"type": "error", "message": "Your response was truncated (missing <<<END>>>). Use shorter content or split into smaller chunks."}
 
-        # Handle malformed tool tag (missing opening <<<)
+# Handle malformed tool tag (missing opening <<<)
         loose_tool = re.search(r'(?:<<<)?TOOL>>>\s*(.*?)\s*' + end_pat, response, re.DOTALL)
         if loose_tool and not done_match:
-            raw = loose_tool.group(1)
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
-                try:
-                    data = json.loads(escaped)
-                except json.JSONDecodeError:
-                    return {"type": "error", "message": "JSON parse error"}
-            if isinstance(data, dict):
-                tool_name = data.get("tool", "")
-                if tool_name.lower() not in ("navn", "name", "nombre", "\u540d\u79f0"):
-                    return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
+         raw = loose_tool.group(1)
+         data, err = _parse_json_robust(raw)
+         if data is not None and isinstance(data, dict):
+          tool_name = data.get("tool", "")
+          if tool_name.lower() not in ("navn", "name", "nombre", "\u540d\u79f0"):
+           return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
         if done_match:
             try:
                 data = json.loads(done_match.group(1))
@@ -288,56 +266,37 @@ class ToolRegistry:
             log.error("Tool '%s' failed: %s", tool_name, traceback.format_exc())
             return {"success": False, "error": f"Værktøjet '{tool_name}' fejlede: {str(e)}"}
 
-    def _parse_json_robust(self, raw, default_error_message=None):
-        try:
-            data = json.loads(raw)
-        except Exception as e:
-            error = e
-            try:
-                data, idx = json.JSONDecoder().raw_decode(raw)
-                if idx < len(raw) and raw[idx:].strip() and not all(c in ']})>' for c in raw[idx:].strip()):
-                    raise ValueError("Trailing content after JSON")
-            except (json.JSONDecodeError, ValueError) as err:
-                error = err
-            escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
-            try:
-                data = json.loads(escaped)
-            except Exception as e2:
-                error = e2
-                try:
-                    data, idx = json.JSONDecoder().raw_decode(escaped)
-                    if idx < len(escaped) and escaped[idx:].strip() and not all(c in ']})>' for c in escaped[idx:].strip()):
-                        raise ValueError("Trailing content after JSON")
-                except (json.JSONDecodeError, ValueError) as err:
-                    error = err
-            return {"error": default_error_message} if default_error_message is not None else {"error": str(error)}
-
-
 def _parse_json_robust(raw: str) -> tuple[dict | None, str | None]:
     """Parse JSON robustly and return data plus error message."""
+    decoder = json.JSONDecoder()
+    # Tier 1: direct load
     try:
         data = json.loads(raw)
+        return data, None
     except json.JSONDecodeError:
-        try:
-            decoder = json.JSONDecoder()
-            data, idx = decoder.raw_decode(raw)
-            if idx < len(raw) and raw[idx:].strip() and not all(c in ']})>' for c in raw[idx:].strip()):
-                raise ValueError("Trailing content after JSON")
-        except (json.JSONDecodeError, ValueError):
-            escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
-            try:
-                data = json.loads(escaped)
-            except json.JSONDecodeError:
-                try:
-                    data, idx = decoder.raw_decode(escaped)
-                    if idx < len(escaped) and escaped[idx:].strip() and not all(c in ']})>' for c in escaped[idx:].strip()):
-                        raise ValueError("Trailing content after JSON")
-                except (json.JSONDecodeError, ValueError):
-                    return None, t(K.TOOL_INVALID_JSON)
-
-## Oversættelser fundet i koden:
-# TOOL_INVALID_JSON = "Ugyldigt JSON i tool-kald"
-
-## Oversættelser fundet i koden:
-# TOOL_INVALID_JSON = "Ugyldigt JSON i tool-kald"
+        pass
+    # Tier 2: raw_decode (handles trailing content)
+    try:
+        data, idx = decoder.raw_decode(raw)
+        if idx < len(raw) and raw[idx:].strip() and not all(c in ']})>' for c in raw[idx:].strip()):
+            raise ValueError("Trailing content after JSON")
+        return data, None
+    except (json.JSONDecodeError, ValueError):
+        pass
+    # Tier 3: escaped newlines + direct load
+    escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
+    try:
+        data = json.loads(escaped)
+        return data, None
+    except json.JSONDecodeError:
+        pass
+    # Tier 4: escaped newlines + raw_decode
+    try:
+        data, idx = decoder.raw_decode(escaped)
+        if idx < len(escaped) and escaped[idx:].strip() and not all(c in ']})>' for c in escaped[idx:].strip()):
+            raise ValueError("Trailing content after JSON")
+        return data, None
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return None, t(K.TOOL_INVALID_JSON)
 
