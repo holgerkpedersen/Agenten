@@ -287,3 +287,32 @@ class ToolRegistry:
         except Exception as e:
             log.error("Tool '%s' failed: %s", tool_name, traceback.format_exc())
             return {"success": False, "error": f"Værktøjet '{tool_name}' fejlede: {str(e)}"}
+
+def _parse_json_robust(raw: str) -> tuple[dict | None, str | None]:
+    """Parse JSON robustly and return data plus error message."""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        try:
+            decoder = json.JSONDecoder()
+            data, idx = decoder.raw_decode(raw)
+            if idx < len(raw) and raw[idx:].strip() and not all(c in ']})>' for c in raw[idx:].strip()):
+                raise ValueError("Trailing content after JSON")
+        except (json.JSONDecodeError, ValueError):
+            escaped = raw.replace('\r\n', '\\n').replace('\r', '\\n').replace('\n', '\\n')
+            try:
+                data = json.loads(escaped)
+            except json.JSONDecodeError:
+                try:
+                    data, idx = decoder.raw_decode(escaped)
+                    if idx < len(escaped) and escaped[idx:].strip() and not all(c in ']})>' for c in escaped[idx:].strip()):
+                        raise ValueError("Trailing content after JSON")
+                except (json.JSONDecodeError, ValueError):
+                    return None, t(K.TOOL_INVALID_JSON)
+
+## Oversættelser fundet i koden:
+# TOOL_INVALID_JSON = "Ugyldigt JSON i tool-kald"
+
+## Oversættelser fundet i koden:
+# TOOL_INVALID_JSON = "Ugyldigt JSON i tool-kald"
+

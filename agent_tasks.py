@@ -723,12 +723,15 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     else:
         user_guidance += t(K.DONE_CONTINUATION, agent.lang).format(DONE_MARKER=agent.tool_registry.DONE_MARKER)
     if not chunk_hint and tools_list:
-        has_any_write = any(t in ('write_file', 'edit_file', 'extract_symbol', 'remove_symbol', 'add_import') for t in agent.tool_registry.active_tools or [])
+        has_any_write = any(t in ('write_file', 'edit_file', 'extract_symbol', 'remove_symbol', 'add_import', 'add_method', 'add_function') for t in agent.tool_registry.active_tools or [])
         if not has_any_write and not agent.images and not agent.file_chunks:
             user_guidance += "\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
-    has_write = any(t in ('write_file', 'edit_file') for t in (agent.tool_registry.active_tools or []))
+    WRITE_TOOLS = {'write_file', 'edit_file', 'add_method', 'add_function', 'extract_symbol', 'remove_symbol', 'add_import'}
+    has_write = any(t in WRITE_TOOLS for t in (agent.tool_registry.active_tools or []))
     if has_write:
         user_guidance += t(K.WRITE_REQUIRED, agent.lang)
+        active_write = [t for t in WRITE_TOOLS if t in (agent.tool_registry.active_tools or [])]
+        user_guidance += f" Tilg\u00e6ngelige skrivev\u00e6rkt\u00f8jer: {', '.join(active_write)}."
     wta_tip = agent._seq.generate_tool_tip(agent.active_template or "fri", task_node.name) if hasattr(agent, '_seq') else ""
     if wta_tip:
         user_guidance += "\n\n" + wta_tip
@@ -742,6 +745,8 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         "read_location": "\n  Brug read_location(filepath='fil.py', name='funktionsnavn') for at læse KUN en bestemt funktion/metode/klasse — IKKE hele filen.",
         "write_file": "\n  Brug write_file(path='ny_fil.py', content='...') for at oprette NYE filer der IKKE findes i forvejen. Brug ALDRIG write_file til at erstatte eksisterende filer — brug edit_file i stedet.",
         "edit_file": "\n  Brug edit_file(path='fil.py', old_text='tekst der skal erstattes', new_text='ny tekst') for at redigere EKSISTERENDE filer. Læs filen FØRST med read_chunk, kopier den præcise tekst som old_text. For at TILFØJE en linje: sæt old_text = hele filens indhold, og new_text = det gamle indhold + den nye linje. ERSTAT ALDRIG hele indholdet med kun den nye tekst.",
+        "add_method": "\n  Brug add_method(filepath='fil.py', class_name='MinKlasse', method_code='def ny_metode(self):\\n    pass') for at TILFØJE en ny metode til en eksisterende klasse. Du skal KUN angive den nye metodekode — IKKE hele klassen. Dette undgår escaping-problemer med edit_file.",
+        "add_function": "\n  Brug add_function(filepath='fil.py', function_code='def ny_funktion():\\n    pass') for at TILFØJE en ny module-level funktion. Valgfrit: after_symbol='anden_funk' indsætter efter givet symbol.",
         "run_tests": "\n  Brug run_tests() for at køre tests og verificere at din kode virker.",
         "update_issue_status": "\n  Brug update_issue_status(issue_id='...', status='resolved') når et issue er løst.",
     }
