@@ -2135,12 +2135,9 @@ def autoresearch_run_from_phase() -> Any:
 
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:
-    """list issues."""
+    """list issues — merged from framework (Agenten) and workdir."""
     issues_path = agent_issues._get_issues_path()
-    if not os.path.exists(issues_path):
-        return jsonify({"success": True, "meta": {"total": 0}, "issues": []})
-    with open(issues_path, encoding="utf-8") as f:
-        data = json.load(f)
+    data = agent_issues._load_all_issues()
     meta = data.setdefault("meta", {})
     all_issue_count = len(data.get("issues", [])) + len(data.get("active_risks", []))
     meta["total_all_issues"] = all_issue_count

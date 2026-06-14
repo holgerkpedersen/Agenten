@@ -30,6 +30,11 @@ REFAC_TEMPLATE = {
 OVERSIZE_LINE_LIMIT = 1000
 
 
+def _get_framework_issues_path() -> str:
+    """Agentens egne issues (framework issues) — altid Agenten-projektets fil."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
+
+
 def _get_issues_path() -> str:
     """get issues path - uses workdir hvis AGENT_WORKDIR er sat, ellers Agentens."""
     workdir = os.environ.get("AGENT_WORKDIR", "")
@@ -37,20 +42,64 @@ def _get_issues_path() -> str:
         wd_path = os.path.join(workdir, "docs", "issues", "observed", "issues.json")
         os.makedirs(os.path.dirname(wd_path), exist_ok=True)
         return wd_path
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "issues", "observed", "issues.json")
+    return _get_framework_issues_path()
 
 
-def _load_issues() -> dict[str, Any]:
-    """load issues."""
-    path = _get_issues_path()
+def _read_json_file(path: str) -> dict[str, Any]:
+    """Læs en JSON-fil med fallback til tom struktur."""
     if not os.path.exists(path):
-        return {"meta": {"generated": "2026-05-20", "source": "Agenten", "total": 0}, "issues": []}
+        return {"meta": {"total": 0}, "issues": [], "active_risks": []}
     try:
         with open(path, encoding="utf-8") as f:
             return _json.load(f)
     except (_json.JSONDecodeError, IOError, OSError) as e:
-        log.warning("Failed to load issues.json: %s", e)
-        return {"meta": {"generated": "2026-05-20", "source": "Agenten", "total": 0}, "issues": []}
+        log.warning("Failed to load %s: %s", path, e)
+        return {"meta": {"total": 0}, "issues": [], "active_risks": []}
+
+
+def _load_all_issues() -> dict[str, Any]:
+    """Load issues from BOTH framework (Agenten) and workdir, merged.
+    
+    Workdir issues override framework issues with the same ID.
+    active_risks from both are concatenated.
+    """
+    framework = _read_json_file(_get_framework_issues_path())
+    workdir_path = _get_issues_path()
+    workdir = _read_json_file(workdir_path)
+
+    # If workdir points to same file as framework, no merge needed
+    if os.path.abspath(_get_framework_issues_path()) == os.path.abspath(workdir_path):
+        return workdir
+
+    # Merge: framework issues first, workdir overwrites on ID conflict
+    seen_ids: set[str] = set()
+    merged_issues: list[dict[str, Any]] = []
+    for source in (workdir.get("issues", []), framework.get("issues", [])):
+        for issue in source:
+            iid = issue.get("id", "")
+            if iid not in seen_ids:
+                seen_ids.add(iid)
+                merged_issues.append(issue)
+            elif iid:
+                # Already seen → workdir's version wins, skip framework duplicate
+                pass
+
+    # Risks: concatenated (no dedup by ID — risks are contextual)
+    all_risks = (workdir.get("active_risks") or []) + (framework.get("active_risks") or [])
+
+    merged = dict(workdir)  # start with workdir (has meta, etc.)
+    merged["issues"] = merged_issues
+    merged["active_risks"] = all_risks
+    merged["meta"] = dict(workdir.get("meta", {}))
+    merged["meta"]["total"] = len(merged_issues)
+    merged["_sources"] = {"framework": _get_framework_issues_path(), "workdir": workdir_path}
+    return merged
+
+
+def _load_issues() -> dict[str, Any]:
+    """load issues from workdir only (for write operations)."""
+    path = _get_issues_path()
+    return _read_json_file(path)
 
 
 def _save_issues(data: dict[str, Any]) -> None:
