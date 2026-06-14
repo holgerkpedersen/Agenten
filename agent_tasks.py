@@ -1002,7 +1002,7 @@ def _check_done_pr_requirements(agent: Any, messages: list[dict], called_tools: 
     return True
 
 
-REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "extract_symbol", "update_issue_status"}
+REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "extract_symbol", "remove_symbol", "add_import", "add_method", "add_function", "update_issue_status"}
 
 
 CLOSE_PHASE_ALIASES = {"opdatering", "opdatér", "luk", "close"}

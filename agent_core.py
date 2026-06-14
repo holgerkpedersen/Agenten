@@ -686,6 +686,22 @@ class Agent:
             )
         ))
         self.tool_registry.register(Tool(
+            "add_method",
+            t(K.TOOL_ADD_METHOD, self.lang),
+            ["filepath", "class_name", "method_code"],
+            lambda filepath, class_name, method_code: git_ops.add_method(
+                filepath=filepath, class_name=class_name, method_code=method_code
+            )
+        ))
+        self.tool_registry.register(Tool(
+            "add_function",
+            t(K.TOOL_ADD_FUNCTION, self.lang),
+            ["filepath", "function_code"],
+            lambda filepath, function_code, after_symbol="": git_ops.add_function(
+                filepath=filepath, function_code=function_code, after_symbol=after_symbol
+            )
+        ))
+        self.tool_registry.register(Tool(
             "add_import",
             t(K.TOOL_ADD_IMPORT, self.lang),
             ["source", "module", "symbol"],

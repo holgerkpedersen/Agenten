@@ -808,3 +808,160 @@ def list_files(path: str = ".", pattern: str | None = None, max_depth: int = 2) 
         return {"success": True, "files": result, "count": len(result), "path": os.path.abspath(path)}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def add_method(filepath: str, class_name: str, method_code: str) -> dict[str, Any]:
+    """Insert a method into an existing class using AST.
+
+    Finds the class by name, inserts method_code at the end of the class body.
+    method_code should contain the 'def' line and body (indentation optional —
+    the function normalizes to 4-space indent). Returns success/error.
+    """
+    path = _resolve_path(filepath)
+    if not is_safe_location(path):
+        return {"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}
+    if not os.path.exists(path):
+        return {"success": False, "error": f"Filen findes ikke: {path}"}
+    if not path.lower().endswith('.py'):
+        return {"success": False, "error": "Kun Python-filer (.py) understøttes"}
+
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception as e:
+        return {"success": False, "error": f"Kunne ikke læse filen: {e}"}
+
+    try:
+        tree = ast.parse(content)
+    except SyntaxError as e:
+        return {"success": False, "error": f"Syntaxfejl i filen: {e}"}
+
+    class_node = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            class_node = node
+            break
+
+    if not class_node:
+        return {"success": False, "error": f"Klasse '{class_name}' ikke fundet i {os.path.basename(path)}"}
+
+    end_line = class_node.end_lineno
+    if end_line is None:
+        return {"success": False, "error": "Kunne ikke bestemme klassens slutning (kræver Python 3.8+)"}
+
+    lines = content.split('\n')
+    method_lines = method_code.split('\n')
+
+    # Strip common leading whitespace from method_code
+    method_lines_stripped = textwrap.dedent('\n'.join(method_lines)).split('\n')
+    # Re-indent to 4 spaces
+    indented = ['    ' + l if l.strip() else l for l in method_lines_stripped]
+    # Ensure def line starts with 4 spaces
+    if indented and indented[0].strip():
+        if not indented[0].startswith('    '):
+            indented[0] = '    ' + indented[0].lstrip()
+
+    insert = [''] + indented  # blank line before method
+    new_lines = lines[:end_line] + insert + lines[end_line:]
+    new_content = '\n'.join(new_lines)
+
+    try:
+        ast.parse(new_content)
+    except SyntaxError as e:
+        return {
+            "success": False,
+            "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
+            "line": e.lineno,
+            "msg": e.msg,
+        }
+
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+    except Exception as e:
+        return {"success": False, "error": f"Kunne ikke skrive filen: {e}"}
+
+    return {
+        "success": True,
+        "method": indented[0] if indented else "",
+        "class": class_name,
+        "file": os.path.abspath(path),
+        "inserted_at": end_line + 1,
+    }
+
+
+def add_function(filepath: str, function_code: str, after_symbol: str = "") -> dict[str, Any]:
+    """Insert a module-level function into a Python file using AST.
+
+    Inserts function_code at the end of the file (or after after_symbol if provided).
+    function_code should contain the 'def' line and body.
+    """
+    path = _resolve_path(filepath)
+    if not is_safe_location(path):
+        return {"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}
+    if not os.path.exists(path):
+        return {"success": False, "error": f"Filen findes ikke: {path}"}
+    if not path.lower().endswith('.py'):
+        return {"success": False, "error": "Kun Python-filer (.py) understøttes"}
+
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception as e:
+        return {"success": False, "error": f"Kunne ikke læse filen: {e}"}
+
+    try:
+        tree = ast.parse(content)
+    except SyntaxError as e:
+        return {"success": False, "error": f"Syntaxfejl i filen: {e}"}
+
+    lines = content.split('\n')
+    func_lines = function_code.split('\n')
+    func_lines_stripped = textwrap.dedent('\n'.join(func_lines)).split('\n')
+
+    if after_symbol:
+        insert_line = None
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == after_symbol:
+                insert_line = node.end_lineno
+        if insert_line is None:
+            return {"success": False, "error": f"Symbol '{after_symbol}' ikke fundet i {os.path.basename(path)}"}
+        insert = [''] + func_lines_stripped
+        new_lines = lines[:insert_line] + insert + lines[insert_line:]
+    else:
+        # Insert before trailing blank lines / if __name__ guard
+        cut = len(lines)
+        for i in range(len(lines) - 1, -1, -1):
+            stripped = lines[i].strip()
+            if stripped and not stripped.startswith('if __name__'):
+                cut = i + 1
+                break
+            if stripped.startswith('if __name__'):
+                cut = i
+        insert = ([''] if cut < len(lines) else ['', '']) + func_lines_stripped
+        new_lines = lines[:cut] + insert + lines[cut:]
+
+    new_content = '\n'.join(new_lines)
+
+    try:
+        ast.parse(new_content)
+    except SyntaxError as e:
+        return {
+            "success": False,
+            "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
+            "line": e.lineno,
+            "msg": e.msg,
+        }
+
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+    except Exception as e:
+        return {"success": False, "error": f"Kunne ikke skrive filen: {e}"}
+
+    return {
+        "success": True,
+        "function": func_lines_stripped[0] if func_lines_stripped else "",
+        "file": os.path.abspath(path),
+        "inserted_after": after_symbol or "(end of file)",
+    }

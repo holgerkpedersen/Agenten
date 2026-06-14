@@ -101,6 +101,8 @@ class K(StrEnum):
     TOOL_WRITE_FILE                     = "tools.write_file"
     TOOL_LIST_FILES                     = "tools.list_files"
     TOOL_ADD_IMAGE                      = "tools.add_image"
+    TOOL_ADD_METHOD                     = "tools.add_method"
+    TOOL_ADD_FUNCTION                   = "tools.add_function"
     TOOL_EXTRACT_SYMBOL                 = "tools.extract_symbol"
     TOOL_REMOVE_SYMBOL                  = "tools.remove_symbol"
     TOOL_ADD_IMPORT                     = "tools.add_import"
