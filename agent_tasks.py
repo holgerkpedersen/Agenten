@@ -1548,9 +1548,11 @@ def _execute_autoresearch_issue(agent: Any, issue_id: str) -> Generator[dict, No
     except ImportError:
         pass
 
-    # Build task tree using the template's actual fallback sections
-    template_config = agent_skills.TEMPLATE_TOOLS.get("selvforbedring", {})
-    phase_names = list(template_config.keys()) if template_config else ["Analyser", "Diagnosticér", "Ret", "Verificér", "Commit"]
+    # Build task tree using title-case phase names (matches SECTION_INSTRUCTIONS
+    # and TEMPLATE_PHASE_CHECKS keys).
+    phase_names = list(agent_phase_checks.TEMPLATE_PHASE_CHECKS.get("selvforbedring", {}).keys())
+    if not phase_names:
+        phase_names = ["Analyser", "Diagnosticér", "Ret", "Verificér", "Commit"]
     tree = TaskTree(prompt)
     for phase_name in phase_names:
         tree.root.add_child(TaskNode(phase_name))
@@ -1712,8 +1714,13 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
             agent._seq.save()
     if task_node.status == "failed":
         agent._log("INFO", t(K.LOG_TASK_FAILED, agent.lang), task_node.name)
-        issue_id = agent_autoresearch.trigger_if_needed(
-            agent, task_node, called_tools, full_response, messages)
+        # Only auto-research when NOT already inside a sub-session —
+        # nested CORE issues from sub-session failures are counterproductive.
+        issue_id = None
+        _d = getattr(agent, '_autoresearch_depth', 0)
+        if not (isinstance(_d, int) and _d > 0):
+            issue_id = agent_autoresearch.trigger_if_needed(
+                agent, task_node, called_tools, full_response, messages)
         if issue_id:
             # Execute the CORE issue inline via selvforbedring sub-session
             yield {"type": "autoresearch", "action": "created", "issue_id": issue_id}

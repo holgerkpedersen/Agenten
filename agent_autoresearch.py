@@ -375,6 +375,11 @@ def trigger_if_needed(agent: Any, task_node: Any,
     if getattr(task_node, "status", "") != "failed":
         return None
 
+    # Belt-and-suspenders: refuse if already inside an auto-research sub-session
+    _d = getattr(agent, '_autoresearch_depth', 0)
+    if isinstance(_d, int) and _d > 0:
+        return None
+
     session_id = getattr(agent, "_session_id", "unknown")
 
     # Gather context for filter check
