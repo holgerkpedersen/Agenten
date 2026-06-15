@@ -299,7 +299,19 @@ class CodeModifier:
         lines = content.split('\n')
 
         new_lines = lines[:start] + lines[end:]
-        new_content = '\n'.join(new_lines).strip() + '\n'
+
+        # Compress runs of 3+ consecutive blank lines to at most 2
+        compressed = []
+        blank_run = 0
+        for line in new_lines:
+            if line.strip() == '':
+                blank_run += 1
+                if blank_run <= 2:
+                    compressed.append(line)
+            else:
+                blank_run = 0
+                compressed.append(line)
+        new_content = '\n'.join(compressed).strip() + '\n'
 
         try:
             ast.parse(new_content)
