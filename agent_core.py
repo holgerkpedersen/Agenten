@@ -18,6 +18,7 @@ import agent_files
 import agent_tree
 import agent_skills
 import agent_git
+import re
 import agent_logs
 from agent_wta import WTAState, SequenceLearner
 from core_analytics import CoreAnalytics, TOOL_HANDLER_MAP
@@ -509,6 +510,23 @@ class Agent:
 
         _auto_load_issue_files(self, prompt, template, files)
         _auto_load_location_file(self, prompt)
+
+        # Stale refactor_plan.md cleanup — if a new refactor session starts
+        # with a different target file than what the plan covers, the plan is
+        # stale and causes wrong todos/phase-checks (e.g., REFAC-023 targetting
+        # agent_phase_checks.py reuses REFAC-016's agent_core.py modules).
+        if template == "refactor" and os.path.exists("refactor_plan.md"):
+            try:
+                with open("refactor_plan.md", "r", encoding="utf-8") as _f:
+                    _header = _f.read(300)
+                _prompt_target = re.search(r'(?:REFAC|ARC|BUG)[-\s]*\d+.*?([a-zA-Z_][\w.]+\.py)', prompt)
+                _plan_target = re.search(r'([a-zA-Z_][\w.]+\.py)', _header)
+                if _prompt_target and _plan_target and _prompt_target.group(1) != _plan_target.group(1):
+                    os.remove("refactor_plan.md")
+                    self._log("INFO", "Slettet gammel refactor_plan.md",
+                              f"Planen målrettede '{_plan_target.group(1)}', men prompten handler om '{_prompt_target.group(1)}'")
+            except (OSError, UnicodeDecodeError):
+                pass
 
         file_context = _build_file_context(self, files, prompt)
 

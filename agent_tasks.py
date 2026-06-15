@@ -1577,7 +1577,7 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
 
 
 
-def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
+def _generate_phase_todos(template: str, phase_name: str, prompt: str = "") -> list[dict]:
     """Generate a todo checklist for a phase based on template and phase name."""
     phase = _normalize_phase(phase_name).lower()
     todos = []
@@ -1615,15 +1615,23 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
         import re as _re
         plan_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'refactor_plan.md') if _os.environ.get('AGENT_WORKDIR') else 'refactor_plan.md'
         plan_content = ''
+        plan_fresh = True
         if _os.path.exists(plan_path):
             try:
                 with open(plan_path, 'r', encoding='utf-8') as _f:
                     plan_content = _f.read()
+                # Staleness check: if plan header mentions a different .py file
+                # than what the prompt targets, the plan is from an old session.
+                if prompt:
+                    _prompt_target = _re.search(r'(?:REFAC|ARC|BUG)[-\s]*\d+.*?([a-zA-Z_][\w.]+\.py)', prompt)
+                    _plan_target = _re.search(r'([a-zA-Z_][\w.]+\.py)', plan_content[:300])
+                    if _prompt_target and _plan_target and _prompt_target.group(1) != _plan_target.group(1):
+                        plan_fresh = False
             except (OSError, UnicodeDecodeError):
                 pass
 
-        # Extract module names from plan
-        plan_modules = sorted(set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))) if plan_content else []
+        # Extract module names from plan (only if plan is fresh)
+        plan_modules = sorted(set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))) if (plan_content and plan_fresh) else []
         existing_modules = [m for m in plan_modules if _os.path.exists(m)]
 
         if phase == "analyse":
@@ -1873,7 +1881,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     Yields:
         ..."""
     task_node.status = "running"
-    agent._phase_todos = _generate_phase_todos(getattr(agent, 'active_template', '') or '', task_node.name)
+    agent._phase_todos = _generate_phase_todos(getattr(agent, 'active_template', '') or '', task_node.name, getattr(agent, 'original_prompt', ''))
     for todo in agent._phase_todos:
         yield {"type": "todo_add", "todo": todo}
     agent._task_start_time = time.time()
