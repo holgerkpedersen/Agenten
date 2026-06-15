@@ -1,4 +1,4 @@
-"""Agent helpers - utility/helper functions extracted from agent_core."""
+"""Agent helper utilities."""
 from __future__ import annotations
 
 import os
@@ -9,11 +9,9 @@ import sys
 from typing import Any
 
 from config import get_logger
-import agent_files
-import agent_issues
-import config
 
 log = get_logger(__name__)
+
 
 _LOOKUP_CACHE: dict[str, str | None] = {}
 
@@ -63,6 +61,8 @@ def _extract_filenames(location: str) -> list[str]:
 
 def _auto_load_issue_files(agent: Any, prompt: str, template: str | None, files: list[dict[str, Any]]) -> None:
     """Automatically load issue-related files when a bug/issue ID is present in the prompt."""
+    import agent_issues
+    import agent_files
     if template not in ("bugfix", "issue_handler") or files:
         return
     issue_match = re.search(r'(BUG-\d+|SEC-\d+|TST-\d+|ARC-\d+|PRF-\d+|MNT-\d+|REFAC-\d+)', prompt)
@@ -94,13 +94,14 @@ def _auto_load_issue_files(agent: Any, prompt: str, template: str | None, files:
                         if content:
                             files.append({"filename": filename, "content": content, "path": path})
                             agent._log("INFO", f"Auto-loaded fil fra {issue_id}", path)
-                        break
+                            break
     except Exception as e:
         agent._log("WARNING", "Kunne ikke auto-loade issue-fil", str(e))
 
 
 def _auto_load_location_file(agent: Any, prompt: str) -> None:
     """Load file(s) from a Location: field in the prompt."""
+    import agent_files
     if agent.file_chunks:
         return
     location_match = re.search(r'Location:\s*([^\n]+)', prompt, re.IGNORECASE)
@@ -130,25 +131,18 @@ def _auto_load_location_file(agent: Any, prompt: str) -> None:
 
 
 def _validate_prompt_against_code(agent: Any, prompt: str) -> str:
-    """Extract symbol names from prompt, check against global symbol index, log findings.
-    Returns a context note to inject into the decomposition prompt.
-    """
+    """Extract symbol names from prompt, check against global symbol index, log findings."""
     import agent_files as _af
     extracted = set()
-    # Backtick patterns: `function_name` or `Class.method`
     for m in re.finditer(r'`([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)?)`', prompt):
         extracted.add(m.group(1))
-    # function_name( or Class.method( patterns
     for m in re.finditer(r'(?<![a-zA-Z._])([a-z_][a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)?)\s*\(', prompt):
         extracted.add(m.group(1))
-    # Location: file.py:symbol — extract the :symbol part
     loc_match = re.search(r'Location:\s*[\w./\\-]+\.\w+\s*:\s*([a-zA-Z_]\w*)', prompt)
     if loc_match:
         extracted.add(loc_match.group(1))
-    # Issue ID references in prompt — extract keywords after "for" or "af"
     for m in re.finditer(r'\b(?:implementer|ret|fix|løs|lav|brug|kald|kør)\s+([a-z_]\w+)', prompt, re.IGNORECASE):
         extracted.add(m.group(1))
-
     index = _af._GLOBAL_SYMBOL_INDEX if hasattr(_af, '_GLOBAL_SYMBOL_INDEX') else {}
     found = []
     for sym in sorted(extracted):
@@ -162,8 +156,6 @@ def _validate_prompt_against_code(agent: Any, prompt: str) -> str:
                     fp, ln = str(m), '?'
                 locations.append(f"{fp}:{ln}")
             found.append((sym, locations))
-
-    # Also check for Location: file.py (without :symbol) — list file's symbols for context
     loc_file_match = re.search(r'Location:\s*([\w./\\-]+\.\w+)', prompt, re.IGNORECASE)
     loc_file_symbols = []
     if loc_file_match and not loc_match:
@@ -174,7 +166,6 @@ def _validate_prompt_against_code(agent: Any, prompt: str) -> str:
                     if isinstance(sm, tuple) and sm[0] == loc_fn:
                         loc_file_symbols.append((sym_name, sm[1]))
                         break
-
     log_detail_lines = [f"Scanner prompt for symbol-match: {len(extracted)} kandidater"]
     for sym in sorted(extracted):
         log_detail_lines.append(f" Symbol: {sym} — {'FUNDET' if sym in index else 'ikke fundet'}")
@@ -186,9 +177,7 @@ def _validate_prompt_against_code(agent: Any, prompt: str) -> str:
         log_detail_lines.append(f"\n Location-fil '{loc_fn}' har {len(loc_file_symbols)} symboler i indekset")
         for sym_name, ln in sorted(loc_file_symbols):
             log_detail_lines.append(f" {sym_name} [{ln}]")
-
     agent._log("VALIDERING", f"Prompt-validering: {len(found)}/{len(extracted)} symboler matcher kode", "\n".join(log_detail_lines))
-
     if not found:
         return ""
     note = "\n\n## ⚠️ Prompt-validering\n"
@@ -200,10 +189,7 @@ def _validate_prompt_against_code(agent: Any, prompt: str) -> str:
 
 
 def _run_doc_refinement(workdir: str, rounds: int = 7, model: str = "") -> dict[str, Any]:
-    """Kør iterativ doc-refinement via scripts/run_doc_refinement.py.
-    Auto-beregner per-call timeout (default 900s) og total script timeout.
-    Returnerer dict med success, rounds, model, output, dialog_path.
-    """
+    """Kør iterativ doc-refinement via scripts/run_doc_refinement.py."""
     if not workdir:
         return {"success": False, "error": "workdir mangler"}
     project_root = os.path.dirname(os.path.abspath(__file__))
@@ -214,17 +200,13 @@ def _run_doc_refinement(workdir: str, rounds: int = 7, model: str = "") -> dict[
     per_call_timeout = 900
     total_timeout = int(per_call_timeout * rounds * 1.5)
     cmd = [
-        sys.executable, script_path,
-        "--workdir", workdir,
-        "--rounds", str(rounds),
-        "--timeout", str(per_call_timeout),
+        sys.executable, script_path, "--workdir", workdir,
+        "--rounds", str(rounds), "--timeout", str(per_call_timeout),
     ]
     if model:
         cmd.extend(["--model", model])
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=total_timeout,
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=total_timeout)
         output = (result.stdout or "") + (result.stderr or "")
         dialog_path = os.path.join(workdir, "docs", "uddybning_dialog.md")
         return {

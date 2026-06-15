@@ -481,6 +481,37 @@
             padding: 10px;
             border-left: 3px solid var(--history-border);
         }
+        .todos-box {
+            padding: 4px 8px;
+            font-size: 12px;
+            overflow-y: auto;
+            height: 100%;
+        }
+        .todo-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 3px 4px;
+            border-radius: 3px;
+            margin: 1px 0;
+            cursor: default;
+        }
+        .todo-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .todo-item.done {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+        .todo-checkbox {
+            cursor: pointer;
+            margin-top: 1px;
+            accent-color: var(--accent);
+        }
+        .todo-text {
+            flex: 1;
+            line-height: 1.4;
+        }
         
         .history-prompt {
             font-weight: bold;
@@ -1187,7 +1218,8 @@ const panelDefinitions = [
     { id: 'tree', title: '📁 Opgavetræ', defaultLeft: 20, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
     { id: 'llm', title: '📡 LLM Output', defaultLeft: 440, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
     { id: 'log', title: '📋 Agent Log', defaultLeft: 860, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
-    { id: 'history', title: '📜 Prompt Historik', defaultLeft: 20, defaultTop: 340, defaultWidth: 1240, defaultHeight: 200 }
+    { id: 'history', title: '📜 Prompt Historik', defaultLeft: 20, defaultTop: 340, defaultWidth: 1240, defaultHeight: 200 },
+    { id: 'todos', title: '📋 Todo', defaultLeft: 20, defaultTop: 680, defaultWidth: 1240, defaultHeight: 100 }
 ];
 
 function getCurrentLayout() {
@@ -2134,6 +2166,8 @@ function createPanels() {
             contentDiv.innerHTML = '<div id="logContent" class="log-box"><div style="color: #64748b;"></div></div>';
         } else if (def.id === 'history') {
             contentDiv.innerHTML = '<div id="historyContent" class="history-box"><div style="color: #64748b;"></div></div>';
+        } else if (def.id === 'todos') {
+            contentDiv.innerHTML = '<div id="todosContent" class="todos-box"><div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div></div>';
         }
     }
     
@@ -2958,6 +2992,40 @@ async function executeWithStream() {
                 
             case 'log':
                 addLogEntry(data.log.level, data.log.message, data.log.detail);
+                break;
+                
+            case 'todo_add':
+                const tc = document.getElementById('todosContent');
+                if (tc) {
+                    const existing = tc.querySelector(`[data-todo-id="${data.todo.id}"]`);
+                    if (!existing) {
+                        const div = document.createElement('div');
+                        div.className = 'todo-item';
+                        div.dataset.todoId = data.todo.id;
+                        div.innerHTML = `<input type="checkbox" class="todo-checkbox" onchange="this.parentElement.classList.toggle('done')"> <span class="todo-text">${escapeHtml(data.todo.text)}</span>`;
+                        if (data.todo.done) {
+                            div.classList.add('done');
+                            div.querySelector('input').checked = true;
+                        }
+                        tc.appendChild(div);
+                    }
+                }
+                break;
+                
+            case 'todo_update':
+                const tc2 = document.getElementById('todosContent');
+                if (tc2) {
+                    const item = tc2.querySelector(`[data-todo-id="${data.id}"]`);
+                    if (item) {
+                        if (data.done) {
+                            item.classList.add('done');
+                            item.querySelector('input').checked = true;
+                        } else {
+                            item.classList.remove('done');
+                            item.querySelector('input').checked = false;
+                        }
+                    }
+                }
                 break;
                 
             case 'start':

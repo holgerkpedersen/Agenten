@@ -1544,6 +1544,87 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
     yield {"type": "done", "result": full_response}
 
 
+
+
+def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
+    """Generate a todo checklist for a phase based on template and phase name."""
+    phase = _normalize_phase(phase_name).lower()
+    todos = []
+
+    try:
+        from agent_phase_checks import TEMPLATE_PHASE_CHECKS
+        checks = TEMPLATE_PHASE_CHECKS.get(template, {}).get(phase_name, {})
+        desc = checks.get("description", "")
+        if desc:
+            todos.append({"id": "todo_desc", "text": desc, "done": False})
+    except Exception:
+        pass
+
+    if template == "bugfix":
+        if phase == "analyse":
+            todos.extend([
+                {"id": "bf_a1", "text": "Laes issue med read_issue()", "done": False},
+                {"id": "bf_a2", "text": "Find relevant kode med locate()", "done": False},
+                {"id": "bf_a3", "text": "Sammenlign koden med buggens paastand", "done": False},
+                {"id": "bf_a4", "text": "Afgoer om fejlen findes eller er rettet", "done": False},
+            ])
+        elif phase == "test" or "test" in phase:
+            todos.extend([
+                {"id": "bf_t1", "text": "Opret testfil i tests/temp/ med write_file", "done": False},
+                {"id": "bf_t2", "text": "Koer specifik test - den SKAL fejle (roed fase)", "done": False},
+            ])
+        elif phase == "implementering":
+            todos.extend([
+                {"id": "bf_i1", "text": "Ret kildekoden med edit_file/add_method/add_function", "done": False},
+                {"id": "bf_i2", "text": "Undgaa write_file - filen findes allerede", "done": False},
+                {"id": "bf_i3", "text": "Brug add_method til nye metoder i klasse", "done": False},
+            ])
+        elif phase == "verifikation":
+            todos.extend([
+                {"id": "bf_v1", "text": "Koer specifik test - den SKAL bestaa (groen fase)", "done": False},
+                {"id": "bf_v2", "text": "Koer HELE testsuiten for at tjekke regression", "done": False},
+            ])
+        elif phase == "opdatering":
+            todos.append({"id": "bf_o1", "text": "Opdater issue status til 'resolved'", "done": False})
+
+    elif template == "refactor":
+        if phase == "analyse":
+            todos.extend([
+                {"id": "rf_a1", "text": "List alle symboler med list_symbols()", "done": False},
+                {"id": "rf_a2", "text": "Laes de vigtigste metoder med read_location()", "done": False},
+                {"id": "rf_a3", "text": "Analyser afhaengigheder med analyze_dependencies()", "done": False},
+                {"id": "rf_a4", "text": "Identificer SOLID-overtraedelser", "done": False},
+            ])
+        elif phase == "plan":
+            todos.extend([
+                {"id": "rf_p1", "text": "Beslut modulopdeling", "done": False},
+                {"id": "rf_p2", "text": "Skriv refactor_plan.md med write_file()", "done": False},
+                {"id": "rf_p3", "text": "Inkluder alle moduler og symboler i planen", "done": False},
+            ])
+        elif phase == "ekstraher":
+            todos.extend([
+                {"id": "rf_e1", "text": "Brug extract_symbol() til at flytte kode til nye moduler", "done": False},
+                {"id": "rf_e2", "text": "Brug kun write_file() hvis extract_symbol ikke virker", "done": False},
+                {"id": "rf_e3", "text": "Inkluder ALLE imports i nye filer (typing.Any mv.)", "done": False},
+                {"id": "rf_e4", "text": "Verificer syntaks med verify_refactor()", "done": False},
+            ])
+        elif phase == "opdater" or phase == "opdatering":
+            todos.extend([
+                {"id": "rf_u1", "text": "Fjern flyttede symboler med remove_symbol()", "done": False},
+                {"id": "rf_u2", "text": "Tilfoej imports med add_import()", "done": False},
+                {"id": "rf_u3", "text": "Verificer syntaks med verify_refactor()", "done": False},
+            ])
+        elif phase == "test":
+            todos.extend([
+                {"id": "rf_t1", "text": "Koer alle tests for at bekaefte ingen regression", "done": False},
+                {"id": "rf_t2", "text": "Opdater issue status til 'resolved'", "done": False},
+            ])
+
+    if not todos:
+        todos.append({"id": "todo_generic", "text": f"Gennemfoer fasen: {phase_name}", "done": False})
+
+    return todos
+
 def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Generator[dict, None, None]:
     """solve task stream.
     
@@ -1555,6 +1636,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     Yields:
         ..."""
     task_node.status = "running"
+    agent._phase_todos = _generate_phase_todos(getattr(agent, 'active_template', '') or '', task_node.name)
+    for t in agent._phase_todos:
+        yield {"type": "todo_add", "todo": t}
     agent._task_start_time = time.time()
     agent.current_phase = _normalize_phase(task_node.name)
     agent._log("INFO", t(K.LOG_TASK_START, agent.lang), f"{task_node.name} (model: {agent.llm.model})")
