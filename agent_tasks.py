@@ -1074,14 +1074,14 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
             iteration = getattr(agent, "_current_task_iteration", 0)
             if iteration >= 3 and not getattr(agent, "_non_productive_reminder_sent", False):
                 agent._non_productive_reminder_sent = True
-                return t(K.SYS_REQUIRED_TOOLS_REFACTOR, agent.lang, count=iteration)
+                return t(K.SYS_REQUIRED_TOOLS_REFACTOR, agent.lang).format(count=iteration)
         programming_writing_phases = ("arkitekturdesign", "implementeringsplan", "kodeimplementering")
         has_written = any(k in (called_tools or {}) for k in called_tools if k.startswith("write_file") or k.startswith("edit_file"))
         if any(k in _normalize_phase(task_name).lower() for k in programming_writing_phases) and not has_written:
             iteration = getattr(agent, "_current_task_iteration", 0)
             if iteration >= 5 and not getattr(agent, "_non_productive_reminder_sent", False):
                 agent._non_productive_reminder_sent = True
-                return t(K.SYS_REQUIRED_TOOLS_PROGRAMMING, agent.lang, count=iteration)
+                return t(K.SYS_REQUIRED_TOOLS_PROGRAMMING, agent.lang).format(count=iteration)
     available = set(agent.tool_registry.active_tools or [])
     required = available & REQUIRED_ACTION_TOOLS
     if not required:

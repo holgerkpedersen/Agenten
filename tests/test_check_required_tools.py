@@ -121,7 +121,7 @@ class TestGetMaxIterations(unittest.TestCase):
 
     def test_refactor_plan(self):
         agent = FakeAgent([], template="refactor")
-        self.assertEqual(_get_max_iterations(agent, "Plan"), 4)
+        self.assertEqual(_get_max_iterations(agent, "Plan"), 8)
 
     def test_refactor_ekstraher_higher_budget(self):
         """Ekstraher needs 15 turns (34+ symbols at ~1 call each)."""
