@@ -1732,6 +1732,18 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     continue
                 consecutive_dedups = 0
                 if tool_name in READ_ONLY_TOOLS:
+                    if getattr(agent, '_read_escape_sent', False):
+                        _active = agent.tool_registry.active_tools or []
+                        write_tools = [t for t in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import")
+                                       if t in _active]
+                        result_str = f"[SYSTEM: L\u00e6sning er blokeret. DU SKAL skrive kode. Brug {'/'.join(write_tools)}]"
+                        result = {"success": True, "result": "Skipped \u2014 reads blocked"}
+                        agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                        continue
                     consecutive_reads += 1
                     if consecutive_reads >= 5:
                         _active = agent.tool_registry.active_tools or []
@@ -1757,7 +1769,6 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             continue
                 if tool_name in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"):
                     consecutive_reads = 0
-                    agent._read_escape_sent = False
                 if tool_name == "write_file" and args_val.get("path"):
                     import os as _os
                     write_path = _os.path.abspath(args_val["path"])
