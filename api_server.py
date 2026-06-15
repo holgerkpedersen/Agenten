@@ -1327,20 +1327,20 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
         if _check_client(agent):
             return
         if getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
-            child.status = "skipped"
             skip_msg = "Skipped — issue was already resolved in an earlier phase"
-            child.result = skip_msg
-            child_results.append(f"- {child.name}: {skip_msg}")
-            yield f"data: {json.dumps({'type': 'task_start', 'task': child.name, 'success_criteria': getattr(child, 'success_criteria', [])})}\n\n"
-            yield f"data: {json.dumps({'type': 'task_done', 'task': child.name, 'status': child.status, 'result': skip_msg})}\n\n"
-            agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {child.name}", "detail": skip_msg})
-            yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
-            completed[0] += _count_tasks(child)
+            for remaining in node.children[node.children.index(child):]:
+                remaining.status = "skipped"
+                remaining.result = skip_msg
+                yield f"data: {json.dumps({'type': 'task_start', 'task': remaining.name, 'success_criteria': getattr(remaining, 'success_criteria', [])})}\n\n"
+                yield f"data: {json.dumps({'type': 'task_done', 'task': remaining.name, 'status': remaining.status, 'result': skip_msg})}\n\n"
+                agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {remaining.name}", "detail": skip_msg})
+                yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+                completed[0] += _count_tasks(remaining)
             progress = int((completed[0] / total_tasks) * 100)
             with execution_status_lock:
                 execution_status["progress"] = progress
             yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-            continue
+            break
         yield from _execute_with_stream(child, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id)
         if child.result:
             child_results.append(f"- {child.name}: {child.result}")
