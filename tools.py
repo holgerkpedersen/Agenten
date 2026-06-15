@@ -9,6 +9,7 @@ import config
 from lang import t
 from i18n import K
 from config import get_logger
+from refactoring_engine import RefactoringError
 log = get_logger(__name__)
 
 
@@ -264,7 +265,10 @@ class ToolRegistry:
             return {"success": True, "result": result}
         except Exception as e:
             log.error("Tool '%s' failed: %s", tool_name, traceback.format_exc())
-            return {"success": False, "error": f"Værktøjet '{tool_name}' fejlede: {str(e)}"}
+            err_info = {"success": False, "error": f"Værkt\u00f8jet '{tool_name}' fejlede: {str(e)}"}
+            if isinstance(e, RefactoringError):
+                err_info["category"] = e.category
+            return err_info
 
 def _parse_json_robust(raw: str) -> tuple[dict | None, str | None]:
     """Parse JSON robustly and return data plus error message."""

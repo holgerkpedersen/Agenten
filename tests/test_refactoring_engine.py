@@ -283,9 +283,8 @@ class TestExtractSymbol:
 
     def test_extract_nonexistent(self, engine, source_file, tmp_path):
         target = tmp_path / "nowhere.py"
-        result = engine.extract_symbol(source_file, "NonExistent", str(target))
-        assert result["success"] is False
-        assert "not found" in result.get("error", "")
+        with pytest.raises(RefactoringError, match="not found"):
+            engine.extract_symbol(source_file, "NonExistent", str(target))
 
     def test_extract_nonexistent_source(self, engine, tmp_path):
         target = tmp_path / "nowhere.py"
@@ -329,9 +328,8 @@ class TestRemoveSymbol:
         assert "class UserHandler" not in content
 
     def test_remove_nonexistent(self, engine, source_file):
-        result = engine.remove_symbol(source_file, "NonExistent")
-        assert result["success"] is False
-        assert "not found" in result.get("error", "")
+        with pytest.raises(RefactoringError, match="not found"):
+            engine.remove_symbol(source_file, "NonExistent")
 
     def test_remove_restores_on_syntax_error(self, engine, source_file):
         """remove_symbol should refuse to produce invalid Python."""
@@ -375,8 +373,8 @@ class TestAddImport:
     def test_add_import_validates_syntax(self, engine, tmp_path):
         path = tmp_path / "syntax_test.py"
         path.write_text("import os\n", encoding="utf-8")
-        result = engine.add_import(str(path), "typing", "")
-        assert result["success"] is False
+        with pytest.raises(RefactoringError, match="Syntax error"):
+            engine.add_import(str(path), "typing", "")
 
 
 # ── RefactoringEngine.verify_refactor ───────────────────────────────────
@@ -434,6 +432,7 @@ class TestMoveSymbol:
         result = engine.move_symbol(source_file, "NonExistent", str(target))
         assert result["success"] is False
         assert result.get("step") == "extract"
+        assert "category" in result
 
     def test_move_rolls_back_on_failure(self, engine, source_file, tmp_path):
         """If remove fails (e.g. symbol already gone), the target file should be rolled back."""
@@ -517,9 +516,8 @@ class TestErrorHandling:
         path = tmp_path / "broken.py"
         path.write_text("def foo(:\n", encoding="utf-8")
         target = tmp_path / "out.py"
-        result = engine.extract_symbol(str(path), "foo", str(target))
-        assert result["success"] is False
-        assert "Syntax error" in result.get("error", "")
+        with pytest.raises(RefactoringError, match="Syntax error"):
+            engine.extract_symbol(str(path), "foo", str(target))
 
 
 class TestDependencyGraph:

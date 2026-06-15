@@ -38,7 +38,31 @@ _BUILTINS: frozenset[str] = frozenset({
 
 
 class RefactoringError(Exception):
-    pass
+    """Structured error for refactoring operations with rollback support.
+
+    Attributes:
+        category: Error category for logging and retry logic.
+        filepath: The affected file path.
+        snapshot: Optional FileSnapshot for automatic rollback.
+        details: Dict with line numbers, content excerpts, etc.
+    """
+    # Error categories
+    SYNTAX = "syntax"
+    FILE_NOT_FOUND = "file_not_found"
+    SYMBOL_NOT_FOUND = "symbol_not_found"
+    IMPORT_FAILED = "import_failed"
+    EXTRACTION_FAILED = "extraction_failed"
+    REMOVAL_FAILED = "removal_failed"
+    TARGET_SYNTAX = "target_syntax"
+
+    def __init__(self, message: str, category: str = "unknown",
+                 filepath: str = "", snapshot: Any = None,
+                 details: dict | None = None):
+        self.category = category
+        self.filepath = filepath
+        self.snapshot = snapshot
+        self.details = details or {}
+        super().__init__(message)
 
 
 class FileSnapshot:
@@ -280,7 +304,12 @@ class CodeModifier:
         try:
             ast.parse(new_content)
         except SyntaxError as e:
-            raise RefactoringError(f"Syntax error after removal: {e}")
+            raise RefactoringError(
+                f"Syntax error after removal: {e}",
+                category=RefactoringError.SYNTAX,
+                filepath=path,
+                details={"line": e.lineno, "msg": e.msg}
+            )
 
         tmppath = path + '.tmp'
         with open(tmppath, 'w', encoding='utf-8') as f:
@@ -318,7 +347,12 @@ class CodeModifier:
         try:
             ast.parse(new_content)
         except SyntaxError as e:
-            raise RefactoringError(f"Syntax error after adding import: {e}")
+            raise RefactoringError(
+                f"Syntax error after adding import: {e}",
+                category=RefactoringError.IMPORT_FAILED,
+                filepath=path,
+                details={"line": e.lineno, "msg": e.msg}
+            )
 
         tmppath = path + '.tmp'
         with open(tmppath, 'w', encoding='utf-8') as f:
@@ -345,7 +379,11 @@ class RefactoringEngine:
     def _abs(self, path: str) -> str:
         p = os.path.abspath(path)
         if not os.path.exists(p):
-            raise RefactoringError(f"File not found: {p}")
+            raise RefactoringError(
+                f"File not found: {p}",
+                category=RefactoringError.FILE_NOT_FOUND,
+                filepath=p
+            )
         return p
 
     def _read(self, path: str) -> tuple[str, list[str]]:
@@ -374,6 +412,7 @@ class RefactoringEngine:
         7. Write target file atomically
 
         Returns dict with success, symbol, source, target, lines, etc.
+        Raises RefactoringError if extraction cannot be performed.
         """
         source = self._abs(source)
         target = os.path.abspath(target)
@@ -383,11 +422,21 @@ class RefactoringEngine:
         try:
             tree = ast.parse(content)
         except SyntaxError as e:
-            return {'success': False, 'error': f"Syntax error in source: {e}"}
+            raise RefactoringError(
+                f"Syntax error in source: {e}",
+                category=RefactoringError.SYNTAX,
+                filepath=source,
+                details={"line": e.lineno, "msg": e.msg}
+            )
 
         node = AstAnalyzer.find_node(tree, symbol_name)
         if node is None:
-            return {'success': False, 'error': f"Symbol '{symbol_name}' not found in {os.path.basename(source)}"}
+            raise RefactoringError(
+                f"Symbol '{symbol_name}' not found in {os.path.basename(source)}",
+                category=RefactoringError.SYMBOL_NOT_FOUND,
+                filepath=source,
+                details={"symbol": symbol_name}
+            )
 
         start_line, end_line = AstAnalyzer.get_symbol_lines(lines, node)
         symbol_code = '\n'.join(lines[start_line:end_line])
@@ -441,10 +490,12 @@ class RefactoringEngine:
             try:
                 ast.parse(target_content)
             except SyntaxError as e:
-                return {'success': False,
-                        'error': f"Target file would be syntactically invalid after extraction: {e}",
-                        'symbol': symbol_name, 'type': symbol_type,
-                        'source': source, 'target': target}
+                raise RefactoringError(
+                    f"Target file would be syntactically invalid after extraction: {e}",
+                    category=RefactoringError.TARGET_SYNTAX,
+                    filepath=target,
+                    details={"line": e.lineno, "msg": e.msg, "symbol": symbol_name}
+                )
 
         self._write(target, target_content)
 
@@ -465,6 +516,7 @@ class RefactoringEngine:
         """Remove a symbol from source file deterministically via AST.
 
         Returns dict with success, symbol, source, lines_removed, etc.
+        Raises RefactoringError if removal cannot be performed.
         """
         source = self._abs(source)
 
@@ -473,11 +525,21 @@ class RefactoringEngine:
         try:
             tree = ast.parse(content)
         except SyntaxError as e:
-            return {'success': False, 'error': f"Syntax error in source: {e}"}
+            raise RefactoringError(
+                f"Syntax error in source: {e}",
+                category=RefactoringError.SYNTAX,
+                filepath=source,
+                details={"line": e.lineno, "msg": e.msg}
+            )
 
         node = AstAnalyzer.find_node(tree, symbol_name)
         if node is None:
-            return {'success': False, 'error': f"Symbol '{symbol_name}' not found in {os.path.basename(source)}"}
+            raise RefactoringError(
+                f"Symbol '{symbol_name}' not found in {os.path.basename(source)}",
+                category=RefactoringError.SYMBOL_NOT_FOUND,
+                filepath=source,
+                details={"symbol": symbol_name}
+            )
 
         start_line, end_line = AstAnalyzer.get_symbol_lines(lines, node)
         snapshot = FileSnapshot.create(source)
@@ -486,7 +548,7 @@ class RefactoringEngine:
             CodeModifier.remove_lines(source, start_line, end_line)
         except RefactoringError as e:
             snapshot.restore()
-            return {'success': False, 'error': str(e)}
+            raise
 
         remaining = self._list_symbols(source)
 
@@ -502,6 +564,7 @@ class RefactoringEngine:
         """Add 'from module import symbol' to source if not already present.
 
         Returns dict with success, import_added, import_line.
+        Raises RefactoringError if import cannot be added.
         """
         source = self._abs(source)
         import_stmt = f"from {module} import {symbol}"
@@ -509,7 +572,7 @@ class RefactoringEngine:
         try:
             added = CodeModifier.insert_import(source, import_stmt)
         except RefactoringError as e:
-            return {'success': False, 'error': str(e)}
+            raise
 
         return {
             'success': True,
@@ -563,17 +626,7 @@ class RefactoringEngine:
         target_exists = os.path.exists(target)
         target_snapshot = FileSnapshot.create(target) if target_exists else None
 
-        result = {}
-
-        extract_result = self.extract_symbol(source, symbol_name, target)
-        result['extract'] = extract_result
-        if not extract_result['success']:
-            return {'success': False, 'error': f"Extract failed: {extract_result.get('error')}",
-                    'step': 'extract', 'partial': result}
-
-        remove_result = self.remove_symbol(source, symbol_name)
-        result['remove'] = remove_result
-        if not remove_result['success']:
+        def _rollback(error_step: str) -> dict[str, Any]:
             source_snapshot.restore()
             if target_snapshot:
                 target_snapshot.restore()
@@ -582,29 +635,52 @@ class RefactoringEngine:
                     os.remove(target)
                 except OSError:
                     pass
-            return {'success': False, 'error': f"Remove failed: {remove_result.get('error')}",
-                    'step': 'remove', 'partial': result}
 
-        import_result = self.add_import(source, target_module, short_name)
-        result['import'] = import_result
-        if not import_result['success']:
-            source_snapshot.restore()
-            if target_snapshot:
-                target_snapshot.restore()
-            else:
-                try:
-                    os.remove(target)
-                except OSError:
-                    pass
-            return {'success': False, 'error': f"Import failed: {import_result.get('error')}",
-                    'step': 'import', 'partial': result}
+        # Step 1: Extract
+        try:
+            extract_result = self.extract_symbol(source, symbol_name, target)
+        except RefactoringError as e:
+            return {
+                'success': False,
+                'error': f"Extract failed: {e}",
+                'step': 'extract',
+                'category': e.category,
+            }
+
+        # Step 2: Remove
+        try:
+            remove_result = self.remove_symbol(source, symbol_name)
+        except RefactoringError as e:
+            _rollback('remove')
+            return {
+                'success': False,
+                'error': f"Remove failed: {e}",
+                'step': 'remove',
+                'category': e.category,
+            }
+
+        # Step 3: Add import
+        try:
+            import_result = self.add_import(source, target_module, short_name)
+        except RefactoringError as e:
+            _rollback('import')
+            return {
+                'success': False,
+                'error': f"Import failed: {e}",
+                'step': 'import',
+                'category': e.category,
+            }
 
         return {
             'success': True,
             'symbol': symbol_name,
             'source': source,
             'target': target,
-            'steps': result,
+            'steps': {
+                'extract': extract_result,
+                'remove': remove_result,
+                'import': import_result,
+            },
         }
 
     def _list_symbols(self, path: str) -> list[dict[str, Any]]:
@@ -631,7 +707,7 @@ class RefactoringEngine:
         try:
             source = self._abs(source)
         except RefactoringError as e:
-            return {'success': False, 'error': str(e)}
+            return {'success': False, 'error': str(e), 'category': e.category}
         content, lines = self._read(source)
 
         try:
