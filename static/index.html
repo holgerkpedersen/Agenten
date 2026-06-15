@@ -3182,6 +3182,9 @@ async function executeWithStream() {
                     }
                 } else if (data.action === 'created') {
                     addLogEntry('AUTOR', `🔬 CORE-issue oprettet: ${data.issue_id}`, 'Starter selvforbedring...');
+                } else if (data.action === 'verifying') {
+                    addLogEntry('AUTOR', `🧪 Auto-research: kører tests for ${data.issue_id}`, '');
+                    if (llmBox) llmBox.innerHTML += `<div style="color:#f59e0b;margin:5px 0;padding:5px;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;">🧪 Auto-research: kører tests for ${escapeHtml(data.issue_id)}...</div>`;
                 }
                 break;
                 const success = data.result?.success;

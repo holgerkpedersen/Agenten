@@ -1459,6 +1459,29 @@ def _verify_self_modification(agent: Any) -> None:
                    test_summary[:200] if test_summary else "")
 
 
+def _run_full_test_suite(agent: Any) -> bool:
+    """Run the full pytest suite to verify no regression."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["python", "-m", "pytest", "tests/", "-q"],
+            capture_output=True, text=True, timeout=120, cwd=os.getcwd()
+        )
+        if result.returncode == 0:
+            return True
+        agent._log("WARNING", f"Auto-research: tests fejlede ({result.returncode} failures)",
+                   result.stdout[-500:] + result.stderr[-500:])
+        return False
+    except subprocess.TimeoutExpired:
+        agent._log("WARNING", "Auto-research: tests timed out after 120s", "")
+        return False
+    except FileNotFoundError:
+        return False
+    except Exception as exc:
+        agent._log("WARNING", f"Auto-research: test exception", str(exc)[:200])
+        return False
+
+
 def _execute_autoresearch_issue(agent: Any, issue_id: str) -> Generator[dict, None, bool]:
     """Execute a CORE issue inline via selvforbedring template.
 
@@ -1696,13 +1719,25 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
             yield {"type": "autoresearch", "action": "created", "issue_id": issue_id}
             autorepair_ok = yield from _execute_autoresearch_issue(agent, issue_id)
             if autorepair_ok:
-                # Auto-research succeeded — mark the original phase as done
-                # so the SSE loop doesn't retry or skip remaining siblings.
+                # Run full test suite to verify no regression
+                yield {"type": "autoresearch", "action": "verifying", "issue_id": issue_id}
+                agent._log("AUTOR", f"Auto-research: kører tests for at verificere {issue_id}", "")
+                yield {"type": "log", "log": agent.agent_log[-1]}
+                tests_ok = _run_full_test_suite(agent)
+                if tests_ok:
+                    agent._log("AUTOR", f"Auto-research: tests bestået for {issue_id}", "Ingen regression")
+                else:
+                    agent._log("AUTOR", f"Auto-research: tests fejlede efter {issue_id}", "Manuel gennemgang påkrævet")
+                yield {"type": "log", "log": agent.agent_log[-1]}
+
+                # Mark the original phase as done
                 task_node.status = "done"
                 full_response = f"Auto-research rettede problemet via {issue_id}"
+                if not tests_ok:
+                    full_response += " (tests fejlede — se log)"
                 # Also try to update the original issue to resolved
                 orig_id = _extract_issue_id(original_prompt or "")
-                if orig_id:
+                if orig_id and orig_id != issue_id:
                     try:
                         agent_issues.update_issue_status(
                             agent, orig_id, "resolved",
