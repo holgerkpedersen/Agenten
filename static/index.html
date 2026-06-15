@@ -705,6 +705,7 @@
             <span class="toolbar-label" id="executeModelLabel">⚡ Execute</span>
             <select id="modelSelect" class="toolbar-select" onchange="switchModel(this.value)" style="flex:1;"></select>
             <span id="modelBadge" style="font-size:11px;color:var(--text-muted);padding:2px 6px;border-radius:4px;background:var(--bg-light, rgba(255,255,255,0.05));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;"></span>
+            <span id="budgetDisplay" style="font-size:11px;color:var(--accent);padding:2px 8px;border-radius:4px;background:rgba(16,185,129,0.1);white-space:nowrap;display:none;"></span>
         </div>
         
         <div class="toolbar-row">
@@ -3061,6 +3062,25 @@ async function executeWithStream() {
                 addLogEntry('TOOL', `🔧 ${data.tool}`, JSON.stringify(data.args));
                 break;
                 
+            case 'budget':
+                const budgetEl = document.getElementById('budgetDisplay');
+                if (budgetEl) {
+                    budgetEl.textContent = `📊 ${data.iteration}/${data.max}`;
+                    budgetEl.style.display = '';
+                    budgetEl.title = `${data.remaining} iterationer tilbage`;
+                    if (data.remaining <= 2) {
+                        budgetEl.style.background = 'rgba(239,68,68,0.15)';
+                        budgetEl.style.color = '#ef4444';
+                    } else if (data.remaining / data.max <= 0.3) {
+                        budgetEl.style.background = 'rgba(245,158,11,0.15)';
+                        budgetEl.style.color = '#f59e0b';
+                    } else {
+                        budgetEl.style.background = 'rgba(16,185,129,0.1)';
+                        budgetEl.style.color = 'var(--accent)';
+                    }
+                }
+                break;
+                
             case 'tool_result':
                 const success = data.result?.success;
                 const icon = success ? '✅' : '❌';
@@ -3080,6 +3100,8 @@ async function executeWithStream() {
                 break;
                 
             case 'complete':
+                const budgetEl = document.getElementById('budgetDisplay');
+                if (budgetEl) budgetEl.style.display = 'none';
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
                 if (progressContainer) progressContainer.style.display = 'none';
                 addLogEntry('INFO', _('stream_done'), _('all_executed'));

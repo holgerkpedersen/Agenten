@@ -43,3 +43,12 @@ web_searcher
 file_handler
 image_handler
 security
+
+agent_context
+
+agent_helpers
+
+refactoring_engine
+
+agent_logs
+agent_pdf

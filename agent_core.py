@@ -24,33 +24,6 @@ from core_analytics import CoreAnalytics, TOOL_HANDLER_MAP
 import agent_tasks
 import agent_pdf
 import config
-
-
-_LOOKUP_CACHE: dict[str, str | None] = {}
-
-
-def _resolve_t_keys_in_result(result: dict) -> dict:
-    """Resolve t(K.XXX) translations in locate/read_location results."""
-    if result.get("success") and result.get("body"):
-        body = result["body"]
-        import re
-        _t_pattern = re.compile(r't\(K\.(\w+)')
-        t_keys = _t_pattern.findall(body)
-        if t_keys:
-            try:
-                from i18n import K as _K
-                from lang import t as _t
-                resolved = []
-                for key_name in sorted(set(t_keys)):
-                    key = getattr(_K, key_name, None)
-                    if key:
-                        value = _t(key, 'da')
-                        resolved.append(f"# {key_name} = \"{value[:200]}\"")
-                if resolved:
-                    result["body"] = body + "\n\n## Oversættelser:\n" + "\n".join(resolved)
-            except Exception:
-                pass
-    return result
 from config import get_logger
 log = get_logger(__name__)
 import re
@@ -61,25 +34,11 @@ import json
 import subprocess
 import threading
 from typing import Any, Generator
-
-def _safe_int(val: Any, default: int = 0) -> int:
-    """Convert a value to an integer safely, returning default on failure."""
-    try:
-        return int(val)
-    except (ValueError, TypeError):
-        return default
-
-
-def _extract_filenames(location: str) -> list[str]:
-    """Extract file paths from a location string using regex."""
-    filenames = []
-    if not location:
-        return filenames
-    for m in re.finditer(r'([\w./\\-]+\.\w+)', location):
-        fn = m.group(1)
-        if fn not in filenames:
-            filenames.append(fn)
-    return filenames
+from agent_helpers import _resolve_t_keys_in_result
+from agent_helpers import _safe_int
+from agent_helpers import _extract_filenames
+from agent_helpers import _run_doc_refinement
+from agent_helpers import _LOOKUP_CACHE
 
 
 def _auto_load_issue_files(agent: Agent, prompt: str, template: str | None, files: list[dict[str, Any]]) -> None:
@@ -368,63 +327,6 @@ def _decompose_via_llm(agent: Agent, prompt: str, file_context: str, template_co
 
     agent._log("INFO", t(K.LOG_DECOMPOSE_DONE, agent.lang), t(K.LOG_TASKS_CREATED, agent.lang).format(n=task_count))
     return agent.task_tree_to_dict()
-
-
-def _run_doc_refinement(workdir: str, rounds: int = 7, model: str = "") -> dict[str, Any]:
-    """Kør iterativ doc-refinement via scripts/run_doc_refinement.py.
-
-    Auto-beregner per-call timeout (default 900s) og total script timeout
-    (per_call_timeout * rounds * 1.5) for at give buffer.
-
-    Returnerer dict med success, rounds, model, output, dialog_path.
-    """
-    import subprocess
-    import sys as _sys
-    if not workdir:
-        return {"success": False, "error": "workdir mangler"}
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    script_path = os.path.join(project_root, "scripts", "run_doc_refinement.py")
-    if not os.path.isfile(script_path):
-        return {"success": False, "error": f"Script ikke fundet: {script_path}"}
-    rounds = max(1, int(rounds))
-    per_call_timeout = 900
-    total_timeout = int(per_call_timeout * rounds * 1.5)
-    cmd = [
-        _sys.executable, script_path,
-        "--workdir", workdir,
-        "--rounds", str(rounds),
-        "--timeout", str(per_call_timeout),
-    ]
-    if model:
-        cmd.extend(["--model", model])
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=total_timeout,
-        )
-        output = (result.stdout or "") + (result.stderr or "")
-        dialog_path = os.path.join(workdir, "docs", "uddybning_dialog.md")
-        return {
-            "success": result.returncode == 0,
-            "exit_code": result.returncode,
-            "rounds_run": rounds,
-            "per_call_timeout": per_call_timeout,
-            "total_timeout": total_timeout,
-            "output": output[-2000:],
-            "dialog_path": dialog_path if os.path.isfile(dialog_path) else None,
-        }
-    except subprocess.TimeoutExpired:
-        return {
-            "success": False,
-            "error": f"Refinement script timeout (>{total_timeout}s = {total_timeout // 60} min for {rounds} rounds)",
-            "rounds_run": rounds,
-            "per_call_timeout": per_call_timeout,
-            "total_timeout": total_timeout,
-        }
-    except Exception as e:
-        return {"success": False, "error": f"Refinement script fejl: {e}"}
 
 
 class Agent:

@@ -1633,6 +1633,16 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
             for entry in agent.agent_log[_report_logs:]:
                 yield {"type": "log", "log": entry}
             _report_logs = len(agent.agent_log)
+            # Inject budget info so the LLM knows remaining iterations
+            remaining = max_iterations - i
+            if remaining > 0:
+                budget_msg = f"\n\n\u23f3 Budget: iteration {i + 1}/{max_iterations} \u2014 {remaining} tilbage."
+                if remaining <= 2:
+                    budget_msg += " (\u26a0\ufe0f F\u00e5 iterationer tilbage \u2014 priorit\u00e9r handlinger)"
+                elif remaining / max_iterations <= 0.3:
+                    budget_msg += " (\u26a0\ufe0f Knaphed)"
+                messages.append({"role": "user", "content": budget_msg})
+                yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)
             for chunk in agent.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=agent.max_tokens, images=agent.images, tools=tools_param):
                 if agent.stop_requested:
