@@ -1554,26 +1554,26 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
     if template == "bugfix":
         if phase == "analyse":
             todos.extend([
-                {"id": "bf_a1", "text": "Laes issue med read_issue()", "done": False},
+                {"id": "bf_a1", "text": "L\u00e6s issue med read_issue()", "done": False},
                 {"id": "bf_a2", "text": "Find relevant kode med locate()", "done": False},
-                {"id": "bf_a3", "text": "Sammenlign koden med buggens paastand", "done": False},
-                {"id": "bf_a4", "text": "Afgoer om fejlen findes eller er rettet", "done": False},
+                {"id": "bf_a3", "text": "Sammenlign koden med buggens p\u00e5stand", "done": False},
+                {"id": "bf_a4", "text": "Afg\u00f8r om fejlen findes eller er rettet", "done": False},
             ])
         elif phase == "test" or "test" in phase:
             todos.extend([
                 {"id": "bf_t1", "text": "Opret testfil i tests/temp/ med write_file", "done": False},
-                {"id": "bf_t2", "text": "Koer specifik test - den SKAL fejle (roed fase)", "done": False},
+                {"id": "bf_t2", "text": "K\u00f8r specifik test - den SKAL fejle (r\u00f8d fase)", "done": False},
             ])
         elif phase == "implementering":
             todos.extend([
                 {"id": "bf_i1", "text": "Ret kildekoden med edit_file/add_method/add_function", "done": False},
-                {"id": "bf_i2", "text": "Undgaa write_file - filen findes allerede", "done": False},
+                {"id": "bf_i2", "text": "Undg\u00e5 write_file - filen findes allerede", "done": False},
                 {"id": "bf_i3", "text": "Brug add_method til nye metoder i klasse", "done": False},
             ])
         elif phase == "verifikation":
             todos.extend([
-                {"id": "bf_v1", "text": "Koer specifik test - den SKAL bestaa (groen fase)", "done": False},
-                {"id": "bf_v2", "text": "Koer HELE testsuiten for at tjekke regression", "done": False},
+                {"id": "bf_v1", "text": "K\u00f8r specifik test - den SKAL best\u00e5 (gr\u00f8n fase)", "done": False},
+                {"id": "bf_v2", "text": "K\u00f8r HELE testsuiten for at tjekke regression", "done": False},
             ])
         elif phase == "opdatering":
             todos.append({"id": "bf_o1", "text": "Opdater issue status til 'resolved'", "done": False})
@@ -1582,9 +1582,9 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
         if phase == "analyse":
             todos.extend([
                 {"id": "rf_a1", "text": "List alle symboler med list_symbols()", "done": False},
-                {"id": "rf_a2", "text": "Laes de vigtigste metoder med read_location()", "done": False},
-                {"id": "rf_a3", "text": "Analyser afhaengigheder med analyze_dependencies()", "done": False},
-                {"id": "rf_a4", "text": "Identificer SOLID-overtraedelser", "done": False},
+                {"id": "rf_a2", "text": "L\u00e6s de vigtigste metoder med read_location()", "done": False},
+                {"id": "rf_a3", "text": "Analyser afh\u00e6ngigheder med analyze_dependencies()", "done": False},
+                {"id": "rf_a4", "text": "Identificer SOLID-overtr\u00e6delser", "done": False},
             ])
         elif phase == "plan":
             todos.extend([
@@ -1602,17 +1602,17 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
         elif phase == "opdater" or phase == "opdatering":
             todos.extend([
                 {"id": "rf_u1", "text": "Fjern flyttede symboler med remove_symbol()", "done": False},
-                {"id": "rf_u2", "text": "Tilfoej imports med add_import()", "done": False},
+                {"id": "rf_u2", "text": "Tilf\u00f8j imports med add_import()", "done": False},
                 {"id": "rf_u3", "text": "Verificer syntaks med verify_refactor()", "done": False},
             ])
         elif phase == "test":
             todos.extend([
-                {"id": "rf_t1", "text": "Koer alle tests for at bekaefte ingen regression", "done": False},
+                {"id": "rf_t1", "text": "K\u00f8r alle tests for at bekr\u00e6fte ingen regression", "done": False},
                 {"id": "rf_t2", "text": "Opdater issue status til 'resolved'", "done": False},
             ])
 
     if not todos:
-        todos.append({"id": "todo_generic", "text": f"Gennemfoer fasen: {phase_name}", "done": False})
+        todos.append({"id": "todo_generic", "text": f"Gennemf\u00f8r fasen: {phase_name}", "done": False})
 
     return todos
 
