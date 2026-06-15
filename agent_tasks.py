@@ -1588,6 +1588,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._non_productive_reminder_sent = False
     agent._tool_log = []
     agent._produced_files = set()
+    agent._recently_deleted_files = set()
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -1758,9 +1759,21 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                             yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                             continue
-                elif tool_name in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"):
+                if tool_name in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"):
                     consecutive_reads = 0
                     agent._read_escape_sent = False
+                if tool_name == "write_file" and args_val.get("path"):
+                    import os as _os
+                    write_path = _os.path.abspath(args_val["path"])
+                    if write_path in getattr(agent, '_recently_deleted_files', set()) and str(args_val.get("overwrite", "")).lower() != "force":
+                        result_str = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — filen '{_os.path.basename(write_path)}' blev for nylig slettet. Brug edit_file for at genskabe den, eller overwrite=\"force\" for at tvinge oprettelsen."
+                        result = {"success": False, "error": "Recently deleted file"}
+                        agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                        continue
                 if tool_name in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
                     result_str = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redig\u00e9r IKKE filer. Brug <<<DONE>>> for at afslutte, eller gen\u00e5bn issuet f\u00f8rst."
                     result = {"success": False, "error": "Issue already resolved"}
@@ -1830,6 +1843,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     error=result.get('error', '') if isinstance(result, dict) else '',
                 )
                 if tool_name in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"):
+                    if tool_name == "delete_file" and isinstance(result, dict) and result.get("success"):
+                        deleted_path = result.get("file", "")
+                        if deleted_path:
+                            agent._recently_deleted_files.add(deleted_path)
                     if tool_name in ("extract_symbol", "remove_symbol", "add_import"):
                         if isinstance(result, dict) and not result.get("success"):
                             called_tools.pop(tool_key, None)
