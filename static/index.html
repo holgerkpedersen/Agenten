@@ -2445,6 +2445,8 @@ async function createNewSession() {
             if (treeContainer) treeContainer.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
             const llmContent = document.getElementById('llmContent');
             if (llmContent) llmContent.innerHTML = `<div style="color:#64748b;">${_('click_stream_hint')}</div>`;
+            const logBox = document.getElementById('logContent');
+            if (logBox) logBox.innerHTML = '';
             addLogEntry('INFO', 'Ny session oprettet', `${name} (${data.session_id})`);
             refreshSessions();
             loadLayoutFromLocal();
@@ -2550,6 +2552,9 @@ async function loadSelectedSession() {
         } else {
             loadLayoutFromLocal();
         }
+        
+        const logBox = document.getElementById('logContent');
+        if (logBox) logBox.innerHTML = '';
         
         if (data.session.tree) {
             currentTree = data.session.tree;
@@ -2732,6 +2737,9 @@ async function decompose() {
         alert(_('enter_task'));
         return;
     }
+    
+    const logBox = document.getElementById('logContent');
+    if (logBox) logBox.innerHTML = '';
     
     const filesData = (loadedFilesContent || []).filter(f => f.included);
     console.log('Sending files to decompose:', filesData.length, filesData.map(f => f.filename));
