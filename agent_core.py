@@ -799,7 +799,7 @@ class Agent:
         self.agent_log.append(log_entry)
         try:
             log_fn = {'INFO': log.info, 'WARNING': log.warning, 'ERROR': log.error}.get(str(level).upper(), log.info)
-            log_fn("%s: %s", str(message), str(detail)[:200])
+            log_fn("%s: %s", str(message), str(detail)[:2000])
         except Exception:
             pass
 

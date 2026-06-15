@@ -3168,8 +3168,8 @@ async function executeWithStream() {
                 break;
                 
             case 'complete':
-                const budgetEl = document.getElementById('budgetDisplay');
-                if (budgetEl) budgetEl.style.display = 'none';
+                const budgetComplete = document.getElementById('budgetDisplay');
+                if (budgetComplete) budgetComplete.style.display = 'none';
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
                 if (progressContainer) progressContainer.style.display = 'none';
                 addLogEntry('INFO', _('stream_done'), _('all_executed'));
