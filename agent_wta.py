@@ -6,6 +6,28 @@ import time
 from collections import Counter
 from typing import Any
 
+# Tool dependency order: lower number = should run earlier
+TOOL_ORDER = {
+    # 1. Read/gather information first
+    "read_issue": 10, "list_files": 10, "list_chunks": 10, "list_symbols": 10,
+    "locate": 10, "read_location": 10, "read_chunk": 10,
+    "analyze_own_logs": 10, "analyze_dependencies": 10, "suggest_module_groups": 10,
+    # 2. Create new code
+    "write_file": 20, "add_method": 20, "add_function": 20, "add_import": 20,
+    # 3. Modify/delete existing code
+    "edit_file": 30, "remove_symbol": 30, "delete_file": 30, "extract_symbol": 30,
+    # 4. Verify
+    "run_tests": 40, "verify_refactor": 40,
+    # 5. Finalize
+    "update_issue_status": 50, "done": 50,
+    # 6. Git/PR operations (after everything)
+    "git_add_all": 60, "git_commit": 60, "git_push": 60, "git_create_branch": 60,
+    "git_checkout": 60, "github_create_pr": 60, "github_create_issue": 60,
+    "git_status": 60, "git_diff": 60, "git_log": 60,
+    # Default (unknown tools)
+}
+_DEFAULT_TOOL_ORDER = 50
+
 
 _WTA_DEFAULT_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -69,10 +91,11 @@ class WTAState:
         tool_calls: list[dict],
         max_calls: int | None = None,
     ) -> list[dict]:
-        """Score and reorder tool calls by historical success rate.
+        """Score and reorder tool calls by dependency order, then historical success.
 
-        Tools with higher success rates come first; low-success tools sink
-        to the end of the list. Optionally cap the total number returned.
+        Tools are first grouped by dependency order (read → create → modify →
+        verify → finalize → git), then sorted by historical success rate within
+        each group. Optionally cap the total number returned.
 
         Args:
             template: Template name (e.g. 'refactor', 'bugfix').
@@ -89,14 +112,28 @@ class WTAState:
         scored = []
         for tc in tool_calls:
             name = tc.get("function", {}).get("name", "?")
+            order = TOOL_ORDER.get(name, _DEFAULT_TOOL_ORDER)
             score = self.get_score(template, phase, name)
-            scored.append((score, tc))
+            # Primary sort: dependency order. Secondary sort: success rate (descending)
+            scored.append((order, -score, tc))
 
-        scored.sort(key=lambda x: -x[0])
+        scored.sort(key=lambda x: (x[0], x[1]))
 
-        result = [tc for _, tc in scored]
+        result = [tc for _, _, tc in scored]
         if max_calls is not None and max_calls > 0:
             result = result[:max_calls]
+
+        # Log reorder if order changed
+        original_order = [tc.get("function", {}).get("name", "?") for tc in tool_calls]
+        new_order = [tc.get("function", {}).get("name", "?") for tc in result]
+        if original_order != new_order:
+            import logging
+            logging.getLogger(__name__).info(
+                "WTA dependency reorder: %s -> %s",
+                ", ".join(original_order),
+                ", ".join(new_order)
+            )
+
         return result
 
 

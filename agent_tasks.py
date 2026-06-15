@@ -1656,11 +1656,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
         if pending_tc and hasattr(agent, '_wta'):
             template = getattr(agent, 'active_template', 'fri') or 'fri'
             phase = getattr(task_node, 'name', '?')
-            original = [tc.get("function", {}).get("name", "?") for tc in pending_tc]
             pending_tc = agent._wta.rank_tool_calls(template, phase, pending_tc)
-            reordered = [tc.get("function", {}).get("name", "?") for tc in pending_tc]
-            if original != reordered:
-                agent._log("WTA", f"Reordered: {', '.join(original or ['?'])} \u2192 {', '.join(reordered or ['?'])}", f"tpl={template}, phase={phase}")
         pending_reasoning = getattr(agent.llm, '_pending_reasoning', None)
         if pending_tc:
             tool_call_msg = {"role": "assistant", "content": None, "tool_calls": list(pending_tc)}
