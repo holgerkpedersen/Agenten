@@ -206,7 +206,8 @@
     "convert_pdf_html5": "将PDF文件转换为HTML5。参数：pdf_path（PDF文件路径），output_path（可选 — 输出HTML文件路径，默认为同名.html文件）。",
     "search_web": "通过DuckDuckGo搜索网络。参数：query（搜索字符串），num_results（可选 — 结果数量，默认3）。",
     "add_method": "使用AST向现有类添加方法。需要：filepath（文件路径），class_name（类名），method_code（def行+方法体）。插入到类末尾。",
-    "add_function": "使用AST向Python文件添加模块级函数。需要：filepath（文件路径），function_code（def行+函数体）。可选：after_symbol（在指定符号后插入）。"
+    "add_function": "使用AST向Python文件添加模块级函数。需要：filepath（文件路径），function_code（def行+函数体）。可选：after_symbol（在指定符号后插入）。",
+    "delete_file": "从磁盘删除文件。需要：filepath（文件路径）。仅在项目目录内有效。调用前请确认文件不再需要。"
   },
   "tool_system_prompt": "你可以使用工具。像这样调用它们：\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\n完成后，像这样回复：\n{DONE_MARKER}{{\"result\":\"你的详细结论 — 不仅仅是done\"}}{END_MARKER}\n\n{tools_desc}\n\n## 任务\n{task}",
   "tool_continuation": "可用：{tools_list}。使用 {TOOL_MARKER} 或用 {DONE_MARKER} 完成。",

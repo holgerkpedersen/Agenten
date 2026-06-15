@@ -957,3 +957,78 @@ def add_function(filepath: str, function_code: str, after_symbol: str = "") -> d
         "file": os.path.abspath(path),
         "inserted_after": after_symbol or "(end of file)",
     }
+
+
+def _find_file_references(filepath: str) -> list[str]:
+    """Search project files for references to the given file.
+
+    Checks for imports and direct filename references in all .py files.
+    Returns list of (filename, line_number, line_text) tuples.
+    """
+    basename = os.path.basename(filepath)
+    module_name = os.path.splitext(basename)[0]
+    refs = []
+    seen = set()
+    workdir = os.environ.get('AGENT_WORKDIR') or os.getcwd()
+    import re
+    import_pattern = re.compile(
+        rf'(?:^|\s)(?:import\s+(?:\w+\s*,\s*)*{re.escape(module_name)}(?:\s*,\s*\w+)*|from\s+{re.escape(module_name)}\s+import)'
+    )
+    for root, dirs, files in os.walk(workdir):
+        dirs[:] = [d for d in dirs if d not in ('.git', '__pycache__', 'node_modules', '.venv', 'venv')]
+        for f in files:
+            if f.endswith('.py') and f != basename:
+                fpath = os.path.join(root, f)
+                try:
+                    with open(fpath, 'r', encoding='utf-8', errors='replace') as fh:
+                        for i, line in enumerate(fh, 1):
+                            stripped = line.strip()
+                            if stripped.startswith('#'):
+                                continue
+                            if import_pattern.search(stripped):
+                                key = (f, i)
+                                if key not in seen:
+                                    seen.add(key)
+                                    refs.append(f"{f}:{i}: {stripped}")
+                except (OSError, UnicodeDecodeError):
+                    continue
+    return refs
+
+
+def delete_file(filepath: str) -> dict[str, Any]:
+    """Delete a file from disk.
+
+    Only works for files within the project directory (safe path check).
+    Scans the entire repo for references to the file before allowing deletion.
+    """
+    path = _resolve_path(filepath)
+    if not is_safe_location(path):
+        return {"success": False, "error": "Adgang n\u00e6gtet: stien er uden for projektmappen"}
+    if not os.path.exists(path):
+        return {"success": False, "error": f"Filen findes ikke: {path}"}
+
+    # Safety guard: check for references in the repo
+    refs = _find_file_references(path)
+    if refs:
+        ref_list = "\n".join(refs[:10])
+        if len(refs) > 10:
+            ref_list += f"\n  ... og {len(refs) - 10} flere"
+        return {
+            "success": False,
+            "error": (
+                f"Filen '{os.path.basename(path)}' kan ikke slettes: den refereres stadig "
+                f"i {len(refs)} fil(er). Fjern disse referencer f\u00f8rst:\n{ref_list}"
+            ),
+            "references": refs,
+            "reference_count": len(refs),
+        }
+
+    try:
+        os.remove(path)
+    except Exception as e:
+        return {"success": False, "error": f"Kunne ikke slette filen: {e}"}
+
+    return {
+        "success": True,
+        "file": os.path.abspath(path),
+    }

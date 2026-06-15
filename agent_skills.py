@@ -206,7 +206,7 @@ TEMPLATE_TASK_TOOLS = {
     "bugfix": {
         "analyse": ["read_issue", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
         "test": ["write_file", "run_tests"],
-        "implementering": ["read_location", "locate", "edit_file", "add_method", "add_function", "run_tests"],
+        "implementering": ["read_location", "locate", "edit_file", "add_method", "add_function", "delete_file", "run_tests"],
         "verifikation": ["run_tests", "edit_file"],
         "opdatering": ["update_issue_status"],
     },
@@ -214,13 +214,13 @@ TEMPLATE_TASK_TOOLS = {
         "analyse": ["read_issue", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_refactor_issue", "analyze_dependencies"],
         "plan": ["read_issue", "update_issue_status", "write_file", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "analyze_dependencies", "suggest_module_groups"],
         "ekstraher": ["list_symbols", "read_location", "locate", "write_file", "extract_symbol", "verify_refactor", "add_method", "add_function", "list_chunks", "read_chunk"],
-        "opdat\u00e9r": ["list_symbols", "read_location", "locate", "edit_file", "update_issue_status", "write_file", "remove_symbol", "add_import", "add_method", "add_function", "verify_refactor"],
+        "opdat\u00e9r": ["list_symbols", "read_location", "locate", "edit_file", "update_issue_status", "write_file", "remove_symbol", "add_import", "add_method", "add_function", "delete_file", "verify_refactor"],
         "test": ["run_tests", "edit_file", "update_issue_status", "verify_refactor"],
     },
     "testgenerering": {
         "analyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "run_tests", "create_issue", "create_refactor_issue"],
         "test": ["write_file", "run_tests"],
-        "implementering": ["read_location", "locate", "edit_file", "add_method", "add_function", "run_tests"],
+        "implementering": ["read_location", "locate", "edit_file", "add_method", "add_function", "delete_file", "run_tests"],
         "verifikation": ["run_tests", "edit_file"],
     },
     "issue_handler": {

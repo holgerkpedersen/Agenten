@@ -206,7 +206,8 @@
     "convert_pdf_html5": "Convert a PDF file to HTML5. Args: pdf_path (path to the PDF file), output_path (optional — path for the output HTML file, defaults to same name with .html).",
     "search_web": "Search the web via DuckDuckGo. Args: query (search string), num_results (optional — number of results, default 3).",
     "add_method": "Add a method to an existing class using AST. Requires: filepath, class_name, method_code (def line + body). Inserts at end of class.",
-    "add_function": "Add a module-level function to a Python file using AST. Requires: filepath, function_code (def line + body). Optional: after_symbol (insert after given symbol)."
+    "add_function": "Add a module-level function to a Python file using AST. Requires: filepath, function_code (def line + body). Optional: after_symbol (insert after given symbol).",
+    "delete_file": "Delete a file from disk. Requires: filepath. Only works within the project directory. Verify the file is no longer needed before calling."
   },
   "tool_system_prompt": "You have access to tools. Call them like this:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nWhen done, respond like this:\n{DONE_MARKER}{{\"result\":\"YOUR DETAILED CONCLUSION — NOT just done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Task\n{task}",
   "tool_continuation": "Available: {tools_list}. Use {TOOL_MARKER} or finish with {DONE_MARKER}.",

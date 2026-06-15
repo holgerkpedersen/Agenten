@@ -723,10 +723,10 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     else:
         user_guidance += t(K.DONE_CONTINUATION, agent.lang).format(DONE_MARKER=agent.tool_registry.DONE_MARKER)
     if not chunk_hint and tools_list:
-        has_any_write = any(t in ('write_file', 'edit_file', 'extract_symbol', 'remove_symbol', 'add_import', 'add_method', 'add_function') for t in agent.tool_registry.active_tools or [])
+        has_any_write = any(t in ('write_file', 'edit_file', 'delete_file', 'extract_symbol', 'remove_symbol', 'add_import', 'add_method', 'add_function') for t in agent.tool_registry.active_tools or [])
         if not has_any_write and not agent.images and not agent.file_chunks:
             user_guidance += "\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
-    WRITE_TOOLS = {'write_file', 'edit_file', 'add_method', 'add_function', 'extract_symbol', 'remove_symbol', 'add_import'}
+    WRITE_TOOLS = {'write_file', 'edit_file', 'delete_file', 'add_method', 'add_function', 'extract_symbol', 'remove_symbol', 'add_import'}
     has_write = any(t in WRITE_TOOLS for t in (agent.tool_registry.active_tools or []))
     if has_write:
         user_guidance += t(K.WRITE_REQUIRED, agent.lang)
@@ -747,6 +747,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         "edit_file": "\n  Brug edit_file(path='fil.py', old_text='tekst der skal erstattes', new_text='ny tekst') for at redigere EKSISTERENDE filer. Læs filen FØRST med read_chunk, kopier den præcise tekst som old_text. For at TILFØJE en linje: sæt old_text = hele filens indhold, og new_text = det gamle indhold + den nye linje. ERSTAT ALDRIG hele indholdet med kun den nye tekst.",
         "add_method": "\n  Brug add_method(filepath='fil.py', class_name='MinKlasse', method_code='def ny_metode(self):\\n    pass') for at TILFØJE en ny metode til en eksisterende klasse. Du skal KUN angive den nye metodekode — IKKE hele klassen. Dette undgår escaping-problemer med edit_file.",
         "add_function": "\n  Brug add_function(filepath='fil.py', function_code='def ny_funktion():\\n    pass') for at TILFØJE en ny module-level funktion. Valgfrit: after_symbol='anden_funk' indsætter efter givet symbol.",
+        "delete_file": "\n  Brug delete_file(filepath='overflødig_fil.py') for at SLETTE en hel fil der ikke længere er nødvendig. Bekræft ALTID at filen ikke bruges af anden kode før sletning.",
         "run_tests": "\n  Brug run_tests() for at køre tests og verificere at din kode virker.",
         "update_issue_status": "\n  Brug update_issue_status(issue_id='...', status='resolved') når et issue er løst.",
     }
@@ -1007,7 +1008,7 @@ def _check_done_pr_requirements(agent: Any, messages: list[dict], called_tools: 
     return True
 
 
-REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "extract_symbol", "remove_symbol", "add_import", "add_method", "add_function", "update_issue_status"}
+REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "delete_file", "extract_symbol", "remove_symbol", "add_import", "add_method", "add_function", "update_issue_status"}
 
 
 CLOSE_PHASE_ALIASES = {"opdatering", "opdatér", "luk", "close"}
@@ -1067,7 +1068,7 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
         refactor_writing_phases = ("plan", "ekstraher", "opdat")
         has_written = any(k in (called_tools or {}) for k in (
             k for k in called_tools
-            if k.startswith("write_file") or k.startswith("edit_file") or k.startswith("extract_symbol") or k.startswith("remove_symbol") or k.startswith("add_import")
+            if k.startswith("write_file") or k.startswith("edit_file") or k.startswith("delete_file") or k.startswith("extract_symbol") or k.startswith("remove_symbol") or k.startswith("add_import")
         ))
         if any(k in _normalize_phase(task_name).lower() for k in refactor_writing_phases) and not has_written:
             iteration = getattr(agent, "_current_task_iteration", 0)
@@ -1336,7 +1337,7 @@ def _get_modified_core_files(agent: Any) -> set[str]:
     modified: set[str] = set()
     for entry in getattr(agent, '_tool_log', []):
         tool = entry.get("tool", "")
-        if tool not in ("write_file", "edit_file", "extract_symbol", "remove_symbol"):
+        if tool not in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol"):
             continue
         if not entry.get("success", False):
             continue
@@ -1737,7 +1738,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     consecutive_reads += 1
                     if consecutive_reads >= 5:
                         _active = agent.tool_registry.active_tools or []
-                        write_tools = [t for t in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import")
+                        write_tools = [t for t in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import")
                                        if t in _active]
                         if write_tools:
                             _add_user_msg(messages, (
@@ -1757,7 +1758,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                             yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                             continue
-                elif tool_name in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import"):
+                elif tool_name in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"):
                     consecutive_reads = 0
                     agent._read_escape_sent = False
                 if tool_name in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
@@ -1828,7 +1829,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     success=result.get('success', False) if isinstance(result, dict) else True,
                     error=result.get('error', '') if isinstance(result, dict) else '',
                 )
-                if tool_name in ("write_file", "edit_file", "extract_symbol", "remove_symbol", "add_import"):
+                if tool_name in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"):
                     if tool_name in ("extract_symbol", "remove_symbol", "add_import"):
                         if isinstance(result, dict) and not result.get("success"):
                             called_tools.pop(tool_key, None)

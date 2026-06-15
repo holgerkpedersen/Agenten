@@ -664,6 +664,12 @@ class Agent:
             lambda path=".", pattern="", max_depth=2: git_ops.list_files(path=path, pattern=pattern or None, max_depth=_safe_int(max_depth, 2))
         ))
         self.tool_registry.register(Tool(
+            "delete_file",
+            t(K.TOOL_DELETE_FILE, self.lang),
+            ["filepath"],
+            lambda filepath: git_ops.delete_file(filepath=filepath)
+        ))
+        self.tool_registry.register(Tool(
             "add_image",
             t(K.TOOL_ADD_IMAGE, self.lang),
             ["path"],

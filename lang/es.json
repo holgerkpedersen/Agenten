@@ -206,7 +206,8 @@
     "convert_pdf_html5": "Convierte un archivo PDF a HTML5. Args: pdf_path (ruta al archivo PDF), output_path (opcional — ruta para el archivo HTML de salida, por defecto mismo nombre con .html).",
     "search_web": "Busca en la web a través de DuckDuckGo. Args: query (cadena de búsqueda), num_results (opcional — número de resultados, default 3).",
     "add_method": "Añadir un método a una clase existente usando AST. Requiere: filepath, class_name, method_code (def + cuerpo). Inserta al final de la clase.",
-    "add_function": "Añadir una función a nivel de módulo usando AST. Requiere: filepath, function_code (def + cuerpo). Opcional: after_symbol."
+    "add_function": "Añadir una función a nivel de módulo usando AST. Requiere: filepath, function_code (def + cuerpo). Opcional: after_symbol.",
+    "delete_file": "Eliminar un archivo del disco. Requiere: filepath. Solo funciona dentro del directorio del proyecto. Verifique que el archivo ya no es necesario."
   },
   "tool_system_prompt": "Tienes acceso a herramientas. Llámalas así:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nCuando termines, responde así:\n{DONE_MARKER}{{\"result\":\"TU CONCLUSIÓN DETALLADA — NO solo done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Tarea\n{task}",
   "tool_continuation": "Disponible: {tools_list}. Usa {TOOL_MARKER} o termina con {DONE_MARKER}.",

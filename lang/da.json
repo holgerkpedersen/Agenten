@@ -206,7 +206,8 @@
     "convert_pdf_html5": "Konverter en PDF-fil til HTML5. Args: pdf_path (stien til PDF-filen), output_path (valgfri — sti til output HTML-fil, default: samme navn med .html).",
     "search_web": "Søg på internettet via DuckDuckGo. Args: query (søgestreng), num_results (valgfri — antal resultater, default 3).",
     "add_method": "Tilføj en metode til en eksisterende klasse vha. AST. Kræver: filepath (stien til filen), class_name (klassenavn), method_code (metodekode med def-linje og body). Indsætter metoden sidst i klassen.",
-    "add_function": "Tilføj en module-level funktion til en Python-fil vha. AST. Kræver: filepath (stien til filen), function_code (funktionskode med def-linje). Valgfrit: after_symbol (indsæt efter givet symbol)."
+    "add_function": "Tilføj en module-level funktion til en Python-fil vha. AST. Kræver: filepath (stien til filen), function_code (funktionskode med def-linje). Valgfrit: after_symbol (indsæt efter givet symbol).",
+    "delete_file": "Slet en fil fra disken. Kræver: filepath (stien til filen). Virker kun inden for projektmappen. Bekræft at filen ikke længere er nødvendig før kald."
   },
   "tool_system_prompt": "Du har adgang til værktøjer. Kald dem sådan:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nNår færdig, svar sådan:\n{DONE_MARKER}{{\"result\":\"DIN DETALJEREDE KONKLUSION — IKKE bare done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Opgave\n{task}",
   "tool_continuation": "Tilgængelige: {tools_list}. Brug {TOOL_MARKER} eller afslut {DONE_MARKER}.",

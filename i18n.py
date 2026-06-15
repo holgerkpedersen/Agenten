@@ -100,6 +100,7 @@ class K(StrEnum):
     TOOL_EDIT_FILE                      = "tools.edit_file"
     TOOL_WRITE_FILE                     = "tools.write_file"
     TOOL_LIST_FILES                     = "tools.list_files"
+    TOOL_DELETE_FILE                    = "tools.delete_file"
     TOOL_ADD_IMAGE                      = "tools.add_image"
     TOOL_ADD_METHOD                     = "tools.add_method"
     TOOL_ADD_FUNCTION                   = "tools.add_function"
