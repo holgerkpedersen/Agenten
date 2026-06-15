@@ -1579,19 +1579,50 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
             todos.append({"id": "bf_o1", "text": "Opdater issue status til 'resolved'", "done": False})
 
     elif template == "refactor":
+        # Read plan file for dynamic todos
+        import os as _os
+        import re as _re
+        plan_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'refactor_plan.md') if _os.environ.get('AGENT_WORKDIR') else 'refactor_plan.md'
+        plan_content = ''
+        if _os.path.exists(plan_path):
+            try:
+                with open(plan_path, 'r', encoding='utf-8') as _f:
+                    plan_content = _f.read()
+            except (OSError, UnicodeDecodeError):
+                pass
+
+        # Extract module names from plan
+        plan_modules = sorted(set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))) if plan_content else []
+        existing_modules = [m for m in plan_modules if _os.path.exists(m)]
+
         if phase == "analyse":
             todos.extend([
                 {"id": "rf_a1", "text": "List alle symboler med list_symbols()", "done": False},
                 {"id": "rf_a2", "text": "L\u00e6s de vigtigste metoder med read_location()", "done": False},
                 {"id": "rf_a3", "text": "Analyser afh\u00e6ngigheder med analyze_dependencies()", "done": False},
                 {"id": "rf_a4", "text": "Identificer SOLID-overtr\u00e6delser", "done": False},
+                {"id": "rf_a5", "text": "Kortl\u00e6g ansvarsomr\u00e5der for modulopdeling", "done": False},
             ])
+            if plan_modules:
+                todos.append({
+                    "id": "rf_a_modules",
+                    "text": "Planen n\u00e6vner {} moduler: {}".format(len(plan_modules), ', '.join(plan_modules)),
+                    "done": False
+                })
+
         elif phase == "plan":
             todos.extend([
                 {"id": "rf_p1", "text": "Beslut modulopdeling", "done": False},
                 {"id": "rf_p2", "text": "Skriv refactor_plan.md med write_file()", "done": False},
                 {"id": "rf_p3", "text": "Inkluder alle moduler og symboler i planen", "done": False},
             ])
+            if existing_modules:
+                todos.append({
+                    "id": "rf_p_existing",
+                    "text": "Findes allerede: {}".format(', '.join(existing_modules)),
+                    "done": True
+                })
+
         elif phase == "ekstraher":
             todos.extend([
                 {"id": "rf_e1", "text": "Brug extract_symbol() til at flytte kode til nye moduler", "done": False},
@@ -1599,15 +1630,70 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
                 {"id": "rf_e3", "text": "Inkluder ALLE imports i nye filer (typing.Any mv.)", "done": False},
                 {"id": "rf_e4", "text": "Verificer syntaks med verify_refactor()", "done": False},
             ])
+            if existing_modules:
+                todos.append({
+                    "id": "rf_e_existing",
+                    "text": "Allerede oprettet ({}/{}): {}".format(
+                        len(existing_modules), len(plan_modules) if plan_modules else '?',
+                        ', '.join(existing_modules)),
+                    "done": True
+                })
+            to_create = [m for m in plan_modules if m not in existing_modules]
+            for mod in to_create:
+                todos.append({
+                    "id": "rf_e_create_" + mod.replace('.py', '').replace('.', '_'),
+                    "text": "Opret modul: {}".format(mod),
+                    "done": False
+                })
+
         elif phase == "opdater" or phase == "opdatering":
-            todos.extend([
-                {"id": "rf_u1", "text": "List symboler i agent_core.py med list_symbols()", "done": False},
-                {"id": "rf_u2", "text": "Fjern ekstraherede symboler med remove_symbol()", "done": False},
-                {"id": "rf_u3", "text": "Tilf\u00f8j imports med add_import() til nye moduler", "done": False},
-                {"id": "rf_u4", "text": "Verificer syntaks med verify_refactor()", "done": False},
-                {"id": "rf_u5", "text": "K\u00f8r tests for at bekr\u00e6fte ingen regression", "done": False},
-                {"id": "rf_u6", "text": "Mark\u00e9r REFAC som resolved med update_issue_status()", "done": False},
-            ])
+            core_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'agent_core.py') if _os.environ.get('AGENT_WORKDIR') else 'agent_core.py'
+            core_symbols = []
+            if _os.path.exists(core_path):
+                try:
+                    with open(core_path, 'r', encoding='utf-8') as _f:
+                        core_content = _f.read()
+                    core_nodes = _re.findall(r'^def (\w+)|^class (\w+)', core_content, _re.MULTILINE)
+                    core_symbols = sorted(set(n[0] or n[1] for n in core_nodes))
+                except (OSError, UnicodeDecodeError):
+                    pass
+
+            todos.append({"id": "rf_u1", "text": "List symboler i agent_core.py med list_symbols()", "done": False})
+
+            # Find symbols mentioned in plan that are still in agent_core.py
+            if plan_content and core_symbols:
+                planned_symbols = sorted(set(
+                    s for t in _re.findall(r'`(\w+)`[^`]*(?:flyttes|rykkes)|symbol_name=\'(\w+)\'', plan_content)
+                    for s in t if s
+                ))
+                still_in_core = [s for s in planned_symbols if s in core_symbols]
+                for sym in still_in_core:
+                    # Find which module this symbol was planned for
+                    target_mod = '?'
+                    for mod in existing_modules:
+                        mod_name = _os.path.splitext(mod)[0]
+                        if mod_name in plan_content:
+                            target_mod = mod
+                    todos.append({
+                        "id": "rf_u_remove_" + sym,
+                        "text": "Fjern `{}` fra agent_core.py (i {})".format(sym, target_mod),
+                        "done": False
+                    })
+
+            if existing_modules:
+                for mod in existing_modules:
+                    mod_name = _os.path.splitext(mod)[0]
+                    if mod_name != 'agent_core':
+                        todos.append({
+                            "id": "rf_u_import_" + mod_name,
+                            "text": "Tilf\u00f8j import fra {} i agent_core.py".format(mod),
+                            "done": False
+                        })
+
+            todos.append({"id": "rf_u_verify", "text": "Verificer syntaks med verify_refactor()", "done": False})
+            todos.append({"id": "rf_u_tests", "text": "K\u00f8r tests for at bekr\u00e6fte ingen regression", "done": False})
+            todos.append({"id": "rf_u_status", "text": "Mark\u00e9r REFAC som resolved med update_issue_status()", "done": False})
+
         elif phase == "test":
             todos.extend([
                 {"id": "rf_t1", "text": "K\u00f8r alle tests for at bekr\u00e6fte ingen regression", "done": False},
@@ -1688,14 +1774,12 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("extract_symbol", None, "rf_e1"),
     ("add_method", None, "bf_i3"),
     ("add_function", None, None),
-    ("remove_symbol", None, "rf_u2"),
-    ("add_import", None, "rf_u3"),
-    ("run_tests", None, "bf_t2"),
-    ("run_tests", None, "rf_u5"),
-    ("update_issue_status", None, "bf_o1"),
-    ("update_issue_status", None, "rf_u6"),
     ("verify_refactor", None, "rf_e4"),
-    ("verify_refactor", None, "rf_u4"),
+    ("run_tests", None, "bf_t2"),
+    ("run_tests", None, "rf_u_tests"),
+    ("update_issue_status", None, "bf_o1"),
+    ("update_issue_status", None, "rf_u_status"),
+    ("verify_refactor", None, "rf_u_verify"),
 ]
 
 
@@ -1704,11 +1788,44 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
     if not hasattr(agent, '_phase_todos'):
         return []
     ids = []
+
+    # Static mapping: simple tool->todo matches
     for tname, arg_check, todo_id in _TODO_TOOL_MAP:
-        if tool_name == tname:
-            if todo_id and any(t.get("id") == todo_id for t in agent._phase_todos):
+        if tool_name == tname and todo_id:
+            if any(t.get("id") == todo_id for t in agent._phase_todos):
                 if arg_check is None or arg_check(args_val):
                     ids.append(todo_id)
+
+    # Dynamic mapping: match tool calls against todo text patterns
+    for todo in getattr(agent, '_phase_todos', []):
+        tid = todo.get("id", "")
+        ttext = todo.get("text", "")
+
+        # remove_symbol -> matches "Fjern `symbol` fra agent_core.py"
+        if tool_name == "remove_symbol":
+            sym = args_val.get("symbol_name", "")
+            if sym and sym in ttext and "Fjern" in ttext:
+                ids.append(tid)
+
+        # add_import -> matches "Tilføj import fra ... i agent_core.py"
+        if tool_name == "add_import":
+            mod = args_val.get("module", "")
+            if mod and mod in ttext and "import" in ttext:
+                ids.append(tid)
+
+        # write_file -> matches "Opret modul: modul.py"
+        if tool_name == "write_file":
+            path = args_val.get("path", "")
+            fname = os.path.basename(path) if path else ""
+            if fname and fname in ttext and "Opret" in ttext:
+                ids.append(tid)
+
+        # extract_symbol -> matches "Flyt symbol ... til ..."
+        if tool_name == "extract_symbol":
+            sym = args_val.get("symbol_name", "")
+            if sym and (sym in ttext or "extract" in ttext.lower()):
+                ids.append(tid)
+
     return ids
 
 
