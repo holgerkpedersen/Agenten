@@ -1326,7 +1326,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
     for child in node.children:
         if _check_client(agent):
             return
-        if getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
+        if getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') not in ('refactor', 'programmering'):
             skip_msg = "Skipped — issue was already resolved in an earlier phase"
             for remaining in node.children[node.children.index(child):]:
                 remaining.status = "skipped"
@@ -1476,6 +1476,7 @@ def _save_session_data(current_session_id: str | None, stream_agent: Any, ui_lan
             "images": stream_agent.images,
             "decompose_model": stream_agent.decompose_llm.model,
             "execute_model": stream_agent.llm.model,
+            "issue_resolved": stream_agent.issue_resolved,
         })
         return data
     try:
@@ -1533,6 +1534,8 @@ def execute_stream() -> Any:
                 stream_agent.decompose_llm.set_model(session_data["decompose_model"])
             if session_data.get("execute_model"):
                 stream_agent.llm.set_model(session_data["execute_model"])
+            if session_data.get("issue_resolved"):
+                stream_agent.issue_resolved = True
 
             fpc = session_data.get("full_prompt_with_context", "")
             if not fpc:
