@@ -1677,6 +1677,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
         yield {"type": "todo_add", "todo": t}
     agent._task_start_time = time.time()
     agent.current_phase = _normalize_phase(task_node.name)
+    if not callable(t):
+        agent._log("WARNING", f"t is not callable: type={type(t)}, repr={repr(t)}", "")
     agent._log("INFO", t(K.LOG_TASK_START, agent.lang), f"{task_node.name} (model: {agent.llm.model})")
     _set_phase_model(agent, task_node.name)
     set_task_tools(agent, task_node.name)
