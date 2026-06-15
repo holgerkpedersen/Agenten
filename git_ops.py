@@ -962,7 +962,9 @@ def add_function(filepath: str, function_code: str, after_symbol: str = "") -> d
 def _find_file_references(filepath: str) -> list[str]:
     """Search project files for references to the given file.
 
-    Checks for imports and direct filename references in all .py files.
+    Scans ALL text-based source files for references:
+    - .py files: checks import statements via regex
+    - All text files: checks for filename (with extension) as a word-boundary match
     Returns list of (filename, line_number, line_text) tuples.
     """
     basename = os.path.basename(filepath)
@@ -971,27 +973,53 @@ def _find_file_references(filepath: str) -> list[str]:
     seen = set()
     workdir = os.environ.get('AGENT_WORKDIR') or os.getcwd()
     import re
+
+    # For .py files: precise import pattern
     import_pattern = re.compile(
         rf'(?:^|\s)(?:import\s+(?:\w+\s*,\s*)*{re.escape(module_name)}(?:\s*,\s*\w+)*|from\s+{re.escape(module_name)}\s+import)'
     )
+    # For all files: filename reference (word-boundary match with common delimiters)
+    escaped = re.escape(basename)
+    ref_pattern = re.compile(
+        rf'(?:^|[\s"\'([{{<,]){escaped}(?:$|[\s"\')\]}}>,.:;!?])'
+    )
+
+    # Directories to skip entirely
+    skip_dirs = {'.git', '__pycache__', 'node_modules', '.venv', 'venv', 'logs', 'sessions'}
+    # Binary/file extensions to skip
+    skip_ext = {'.pyc', '.pyo', '.exe', '.dll', '.so', '.dylib', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.ico', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.pdf'}
+
     for root, dirs, files in os.walk(workdir):
-        dirs[:] = [d for d in dirs if d not in ('.git', '__pycache__', 'node_modules', '.venv', 'venv')]
+        dirs[:] = [d for d in dirs if d not in skip_dirs]
         for f in files:
-            if f.endswith('.py') and f != basename:
-                fpath = os.path.join(root, f)
-                try:
-                    with open(fpath, 'r', encoding='utf-8', errors='replace') as fh:
-                        for i, line in enumerate(fh, 1):
-                            stripped = line.strip()
-                            if stripped.startswith('#'):
-                                continue
+            if f == basename:
+                continue  # skip the file itself
+            ext = os.path.splitext(f)[1].lower()
+            if ext in skip_ext:
+                continue
+            fpath = os.path.join(root, f)
+            try:
+                with open(fpath, 'r', encoding='utf-8', errors='replace') as fh:
+                    for i, line in enumerate(fh, 1):
+                        stripped = line.strip()
+                        if stripped.startswith('#'):
+                            continue
+                        # .py files: check import pattern first
+                        if f.endswith('.py'):
                             if import_pattern.search(stripped):
-                                key = (f, i)
+                                key = (f, i, 'import')
                                 if key not in seen:
                                     seen.add(key)
                                     refs.append(f"{f}:{i}: {stripped}")
-                except (OSError, UnicodeDecodeError):
-                    continue
+                                continue  # skip filename ref check to avoid dupes
+                        # All text files: check filename reference
+                        if ref_pattern.search(stripped):
+                            key = (f, i, stripped[:80])
+                            if key not in seen:
+                                seen.add(key)
+                                refs.append(f"{f}:{i}: {stripped}")
+            except (OSError, UnicodeDecodeError, PermissionError):
+                continue
     return refs
 
 
