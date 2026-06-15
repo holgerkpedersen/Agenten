@@ -708,30 +708,19 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
             new_content = content.replace(exact_old, new_text, 1)
 
             if path.endswith('.py'):
+                normalized_new = _normalize_indentation(new_text, exact_old)
+                if normalized_new != new_text:
+                    new_content = content.replace(exact_old, normalized_new, 1)
+                    new_text = normalized_new
                 try:
                     ast.parse(new_content)
                 except SyntaxError as e:
-                    normalized_new = _normalize_indentation(new_text, exact_old)
-                    if normalized_new != new_text:
-                        normalized_content = content.replace(exact_old, normalized_new, 1)
-                        try:
-                            ast.parse(normalized_content)
-                            new_text = normalized_new
-                            new_content = normalized_content
-                        except SyntaxError as e2:
-                            return {
-                                "success": False,
-                                "error": f"Syntaksfejl på linje {e2.lineno}: {e2.msg}",
-                                "line": e2.lineno,
-                                "msg": e2.msg
-                            }
-                    else:
-                        return {
-                            "success": False,
-                            "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
-                            "line": e.lineno,
-                            "msg": e.msg
-                        }
+                    return {
+                        "success": False,
+                        "error": f"Syntaksfejl på linje {e.lineno}: {e.msg}",
+                        "line": e.lineno,
+                        "msg": e.msg
+                    }
         else:
             return {"success": False, "error": "Provide either symbol (AST-based) or old_text+new_text (search-and-replace)."}
 
