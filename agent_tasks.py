@@ -1718,6 +1718,17 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
             # Execute the CORE issue inline via selvforbedring sub-session
             yield {"type": "autoresearch", "action": "created", "issue_id": issue_id}
             autorepair_ok = yield from _execute_autoresearch_issue(agent, issue_id)
+
+            # Update CORE issue status
+            try:
+                core_status = "resolved" if autorepair_ok else "escalated"
+                agent_issues.update_issue_status(
+                    agent, issue_id, core_status,
+                    f"Auto-research {'gennemførte' if autorepair_ok else 'kunne ikke gennemføre'} alle faser."
+                )
+            except Exception:
+                pass
+
             if autorepair_ok:
                 # Run full test suite to verify no regression
                 yield {"type": "autoresearch", "action": "verifying", "issue_id": issue_id}
