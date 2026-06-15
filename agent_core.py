@@ -732,7 +732,7 @@ class Agent:
             t(K.TOOL_SUGGEST_MODULE_GROUPS, self.lang),
 ["source"],
             lambda source, max_group_size=5: self.refactoring_engine.suggest_module_groups(
-                source=source, max_group_size=max_group_size
+                source=source, max_group_size=_safe_int(max_group_size, 5)
             )
         ))
 

@@ -1,9 +1,0 @@
-[LLM] System prompt
-    6768 chars — Svar på dansk. Brug de tilgængelige værktøjer til at fuldføre opgaven. Når du er færdig, angiv dit resultat.
-
-Du har adgang til værktøjer. Kald dem når det er nødvendigt for at fuldføre o
-[LLM] User guidance
-    Svar på dansk. ## TILGÆNGELIGE FILER (projektmappe: C:\Dev\Agenten)
-  tools.py (1 chunk)
-
-  Brug list_symbols(filepath='fil.py') for at se ALLE symboler (funktioner, klasser, variabler) i en Python-fi
