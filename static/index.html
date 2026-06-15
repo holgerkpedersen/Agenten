@@ -3162,8 +3162,31 @@ async function executeWithStream() {
                     }
                 }
                 break;
-                
-            case 'tool_result':
+
+            case 'autoresearch':
+                if (data.action === 'start') {
+                    addLogEntry('AUTOR', `🔬 Auto-research: kører ${data.issue_id} — ${data.title || ''}`, '');
+                    if (llmBox) llmBox.innerHTML += `<div style="color:#a78bfa;margin:10px 0;padding:8px;background:rgba(167,139,250,0.1);border-left:3px solid #a78bfa;">🔬 <strong>${data.issue_id}</strong>: ${escapeHtml(data.title || 'Auto-research')} — starter selvforbedring</div>`;
+                } else if (data.action === 'phase_done') {
+                    addLogEntry('AUTOR', `✅ Auto-research: ${data.phase} gennemført`, data.issue_id);
+                } else if (data.action === 'phase_failed') {
+                    addLogEntry('AUTOR', `❌ Auto-research: ${data.phase} fejlede`, data.issue_id);
+                    if (llmBox) llmBox.innerHTML += `<div style="color:#ef4444;margin:5px 0;padding:5px;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;">❌ Auto-research: ${escapeHtml(data.phase)} fejlede</div>`;
+                } else if (data.action === 'complete') {
+                    if (data.success) {
+                        addLogEntry('AUTOR', `✅ Auto-research: ${data.issue_id} gennemført!`, '');
+                        if (llmBox) llmBox.innerHTML += `<div style="color:var(--success);margin:10px 0;padding:8px;background:rgba(16,185,129,0.1);border-left:3px solid var(--success);">✅ <strong>${data.issue_id}</strong>: Fix gennemført</div>`;
+                    } else {
+                        addLogEntry('AUTOR', `❌ Auto-research: ${data.issue_id} fejlede`, 'Nogle faser kunne ikke gennemføres');
+                        if (llmBox) llmBox.innerHTML += `<div style="color:#ef4444;margin:10px 0;padding:8px;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;">❌ <strong>${data.issue_id}</strong>: Fix kunne ikke gennemføres</div>`;
+                    }
+                } else if (data.action === 'created') {
+                    addLogEntry('AUTOR', `🔬 CORE-issue oprettet: ${data.issue_id}`, 'Starter selvforbedring...');
+                } else if (data.action === 'verifying') {
+                    addLogEntry('AUTOR', `🧪 Auto-research: kører tests for ${data.issue_id}`, '');
+                    if (llmBox) llmBox.innerHTML += `<div style="color:#f59e0b;margin:5px 0;padding:5px;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;">🧪 Auto-research: kører tests for ${escapeHtml(data.issue_id)}...</div>`;
+                }
+                break;
                 const success = data.result?.success;
                 const icon = success ? '✅' : '❌';
                 const rtext = JSON.stringify(data.result, null, 2);

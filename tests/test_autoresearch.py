@@ -146,21 +146,6 @@ class TestFindDuplicateIssue:
         assert dup is None
 
 
-class TestAnalyzeFailure:
-    def test_returns_structured_summary(self):
-        from agent_autoresearch import _analyze_failure
-        agent = MagicMock()
-        result = _analyze_failure(
-            agent, "missing_tool",
-            {"required": ["update_issue_status"],
-             "called": ["read_issue"], "uncalled": ["update_issue_status"]},
-            "issue_handler", "Luk Issue")
-        assert "missing_tool" in result
-        assert "issue_handler" in result
-        assert "Luk Issue" in result
-        assert "update_issue_status" in result
-
-
 class TestCreateIssue:
     def test_creates_issue(self, mock_agent):
         from agent_autoresearch import _create_issue
@@ -225,13 +210,12 @@ class TestTriggerIfNeeded:
         mock_agent.autoresearch_enabled = True
         with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
              patch("agent_issues._load_issues") as mock_load, \
-             patch("agent_issues.create_issue") as mock_create_issue, \
-             patch("agent_autoresearch.start_research_for_issue") as mock_start:
+             patch("agent_issues.create_issue") as mock_create_issue:
             mock_load.return_value = {"issues": [], "meta": {"total": 0}}
             mock_create_issue.return_value = {"success": True, "issue": {"id": "CORE-999"}}
-            trigger_if_needed(mock_agent, mock_task_node,
-                              {"read_issue{}": 1}, "", [])
-            mock_start.assert_called_once_with(mock_agent, "CORE-999")
+            result = trigger_if_needed(mock_agent, mock_task_node,
+                                       {"read_issue{}": 1}, "", [])
+            assert result == "CORE-999", f"Expected issue_id, got {result}"
 
 
 class TestEventQueue:

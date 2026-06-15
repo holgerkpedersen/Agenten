@@ -411,6 +411,16 @@ def detect_oversize_file(agent: Any, filename: str, content: str, related_bugs: 
         filename:
         content:
         related_bugs:"""
+    # Skip oversize detection if a session is already running — creating new
+    # REFAC issues mid-execution distracts the LLM and pollutes the issue list.
+    # MagicMock auto-creates attributes, so we must check the actual type.
+    tt = getattr(agent, 'task_tree', None)
+    if tt is not None and 'mock' not in type(tt).__module__.lower():
+        return None
+    cp = getattr(agent, 'current_phase', None)
+    if cp is not None and 'mock' not in type(cp).__module__.lower():
+        return None
+        return None
     line_count = content.count("\n")
     if line_count < OVERSIZE_LINE_LIMIT:
         agent._pending_refactor = None

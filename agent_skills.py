@@ -231,7 +231,7 @@ TEMPLATE_TASK_TOOLS = {
     "selvforbedring": {
         "analyser": ["read_issue", "list_symbols", "locate", "read_location", "list_files", "list_chunks", "run_tests"],
         "diagnostic\u00e9r": ["run_tests", "read_location", "locate", "read_chunk", "list_symbols", "list_files", "list_chunks", "read_issue"],
-        "ret": ["edit_file", "locate", "list_symbols", "read_location", "run_tests", "create_issue", "add_method", "add_function"],
+        "ret": ["edit_file", "locate", "list_symbols", "read_location", "run_tests", "create_issue", "add_method", "add_function", "read_chunk", "list_chunks"],
         "verific\u00e9r": ["run_tests", "update_issue_status"],
         "commit": ["git_create_branch", "git_status", "git_diff", "git_commit", "git_push", "git_checkout", "git_current_branch"],
     },
