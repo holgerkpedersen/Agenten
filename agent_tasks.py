@@ -1459,6 +1459,97 @@ def _verify_self_modification(agent: Any) -> None:
                    test_summary[:200] if test_summary else "")
 
 
+def _execute_autoresearch_issue(agent: Any, issue_id: str) -> Generator[dict, None, bool]:
+    """Execute a CORE issue inline via selvforbedring template.
+
+    Called from _finalize_task_stream when a phase fails and auto-research
+    creates a CORE issue. Builds a task tree (Analyser → Diagnosticér → Ret
+    → Verificér → Commit) and executes each phase via solve_task_stream,
+    yielding events through the same SSE stream so the user sees live progress.
+
+    Returns:
+        True if ALL phases completed successfully, False if any phase failed.
+    """
+    from task_tree import TaskTree, TaskNode
+
+    # Load the issue
+    try:
+        data = agent_issues._load_issues()
+        issue = next((i for i in data.get("issues", []) if i.get("id") == issue_id), None)
+    except Exception:
+        issue = None
+    if not issue:
+        return False
+
+    prompt = (
+        f"{issue.get('id', issue_id)}: {issue.get('title', '')}\n\n"
+        f"{issue.get('description', '')}\n\n"
+        f"Location: {issue.get('location', '—')}\n"
+        f"Impact: {issue.get('impact', '—')}\n\n"
+        f"{issue.get('proposed_fix', '')}"
+    )
+
+    yield {"type": "autoresearch", "action": "start", "issue_id": issue_id, "title": issue.get("title", "")}
+
+    # Save original state
+    orig_template = agent.active_template
+    orig_prompt = getattr(agent, "original_prompt", "")
+    orig_tree = getattr(agent, "task_tree", None)
+    orig_file_chunks = dict(getattr(agent, "file_chunks", {}))
+
+    # Configure for selvforbedring
+    agent.active_template = "selvforbedring"
+    agent.original_prompt = prompt
+    # Auto-load files from issue location
+    try:
+        from agent_file_context import _auto_load_issue_files, _auto_load_location_file
+        _auto_load_issue_files(agent, prompt, "selvforbedring", None)
+        _auto_load_location_file(agent, prompt)
+    except ImportError:
+        pass
+
+    # Build task tree
+    tree = TaskTree(prompt)
+    for phase_name in ["Analyser", "Diagnosticér", "Ret", "Verificér", "Commit"]:
+        tree.root.add_child(TaskNode(phase_name))
+    agent.task_tree = tree
+
+    # Execute each phase
+    all_done = True
+    for child in list(tree.root.children):
+        child.status = "pending"
+        for event in agent.solve_task_stream(child, prompt):
+            yield event
+            if event.get("type") == "done":
+                if child.status == "failed":
+                    all_done = False
+                    agent._log("AUTOR", f"Auto-research: {child.name} fejlede", issue_id)
+                    yield {"type": "autoresearch", "action": "phase_failed", "issue_id": issue_id, "phase": child.name}
+                    yield {"type": "log", "log": agent.agent_log[-1]}
+                else:
+                    yield {"type": "autoresearch", "action": "phase_done", "issue_id": issue_id, "phase": child.name}
+                break
+        if not all_done:
+            for remaining in list(tree.root.children)[tree.root.children.index(child) + 1:]:
+                remaining.status = "skipped"
+            break
+
+    # Restore original state
+    agent.active_template = orig_template
+    agent.original_prompt = orig_prompt
+    agent.task_tree = orig_tree
+    agent.file_chunks = orig_file_chunks
+
+    success = all_done and all(c.status == "done" for c in tree.root.children if c.status not in ("skipped",))
+    yield {"type": "autoresearch", "action": "complete", "issue_id": issue_id, "success": success}
+
+    if success:
+        agent._log("AUTOR", f"Auto-research: {issue_id} gennemført",
+                   "Alle faser i selvforbedring bestod")
+        yield {"type": "log", "log": agent.agent_log[-1]}
+    return success
+
+
 def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_fallback: str, called_tools: dict, _report_logs: int = 0, original_prompt: str = "", messages: list[dict] | None = None) -> Generator[dict, None, None]:
     """finalize task stream.
     
@@ -1569,8 +1660,17 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
             agent._seq.save()
     if task_node.status == "failed":
         agent._log("INFO", t(K.LOG_TASK_FAILED, agent.lang), task_node.name)
-        agent_autoresearch.trigger_if_needed(
+        issue_id = agent_autoresearch.trigger_if_needed(
             agent, task_node, called_tools, full_response, messages)
+        if issue_id:
+            # Execute the CORE issue inline via selvforbedring sub-session
+            yield {"type": "autoresearch", "action": "created", "issue_id": issue_id}
+            autorepair_ok = yield from _execute_autoresearch_issue(agent, issue_id)
+            if autorepair_ok:
+                # Auto-research succeeded — mark the original phase as done
+                # so the SSE loop doesn't retry or skip remaining siblings.
+                task_node.status = "done"
+                full_response = f"Auto-research rettede problemet via {issue_id}"
     else:
         agent._log("INFO", t(K.LOG_TASK_DONE, agent.lang), task_node.name)
     agent._evolve_if_needed()

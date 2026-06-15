@@ -1412,6 +1412,8 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
                 yield f"data: {json.dumps({'type': 'budget', 'iteration': event['iteration'], 'max': event['max'], 'remaining': event['remaining']})}\n\n"
             elif event["type"] == "done":
                 full_response = event["result"]
+            elif event["type"] == "autoresearch":
+                yield f"data: {json.dumps(event)}\n\n"
 
         if not full_response:
             full_response = t(K.UI_TASK_RESULT_PREFIX, ui_lang) + ": " + node.name

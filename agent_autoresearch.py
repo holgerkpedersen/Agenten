@@ -365,14 +365,15 @@ def _rate_limit_ok(session_id: str) -> bool:
 def trigger_if_needed(agent: Any, task_node: Any,
                        called_tools: dict,
                        full_response: str,
-                       messages: list[dict] | None = None) -> None:
+                       messages: list[dict] | None = None) -> str | None:
     """Called from _finalize_task_stream when a task fails.
 
     Checks autoresearch_enabled + filters, rate-limits, deduplicates,
-    creates a CORE-issue, and starts an autonomous research loop.
+    creates a CORE-issue, and returns the issue_id so the caller can
+    start an inline sub-session (instead of a background thread).
     """
     if getattr(task_node, "status", "") != "failed":
-        return
+        return None
 
     session_id = getattr(agent, "_session_id", "unknown")
 
@@ -386,11 +387,11 @@ def trigger_if_needed(agent: Any, task_node: Any,
     # Apply filters
     if not _check_filters(agent, template=template, phase=phase,
                           failure_type=failure_type):
-        return
+        return None
 
     if not _rate_limit_ok(session_id):
         agent._log("AUTOR", "Auto-research: rate-limited", session_id)
-        return
+        return None
 
     # Dedup
     try:
@@ -401,17 +402,18 @@ def trigger_if_needed(agent: Any, task_node: Any,
         if dup_id:
             agent._log("AUTOR", f"Auto-research: dublet — {dup_id}",
                        f"{failure_type} i {template}/{phase}")
-            return
+            return None
     except Exception as exc:
         agent._log("AUTOR", "Auto-research: dedup fejlede", str(exc))
 
-    # Create a CORE-issue documenting the failure and start research
+    # Create a CORE-issue documenting the failure
     issue_id = _create_issue(agent, failure_type, evidence, template, phase, "")
     if issue_id:
         _save_core_reference(session_id, issue_id, template, phase, failure_type)
         agent._log("AUTOR", f"Oprettede {issue_id} — original session: {session_id[:12]}",
                    f"{template}/{phase} fejlede med {failure_type}")
-        start_research_for_issue(agent, issue_id)
+        # NOTE: No longer starts background thread — caller handles inline execution
+    return issue_id
 
 
 # ── Research loop ──────────────────────────────────────────────

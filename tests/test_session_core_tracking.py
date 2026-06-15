@@ -235,22 +235,21 @@ class TestTriggerIfNeededFlow:
             with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
                  patch("agent_issues._load_issues") as mock_load, \
                  patch("agent_issues.create_issue") as mock_create_issue, \
-                 patch("agent_autoresearch.start_research_for_issue") as mock_start, \
                  abspath_patch, dirname_patch:
 
                 mock_load.return_value = {"issues": [], "meta": {"total": 0}}
                 mock_create_issue.return_value = {
                     "success": True, "issue": {"id": "CORE-777"}}
 
-                trigger_if_needed(
+                result = trigger_if_needed(
                     mock_agent, mock_task_node,
                     {"read_issue{}": 1}, "kort output", []
                 )
 
             # Verify issue was created
             mock_create_issue.assert_called_once()
-            # Verify research was started
-            mock_start.assert_called_once_with(mock_agent, "CORE-777")
+            # Verify returns issue_id instead of starting background thread
+            assert result == "CORE-777", f"Expected CORE-777, got {result}"
 
             # Verify session file got the core_issues reference
             data = _read_session(tmpdir, sid)
