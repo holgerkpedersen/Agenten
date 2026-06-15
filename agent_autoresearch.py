@@ -1,25 +1,18 @@
 """Auto-research engine for Agenten.
 
-Inspired by Karpathy's autoresearch concept (github.com/karpathy/autoresearch).
-
-When a task phase fails, this module runs a research loop:
-  1. Analyze   — LLM reads the failure context, determines root cause
-  2. Fix       — LLM edits the relevant source code (coding phase)
-  3. Verify    — run_tests, keep (git commit) or discard (git checkout)
-  4. Log       — record experiment outcome in research log
-  5. Repeat    — loop until fix verified or max iterations reached
-
 Design:
-  - Runs async in a daemon thread — never blocks the SSE stream.
-  - Sends progress events via a JSON event queue (polled by API).
-  - Supports pause/resume by saving ResearchSession state to file.
-  - Rate-limited: 1 research session per 5 minutes per session.
+  - trigger_if_needed() is called from _finalize_task_stream when a phase fails.
+  - It classifies the failure, deduplicates, rate-limits, and creates a CORE-issue.
+  - The caller (agent_tasks._finalize_task_stream) then executes the CORE-issue
+    inline via _execute_autoresearch_issue() as a selvforbedring sub-session.
+  - The sub-session runs in the same SSE stream — user sees Analyser→Diagnosticér
+    →Ret→Verificér→Commit live in the UI.
+  - Depth-limited (max 2 nested sessions) to prevent infinite recursion.
 """
 
 import json
 import os
 import re
-import threading
 import time
 import uuid
 from typing import Any
@@ -421,150 +414,18 @@ def trigger_if_needed(agent: Any, task_node: Any,
     return issue_id
 
 
-# ── Research loop ──────────────────────────────────────────────
-
-_MAX_RESEARCH_ITERATIONS = 5
-
-
 def start_research_for_issue(agent: Any, issue_id: str) -> None:
-    """Start an autonomous research loop for a specific issue.
+    """Start autonomous research for a specific issue.
 
-    Reads the issue, creates a research session, and launches an
-    async thread that analyzes, fixes, verifies, and iterates until
-    the issue is resolved or max attempts reached.
+    Now uses the inline sub-session flow. For POST endpoints without
+    SSE context (e.g. /api/autoresearch/run/<issue_id>), this logs
+    a depreciation notice. Use the automatic inline flow instead
+    (trigger_if_needed → _finalize_task_stream → _execute_autoresearch_issue).
     """
-    from agent_issues import _load_issues
-    try:
-        data = _load_issues()
-    except Exception:
-        return
+    agent._log("AUTOR", f"Auto-research: {issue_id} — brug automatisk inline flow",
+               "start_research_for_issue er deprecated. Auto-research kører nu "
+               "automatisk via SSE under fase-eksekvering.")
 
-    issue = None
-    for i in data.get("issues", []):
-        if i.get("id", "").lower() == issue_id.lower():
-            issue = i
-            break
-    if not issue:
-        return
-
-    # Apply filters
-    if not _check_filters(agent, issue=issue):
-        agent._log("AUTOR", f"Auto-research: filtreret fra — {issue_id}",
-                   issue.get("type", ""))
-        return
-
-    session_id = getattr(agent, "_session_id", "unknown")
-    research_id = str(uuid.uuid4())[:8]
-
-    state = {
-        "research_id": research_id,
-        "session_id": session_id,
-        "issue_id": issue_id,
-        "issue_title": issue.get("title", ""),
-        "issue_location": issue.get("location", ""),
-        "issue_type": issue.get("type", "bug"),
-        "status": "running",
-        "iteration": 0,
-        "max_iterations": _MAX_RESEARCH_ITERATIONS,
-        "experiments": [],
-        "started_at": time.time(),
-    }
-
-    dirpath = os.path.join(_LOG_DIR, research_id)
-    os.makedirs(dirpath, exist_ok=True)
-    _save_state(research_id, state)
-
-    agent._log("AUTOR", f"Auto-research startet for {issue_id}: {research_id}",
-               issue.get("title", "")[:100])
-
-    thread = threading.Thread(
-        target=_research_loop_for_issue,
-        args=(agent, issue, research_id, state),
-        daemon=True,
-    )
-    thread.start()
-
-
-def _research_loop_for_issue(agent: Any, issue: dict,
-                              research_id: str, state: dict) -> None:
-    """Research loop that targets a specific issue."""
-    issue_id = issue.get("id", "?")
-    issue_title = issue.get("title", "")
-    issue_location = issue.get("location", "")
-    session_id = state["session_id"]
-
-    _emit_event(research_id, "research_started", {
-        "issue_id": issue_id,
-        "title": issue_title[:100],
-        "location": issue_location,
-    })
-
-    for iteration in range(1, _MAX_RESEARCH_ITERATIONS + 1):
-        if os.path.exists(_paused_path(research_id)):
-            _emit_event(research_id, "paused", {"iteration": iteration})
-            state["status"] = "paused"
-            state["iteration"] = iteration
-            _save_state(research_id, state)
-            return
-
-        state["iteration"] = iteration
-        _emit_event(research_id, "iteration_started", {"iteration": iteration})
-
-        # Analyze
-        _emit_event(research_id, "phase", {"phase": "analyze", "iteration": iteration})
-        analysis = (
-            f"Research iteration {iteration} for {issue_id}: {issue_title}\n"
-            f"Location: {issue_location}\n"
-        )
-        _emit_event(research_id, "analysis_done", {"summary": analysis[:200]})
-
-        # Fix (coding phase) — creates a CORE-issue as placeholder
-        _emit_event(research_id, "phase", {"phase": "fix", "iteration": iteration})
-        from agent_issues import create_issue
-        result = create_issue(
-            agent,
-            title=f"Auto-fix: {issue_title[:80]}",
-            type="self",
-            severity="medium",
-            description=analysis[:2000],
-            location=issue_location,
-            impact=f"Issue {issue_id} forsøges løst automatisk.",
-            proposed_fix="Se auto-research log.",
-        )
-        fix_success = result.get("success", False)
-        _emit_event(research_id, "fix_done", {
-            "success": False,
-            "changes": [result.get("issue", {}).get("id", "?")] if fix_success else [],
-        })
-
-        # Log experiment
-        state["experiments"].append({
-            "iteration": iteration,
-            "analysis": analysis[:500],
-            "fix_attempted": fix_success,
-            "kept": False,
-        })
-        _save_state(research_id, state)
-
-    _emit_event(research_id, "research_failed", {
-        "reason": "Max iterations reached without fix",
-        "issue_id": issue_id,
-    })
-    state["status"] = "failed"
-    _save_state(research_id, state)
-
-    # Create an issue documenting the failure
-    from agent_issues import create_issue as ci
-    ci(
-        agent,
-        title=f"Auto-research exhausted for {issue_id}",
-        type="self",
-        severity="medium",
-        description=f"Auto-research kunne ikke løse {issue_id} efter {_MAX_RESEARCH_ITERATIONS} iterationer.",
-        location=issue_location,
-        impact="Kræver manuel gennemgang.",
-        proposed_fix="Se auto-research log.",
-    )
 
 
 def _save_state(research_id: str, state: dict) -> None:
