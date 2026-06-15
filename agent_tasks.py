@@ -1601,9 +1601,12 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
             ])
         elif phase == "opdater" or phase == "opdatering":
             todos.extend([
-                {"id": "rf_u1", "text": "Fjern flyttede symboler med remove_symbol()", "done": False},
-                {"id": "rf_u2", "text": "Tilf\u00f8j imports med add_import()", "done": False},
-                {"id": "rf_u3", "text": "Verificer syntaks med verify_refactor()", "done": False},
+                {"id": "rf_u1", "text": "List symboler i agent_core.py med list_symbols()", "done": False},
+                {"id": "rf_u2", "text": "Fjern ekstraherede symboler med remove_symbol()", "done": False},
+                {"id": "rf_u3", "text": "Tilf\u00f8j imports med add_import() til nye moduler", "done": False},
+                {"id": "rf_u4", "text": "Verificer syntaks med verify_refactor()", "done": False},
+                {"id": "rf_u5", "text": "K\u00f8r tests for at bekr\u00e6fte ingen regression", "done": False},
+                {"id": "rf_u6", "text": "Mark\u00e9r REFAC som resolved med update_issue_status()", "done": False},
             ])
         elif phase == "test":
             todos.extend([
@@ -1685,14 +1688,14 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("extract_symbol", None, "rf_e1"),
     ("add_method", None, "bf_i3"),
     ("add_function", None, None),
-    ("remove_symbol", None, "rf_u1"),
-    ("add_import", None, "rf_u2"),
+    ("remove_symbol", None, "rf_u2"),
+    ("add_import", None, "rf_u3"),
     ("run_tests", None, "bf_t2"),
-    ("run_tests", None, "rf_t1"),
+    ("run_tests", None, "rf_u5"),
     ("update_issue_status", None, "bf_o1"),
-    ("update_issue_status", None, "rf_t2"),
+    ("update_issue_status", None, "rf_u6"),
     ("verify_refactor", None, "rf_e4"),
-    ("verify_refactor", None, "rf_u3"),
+    ("verify_refactor", None, "rf_u4"),
 ]
 
 
