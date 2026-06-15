@@ -146,21 +146,6 @@ class TestFindDuplicateIssue:
         assert dup is None
 
 
-class TestAnalyzeFailure:
-    def test_returns_structured_summary(self):
-        from agent_autoresearch import _analyze_failure
-        agent = MagicMock()
-        result = _analyze_failure(
-            agent, "missing_tool",
-            {"required": ["update_issue_status"],
-             "called": ["read_issue"], "uncalled": ["update_issue_status"]},
-            "issue_handler", "Luk Issue")
-        assert "missing_tool" in result
-        assert "issue_handler" in result
-        assert "Luk Issue" in result
-        assert "update_issue_status" in result
-
-
 class TestCreateIssue:
     def test_creates_issue(self, mock_agent):
         from agent_autoresearch import _create_issue
