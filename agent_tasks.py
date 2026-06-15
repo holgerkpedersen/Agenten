@@ -2092,14 +2092,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 if tool_name == "edit_file" and args_val.get("old_text") and not args_val.get("symbol"):
                     old_text = args_val["old_text"]
                     if not _old_text_was_in_prior_result(old_text, messages):
-                        # Auto-read non-Python files not in file_chunks (can't use read_location/read_chunk)
+                        # Auto-read the file to give the LLM the actual content
                         filepath = args_val.get("path", "")
-                        is_python = filepath.endswith(".py") if filepath else False
-                        in_chunks = filepath and any(
-                            filepath.endswith(k.replace("file_", "", 1))
-                            for k in (agent.file_chunks or {}).keys()
-                        ) if hasattr(agent, 'file_chunks') else False
-                        if not is_python and not in_chunks and filepath:
+                        if filepath and os.path.exists(filepath):
                             try:
                                 with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
                                     content = f.read()

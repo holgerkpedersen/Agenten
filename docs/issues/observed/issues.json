@@ -1876,8 +1876,10 @@
       "location": "agent_core.py",
       "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
       "proposed_fix": "Opdel agent_core.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
-      "status": "open",
-      "related": []
+      "status": "resolved",
+      "related": [],
+      "updated_at": "2026-06-15T17:35:26",
+      "resolution_note": "agent_core.py reduceret til 916 linjer (< 1000 mål). Funktionerne _add_file_entry og _build_file_context er allerede flyttet til agent_context.py. Filen er syntaktisk gyldig med verify_refactor()."
     },
     {
       "id": "REFAC-021",
