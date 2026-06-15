@@ -1551,15 +1551,6 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
     phase = _normalize_phase(phase_name).lower()
     todos = []
 
-    try:
-        from agent_phase_checks import TEMPLATE_PHASE_CHECKS
-        checks = TEMPLATE_PHASE_CHECKS.get(template, {}).get(phase_name, {})
-        desc = checks.get("description", "")
-        if desc:
-            todos.append({"id": "todo_desc", "text": desc, "done": False})
-    except Exception:
-        pass
-
     if template == "bugfix":
         if phase == "analyse":
             todos.extend([
@@ -1658,6 +1649,27 @@ def _check_refactor_progress() -> str:
         parts.append("Allerede oprettet ({}/{}): {}".format(len(existing), total, ', '.join(existing)))
     if remaining:
         parts.append("Mangler ({}/{}): {}".format(len(remaining), total, ', '.join(remaining)))
+
+    # For Opdatér phase: show symbols still in agent_core.py vs already removed
+    core_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'agent_core.py') if _os.environ.get('AGENT_WORKDIR') else 'agent_core.py'
+    if _os.path.exists(core_path):
+        try:
+            with open(core_path, 'r', encoding='utf-8') as f:
+                core_content = f.read()
+            core_nodes = _re.findall(r'^def (\w+)|^class (\w+)', core_content, _re.MULTILINE)
+            core_symbols = sorted(set(n[0] or n[1] for n in core_nodes))
+            plan_symbols = _re.findall(r'`(\w+)`[^`]*flyttes|`(\w+)`[^`]*rykkes|symbol_name=\'(\w+)\'', plan_content)
+            planned = sorted(set(s for t in plan_symbols for s in t if s))
+            if planned and core_symbols:
+                still_in_core = [s for s in planned if s in core_symbols]
+                already_removed = [s for s in planned if s not in core_symbols]
+                if still_in_core:
+                    parts.append("Skal fjernes fra agent_core.py ({}): {}".format(len(still_in_core), ', '.join(still_in_core)))
+                if already_removed:
+                    parts.append("Allerede fjernet fra agent_core.py ({}): {}".format(len(already_removed), ', '.join(already_removed)))
+        except (OSError, UnicodeDecodeError):
+            pass
+
     return '\n'.join(parts)
 
 

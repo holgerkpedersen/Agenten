@@ -10,6 +10,7 @@ import agent_issues
 import config
 from task_tree import TaskTree, TaskNode
 from lang import t
+from i18n import K
 
 
 def _add_file_entry(file_context: str, agent: Any, filename: str, content: str) -> str:
@@ -39,9 +40,36 @@ def _add_file_entry(file_context: str, agent: Any, filename: str, content: str) 
     return file_context
 
 
-def _build_file_context(agent: Any, files: list[dict[str, Any]] | None, prompt: str) -> str:
-    """Build complete file context."""
-    from i18n import K
+def _build_fallback_tree(agent: Any, prompt: str, fallback_sections: list[str]) -> None:
+    """Build a structured fallback task tree from a template's section list."""
+    tree = TaskTree(prompt)
+    _criteria_re = re.compile(r'^(.+?)\s*\(([^)]+)\)\s*$')
+    for section in fallback_sections:
+        section_str = str(section)
+        m = _criteria_re.match(section_str)
+        if m:
+            name = m.group(1).strip()
+            criteria = [c.strip() for c in m.group(2).split(",")]
+        else:
+            name = section_str
+            criteria = []
+        node = TaskNode(name)
+        node.success_criteria = criteria
+        tree.root.add_child(node)
+    agent.task_tree = tree
+
+
+
+def _build_file_context(agent: Agent, files: list[dict[str, Any]] | None, prompt: str) -> str:
+    """build file context.
+    
+    Args:
+        agent:
+        files:
+        prompt:
+    
+    Returns:
+        str"""
     file_context = ""
     if files and len(files) > 0:
         file_context = t(K.FILE_CONTEXT_HEADER, agent.lang)
@@ -63,22 +91,3 @@ def _build_file_context(agent: Any, files: list[dict[str, Any]] | None, prompt: 
                 file_context = _add_file_entry("", agent, filename, file_content)
                 file_context = t(K.FILE_CONTEXT_HEADER, agent.lang) + file_context.lstrip()
     return file_context
-
-
-def _build_fallback_tree(agent: Any, prompt: str, fallback_sections: list[str]) -> None:
-    """Build a structured fallback task tree from a template's section list."""
-    tree = TaskTree(prompt)
-    _criteria_re = re.compile(r'^(.+?)\s*\(([^)]+)\)\s*$')
-    for section in fallback_sections:
-        section_str = str(section)
-        m = _criteria_re.match(section_str)
-        if m:
-            name = m.group(1).strip()
-            criteria = [c.strip() for c in m.group(2).split(",")]
-        else:
-            name = section_str
-            criteria = []
-        node = TaskNode(name)
-        node.success_criteria = criteria
-        tree.root.add_child(node)
-    agent.task_tree = tree
