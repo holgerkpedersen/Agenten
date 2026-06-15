@@ -1625,6 +1625,42 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
 
     return todos
 
+
+def _check_refactor_progress() -> str:
+    """Check which planned modules from refactor_plan.md exist on disk.
+
+    Returns a status string like:
+      'Already created (5/8): mod_a.py, mod_b.py, ...
+       Remaining (3/8): mod_c.py, mod_d.py, mod_e.py'
+    Returns empty string if refactor_plan.md doesn't exist.
+    """
+    import os as _os
+    import re as _re
+    plan_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'refactor_plan.md') if _os.environ.get('AGENT_WORKDIR') else 'refactor_plan.md'
+    if not _os.path.exists(plan_path):
+        return ''
+    try:
+        with open(plan_path, 'r', encoding='utf-8') as f:
+            plan_content = f.read()
+    except (OSError, UnicodeDecodeError):
+        return ''
+    modules = _re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content)
+    if not modules:
+        return ''
+    modules = sorted(set(modules))
+    existing = [m for m in modules if _os.path.exists(m)]
+    remaining = [m for m in modules if m not in existing]
+    total = len(modules)
+    if total == 0:
+        return ''
+    parts = []
+    if existing:
+        parts.append("Allerede oprettet ({}/{}): {}".format(len(existing), total, ', '.join(existing)))
+    if remaining:
+        parts.append("Mangler ({}/{}): {}".format(len(remaining), total, ', '.join(remaining)))
+    return '\n'.join(parts)
+
+
 def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Generator[dict, None, None]:
     """solve task stream.
     
