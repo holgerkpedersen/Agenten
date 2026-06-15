@@ -46,6 +46,9 @@ from agent_context import _add_file_entry
 from agent_context import _build_file_context
 from agent_decomposition import _build_fallback_tree
 from agent_decomposition import _decompose_via_llm
+from agent_tools_github import register_github_tools
+from agent_tools_git import register_git_tools
+from agent_tools_file import register_file_tools
 
 
 class Agent:
@@ -115,247 +118,10 @@ class Agent:
 
     def _register_tools(self) -> None:
         """register tools."""
-        self._register_github_tools()
-        self._register_git_tools()
-        self._register_file_tools()
+        register_github_tools(self)
+        register_git_tools(self)
+        register_file_tools(self)
         self._register_agent_tools()
-
-    def _register_github_tools(self) -> None:
-        gh = GithubAPI()
-        self.tool_registry.register(Tool(
-            "github_create_repo",
-            t(K.TOOL_GITHUB_CREATE_REPO, self.lang),
-            ["name", "description", "private"],
-            lambda name, description="", private=False: gh.create_repo(name=name, description=description, private=private)
-        ))
-        self.tool_registry.register(Tool(
-            "github_list_repos",
-            t(K.TOOL_GITHUB_LIST_REPOS, self.lang),
-            [],
-            lambda: gh.list_repos()
-        ))
-        self.tool_registry.register(Tool(
-            "github_create_issue",
-            t(K.TOOL_GITHUB_CREATE_ISSUE, self.lang),
-            ["owner", "repo", "title", "body"],
-            lambda owner, repo, title, body="": gh.create_issue(owner=owner, repo=repo, title=title, body=body)
-        ))
-        self.tool_registry.register(Tool(
-            "github_create_pr",
-            t(K.TOOL_GITHUB_CREATE_PR, self.lang),
-            ["owner", "repo", "title", "branch"],
-            lambda owner, repo, title, branch, base="main": gh.create_pr(owner=owner, repo=repo, title=title, head=branch, base=base)
-        ))
-
-    def _register_git_tools(self) -> None:
-        self.tool_registry.register(Tool(
-            "git_status",
-            t(K.TOOL_GIT_STATUS, self.lang),
-            [],
-            lambda: git_ops.git_status()
-        ))
-        self.tool_registry.register(Tool(
-            "git_add_all",
-            t(K.TOOL_GIT_ADD_ALL, self.lang),
-            [],
-            lambda: git_ops.git_add_all()
-        ))
-        self.tool_registry.register(Tool(
-            "git_commit",
-            t(K.TOOL_GIT_COMMIT, self.lang),
-            ["message"],
-            lambda message: git_ops.git_commit(message=message)
-        ))
-        self.tool_registry.register(Tool(
-            "git_push",
-            t(K.TOOL_GIT_PUSH, self.lang),
-            ["branch"],
-            lambda branch="main": git_ops.git_push(branch=branch)
-        ))
-        self.tool_registry.register(Tool(
-            "git_set_remote",
-            t(K.TOOL_GIT_SET_REMOTE, self.lang),
-            ["url"],
-            lambda url: git_ops.git_set_remote(url=url)
-        ))
-        self.tool_registry.register(Tool(
-            "git_remote_status",
-            t(K.TOOL_GIT_REMOTE_STATUS, self.lang),
-            [],
-            lambda: git_ops.git_remote_exists()
-        ))
-        self.tool_registry.register(Tool(
-            "git_diff",
-            t(K.TOOL_GIT_DIFF, self.lang),
-            ["older", "newer"],
-            lambda older="HEAD~1", newer="HEAD": git_ops.git_diff(older, newer)
-        ))
-        self.tool_registry.register(Tool(
-            "git_log",
-            t(K.TOOL_GIT_LOG, self.lang),
-            ["count"],
-            lambda count=10: git_ops.git_log(_safe_int(count, 10))
-        ))
-        self.tool_registry.register(Tool(
-            "git_create_branch",
-            t(K.TOOL_GIT_CREATE_BRANCH, self.lang),
-            ["name"],
-            lambda name: git_ops.git_create_branch(name=name)
-        ))
-        self.tool_registry.register(Tool(
-            "git_current_branch",
-            t(K.TOOL_GIT_CURRENT_BRANCH, self.lang),
-            [],
-            lambda: git_ops.git_current_branch()
-        ))
-        self.tool_registry.register(Tool(
-            "git_branch_list",
-            t(K.TOOL_GIT_BRANCH_LIST, self.lang),
-            [],
-            lambda: git_ops.git_branch_list()
-        ))
-        self.tool_registry.register(Tool(
-            "git_pull",
-            t(K.TOOL_GIT_PULL, self.lang),
-            ["remote", "branch"],
-            lambda remote="origin", branch="main": git_ops.git_pull(remote=remote, branch=branch)
-        ))
-        self.tool_registry.register(Tool(
-            "git_checkout",
-            t(K.TOOL_GIT_CHECKOUT, self.lang),
-            ["branch"],
-            lambda branch: git_ops.git_checkout(branch=branch)
-        ))
-
-    def _register_file_tools(self) -> None:
-        self.tool_registry.register(Tool(
-            "read_location",
-            t(K.TOOL_READ_LOCATION, self.lang),
-            ["filepath", "name"],
-            lambda filepath, name=None, line_no=None: agent_files.read_location(filepath=filepath, name=name, line_no=line_no),
-            optional_params=["line_no"]
-        ))
-        self.tool_registry.register(Tool(
-            "read_chunk",
-            t(K.TOOL_READ_CHUNK, self.lang),
-            ["file_key", "index"],
-            lambda file_key, index=1: self._read_chunk(file_key, int(index))
-        ))
-        self.tool_registry.register(Tool(
-            "list_chunks",
-            t(K.TOOL_LIST_CHUNKS, self.lang),
-            [],
-            lambda: self._list_chunks()
-        ))
-        self.tool_registry.register(Tool(
-            "list_symbols",
-            t(K.TOOL_LIST_SYMBOLS, self.lang),
-            ["filepath"],
-            lambda filepath: agent_files.list_symbols(filepath=filepath)
-        ))
-        self.tool_registry.register(Tool(
-            "locate",
-            t(K.TOOL_LOCATE, self.lang),
-            ["name", "filepath"],
-            lambda name=None, filepath=None, line_no=None: _resolve_t_keys_in_result(
-                agent_files.locate_code(filepath=filepath, name=name, line_no=line_no)),
-            optional_params=["filepath"]
-        ))
-        self.tool_registry.register(Tool(
-             "edit_file",
-             t(K.TOOL_EDIT_FILE, self.lang),
-             ["path", "old_text", "new_text"],
-              lambda path, old_text="", new_text="", symbol=None, test_path="": git_ops.edit_file(
-                  path=path, old_text=old_text, new_text=new_text,
-                  expected_hash=self._file_hash_registry.get(os.path.normcase(os.path.abspath(path))),
-                  symbol=symbol, test_path=test_path, llm=self.llm,
-              ),
-              optional_params=["symbol", "test_path"]
-        ))
-        self.tool_registry.register(Tool(
-            "write_file",
-            t(K.TOOL_WRITE_FILE, self.lang),
-            ["path", "content"],
-            lambda path, content, overwrite=False: git_ops.write_file(path=path, content=content, overwrite=overwrite)
-        ))
-        self.tool_registry.register(Tool(
-            "list_files",
-            t(K.TOOL_LIST_FILES, self.lang),
-            ["path"],
-            lambda path=".", pattern="", max_depth=2: git_ops.list_files(path=path, pattern=pattern or None, max_depth=_safe_int(max_depth, 2))
-        ))
-        self.tool_registry.register(Tool(
-            "delete_file",
-            t(K.TOOL_DELETE_FILE, self.lang),
-            ["filepath"],
-            lambda filepath: git_ops.delete_file(filepath=filepath)
-        ))
-        self.tool_registry.register(Tool(
-            "add_image",
-            t(K.TOOL_ADD_IMAGE, self.lang),
-            ["path"],
-            lambda path: self._add_image(path)
-        ))
-        self.tool_registry.register(Tool(
-            "extract_symbol",
-            t(K.TOOL_EXTRACT_SYMBOL, self.lang),
-            ["source", "symbol_name", "target"],
-            lambda source, symbol_name, target: self.refactoring_engine.move_symbol(
-                source=source, symbol_name=symbol_name, target=target
-            )
-        ))
-        self.tool_registry.register(Tool(
-            "remove_symbol",
-            t(K.TOOL_REMOVE_SYMBOL, self.lang),
-            ["source", "symbol_name"],
-            lambda source, symbol_name: self.refactoring_engine.remove_symbol(
-                source=source, symbol_name=symbol_name
-            )
-        ))
-        self.tool_registry.register(Tool(
-            "add_method",
-            t(K.TOOL_ADD_METHOD, self.lang),
-            ["filepath", "class_name", "method_code"],
-            lambda filepath, class_name, method_code: git_ops.add_method(
-                filepath=filepath, class_name=class_name, method_code=method_code
-            )
-        ))
-        self.tool_registry.register(Tool(
-            "add_function",
-            t(K.TOOL_ADD_FUNCTION, self.lang),
-            ["filepath", "function_code"],
-            lambda filepath, function_code, after_symbol="": git_ops.add_function(
-                filepath=filepath, function_code=function_code, after_symbol=after_symbol
-            )
-        ))
-        self.tool_registry.register(Tool(
-            "add_import",
-            t(K.TOOL_ADD_IMPORT, self.lang),
-            ["source", "module", "symbol"],
-            lambda source, module, symbol: self.refactoring_engine.add_import(
-                source=source, module=module, symbol=symbol
-            )
-        ))
-        self.tool_registry.register(Tool(
-            "verify_refactor",
-            t(K.TOOL_VERIFY_REFACTOR, self.lang),
-            ["source"],
-            lambda source: self.refactoring_engine.verify_refactor(source=source)
-        ))
-        self.tool_registry.register(Tool(
-            "analyze_dependencies",
-            t(K.TOOL_ANALYZE_DEPENDENCIES, self.lang),
-            ["source"],
-            lambda source: self.refactoring_engine.analyze_dependencies(source=source)
-        ))
-        self.tool_registry.register(Tool(
-            "suggest_module_groups",
-            t(K.TOOL_SUGGEST_MODULE_GROUPS, self.lang),
-["source"],
-            lambda source, max_group_size=5: self.refactoring_engine.suggest_module_groups(
-                source=source, max_group_size=_safe_int(max_group_size, 5)
-            )
-        ))
 
     def _register_agent_tools(self) -> None:
         self.tool_registry.register(Tool(
@@ -495,6 +261,13 @@ class Agent:
         Returns:
             None"""
         agent_tree.evolve_if_needed(self)
+
+    def _create_fallback_tree(self, prompt: str) -> Any:
+        """Create fallback task tree from template sections."""
+        from agent_decomposition import _build_fallback_tree
+        sections = [f"Analyser: {prompt}", "Plan", "Implementer", "Test", "Konkluder"]
+        _build_fallback_tree(self, prompt, sections)
+        return self.task_tree
 
     def _log(self, level: str, message: str, detail: str = "", log_file: str | None = None) -> None:
         """log.
@@ -648,36 +421,19 @@ class Agent:
             str | None"""
         return agent_files.read_file_content(self, filepath)
 
-    def _get_single_file_context(self, prompt: str) -> tuple[str | None, str | None]:
-        """get single file context.
-        
-        Args:
-            prompt (str):
-        
-        Returns:
-            tuple[str | None, str | None]"""
-        return agent_files.get_single_file_context(self, prompt)
-
-    def _get_folder_context(self, prompt: str) -> list[dict[str, Any]] | None:
-        """get folder context.
-        
-        Args:
-            prompt (str):
-        
-        Returns:
-            list[dict[str, Any]] | None"""
+    def _get_folder_context(self, prompt: str) -> list[tuple[str, str]]:
+        """Scan folder and return file path + content pairs."""
         return agent_files.get_folder_context(self, prompt)
 
-    def _create_fallback_tree(self, prompt: str) -> dict[str, Any]:
-        """create fallback tree.
-        
-        Args:
-            prompt (str):
-        
-        Returns:
-            dict[str, Any]"""
-        self.original_prompt = prompt
-        return agent_tree.create_fallback_tree(self, prompt)
+    def _get_single_file_context(self, prompt: str) -> tuple[str, str] | None:
+        """Get single file context from prompt."""
+        return agent_files.get_single_file_context(self, prompt)
+
+    def _add_file_entry(self, file_path: str, file_content: str) -> None:
+        """Add file entry to file_chunks."""
+        if not hasattr(self, 'file_chunks'):
+            self.file_chunks = {}
+        self.file_chunks[file_path] = file_content
 
     def _parse_tree_from_llm(self, prompt: str, llm_response: str) -> dict[str, Any]:
         """parse tree from llm.

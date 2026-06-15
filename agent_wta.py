@@ -12,11 +12,13 @@ TOOL_ORDER = {
     "read_issue": 10, "list_files": 10, "list_chunks": 10, "list_symbols": 10,
     "locate": 10, "read_location": 10, "read_chunk": 10,
     "analyze_own_logs": 10, "analyze_dependencies": 10, "suggest_module_groups": 10,
-    # 2. Create new code
-    "write_file": 20, "add_method": 20, "add_function": 20, "add_import": 20,
+    # 2. Create new code (new files)
+    "write_file": 20, "add_method": 20, "add_function": 20,
     # 3. Modify/delete existing code
     "edit_file": 30, "remove_symbol": 30, "delete_file": 30, "extract_symbol": 30,
-    # 4. Verify
+    # 4. Add imports (after removing old symbols so import doesn't conflict)
+    "add_import": 35,
+    # 5. Verify
     "run_tests": 40, "verify_refactor": 40,
     # 5. Finalize
     "update_issue_status": 50, "done": 50,

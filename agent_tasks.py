@@ -170,6 +170,24 @@ def _normalize_phase(name: str) -> str:
     return PHASE_ALIASES.get(lower, lower)
 
 
+def _get_phase_task_tools(agent: Any, task_name: str) -> set[str] | None:
+    """Return the set of REQUIRED_ACTION_TOOLS that the phase's task tools list.
+    Returns None when no template or no phase-specific list is found, so
+    callers fall back to the default 'all action tools' behaviour.
+    """
+    template = getattr(agent, "active_template", "") or ""
+    if not template or not task_name:
+        return None
+    phase = _normalize_phase(task_name).lower()
+    template_tools = agent_skills.TEMPLATE_TASK_TOOLS.get(template, {})
+    if phase in template_tools:
+        return {t for t in REQUIRED_ACTION_TOOLS if t in template_tools[phase]}
+    for key, tools in template_tools.items():
+        if key.lower() in phase or phase in key.lower():
+            return {t for t in REQUIRED_ACTION_TOOLS if t in tools}
+    return None
+
+
 def _refactor_actually_moved_code(agent: Any) -> bool:
     """Return True if a real refactor was performed (ALL modules moved + api_server reduced).
 
@@ -1083,7 +1101,15 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
                 agent._non_productive_reminder_sent = True
                 return t(K.SYS_REQUIRED_TOOLS_PROGRAMMING, agent.lang).format(count=iteration)
     available = set(agent.tool_registry.active_tools or [])
-    required = available & REQUIRED_ACTION_TOOLS
+    # Phase-specific required tools: only require action tools that the
+    # phase's TEMPLATE_TASK_TOOLS actually lists. This prevents phases
+    # from requiring tools they don't use (e.g., refactor Opdatér should
+    # not require extract_symbol or write_file if remove_symbol+add_import suffice).
+    phase_tools = _get_phase_task_tools(agent, task_name)
+    if phase_tools is not None:
+        required = phase_tools
+    else:
+        required = available & REQUIRED_ACTION_TOOLS
     if not required:
         return None
     phase = _normalize_phase(task_name).lower() if task_name else ""
@@ -1124,6 +1150,11 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     if template == "selvforbedring" and "ret" in phase:
         if "edit_file" in uncalled and "create_issue" in called_names:
             uncalled.discard("edit_file")
+    # remove_symbol + add_import together are the AST-based refactoring
+    # approach — they achieve the same goal as edit_file/write_file/
+    # delete_file/add_method/add_function.
+    if "remove_symbol" in called_names and "add_import" in called_names:
+        uncalled -= {"edit_file", "write_file", "delete_file", "add_method", "add_function"}
     # tool_log success check: tools where ALL attempts failed due to LLM error
     # do NOT count as satisfied — only system blocks (hash, path safety) are excused.
     if agent._tool_log and not uncalled:
@@ -1661,19 +1692,21 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
             todos.append({"id": "rf_u1", "text": "List symboler i agent_core.py med list_symbols()", "done": False})
 
             # Find symbols mentioned in plan that are still in agent_core.py
+            # Format: "- `symbol_name` (linje N) -> `target_module.py`"
             if plan_content and core_symbols:
-                planned_symbols = sorted(set(
-                    s for t in _re.findall(r'`(\w+)`[^`]*(?:flyttes|rykkes)|symbol_name=\'(\w+)\'', plan_content)
-                    for s in t if s
-                ))
-                still_in_core = [s for s in planned_symbols if s in core_symbols]
+                symbol_map = {}  # symbol -> target_module
+                for m in _re.finditer(r'- `(\w+)`[^`]+`([\w.]+\.py)`', plan_content):
+                    sym = m.group(1)
+                    target = m.group(2)
+                    symbol_map[sym] = target
+                # Also match explicit symbol_name references
+                for m in _re.finditer(r"symbol_name='(\w+)'", plan_content):
+                    sym = m.group(1)
+                    if sym not in symbol_map:
+                        symbol_map[sym] = '?'
+                still_in_core = [s for s in symbol_map if s in core_symbols]
                 for sym in still_in_core:
-                    # Find which module this symbol was planned for
-                    target_mod = '?'
-                    for mod in existing_modules:
-                        mod_name = _os.path.splitext(mod)[0]
-                        if mod_name in plan_content:
-                            target_mod = mod
+                    target_mod = symbol_map.get(sym, '?')
                     todos.append({
                         "id": "rf_u_remove_" + sym,
                         "text": "Fjern `{}` fra agent_core.py (i {})".format(sym, target_mod),
@@ -1929,6 +1962,16 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     budget_msg += " (\u26a0\ufe0f F\u00e5 iterationer tilbage \u2014 priorit\u00e9r handlinger)"
                 elif remaining / max_iterations <= 0.3:
                     budget_msg += " (\u26a0\ufe0f Knaphed)"
+                # For refactor phases: inject progress and suggested order
+                if getattr(agent, 'active_template', '') == 'refactor':
+                    progress = _check_refactor_progress()
+                    if progress:
+                        budget_msg += f"\n\n{progress}"
+                    phase_lower = _normalize_phase(task_node.name).lower()
+                    if phase_lower in ("opdatering", "opdat\u00e9r", "opdater"):
+                        budget_msg += "\n\nR\u00e6kkef\u00f8lge: 1) list_symbols 2) remove_symbol 3) add_import 4) verify_refactor 5) run_tests 6) update_issue_status"
+                    elif phase_lower == "ekstraher":
+                        budget_msg += "\n\nR\u00e6kkef\u00f8lge: 1) list_symbols 2) extract_symbol (gentag) 3) add_function/add_method kun hvis n\u00f8dvendigt 4) verify_refactor"
                 messages.append({"role": "user", "content": budget_msg})
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)

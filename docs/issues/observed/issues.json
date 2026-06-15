@@ -1878,8 +1878,8 @@
       "proposed_fix": "Opdel agent_core.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
       "status": "resolved",
       "related": [],
-      "updated_at": "2026-06-15T17:35:26",
-      "resolution_note": "agent_core.py reduceret til 916 linjer (< 1000 mål). Funktionerne _add_file_entry og _build_file_context er allerede flyttet til agent_context.py. Filen er syntaktisk gyldig med verify_refactor()."
+      "updated_at": "2026-06-15T18:32:07",
+      "resolution_note": "agent_core.py reduceret til 650 linjer (under 1000-målet). Funktioner flyttet til agent_context.py, agent_decomposition.py og agent_file_context.py. Imports er på plads: _add_file_entry, _build_file_context fra agent_context; _build_fallback_tree, _decompose_via_llm fra agent_decomposition; _auto_load_location_file, _validate_prompt_against_code fra agent_file_context. Filen er syntaktisk gyldig med 650 linjer og Agent-klassen med alle metoder intakte."
     },
     {
       "id": "REFAC-021",
