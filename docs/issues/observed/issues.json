@@ -1903,7 +1903,8 @@
       "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
       "proposed_fix": "Opdel agent_phase_checks.py i mindre moduler (maks 300 linjer per fil). Ekstraher relaterede funktioner til dedikerede moduler.",
       "acceptance_criteria": "agent_phase_checks.py er reduceret til under 300 linjer.",
-      "status": "open"
+      "status": "in_progress",
+      "updated_at": "2026-06-15T20:34:58"
     },
     {
       "id": "BUG-096",

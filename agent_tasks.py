@@ -1155,6 +1155,10 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     # delete_file/add_method/add_function.
     if "remove_symbol" in called_names and "add_import" in called_names:
         uncalled -= {"edit_file", "write_file", "delete_file", "add_method", "add_function"}
+    # write_file/edit_file are supersets of add_method/add_function —
+    # if the LLM wrote or edited the whole file, per-method tools aren't needed.
+    if "write_file" in called_names or "edit_file" in called_names:
+        uncalled -= {"add_method", "add_function"}
     # tool_log success check: tools where ALL attempts failed due to LLM error
     # do NOT count as satisfied — only system blocks (hash, path safety) are excused.
     if agent._tool_log and not uncalled:
