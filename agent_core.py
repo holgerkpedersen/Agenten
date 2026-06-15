@@ -115,6 +115,7 @@ class Agent:
         self._write_failed: bool = False
         self._tests_failed: bool = False
         self._located_files: set[str] = set()
+        self._autoresearch_depth: int = 0
         self.refactoring_engine: RefactoringEngine = RefactoringEngine()
 
     def _register_tools(self) -> None:
