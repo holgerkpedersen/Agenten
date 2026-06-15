@@ -2032,6 +2032,20 @@
       "symptoms": "Hvis _ensure_done_tools logik ændres, skal den stadig kun kaldes én gang. De ekstra kald er støj i koden. Funktionen kunne kaldes én gang før return..",
       "environment": "Windows, Python 3.12",
       "status": "open"
+    },
+    {
+      "id": "CORE-002",
+      "title": "Auto-research: template-valg for REFAC issues — issue_handler i stedet for refactor",
+      "type": "self",
+      "severity": "medium",
+      "description": "Auto-research oprettede REFAC-023 (agent_phase_checks.py 1000 linjer) korrekt, men ved session-start valgte systemet template 'issue_handler' i stedet for 'refactor'.\n\nResultat: Læs/Afklar/Fix/Luk Issue faser — Fix fasen fejlede fordi workflowet forventer issue-fix (edit_file/write_file), ikke refactoring (extract_symbol/remove_symbol/add_import).\n\nREFAC issues bør automatisk bruge 'refactor'-templaten (Analyse/Plan/Ekstraher/Opdatér/Test) når de startes fra auto-research.",
+      "location": "agent_core.py:decompose_prompt / SkillLoader.suggest_template",
+      "impact": "Høj: Auto-genererede REFAC issues kan ikke gennemføres automatisk fordi template-valget er forkert. Brugeren skal manuelt skifte template.",
+      "proposed_fix": "1. I SkillLoader.suggest_template() eller decompose_prompt(): hvis prompt starter med REFAC-* (eller ARC-* for arkitektur), tving template til 'refactor'.\n2. Alternativt: udvid issue_handler til at genkende refactor-issues og vælge refactor-template når issue typen er refactor.",
+      "acceptance_criteria": "REFAC-023 startes fra auto-research → template er 'refactor', ikke 'issue_handler'. Alle tests består.",
+      "status": "open",
+      "created_at": "2026-06-15T21:20:00",
+      "updated_at": "2026-06-15T21:20:00"
     }
   ],
   "active_risks": [
