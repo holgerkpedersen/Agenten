@@ -1673,6 +1673,42 @@ def _check_refactor_progress() -> str:
     return '\n'.join(parts)
 
 
+# Tool-to-todo mapping: (tool_name, arg_check_func_or_none) -> todo_id
+_TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
+    ("read_issue", None, "bf_a1"),
+    ("locate", None, "bf_a2"),
+    ("list_symbols", None, "rf_a1"),
+    ("read_location", None, "bf_a3"),
+    ("analyze_dependencies", None, "rf_a3"),
+    ("write_file", lambda a: "refactor_plan" in str(a.get("path", "")), "rf_p2"),
+    ("write_file", lambda a: "tests/temp" in str(a.get("path", "")), "bf_t1"),
+    ("extract_symbol", None, "rf_e1"),
+    ("add_method", None, "bf_i3"),
+    ("add_function", None, None),
+    ("remove_symbol", None, "rf_u1"),
+    ("add_import", None, "rf_u2"),
+    ("run_tests", None, "bf_t2"),
+    ("run_tests", None, "rf_t1"),
+    ("update_issue_status", None, "bf_o1"),
+    ("update_issue_status", None, "rf_t2"),
+    ("verify_refactor", None, "rf_e4"),
+    ("verify_refactor", None, "rf_u3"),
+]
+
+
+def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
+    """Check if a tool call matches any active todo and returns todo_ids to mark done."""
+    if not hasattr(agent, '_phase_todos'):
+        return []
+    ids = []
+    for tname, arg_check, todo_id in _TODO_TOOL_MAP:
+        if tool_name == tname:
+            if todo_id and any(t.get("id") == todo_id for t in agent._phase_todos):
+                if arg_check is None or arg_check(args_val):
+                    ids.append(todo_id)
+    return ids
+
+
 def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Generator[dict, None, None]:
     """solve task stream.
     
@@ -2100,6 +2136,9 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 _report_logs = len(agent.agent_log)
                 yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                 yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                # Auto-check matching todos
+                for tid in _auto_todo_update(tool_name, args_val, agent):
+                    yield {"type": "todo_update", "id": tid, "done": True}
                 messages = _truncate_messages(messages, agent.max_conversation_chars)
                 total_calls = sum(called_tools.values())
                 if total_calls >= _get_max_tool_calls(task_node.name):
@@ -2148,6 +2187,8 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             _report_logs = len(agent.agent_log)
             yield {"type": "tool_call", "tool": tool_result["tool"], "args": tool_result["args"]}
             yield {"type": "tool_result", "tool": tool_result["tool"], "result": tool_result["result"]}
+            for tid in _auto_todo_update(tool_result["tool"], tool_result["args"], agent):
+                yield {"type": "todo_update", "id": tid, "done": True}
             _track_produced_file(agent, tool_result)
             if agent._produced_files:
                 yield {"type": "output_files", "files": sorted(agent._produced_files)}
