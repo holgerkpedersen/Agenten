@@ -2046,6 +2046,20 @@
       "status": "open",
       "created_at": "2026-06-15T21:20:00",
       "updated_at": "2026-06-15T21:20:00"
+    },
+    {
+      "id": "CORE-003",
+      "title": "Auto-knap på fase overskriver eksisterende issues prompt ved 'Use as Task'",
+      "type": "self",
+      "severity": "medium",
+      "description": "Når en fase fejler og brugeren klikker '🔬 Auto', oprettes et CORE-issue med auto-research analyse. Problemet opstår når brugeren bagefter klikker 'Use as Task' på det nye CORE-issue:\n\n- 'Use as Task' konstruerer en NY prompt fra issue-felterne (title, description, location, impact, proposed_fix)\n- prompt.value = promptText overskriver den nuværende prompt i textarea\n- Brugerens ORIGINALE prompt (fx 'REFAC-023: agent_phase_checks.py er 1000 linjer...') går tabt\n- Den originale sessions kontekst og træ er ikke længere tilgængelig i textarea\n\n**Eksempel (REFAC-023):**\n- Original prompt: 'REFAC-023: agent_phase_checks.py er 1000 linjer — bryder Single Responsibility Principle'\n- Auto-research opretter CORE-003 med titel 'Auto-knap på fase overskrider...'\n- Bruger klikker 'Use as Task' på CORE-003\n- Prompt skifter til 'CORE-003: Auto-knap på fase overskrider...' — REFAC-023 tabt\n\n**Mulige løsninger:**\n1. Auto-knappen bør også KØRE den nye CORE-issue (decompose+execute) i stedet for kun at oprette den\n2. 'Use as Task' bør gemme den nuværende prompt i prompt history før overskrivning\n3. Auto-knappen bør tilbyde at starte CORE-issuet direkte uden at ændre den originale sessions prompt",
+      "location": "static/index.html:useIssueAsTask (linje ~3717) + api_server.py:autoresearch_run_from_phase (linje ~2030)",
+      "impact": "Mellem: Auto-research workflowet er besværligt fordi brugeren mister den oprindelige kontekst når CORE-issuet skal bruges. Workflowet kræver manuel prompt-gendannelse.",
+      "proposed_fix": "I 'approveAutoResearch' (frontend, linje ~1664): efter CORE-issue er oprettet, tilbyd at starte en NY session med CORE-issuet (decompose+execute) i stedet for kun at oprette det og lade brugeren klikke 'Use as Task'.\n\nAlternativt i 'useIssueAsTask': gem nuværende prompt i promptHistory før overskrivning, så brugeren kan gendanne.",
+      "acceptance_criteria": "1. Auto-knap opretter CORE-issue OG starter en ny session/decompose automatisk\n2. Den originale session forbliver intakt og kan genindlæses\n3. Prompt overskrives ikke uden brugerens bevidsthed",
+      "status": "open",
+      "created_at": "2026-06-15T21:30:00",
+      "updated_at": "2026-06-15T21:30:00"
     }
   ],
   "active_risks": [
