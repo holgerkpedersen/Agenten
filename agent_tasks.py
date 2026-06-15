@@ -1646,7 +1646,7 @@ def _generate_phase_todos(template: str, phase_name: str) -> list[dict]:
                     "done": False
                 })
 
-        elif phase == "opdater" or phase == "opdatering":
+        elif phase in ("opdater", "opdatering", "opdat\u00e9r"):
             core_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'agent_core.py') if _os.environ.get('AGENT_WORKDIR') else 'agent_core.py'
             core_symbols = []
             if _os.path.exists(core_path):
