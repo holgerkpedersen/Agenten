@@ -767,12 +767,20 @@ def list_symbols(filepath: str) -> dict[str, Any]:
     if not filepath or not os.path.exists(filepath):
         return {"success": False, "error": f"File not found: {filepath}"}
     if not filepath.lower().endswith('.py'):
+        preview = ""
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                lines = [next(f) for _ in range(100)]
+            preview = "\n" + "".join(lines)[:3000]
+        except (OSError, StopIteration):
+            pass
         return {
             "success": False,
             "error": (
                 f"list_symbols understøtter kun Python-filer (.py), fik '{os.path.basename(filepath)}'. "
-                f"Brug read_chunk for andre filtyper."
+                f"Brug read_chunk for at læse hele filen."
             ),
+            "content_preview": preview if preview else None,
         }
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -845,12 +853,21 @@ def locate_code(filepath: str | None = None, name: str | None = None, line_no: i
     if not filepath or not os.path.exists(filepath):
         return {"success": False, "error": f"File not found: {filepath}"}
     if not filepath.lower().endswith('.py'):
+        # Auto-read first lines so the LLM has immediate context
+        preview = ""
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+                lines = [next(f) for _ in range(100)]
+            preview = "\n" + "".join(lines)[:3000]
+        except (OSError, StopIteration):
+            pass
         return {
             "success": False,
             "error": (
                 f"locate_code understøtter kun Python-filer (.py), fik '{os.path.basename(filepath)}'. "
-                f"Brug list_symbols eller read_chunk for andre filtyper."
+                f"Brug read_chunk for at læse hele filen."
             ),
+            "content_preview": preview if preview else None,
         }
     try:
         with open(filepath, 'r', encoding='utf-8') as f:

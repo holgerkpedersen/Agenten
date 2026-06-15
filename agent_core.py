@@ -492,7 +492,15 @@ class Agent:
         self._refresh_skills()
         templates = self._get_templates()
 
-        if not template:
+        # Issue-type template routing: override skill matching for known prefixes
+        issue_match = re.match(r'^\s*(REFAC|ARC)-\d+', prompt)
+        if issue_match:
+            template = "refactor"
+        elif re.match(r'^\s*CORE-\d+', prompt):
+            template = "selvforbedring"
+        elif re.match(r'^\s*(BUG|SEC)-\d+', prompt):
+            template = "bugfix"
+        elif not template:
             suggested = SkillLoader.suggest_template(prompt, self._skills)
             if suggested and suggested in templates:
                 template = suggested
