@@ -1503,7 +1503,8 @@ def _execute_autoresearch_issue(agent: Any, issue_id: str) -> Generator[dict, No
     if depth >= 2:
         agent._log("AUTOR", f"Auto-research: max dybde ({depth}) nået for {issue_id}",
                    "Stopper for at undgå uendelig rekursion")
-        yield {"type": "log", "log": agent.agent_log[-1]}
+        if agent.agent_log:
+            yield {"type": "log", "log": agent.agent_log[-1]}
         yield {"type": "autoresearch", "action": "error", "issue_id": issue_id,
                "error": "Max dybde nået — undgår uendelig rekursion"}
         return False
