@@ -716,6 +716,17 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     else:
         task_prompt = f"{task_node.name}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
+    # Append phase todos as a numbered checklist — LLM must follow the order
+    todos = getattr(agent, '_phase_todos', None)
+    if todos:
+        todo_lines = []
+        for i, todo in enumerate(todos, 1):
+            status = " [✓]" if todo.get("done") else ""
+            todo_lines.append(f"  {i}. {todo.get('text', '')}{status}")
+        if todo_lines:
+            task_prompt += "\n\n## Opgaveplan (følg rækkefølgen)\n" + "\n".join(todo_lines) + \
+                           "\n\nUdfør hvert trin i rækkefølge. Spring IKKE frem til et senere trin før de foregående er gennemført."
+
     agent._refresh_skills()
     agent._match_skills(clean_prompt)
     skills_block = agent._format_skills_for_prompt()
@@ -2062,6 +2073,35 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
             sym = args_val.get("symbol_name", "")
             if sym and (sym in ttext or "extract" in ttext.lower()):
                 ids.append(tid)
+
+    # Sequential order validation: only allow checkmarking the FIRST
+    # unfinished todo that has a tool mapping. Soft todos (analysis/
+    # planning tasks without tool matches) don't block — they're
+    # implicitly completed when the next hard todo is triggered.
+    if ids:
+        valid_ids = []
+        for checked_id in ids:
+            checked_idx = -1
+            first_hard_unfinished = -1
+            for i, t in enumerate(agent._phase_todos):
+                if t.get("id") == checked_id:
+                    checked_idx = i
+                if not t.get("done") and first_hard_unfinished == -1:
+                    # Check if this todo has any tool mapping
+                    tid = t.get("id", "")
+                    has_mapping = any(m[2] == tid for m in _TODO_TOOL_MAP)
+                    # Also check dynamic patterns
+                    ttext = t.get("text", "")
+                    has_dynamic = any(kw in ttext for kw in ["Opret", "Fjern", "import", "extract"])
+                    if has_mapping or has_dynamic:
+                        first_hard_unfinished = i
+            if checked_idx == first_hard_unfinished or checked_idx <= first_hard_unfinished:
+                valid_ids.append(checked_id)
+            else:
+                checked_text = next((t.get("text","") for t in agent._phase_todos if t.get("id") == checked_id), checked_id)
+                first_text = next((t.get("text","") for t in agent._phase_todos if t.get("id") == agent._phase_todos[first_hard_unfinished].get("id")), "")
+                agent._log("TODO", f"Rækkefølge: '{checked_text[:60]}...' venter på '{first_text[:60]}...'", "")
+        ids = valid_ids
 
     return ids
 
