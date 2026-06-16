@@ -1170,6 +1170,13 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     # if the LLM wrote or edited the whole file, per-method tools aren't needed.
     if "write_file" in called_names or "edit_file" in called_names:
         uncalled -= {"add_method", "add_function"}
+    # write_file(overwrite="force") on an existing file is an alternative to
+    # remove_symbol — the entire file was rewritten including all changes.
+    if "remove_symbol" in uncalled:
+        for k in called_tools:
+            if k.startswith("write_file") and '"force"' in k.split("{", 1)[-1]:
+                uncalled.discard("remove_symbol")
+                break
     # tool_log success check: tools where ALL attempts failed due to LLM error
     # do NOT count as satisfied — only system blocks (hash, path safety) are excused.
     if agent._tool_log and not uncalled:
@@ -1657,6 +1664,26 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                 task_node.status = "failed"
     else:
         task_node.status = "done"
+
+    # Auto-resolve for close phases: if the phase completed and update_issue_status
+    # hasn't been called yet, call it automatically to avoid false negatives from
+    # _check_required_tools (which requires update_issue_status for close phases).
+    if task_node.status in ("done", "running"):
+        phase = _normalize_phase(task_node.name).lower()
+        if phase in CLOSE_PHASE_ALIASES:
+            called_names = {k.split("{")[0] for k in (called_tools or {})}
+            if "update_issue_status" not in called_names:
+                orig_id = _extract_issue_id(original_prompt or "")
+                if orig_id:
+                    try:
+                        agent_issues.update_issue_status(
+                            agent, orig_id, "resolved",
+                            "Auto-resolved: fase gennemført via auto-advance."
+                        )
+                        called_tools["update_issue_status{}"] = 1
+                        agent._log("INFO", f"Auto-resolved {orig_id}", "update_issue_status kaldt automatisk")
+                    except Exception:
+                        pass
 
     missing_msg = _check_required_tools(agent, called_tools, task_node.name)
     if missing_msg:

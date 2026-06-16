@@ -114,6 +114,15 @@ def register_file_tools(agent: Any) -> None:
     ))
 
     agent.tool_registry.register(Tool(
+        "batch_extract_symbols",
+        "Flyt flere symboler til et modul i ét kald",
+        ["source", "symbols", "target"],
+        lambda source, symbols, target: refactoring_engine.batch_extract_symbols(
+            source=source, symbols=symbols, target=target
+        )
+    ))
+
+    agent.tool_registry.register(Tool(
         "remove_symbol",
         t(K.TOOL_REMOVE_SYMBOL, agent.lang),
         ["source", "symbol_name"],

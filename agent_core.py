@@ -488,6 +488,7 @@ class Agent:
                 ]}
             }
         self.agent_log = []
+        self.issue_resolved = False
         self.original_prompt = prompt
         self.tool_registry.lang = self.lang
         self._refresh_skills()

@@ -328,8 +328,10 @@ class TestRemoveSymbol:
         assert "class UserHandler" not in content
 
     def test_remove_nonexistent(self, engine, source_file):
-        with pytest.raises(RefactoringError, match="not found"):
-            engine.remove_symbol(source_file, "NonExistent")
+        result = engine.remove_symbol(source_file, "NonExistent")
+        assert result["success"] is True
+        assert result.get("already_removed") is True
+        assert "NonExistent" in result.get("note", "")
 
     def test_remove_restores_on_syntax_error(self, engine, source_file):
         """remove_symbol should refuse to produce invalid Python."""

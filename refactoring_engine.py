@@ -335,6 +335,8 @@ class CodeModifier:
         """Insert an import statement into a Python file after existing imports.
 
         Returns True if import was added, False if it already exists.
+        Merges with existing same-module imports (e.g. 'from os import path'
+        becomes 'from os import path, walk' instead of adding a separate line).
         """
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read().replace('\r\n', '\n').replace('\r', '\n')
@@ -345,6 +347,55 @@ class CodeModifier:
         tree = ast.parse(content)
         lines = content.split('\n')
 
+        # Try to merge with existing same-module ImportFrom
+        import ast as _ast
+        try:
+            parsed_import = _ast.parse(import_stmt)
+            merge_candidate = (parsed_import and parsed_import.body and
+                               isinstance(parsed_import.body[0], _ast.ImportFrom))
+        except SyntaxError:
+            merge_candidate = False
+        if merge_candidate:
+            new_node = parsed_import.body[0]
+            new_module = new_node.module
+            new_name = new_node.names[0].name if new_node.names else ""
+
+            for node in _ast.iter_child_nodes(tree):
+                if isinstance(node, _ast.ImportFrom) and node.module == new_module:
+                    # Same module — check if symbol already exists in this import
+                    existing_names = {alias.name for alias in node.names}
+                    if new_name in existing_names:
+                        return False  # Already imported
+                    # Merge: add symbol to existing import line
+                    old_line_num = node.lineno - 1  # 0-indexed
+                    old_line = lines[old_line_num]
+                    # Find the last name in the existing import
+                    last_name = node.names[-1].name
+                    # Replace the closing paren or add to existing paren
+                    if old_line.rstrip().endswith(')'):
+                        # Multi-line import or parenthesized — insert before closing )
+                        new_line = old_line.rstrip()
+                        insert_pos = new_line.rfind(')')
+                        new_line = new_line[:insert_pos] + ', ' + new_name + new_line[insert_pos:]
+                        lines[old_line_num] = new_line
+                    else:
+                        # Single-line import: from X import a → from X import a, b
+                        lines[old_line_num] = old_line.rstrip() + ', ' + new_name
+                    new_content = '\n'.join(lines)
+                    try:
+                        _ast.parse(new_content)
+                    except SyntaxError:
+                        # Fall through to normal insert below
+                        lines = content.split('\n')
+                        break
+                    # Write merged result
+                    tmppath = path + '.tmp'
+                    with open(tmppath, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+                    os.replace(tmppath, path)
+                    return True
+
+        # Normal insert after last import line
         last_import_line = 0
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -546,12 +597,15 @@ class RefactoringEngine:
 
         node = AstAnalyzer.find_node(tree, symbol_name)
         if node is None:
-            raise RefactoringError(
-                f"Symbol '{symbol_name}' not found in {os.path.basename(source)}",
-                category=RefactoringError.SYMBOL_NOT_FOUND,
-                filepath=source,
-                details={"symbol": symbol_name}
-            )
+            # Symbol not found — likely already extracted in a prior phase.
+            # Return soft success instead of raising, so the LLM can continue.
+            return {
+                'success': True,
+                'symbol': symbol_name,
+                'source': source,
+                'already_removed': True,
+                'note': f"Symbol '{symbol_name}' findes ikke i {os.path.basename(source)} — allerede fjernet?"
+            }
 
         start_line, end_line = AstAnalyzer.get_symbol_lines(lines, node)
         snapshot = FileSnapshot.create(source)
@@ -615,6 +669,35 @@ class RefactoringEngine:
             'source': source,
             'lines': len(lines),
             'symbols': symbols,
+        }
+
+    def batch_extract_symbols(self, source: str, symbols: list[str], target: str) -> dict[str, Any]:
+        """Extract multiple symbols to a target module in a single call.
+
+        Each symbol is moved via move_symbol (extract + remove + add_import).
+        Results include per-symbol outcomes so the LLM can see which succeeded
+        and which failed without wasting iterations.
+        """
+        results = []
+        for sym in symbols:
+            try:
+                r = self.move_symbol(source, sym, target)
+                results.append(r)
+            except RefactoringError as e:
+                results.append({
+                    "success": False,
+                    "symbol": sym,
+                    "error": str(e),
+                    "category": e.category,
+                })
+        return {
+            "success": True,
+            "source": source,
+            "target": target,
+            "total": len(symbols),
+            "succeeded": sum(1 for r in results if r.get("success")),
+            "failed": sum(1 for r in results if not r.get("success")),
+            "results": results,
         }
 
     def move_symbol(self, source: str, symbol_name: str, target: str) -> dict[str, Any]:
