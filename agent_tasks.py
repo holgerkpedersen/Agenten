@@ -2023,7 +2023,17 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "") -> l
                 })
 
         elif phase in ("opdater", "opdatering", "opdat\u00e9r"):
-            core_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'agent_core.py') if _os.environ.get('AGENT_WORKDIR') else 'agent_core.py'
+            # Determine target file from prompt + plan — fallback to agent_core.py
+            _target_file = 'agent_core.py'
+            _file_match = _re.search(r"([a-zA-Z_][\w.]+\.py)", prompt)
+            if _file_match:
+                _target_file = _file_match.group(1)
+            if plan_content:
+                _plan_match = _re.search(r'([a-zA-Z_][\w.]+\.py)', plan_content[:300])
+                if _plan_match and _plan_match.group(1) != _target_file:
+                    _target_file = _plan_match.group(1)
+
+            core_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), _target_file) if _os.environ.get('AGENT_WORKDIR') else _target_file
             core_symbols = []
             if _os.path.exists(core_path):
                 try:
@@ -2034,9 +2044,9 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "") -> l
                 except (OSError, UnicodeDecodeError):
                     pass
 
-            todos.append({"id": "rf_u1", "text": "List symboler i agent_core.py med list_symbols()", "done": False})
+            todos.append({"id": "rf_u1", "text": "List symboler i {} med list_symbols()".format(_target_file), "done": False})
 
-            # Find symbols mentioned in plan that are still in agent_core.py
+            # Find symbols mentioned in plan that are still in the target file
             # Format: "- `symbol_name` (linje N) -> `target_module.py`"
             if plan_content and core_symbols:
                 symbol_map = {}  # symbol -> target_module
@@ -2054,17 +2064,18 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "") -> l
                     target_mod = symbol_map.get(sym, '?')
                     todos.append({
                         "id": "rf_u_remove_" + sym,
-                        "text": "Fjern `{}` fra agent_core.py (i {})".format(sym, target_mod),
+                        "text": "Fjern `{}` fra {} (i {})".format(sym, _target_file, target_mod),
                         "done": False
                     })
 
             if existing_modules:
+                _target_base = _os.path.splitext(_target_file)[0]
                 for mod in existing_modules:
                     mod_name = _os.path.splitext(mod)[0]
-                    if mod_name != 'agent_core':
+                    if mod_name != _target_base:
                         todos.append({
                             "id": "rf_u_import_" + mod_name,
-                            "text": "Tilf\u00f8j import fra {} i agent_core.py".format(mod),
+                            "text": "Tilf\u00f8j import fra {} i {}".format(mod, _target_file),
                             "done": False
                         })
 
