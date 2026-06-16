@@ -1237,10 +1237,16 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     template = getattr(agent, "active_template", "")
     if template == "refactor" and task_name:
         refactor_writing_phases = ("plan", "ekstraher", "opdat")
-        has_written = any(k in (called_tools or {}) for k in (
-            k for k in called_tools
-            if k.startswith("write_file") or k.startswith("edit_file") or k.startswith("delete_file") or k.startswith("extract_symbol") or k.startswith("remove_symbol") or k.startswith("add_import")
-        ))
+        # Check BOTH current called_tools AND historical tool_log (covers retries)
+        _all_writes = set()
+        for k in (called_tools or {}):
+            _all_writes.add(k.split("{")[0])
+        for e in (getattr(agent, "_tool_log", None) or []):
+            tn = e.get("tool", "")
+            if tn:
+                _all_writes.add(tn)
+        has_written = any(t in _all_writes for t in
+            ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"))
         if any(k in _normalize_phase(task_name).lower() for k in refactor_writing_phases) and not has_written:
             iteration = getattr(agent, "_current_task_iteration", 0)
             if iteration >= 3 and not getattr(agent, "_non_productive_reminder_sent", False):
@@ -2445,7 +2451,7 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
     # Non-blocking tools (verify_refactor, add_import) are always
     # allowed — they're incremental/verification tools where
     # out-of-order calling is harmless.
-    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import", "run_tests", "read_issue", "analyze_dependencies", "extract_symbol", "batch_extract_symbols", "list_symbols"}
+    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import", "run_tests", "read_issue", "analyze_dependencies", "extract_symbol", "batch_extract_symbols", "list_symbols", "edit_file"}
     if ids:
         valid_ids = []
         for checked_id in ids:
