@@ -142,3 +142,19 @@ def serve_upload(filename: str) -> Any:
     if not _is_safe_path(UPLOAD_DIR, filepath):
         return "<h2>Access denied</h2>", 403
     return send_from_directory(UPLOAD_DIR, filename)
+
+    f = request.files['image']
+
+from datetime import datetime
+
+
+# ============ VERSION ============
+def _file_mtime(path: str) -> str:
+    """file mtime.
+    
+    Args:
+        path:"""
+    try: return datetime.fromtimestamp(os.path.getmtime(os.path.join(BASE_DIR, path))).strftime("%H:%M:%S")
+    except OSError: return "?"
+
+    f = request.files['image']

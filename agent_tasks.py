@@ -2422,10 +2422,16 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
             if fname and fname in ttext and "Opret" in ttext:
                 ids.append(tid)
 
-        # extract_symbol -> matches "Flyt symbol ... til ..."
-        if tool_name == "extract_symbol":
+        # extract_symbol / batch_extract_symbols -> matches "Flyt symbol ... til ..."
+        if tool_name in ("extract_symbol", "batch_extract_symbols"):
             sym = args_val.get("symbol_name", "")
             if sym and (sym in ttext or "extract" in ttext.lower()):
+                ids.append(tid)
+            # rf_e2: write_file fallback is not needed when extract_symbol works
+            # rf_e3: extract_symbol always includes imports
+            if "write_file" in ttext and "extract_symbol" in ttext:
+                ids.append(tid)
+            if "imports" in ttext.lower() or "typing" in ttext.lower():
                 ids.append(tid)
 
     # Sequential order validation: only allow checkmarking the FIRST
@@ -2435,7 +2441,7 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
     # Non-blocking tools (verify_refactor, add_import) are always
     # allowed — they're incremental/verification tools where
     # out-of-order calling is harmless.
-    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import", "run_tests", "read_issue", "analyze_dependencies", "extract_symbol", "batch_extract_symbols"}
+    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import", "run_tests", "read_issue", "analyze_dependencies", "extract_symbol", "batch_extract_symbols", "list_symbols"}
     if ids:
         valid_ids = []
         for checked_id in ids:

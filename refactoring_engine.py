@@ -50,8 +50,16 @@ def _parse_symbols_list(symbols: str | list[str]) -> list[str]:
         except (ValueError, SyntaxError, TypeError):
             pass
 
-    # Fallback: comma-separated with cleanup
-    return [p.strip(" \t\"'[]") for p in s.split(",") if p.strip(" \t\"'[]")]
+    # Comma-separated
+    if "," in s:
+        return [p.strip(" \t\"'[]") for p in s.split(",") if p.strip(" \t\"'[]")]
+
+    # Space-separated (no commas found)
+    parts = [p.strip(" \t\"'[]") for p in s.split() if p.strip(" \t\"'[]")]
+    if parts:
+        return parts
+
+    return []
 
 
 _BUILTINS: frozenset[str] = frozenset({
