@@ -52,3 +52,10 @@ refactoring_engine
 
 agent_logs
 agent_pdf
+
+file_checks
+phase_engine
+symbol_checks
+text_tool_checks
+
+agent_phase_checks
