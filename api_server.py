@@ -1485,7 +1485,6 @@ def _save_session_data(current_session_id: str | None, stream_agent: Any, ui_lan
             "decompose_model": stream_agent.decompose_llm.model,
             "execute_model": stream_agent.llm.model,
             "issue_resolved": stream_agent.issue_resolved,
-            "phase_todos": getattr(stream_agent, '_phase_todos', []),
         })
         return data
     try:

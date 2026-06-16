@@ -2597,18 +2597,10 @@ async function loadSelectedSession() {
             updateTreeDisplay();
         }
         
-        if (data.session.phase_todos) {
-            const tc = document.getElementById('todosContent');
-            if (tc) {
-                tc.innerHTML = '';
-                for (const todo of data.session.phase_todos) {
-                    const div = document.createElement('div');
-                    div.className = 'todo-item' + (todo.done ? ' done' : '');
-                    div.dataset.todoId = todo.id;
-                    div.innerHTML = `<input type="checkbox" class="todo-checkbox" onchange="this.parentElement.classList.toggle('done')" ${todo.done ? 'checked' : ''}> <span class="todo-text">${escapeHtml(todo.text)}</span>`;
-                    tc.appendChild(div);
-                }
-            }
+        // Clear stale todos — they'll be regenerated when a phase starts
+        const tc = document.getElementById('todosContent');
+        if (tc) {
+            tc.innerHTML = '<div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div>';
         }
         
         if (data.session.show_thinking !== undefined) {
