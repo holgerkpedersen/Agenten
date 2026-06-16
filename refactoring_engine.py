@@ -12,10 +12,47 @@ Design patterns used:
 """
 
 import ast
+import json
 import os
 from typing import Any
-
 from collections import defaultdict
+
+
+def _parse_symbols_list(symbols: str | list[str]) -> list[str]:
+    """Parse the ``symbols`` parameter into a clean list of symbol names.
+
+    Handles all formats commonly sent by LLMs:
+    - ``["sym1", "sym2"]`` — JSON array string
+    - ``['sym1', 'sym2']`` — Python list string
+    - ``sym1, sym2, sym3`` — comma-separated string
+    - ``["sym1", "sym2"]`` as actual list (from JSON API)
+    """
+    if isinstance(symbols, list):
+        return [str(s).strip() for s in symbols if str(s).strip()]
+
+    s = str(symbols).strip()
+
+    # Try JSON array: ["sym1", "sym2"]
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            parsed = json.loads(s)
+            if isinstance(parsed, list):
+                return [str(item).strip(" \t\"'") for item in parsed if item]
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Try Python list: ['sym1', 'sym2']
+    if s.startswith("[") and s.endswith("]"):
+        try:
+            parsed = ast.literal_eval(s)
+            if isinstance(parsed, list):
+                return [str(item).strip(" \t\"'") for item in parsed if item]
+        except (ValueError, SyntaxError, TypeError):
+            pass
+
+    # Fallback: comma-separated with cleanup
+    return [p.strip(" \t\"'[]") for p in s.split(",") if p.strip(" \t\"'[]")]
+
 
 _BUILTINS: frozenset[str] = frozenset({
     'abs', 'all', 'any', 'bool', 'bytes', 'callable', 'chr', 'classmethod',
@@ -682,20 +719,7 @@ class RefactoringEngine:
         comma-separated string, or a JSON array string (common LLM
         hallucination: ``'["sym1", "sym2"]'``).
         """
-        if isinstance(symbols, str):
-            # Try JSON array format first: '["sym1", "sym2"]'
-            symbols_stripped = symbols.strip()
-            if symbols_stripped.startswith("[") and symbols_stripped.endswith("]"):
-                try:
-                    import json as _json
-                    parsed = _json.loads(symbols_stripped)
-                    if isinstance(parsed, list):
-                        symbols = [str(s).strip() for s in parsed if s]
-                except (_json.JSONDecodeError, TypeError):
-                    pass
-            # Fall back to comma-separated
-            if isinstance(symbols, str):
-                symbols = [s.strip(" \t\"'[]") for s in symbols.split(",") if s.strip(" \t\"'[]")]
+        symbols = _parse_symbols_list(symbols)
         results = []
         for sym in symbols:
             try:

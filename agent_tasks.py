@@ -2354,6 +2354,7 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("write_file", lambda a: "docs/" in str(a.get("path", "")) and a.get("path","").endswith(".md"), "ka_a4"),
     ("write_file", lambda a: "docs/" in str(a.get("path", "")), "pr_a2"),
     ("extract_symbol", None, "rf_e1"),
+    ("batch_extract_symbols", None, "rf_e1"),
     ("add_method", None, "bf_i3"),
     ("add_function", None, None),
     ("verify_refactor", None, "rf_e4"),
