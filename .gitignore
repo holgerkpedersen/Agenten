@@ -16,6 +16,7 @@ uploads/
 # Generated preview/report files
 agenten_preview_*.md
 agent_session_*.md
+*.pruned
 
 # IDE
 .vscode/
