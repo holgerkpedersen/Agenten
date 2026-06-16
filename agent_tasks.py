@@ -2208,8 +2208,10 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("verify_refactor", None, "rf_e4"),
     ("run_tests", None, "bf_t2"),
     ("run_tests", None, "rf_u_tests"),
+    ("run_tests", None, "rf_t1"),
     ("update_issue_status", None, "bf_o1"),
     ("update_issue_status", None, "rf_u_status"),
+    ("update_issue_status", None, "rf_t2"),
     ("verify_refactor", None, "rf_u_verify"),
 ]
 
