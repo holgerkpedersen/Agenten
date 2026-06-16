@@ -1255,10 +1255,10 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     for k in called_tools:
         name = k.split("{")[0]
         called_names.add(name)
-    # If update_issue_status was called, the bug is being resolved —
-    # edit_file/write_file are no longer needed.
+    # If update_issue_status was called, the phase is complete regardless
+    # of which write tools were or weren't called — return None immediately.
     if "update_issue_status" in called_names:
-        required -= {"edit_file", "write_file"}
+        return None
     # If the run_tests auto-complete already marked the issue resolved
     # (Test phase with passing tests), edit_file/write_file are no longer needed.
     if getattr(agent, "issue_resolved", False) and getattr(agent, 'active_template', '') != 'refactor':
