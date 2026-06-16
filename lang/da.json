@@ -448,6 +448,7 @@
     "llm_panel": "LLM Output",
     "log_panel": "Agent Log",
     "history_panel": "Prompt Historik",
+    "todos_panel": "Opgaveplan",
     "export_md_report_header": "# 📊 Agenten - Session Rapport",
     "export_md_name": "**Navn:**",
     "export_md_created": "**Oprettet:**",

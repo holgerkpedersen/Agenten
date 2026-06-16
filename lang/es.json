@@ -448,6 +448,7 @@
     "llm_panel": "Salida LLM",
     "log_panel": "Registro del Agente",
     "history_panel": "Historial de Tareas",
+    "todos_panel": "Plan de Tareas",
     "export_md_report_header": "# 📊 Agenten - Informe de Sesión",
     "export_md_name": "**Nombre:**",
     "export_md_created": "**Creado:**",

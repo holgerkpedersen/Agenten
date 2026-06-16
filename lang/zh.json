@@ -448,6 +448,7 @@
     "llm_panel": "LLM输出",
     "log_panel": "智能体日志",
     "history_panel": "任务历史",
+    "todos_panel": "任务计划",
     "export_md_report_header": "# 📊 Agenten - 会话报告",
     "export_md_name": "**名称：**",
     "export_md_created": "**创建：**",
