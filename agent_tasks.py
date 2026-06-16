@@ -1315,6 +1315,10 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     # if the LLM wrote or edited the whole file, per-method tools aren't needed.
     if "write_file" in called_names or "edit_file" in called_names:
         uncalled -= {"add_method", "add_function"}
+    # extract_symbol/batch_extract_symbols are supersets of add_method/add_function
+    # — extracting a symbol to a new file achieves the same goal as adding a method.
+    if "extract_symbol" in called_names or "batch_extract_symbols" in called_names:
+        uncalled -= {"add_method", "add_function"}
     # write_file(overwrite="force") on an existing file is an alternative to
     # remove_symbol — the entire file was rewritten including all changes.
     if "remove_symbol" in uncalled:
