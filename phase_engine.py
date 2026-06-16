@@ -1,3 +1,4 @@
+import os
 import re
 from typing import Any
 
@@ -354,6 +355,43 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
     spec = template_checks.get(canonical_key)
     if not spec:
         return False, ""
+
+    # Dynamic path resolution: replace hardcoded api_server.py with the
+    # actual target file from refactor_plan.md header or original prompt.
+    # This ensures phase checks work for any REFAC-xxx, not just api_server.
+    if "api_server.py" in str(spec):
+        _plan_path = None
+        if base_dir:
+            _plan_candidate = os.path.join(base_dir, "refactor_plan.md")
+            if os.path.exists(_plan_candidate):
+                _plan_path = _plan_candidate
+        if not _plan_path and os.path.exists("refactor_plan.md"):
+            _plan_path = "refactor_plan.md"
+        _target = None
+        if _plan_path:
+            try:
+                with open(_plan_path, "r", encoding="utf-8") as _f:
+                    _header = _f.read(300)
+                _pm = re.search(r'([a-zA-Z_][\w.]+\.py)', _header)
+                if _pm and _pm.group(1) != "api_server.py":
+                    _target = _pm.group(1)
+            except (OSError, UnicodeDecodeError):
+                pass
+        if not _target:
+            _prompt = getattr(agent, "original_prompt", "")
+            _pm = re.search(r"([a-zA-Z_][\w.]+\.py)", _prompt)
+            if _pm and _pm.group(1) != "api_server.py":
+                _target = _pm.group(1)
+        # Only override if the target file actually exists (avoid breaking tests)
+        if _target and os.path.exists(_target if not base_dir else os.path.join(base_dir, _target)):
+            # Create a copy of spec with api_server.py replaced
+            spec = dict(spec)
+            for k, v in list(spec.items()):
+                if isinstance(v, str) and "api_server.py" in v:
+                    spec[k] = v.replace("api_server.py", _target)
+                elif isinstance(v, list):
+                    spec[k] = [item.replace("api_server.py", _target) if isinstance(item, str) else item for item in v]
+
     check_type = spec.get("type")
     if check_type == "file_exists":
         return check_file_exists(spec.get("paths", []), spec, base_dir=base_dir)

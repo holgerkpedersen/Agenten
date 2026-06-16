@@ -1904,8 +1904,8 @@
       "proposed_fix": "Opdel agent_phase_checks.py i mindre moduler (maks 300 linjer per fil). Ekstraher relaterede funktioner til dedikerede moduler.",
       "acceptance_criteria": "agent_phase_checks.py er reduceret til under 300 linjer.",
       "status": "resolved",
-      "updated_at": "2026-06-16T15:32:20",
-      "resolution_note": "agent_phase_checks.py opdateret til import facade (68 linjer). Alle symboler flyttet til 5 moduler: file_checks.py, text_tool_checks.py, symbol_checks.py, phase_engine.py. Facaden re-eksporterer alle symboler via imports og __all__. api_server.py importerer check_phase_done fra agent_phase_checks.py — ingen ændringer nødvendige."
+      "updated_at": "2026-06-16T16:03:27",
+      "resolution_note": "agent_phase_checks.py er nu en import facade på 68 linjer. Alle symboler flyttet til modulerne file_checks.py, text_tool_checks.py, symbol_checks.py og phase_engine.py. Filen indeholder kun imports og __all__."
     },
     {
       "id": "BUG-096",
