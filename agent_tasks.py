@@ -223,15 +223,39 @@ def _refactor_actually_moved_code(agent: Any) -> bool:
         path = os.path.join(os.getcwd(), mod)
         if not _apc._has_real_code(path, min_lines=20):
             return False
-    api_path = os.path.join(os.getcwd(), "api_server.py")
-    if os.path.exists(api_path):
-        try:
-            with open(api_path, encoding="utf-8") as f:
-                line_count = sum(1 for _ in f)
-            if line_count >= 1000:
+    # Check that the source file (from plan header) has been reduced
+    # Use plan header: "# Refactor Plan for <file.py>"
+    _target_file = None
+    try:
+        with open(plan_path, "r", encoding="utf-8") as _f:
+            _first = _f.readline(200)
+        _m = re.search(r'for\s+([a-zA-Z_][\w.]+\.py)', _first, re.IGNORECASE)
+        if _m:
+            _target_file = _m.group(1)
+    except (OSError, UnicodeDecodeError):
+        pass
+    if _target_file:
+        _target_path = os.path.join(os.getcwd(), _target_file)
+        if os.path.exists(_target_path):
+            try:
+                with open(_target_path, encoding="utf-8") as f:
+                    _line_count = sum(1 for _ in f)
+                # Original was ~1000+, reduced version should be well under 500
+                if _line_count >= 500:
+                    return False
+            except OSError:
                 return False
-        except OSError:
-            return False
+    else:
+        # Fallback: check api_server.py (legacy refactors)
+        _api_path = os.path.join(os.getcwd(), "api_server.py")
+        if os.path.exists(_api_path):
+            try:
+                with open(_api_path, encoding="utf-8") as f:
+                    _line_count = sum(1 for _ in f)
+                if _line_count >= 1000:
+                    return False
+            except OSError:
+                return False
     return True
 
 
