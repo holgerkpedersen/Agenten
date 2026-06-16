@@ -1263,6 +1263,9 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     # (Test phase with passing tests), edit_file/write_file are no longer needed.
     if getattr(agent, "issue_resolved", False) and getattr(agent, 'active_template', '') != 'refactor':
         required -= {"edit_file", "write_file"}
+    # For refactor Test phase: if run_tests was called and passed, no editing needed
+    if template == "refactor" and "run_tests" in called_names and not getattr(agent, '_tests_failed', False):
+        required -= {"edit_file"}
     uncalled = required - called_names
     # write_file and extract_symbol are alternatives — calling either satisfies the requirement
     if "write_file" in uncalled and "extract_symbol" in called_names:
