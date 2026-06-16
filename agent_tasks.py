@@ -2252,6 +2252,50 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
     return ids
 
 
+def _reconcile_todos_with_disk(agent: Any) -> list[str]:
+    """Check actual file state against todos and return newly satisfiable todo IDs.
+
+    For Opdatér phase: if a 'Tilføj import fra modul.py i target.py' todo exists,
+    but the import already exists in the target file, checkmark it.
+    This prevents the LLM from being blocked by stale todos.
+    """
+    import re as _re
+    import os as _os
+    todos = getattr(agent, '_phase_todos', None)
+    if not todos:
+        return []
+    phase = getattr(agent, 'current_phase', '')
+    if _normalize_phase(phase).lower() not in ("opdater", "opdatering", "opdat\u00e9r"):
+        return []
+
+    ids = []
+    for todo in todos:
+        if todo.get("done"):
+            continue
+        text = todo.get("text", "")
+        tid = todo.get("id", "")
+
+        # Match "Tilføj import fra modul.py i target.py"
+        m = _re.match(r'Tilf\u00f8j import fra ([\w./-]+\.py) i ([\w./-]+\.py)', text)
+        if not m:
+            continue
+        mod_file = m.group(1)
+        target_file = m.group(2)
+        target_path = target_file if _os.path.exists(target_file) else _os.path.join(_os.getcwd(), target_file)
+        if not _os.path.exists(target_path):
+            continue
+        try:
+            with open(target_path, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            mod_name = _os.path.splitext(mod_file)[0]
+            # Check if module is already imported (from X import ... or import X)
+            if f"from {mod_name}" in content or f"import {mod_name}" in content:
+                ids.append(tid)
+        except (OSError, UnicodeDecodeError):
+            pass
+    return ids
+
+
 def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Generator[dict, None, None]:
     """solve task stream.
     
@@ -2737,6 +2781,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             yield {"type": "tool_result", "tool": tool_result["tool"], "result": tool_result["result"]}
             for tid in _auto_todo_update(tool_result["tool"], tool_result["args"], agent):
                 yield {"type": "todo_update", "id": tid, "done": True}
+            # State-based reconciliation: checkmark todos if work is already done on disk
+            for tid in _reconcile_todos_with_disk(agent):
+                if tid:
+                    yield {"type": "todo_update", "id": tid, "done": True}
             _track_produced_file(agent, tool_result)
             if agent._produced_files:
                 yield {"type": "output_files", "files": sorted(agent._produced_files)}
