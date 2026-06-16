@@ -895,6 +895,16 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     messages = [{"role": "system", "content": system_prompt}]
     if file_ctx:
         messages.append({"role": "system", "content": f"## Filindhold (f\u00f8rste iteration)\n\n{file_ctx}"})
+        # Append structured entity map if available
+        _em = getattr(agent, '_entity_map', None)
+        if _em:
+            try:
+                import agent_entity_map
+                _em_text = agent_entity_map.format_entity_map_prompt(_em)
+                if _em_text:
+                    messages.append({"role": "system", "content": _em_text})
+            except Exception:
+                pass
         extraction_guidance = t(K.EXTRACT_CONTEXT_FIRST, agent.lang)
         user_guidance = extraction_guidance + "\n\n" + user_guidance
     messages.append({"role": "user", "content": user_guidance})

@@ -121,6 +121,7 @@ class Agent:
         self._tests_failed: bool = False
         self._located_files: set[str] = set()
         self._autoresearch_depth: int = 0
+        self._entity_map: dict | None = None
         self.refactoring_engine: RefactoringEngine = RefactoringEngine()
 
     def _register_tools(self) -> None:
@@ -544,6 +545,14 @@ class Agent:
                 pass
 
         file_context = _build_file_context(self, files, prompt)
+
+        # Build entity map from loaded file_chunks for structured LLM context
+        try:
+            import agent_entity_map
+            fc_paths = [os.path.join(os.getcwd(), k.replace("file_", "", 1)) for k in getattr(self, 'file_chunks', {}) or {}]
+            self._entity_map = agent_entity_map.build_entity_map(fc_paths)
+        except Exception:
+            self._entity_map = None
 
         if self._pending_refactor:
             oversize_note = (
