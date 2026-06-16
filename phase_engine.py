@@ -356,6 +356,16 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
     if not spec:
         return False, ""
 
+    # Replace refactor_plan.md with session-scoped path from agent
+    _splan = getattr(agent, '_refactor_plan_path', '')
+    if _splan and "refactor_plan.md" in str(spec):
+        spec = dict(spec)
+        for k, v in list(spec.items()):
+            if isinstance(v, str) and "refactor_plan.md" in v:
+                spec[k] = v.replace("refactor_plan.md", _splan)
+            elif isinstance(v, list):
+                spec[k] = [item.replace("refactor_plan.md", _splan) if isinstance(item, str) else item for item in v]
+
     # Dynamic path resolution: replace hardcoded api_server.py with the
     # actual target file from refactor_plan.md header or original prompt.
     # This ensures phase checks work for any REFAC-xxx, not just api_server.

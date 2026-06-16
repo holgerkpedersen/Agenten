@@ -122,6 +122,7 @@ class Agent:
         self._located_files: set[str] = set()
         self._autoresearch_depth: int = 0
         self._entity_map: dict | None = None
+        self._refactor_plan_path: str = ""
         self.refactoring_engine: RefactoringEngine = RefactoringEngine()
 
     def _register_tools(self) -> None:
@@ -527,22 +528,26 @@ class Agent:
         _auto_load_issue_files(self, prompt, template, files)
         _auto_load_location_file(self, prompt)
 
-        # Stale refactor_plan.md cleanup — if a new refactor session starts
-        # with a different target file than what the plan covers, the plan is
-        # stale and causes wrong todos/phase-checks (e.g., REFAC-023 targetting
-        # agent_phase_checks.py reuses REFAC-016's agent_core.py modules).
-        if template == "refactor" and os.path.exists("refactor_plan.md"):
+        # Refactor plan path: session-scoped to avoid stale plans
+        if template == "refactor":
+            _sid = getattr(self, '_session_id', 'unknown')[:8]
+            _plan_dir = os.path.join("refactor_plans", _sid)
             try:
-                with open("refactor_plan.md", "r", encoding="utf-8") as _f:
-                    _header = _f.read(300)
-                _prompt_target = re.search(r'(?:REFAC|ARC|BUG)[-\s]*\d+.*?([a-zA-Z_][\w.]+\.py)', prompt)
-                _plan_target = re.search(r'([a-zA-Z_][\w.]+\.py)', _header)
-                if _prompt_target and _plan_target and _prompt_target.group(1) != _plan_target.group(1):
-                    os.remove("refactor_plan.md")
-                    self._log("INFO", "Slettet gammel refactor_plan.md",
-                              f"Planen målrettede '{_plan_target.group(1)}', men prompten handler om '{_prompt_target.group(1)}'")
-            except (OSError, UnicodeDecodeError):
+                os.makedirs(_plan_dir, exist_ok=True)
+                # Auto-cleanup: delete directories older than 24 hours
+                _now = time.time()
+                for _d in os.listdir("refactor_plans/"):
+                    _dp = os.path.join("refactor_plans", _d)
+                    if os.path.isdir(_dp) and _d != _sid:
+                        if _now - os.path.getmtime(_dp) > 86400:
+                            self._log("INFO", "Rydder op i refactor_plans", f"Sletter gammel mappe: {_d}")
+                            import shutil
+                            shutil.rmtree(_dp, ignore_errors=True)
+            except (OSError, PermissionError):
                 pass
+            self._refactor_plan_path = os.path.join(_plan_dir, "plan.md")
+        else:
+            self._refactor_plan_path = ""
 
         file_context = _build_file_context(self, files, prompt)
 

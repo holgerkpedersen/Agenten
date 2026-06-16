@@ -264,7 +264,7 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
     Reads refactor_plan.md + AST of source/target modules so the LLM
     sees EXACTLY which symbols need extraction/cleanup.
     """
-    plan_path = os.path.join(os.getcwd(), "refactor_plan.md")
+    plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
     if not os.path.exists(plan_path):
         return ""
 
@@ -785,8 +785,8 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     plan_block = ""
     if (agent.active_template == "refactor" and
         task_node.name.lower() in ("ekstraher", "opdatér") and
-        not any("refactor_plan.md" in str(c) for c in agent.file_chunks.values())):
-        plan_path = "refactor_plan.md"
+        not any("plan.md" in str(c) for c in agent.file_chunks.values())):
+        plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
         if os.path.exists(plan_path):
             try:
                 with open(plan_path, encoding="utf-8") as _pf:
@@ -1415,7 +1415,7 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
     # Phase output verification — prevent auto-complete when no output was produced
     if tool_name in ("write_file",):
         if "plan" in phase:
-            plan_path = os.path.join(os.getcwd(), "refactor_plan.md")
+            plan_path = getattr(agent, '_refactor_plan_path', '') or os.path.join(os.getcwd(), "refactor_plan.md")
             if not os.path.exists(plan_path) or os.path.getsize(plan_path) == 0:
                 agent._log("DEBUG", "Plan output verification", f"{plan_path} mangler eller er tom — afslutter IKKE auto-complete")
                 return None
@@ -1956,7 +1956,7 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
 
 
 
-def _generate_phase_todos(template: str, phase_name: str, prompt: str = "") -> list[dict]:
+def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agent: Any | None = None) -> list[dict]:
     """Generate a todo checklist for a phase based on template and phase name."""
     phase = _normalize_phase(phase_name).lower()
     todos = []
@@ -1989,18 +1989,19 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "") -> l
             todos.append({"id": "bf_o1", "text": "Opdater issue status til 'resolved'", "done": False})
 
     elif template == "refactor":
-        # Read plan file for dynamic todos
         import os as _os
         import re as _re
-        plan_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'refactor_plan.md') if _os.environ.get('AGENT_WORKDIR') else 'refactor_plan.md'
+        # Use session-scoped plan path when available
+        if agent and getattr(agent, '_refactor_plan_path', ''):
+            _plan_path = agent._refactor_plan_path
+        else:
+            _plan_path = 'refactor_plan.md'
         plan_content = ''
         plan_fresh = True
-        if _os.path.exists(plan_path):
+        if _os.path.exists(_plan_path):
             try:
-                with open(plan_path, 'r', encoding='utf-8') as _f:
+                with open(_plan_path, 'r', encoding='utf-8') as _f:
                     plan_content = _f.read()
-                # Staleness check: if plan header mentions a different .py file
-                # than what the prompt targets, the plan is from an old session.
                 if prompt:
                     _prompt_target = _re.search(r'(?:REFAC|ARC|BUG)[-\s]*\d+.*?([a-zA-Z_][\w.]+\.py)', prompt)
                     _plan_target = _re.search(r'([a-zA-Z_][\w.]+\.py)', plan_content[:300])
@@ -2031,7 +2032,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "") -> l
         elif phase == "plan":
             todos.extend([
                 {"id": "rf_p1", "text": "Beslut modulopdeling", "done": False},
-                {"id": "rf_p2", "text": "Skriv refactor_plan.md med write_file()", "done": False},
+                {"id": "rf_p2", "text": "Skriv refactor_plan.md med write_file() (i roden, IKKE docs/)", "done": False},
                 {"id": "rf_p3", "text": "Inkluder alle moduler og symboler i planen", "done": False},
             ])
             if existing_modules:
@@ -2542,7 +2543,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     Yields:
         ..."""
     task_node.status = "running"
-    agent._phase_todos = _generate_phase_todos(getattr(agent, 'active_template', '') or '', task_node.name, getattr(agent, 'original_prompt', ''))
+    agent._phase_todos = _generate_phase_todos(getattr(agent, 'active_template', '') or '', task_node.name, getattr(agent, 'original_prompt', ''), agent)
     for todo in agent._phase_todos:
         yield {"type": "todo_add", "todo": todo}
     agent._task_start_time = time.time()

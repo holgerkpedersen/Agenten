@@ -28,6 +28,9 @@ agent_session_*.md
 # Export folder
 exports/
 
+# Refactor plan sessions
+refactor_plans/
+
 # Brainstorms folder
 .brainstorms/
 
