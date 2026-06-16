@@ -2434,7 +2434,7 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
     # Non-blocking tools (verify_refactor, add_import) are always
     # allowed — they're incremental/verification tools where
     # out-of-order calling is harmless.
-    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import", "run_tests", "read_issue", "analyze_dependencies"}
+    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import", "run_tests", "read_issue", "analyze_dependencies", "extract_symbol", "batch_extract_symbols"}
     if ids:
         valid_ids = []
         for checked_id in ids:

@@ -678,11 +678,24 @@ class RefactoringEngine:
         Results include per-symbol outcomes so the LLM can see which succeeded
         and which failed without wasting iterations.
 
-        Accepts ``symbols`` both as a list of strings (preferred) and as a
-        comma-separated string (common LLM hallucination).
+        Accepts ``symbols`` as a list of strings (preferred), a
+        comma-separated string, or a JSON array string (common LLM
+        hallucination: ``'["sym1", "sym2"]'``).
         """
         if isinstance(symbols, str):
-            symbols = [s.strip() for s in symbols.split(",") if s.strip()]
+            # Try JSON array format first: '["sym1", "sym2"]'
+            symbols_stripped = symbols.strip()
+            if symbols_stripped.startswith("[") and symbols_stripped.endswith("]"):
+                try:
+                    import json as _json
+                    parsed = _json.loads(symbols_stripped)
+                    if isinstance(parsed, list):
+                        symbols = [str(s).strip() for s in parsed if s]
+                except (_json.JSONDecodeError, TypeError):
+                    pass
+            # Fall back to comma-separated
+            if isinstance(symbols, str):
+                symbols = [s.strip(" \t\"'[]") for s in symbols.split(",") if s.strip(" \t\"'[]")]
         results = []
         for sym in symbols:
             try:
