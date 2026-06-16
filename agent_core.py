@@ -50,6 +50,11 @@ from agent_decomposition import _decompose_via_llm
 from agent_tools_github import register_github_tools
 from agent_tools_git import register_git_tools
 from agent_tools_file import register_file_tools
+from agent_phase_checks import check_phase_done, TEMPLATE_PHASE_CHECKS
+from file_checks import check_file_exists
+from phase_engine import check_all_of, TEMPLATE_PHASE_CHECKS
+from symbol_checks import check_symbols_covered_by_modules
+from text_tool_checks import check_text_contains
 
 
 class Agent:

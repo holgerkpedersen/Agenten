@@ -2208,6 +2208,10 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
     # unfinished todo that has a tool mapping. Soft todos (analysis/
     # planning tasks without tool matches) don't block — they're
     # implicitly completed when the next hard todo is triggered.
+    # Non-blocking tools (verify_refactor, add_import) are always
+    # allowed — they're incremental/verification tools where
+    # out-of-order calling is harmless.
+    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import"}
     if ids:
         valid_ids = []
         for checked_id in ids:
@@ -2225,7 +2229,8 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
                     has_dynamic = any(kw in ttext for kw in ["Opret", "Fjern", "import", "extract"])
                     if has_mapping or has_dynamic:
                         first_hard_unfinished = i
-            if checked_idx == first_hard_unfinished or checked_idx <= first_hard_unfinished:
+            if (checked_idx == first_hard_unfinished or checked_idx <= first_hard_unfinished or
+                tool_name in NON_BLOCKING_TOOLS):
                 valid_ids.append(checked_id)
             else:
                 checked_text = next((t.get("text","") for t in agent._phase_todos if t.get("id") == checked_id), checked_id)

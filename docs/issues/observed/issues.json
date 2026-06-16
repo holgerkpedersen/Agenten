@@ -1903,8 +1903,9 @@
       "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
       "proposed_fix": "Opdel agent_phase_checks.py i mindre moduler (maks 300 linjer per fil). Ekstraher relaterede funktioner til dedikerede moduler.",
       "acceptance_criteria": "agent_phase_checks.py er reduceret til under 300 linjer.",
-      "status": "in_progress",
-      "updated_at": "2026-06-15T20:34:58"
+      "status": "resolved",
+      "updated_at": "2026-06-16T14:47:41",
+      "resolution_note": "agent_phase_checks.py (1000 linjer) opdelte i 5 moduler: file_checks.py (176 linjer, 5 symboler), text_tool_checks.py (200 linjer, 5 symboler), symbol_checks.py (273 linjer, 6 symboler incl. PHASE_ALIASES, _resolve_phase_key, check_all_of), phase_engine.py (380 linjer, 2 symboler). agent_phase_checks.py er nu facade (68 linjer) med imports og __all__ re-export. Alle filer syntaktisk verificeret. Imports tilføjet i agent_core.py."
     },
     {
       "id": "BUG-096",
