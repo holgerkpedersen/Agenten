@@ -2168,7 +2168,7 @@ function createPanels() {
         } else if (def.id === 'history') {
             contentDiv.innerHTML = '<div id="historyContent" class="history-box"><div style="color: #64748b;"></div></div>';
         } else if (def.id === 'todos') {
-            contentDiv.innerHTML = '<div id="todosContent" class="todos-box"><div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div></div>';
+            contentDiv.innerHTML = '<div class="todos-toolbar" id="todosToolbar" style="display:none;padding:2px 6px;border-bottom:1px solid var(--border);font-size:11px;"><button onclick="copyTodos()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text);">📋 Kopiér</button></div><div id="todosContent" class="todos-box"><div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div></div>';
         }
     }
     
@@ -2602,6 +2602,8 @@ async function loadSelectedSession() {
         if (tc) {
             tc.innerHTML = '<div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div>';
         }
+        const tb = document.getElementById('todosToolbar');
+        if (tb) tb.style.display = 'none';
         
         if (data.session.show_thinking !== undefined) {
             showThinking = data.session.show_thinking;
@@ -3014,7 +3016,13 @@ async function executeWithStream() {
                             div.classList.add('done');
                             div.querySelector('input').checked = true;
                         }
+                        // Remove placeholder text when first todo is added
+                        const placeholder = tc.querySelector('div[style*="color: #64748b"]');
+                        if (placeholder) placeholder.remove();
                         tc.appendChild(div);
+                        // Show copy toolbar
+                        const tb = document.getElementById('todosToolbar');
+                        if (tb) tb.style.display = '';
                     }
                 }
                 break;
@@ -3223,6 +3231,38 @@ async function executeWithStream() {
     eventSource.onerror = function() {
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
     };
+}
+
+function copyTodos() {
+    const tc = document.getElementById('todosContent');
+    if (!tc) return;
+    const items = tc.querySelectorAll('.todo-item');
+    if (!items.length) return;
+    const lines = [];
+    items.forEach((item, i) => {
+        const textEl = item.querySelector('.todo-text');
+        const text = textEl ? textEl.textContent.trim() : '';
+        const done = item.classList.contains('done');
+        const status = done ? '[x]' : '[ ]';
+        lines.push(`${status} ${text}`);
+    });
+    const text = `## Opgaveplan\n\n` + lines.join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+        const tb = document.getElementById('todosToolbar');
+        if (tb) {
+            const old = tb.innerHTML;
+            tb.innerHTML = '<span style="padding:2px 6px;color:var(--accent);font-size:11px;">✅ Kopieret</span>';
+            setTimeout(() => { if (tb) tb.innerHTML = old; }, 2000);
+        }
+    }).catch(() => {
+        // Fallback: select and copy
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    });
 }
 
 function stripHarmony(text) {

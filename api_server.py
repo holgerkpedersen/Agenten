@@ -18,7 +18,7 @@ from typing import Any, Generator
 from lang import t, get_ui_translations
 from i18n import K
 from agent_files import _is_safe_path
-from agent_phase_checks import TEMPLATE_PHASE_CHECKS
+from agent_phase_checks import TEMPLATE_PHASE_CHECKS, check_phase_done
 from config import get_logger
 import agent_issues
 import agent_autoresearch

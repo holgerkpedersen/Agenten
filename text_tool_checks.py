@@ -158,3 +158,42 @@ def check_code_contains(spec: dict[str, Any], base_dir: str | None = None) -> tu
     if len(matched) >= min_matches:
         return True, f"code_contains: {len(matched)} patterns matchet i {rel} (>= {min_matches})"
     return False, f"code_contains: kun {len(matched)}/{len(patterns)} matchet i {rel} (kræver {min_matches})"
+
+
+
+def check_tests_pass(spec: dict[str, Any], agent: Any | None = None, tool_name: str = "", called_tools: dict | None = None) -> tuple[bool, str]:
+    """Return ``(passed, message)`` for a tests_pass check.
+
+    The check has three guards:
+
+      1. ``require_run`` (default True) — fail unless the LLM actually
+         called ``run_tests`` (we use ``tool_name`` for the latest call
+         and fall back to scanning ``called_tools`` keys).
+      2. ``agent._tests_failed`` must be ``False`` (or absent).
+      3. ``agent._last_test_summary`` (if present) should not contain
+         substrings like ``failed`` or ``error``.
+
+    This is the only way a Test phase auto-completes — declaring
+    ``<<<DONE>>>`` without invoking ``run_tests`` does not pass.
+
+    Spec keys:
+      - ``scope`` (default "all") — informational only; current
+        implementation only supports the project-wide test suite.
+      - ``require_run`` (default True) — gate on LLM having invoked
+        ``run_tests``.
+    """
+    require_run = bool(spec.get("require_run", True))
+    if require_run:
+        ran = tool_name == "run_tests"
+        if not ran and called_tools:
+            ran = any(k.split("{")[0] == "run_tests" for k in called_tools)
+        if not ran:
+            return False, "tests_pass: LLM kaldte ikke run_tests i denne fase"
+    if agent is not None and getattr(agent, "_tests_failed", False):
+        return False, "tests_pass: seneste testkørsel fejlede"
+    summary = ""
+    if agent is not None:
+        summary = getattr(agent, "_last_test_summary", "") or ""
+    if summary and re.search(r"\b(failed|error)\b", summary, re.IGNORECASE):
+        return False, f"tests_pass: test summary nævner fejl: {summary[:120]}"
+    return True, "tests_pass: alle tests bestod"

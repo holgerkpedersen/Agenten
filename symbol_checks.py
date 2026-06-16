@@ -159,3 +159,114 @@ def check_symbols_covered_by_modules(spec: dict[str, Any], base_dir: str | None 
         more = f" (+{len(duplicated) - 3} flere)" if len(duplicated) > 3 else ""
         parts.append(f"duplikeret på tværs: {dup_detail}{more}")
     return False, f"symbols_covered: {' | '.join(parts)}"
+
+
+
+
+# Phase name aliases for multi-language support.
+# Maps canonical (Danish) phase key → list of alias phase names in other languages.
+# Used by both backend check_phase_done() and the frontend /api/phase-checks endpoint.
+PHASE_ALIASES: dict[str, list[str]] = {
+    "analyse": ["analysis", "análisis", "分析"],
+    "ekstraher": ["extract", "extraer", "提取"],
+    "opdatér": ["update", "actualizar", "更新"],
+    "test": ["probar", "测试"],
+    "test (red)": ["prueba (red)", "测试 (red)"],
+    "implementering": ["implementation", "implementación", "实施"],
+    "verifikation (green)": ["verification (green)", "verificación (green)", "验证 (green)"],
+    "opdatering": ["update", "actualización", "更新"],
+    "læs": ["read"],
+    "afklar": ["clarify"],
+    "luk": ["close"],
+}
+
+from symbol_checks import check_symbols_covered_by_modules, PHASE_ALIASES
+
+
+
+def _resolve_phase_key(phase_name: str, template_checks: dict[str, dict[str, Any]]) -> str | None:
+    """Find the canonical key in template_checks matching *phase_name*.
+
+    Checks direct (case-insensitive) match first, then alias lookups.
+    Returns the actual key from *template_checks* or None.
+    """
+    lowered = phase_name.lower()
+    for key in template_checks:
+        if key.lower() == lowered:
+            return key
+    # Alias lookup: find the canonical alias key, then find the matching
+    # template_checks entry (case-insensitive).
+    for alias_key, aliases in PHASE_ALIASES.items():
+        if lowered == alias_key or lowered in aliases:
+            for key in template_checks:
+                if key.lower() == alias_key:
+                    return key
+    return None
+
+from symbol_checks import check_symbols_covered_by_modules, PHASE_ALIASES, _resolve_phase_key
+from file_checks import check_file_exists
+from file_checks import check_files_from_plan
+from text_tool_checks import check_text_contains
+from text_tool_checks import check_min_text_length
+from text_tool_checks import check_tool_called
+from text_tool_checks import check_code_contains
+
+
+
+def check_all_of(
+    spec: dict[str, Any],
+    agent: Any | None = None,
+    task_node: Any | None = None,
+    called_tools: dict | None = None,
+    base_dir: str | None = None,
+    tool_name: str = "",
+    full_response: str = "",
+) -> tuple[bool, str]:
+    """Return ``(passed, message)`` for an all_of compound check.
+
+    Runs each sub-spec in ``spec["checks"]`` (list) and passes only if all
+    pass. Useful when a phase needs to satisfy more than one criterion
+    (e.g. refactor Ekstraher needs both ``files_from_plan`` AND
+    ``symbols_covered``).
+
+    Spec keys:
+      - ``checks`` (required) — list of sub-specs. Each must have a
+        ``"type"`` key matching one of the supported check types.
+      - ``fail_fast`` (default True) — stop at the first failing sub-check
+        (the message reports the failing type).
+    """
+    sub_specs = spec.get("checks", []) or []
+    if not sub_specs:
+        return False, "all_of: ingen sub-checks"
+    fail_fast = bool(spec.get("fail_fast", True))
+    passed_types: list[str] = []
+    for sub in sub_specs:
+        if not isinstance(sub, dict):
+            continue
+        sub_type = sub.get("type")
+        if sub_type == "file_exists":
+            r = check_file_exists(sub.get("paths", []), sub, base_dir=base_dir)
+        elif sub_type == "files_from_plan":
+            r = check_files_from_plan(sub, base_dir=base_dir)
+        elif sub_type == "min_text_length":
+            r = check_min_text_length(sub, full_response=full_response, agent=agent)
+        elif sub_type == "code_contains":
+            r = check_code_contains(sub, base_dir=base_dir)
+        elif sub_type == "tool_called":
+            r = check_tool_called(sub, tool_name=tool_name, called_tools=called_tools)
+        elif sub_type == "tests_pass":
+            from phase_engine import check_tests_pass as _check_tp
+            r = _check_tp(sub, agent=agent, tool_name=tool_name, called_tools=called_tools)
+        elif sub_type == "symbols_covered":
+            r = check_symbols_covered_by_modules(sub, base_dir=base_dir)
+        elif sub_type == "text_contains":
+            r = check_text_contains(sub, full_response=full_response)
+        else:
+            r = (False, f"unknown sub-check: {sub_type}")
+        if r[0]:
+            passed_types.append(sub_type)
+            continue
+        if fail_fast:
+            return False, f"all_of: {sub_type} fejlede — {r[1]}"
+        return False, f"all_of: {sub_type} fejlede — {r[1]}"
+    return True, f"all_of: alle {len(passed_types)} sub-checks bestod ({', '.join(passed_types)})"
