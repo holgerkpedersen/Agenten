@@ -1219,7 +1219,7 @@ const panelDefinitions = [
     { id: 'llm', title: '📡 LLM Output', defaultLeft: 440, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
     { id: 'log', title: '📋 Agent Log', defaultLeft: 860, defaultTop: 20, defaultWidth: 400, defaultHeight: 300 },
     { id: 'history', title: '📜 Prompt Historik', defaultLeft: 20, defaultTop: 340, defaultWidth: 1240, defaultHeight: 200 },
-    { id: 'todos', title: '📋 Todo', defaultLeft: 20, defaultTop: 680, defaultWidth: 1240, defaultHeight: 100 }
+    { id: 'todos', title: '📋 Opgaveplan', defaultLeft: 20, defaultTop: 680, defaultWidth: 1240, defaultHeight: 100 }
 ];
 
 function getCurrentLayout() {
@@ -2167,7 +2167,7 @@ function createPanels() {
         } else if (def.id === 'history') {
             contentDiv.innerHTML = '<div id="historyContent" class="history-box"><div style="color: #64748b;"></div></div>';
         } else if (def.id === 'todos') {
-            contentDiv.innerHTML = '<div style="padding:6px 8px;font-weight:600;border-bottom:1px solid var(--border);">📋 Opgaver</div><div id="todosContent" class="todos-box"><div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div></div>';
+            contentDiv.innerHTML = '<div id="todosContent" class="todos-box"><div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div></div>';
         }
     }
     
