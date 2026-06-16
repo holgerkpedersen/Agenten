@@ -2131,6 +2131,154 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "") -> l
                 {"id": "rf_t2", "text": "Opdater issue status til 'resolved'", "done": False},
             ])
 
+    elif template == "kodeanalyse":
+        if phase == "analyse" or "form\u00e5l" in phase:
+            todos.extend([
+                {"id": "ka_a1", "text": "List symboler med list_symbols()", "done": False},
+                {"id": "ka_a2", "text": "L\u00e6s vigtige funktioner med read_location()", "done": False},
+                {"id": "ka_a3", "text": "Analyser afh\u00e6ngigheder", "done": False},
+                {"id": "ka_a4", "text": "Skriv analyserapport med write_file()", "done": False},
+            ])
+        elif "import" in phase:
+            todos.extend([
+                {"id": "ka_i1", "text": "Gennemg\u00e5 imports med read_location()", "done": False},
+                {"id": "ka_i2", "text": "Not\u00e9r ubrugte og cirkul\u00e6re imports", "done": False},
+                {"id": "ka_i3", "text": "Skriv import-rapport med write_file()", "done": False},
+            ])
+        elif "arkitektur" in phase:
+            todos.extend([
+                {"id": "ka_k1", "text": "Analys\u00e9r klasse- og funktionsstruktur", "done": False},
+                {"id": "ka_k2", "text": "Vurd\u00e9r design patterns og SOLID", "done": False},
+                {"id": "ka_k3", "text": "Skriv arkitektur-rapport med write_file()", "done": False},
+            ])
+        elif "kvalitet" in phase or "kodekvalitet" in phase:
+            todos.extend([
+                {"id": "ka_q1", "text": "Vurd\u00e9r l\u00e6sbarhed, navngivning, type hints", "done": False},
+                {"id": "ka_q2", "text": "Tjek test coverage og kompleksitet", "done": False},
+                {"id": "ka_q3", "text": "Skriv kodekvalitets-rapport med write_file()", "done": False},
+            ])
+        elif "sikkerhed" in phase:
+            todos.extend([
+                {"id": "ka_s1", "text": "Analys\u00e9r inputvalidering og autentifikation", "done": False},
+                {"id": "ka_s2", "text": "Tjek for OWASP-top-10 s\u00e5rbarheder", "done": False},
+                {"id": "ka_s3", "text": "Skriv sikkerheds-rapport med write_file()", "done": False},
+            ])
+
+    elif template == "programmering":
+        if phase == "analyse" or "krav" in phase:
+            todos.extend([
+                {"id": "pr_a1", "text": "Analys\u00e9r krav og behov", "done": False},
+                {"id": "pr_a2", "text": "Skriv kravanalyse i docs/kravanalyse.md", "done": False},
+            ])
+        elif "arkitektur" in phase:
+            todos.extend([
+                {"id": "pr_d1", "text": "Design arkitektur med komponenter og gr\u00e6nseflader", "done": False},
+                {"id": "pr_d2", "text": "Skriv arkitektur i docs/arkitektur.md", "done": False},
+            ])
+        elif "implementeringsplan" in phase:
+            todos.extend([
+                {"id": "pr_p1", "text": "Lav implementeringsplan med moduler og r\u00e6kkef\u00f8lge", "done": False},
+                {"id": "pr_p2", "text": "Skriv plan i docs/implementeringsplan.md", "done": False},
+            ])
+        elif "sikkerhed" in phase:
+            todos.extend([
+                {"id": "pr_s1", "text": "Analys\u00e9r sikkerhedsaspekter", "done": False},
+                {"id": "pr_s2", "text": "Skriv sikkerhedsanalyse i docs/sikkerhedsanalyse.md", "done": False},
+            ])
+        elif "refinement" in phase or "uddyb" in phase:
+            todos.extend([
+                {"id": "pr_r1", "text": "Udfyld detaljer og pr\u00e6cis\u00e9r specifikationer", "done": False},
+            ])
+        elif "kodeimplementering" in phase or "implementer" in phase:
+            todos.extend([
+                {"id": "pr_i1", "text": "Implement\u00e9r koden med write_file()", "done": False},
+                {"id": "pr_i2", "text": "K\u00f8r tests med run_tests()", "done": False},
+            ])
+
+    elif template == "issue_handler":
+        if phase in ("l\u00e6s", "read", "analyse"):
+            todos.extend([
+                {"id": "ih_a1", "text": "L\u00e6s issue med read_issue()", "done": False},
+                {"id": "ih_a2", "text": "Find relevant kode med locate()", "done": False},
+            ])
+        elif phase in ("afklar", "clarify"):
+            todos.extend([
+                {"id": "ih_c1", "text": "Forst\u00e5 problemet og afg\u00f8r l\u00f8sning", "done": False},
+            ])
+        elif phase in ("fix", "implementering"):
+            todos.extend([
+                {"id": "ih_f1", "text": "Ret koden med edit_file()", "done": False},
+                {"id": "ih_f2", "text": "K\u00f8r tests med run_tests()", "done": False},
+            ])
+        elif phase in ("luk", "close"):
+            todos.extend([
+                {"id": "ih_l1", "text": "Opdater issue status til 'resolved'", "done": False},
+            ])
+
+    elif template == "selvforbedring":
+        if phase == "analyse" or "analyser" in phase:
+            todos.extend([
+                {"id": "sf_a1", "text": "L\u00e6s CORE-issue med read_issue()", "done": False},
+                {"id": "sf_a2", "text": "Find relevant kode med locate()", "done": False},
+            ])
+        elif "diagnostic" in phase:
+            todos.extend([
+                {"id": "sf_d1", "text": "K\u00f8r tests med run_tests()", "done": False},
+                {"id": "sf_d2", "text": "Identific\u00e9r rod\u00e5rsag", "done": False},
+            ])
+        elif phase in ("ret", "fix"):
+            todos.extend([
+                {"id": "sf_r1", "text": "Ret koden med edit_file()", "done": False},
+                {"id": "sf_r2", "text": "K\u00f8r tests for at bekr\u00e6fte fix", "done": False},
+            ])
+        elif "verific" in phase or "test" in phase:
+            todos.extend([
+                {"id": "sf_v1", "text": "K\u00f8r HELE testsuiten", "done": False},
+                {"id": "sf_v2", "text": "Opdater CORE-issue status til 'resolved'", "done": False},
+            ])
+        elif "commit" in phase:
+            todos.extend([
+                {"id": "sf_c1", "text": "Commit \u00e6ndringer med git_commit()", "done": False},
+            ])
+
+    elif template == "testgenerering":
+        if phase == "analyse":
+            todos.extend([
+                {"id": "tg_a1", "text": "Analys\u00e9r koden og find testbare enheder", "done": False},
+            ])
+        elif "test" in phase:
+            todos.extend([
+                {"id": "tg_t1", "text": "Opret testfil i tests/temp/ med write_file()", "done": False},
+                {"id": "tg_t2", "text": "K\u00f8r test - den SKAL fejle f\u00f8rst (r\u00f8d)", "done": False},
+            ])
+        elif "implementer" in phase:
+            todos.extend([
+                {"id": "tg_i1", "text": "Implement\u00e9r koden der g\u00f8r testen gr\u00f8n", "done": False},
+                {"id": "tg_i2", "text": "K\u00f8r specifik test - skal best\u00e5", "done": False},
+            ])
+        elif "verifikation" in phase or "green" in phase:
+            todos.extend([
+                {"id": "tg_v1", "text": "K\u00f8r HELE testsuiten for regression", "done": False},
+            ])
+
+    elif template == "agenten":
+        if "branch" in phase:
+            todos.extend([
+                {"id": "ag_b1", "text": "Opret og skift til ny branch", "done": False},
+            ])
+        elif "commit" in phase:
+            todos.extend([
+                {"id": "ag_c1", "text": "Commit \u00e6ndringer", "done": False},
+            ])
+        elif "push" in phase:
+            todos.extend([
+                {"id": "ag_p1", "text": "Push til remote", "done": False},
+            ])
+        elif "pull" in phase or "pr" in phase or "request" in phase:
+            todos.extend([
+                {"id": "ag_pr1", "text": "Opret Pull Request", "done": False},
+            ])
+
     if not todos:
         todos.append({"id": "todo_generic", "text": f"Gennemf\u00f8r fasen: {phase_name}", "done": False})
 
@@ -2202,6 +2350,8 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("analyze_dependencies", None, "rf_a3"),
     ("write_file", lambda a: "refactor_plan" in str(a.get("path", "")), "rf_p2"),
     ("write_file", lambda a: "tests/temp" in str(a.get("path", "")), "bf_t1"),
+    ("write_file", lambda a: "docs/" in str(a.get("path", "")) and a.get("path","").endswith(".md"), "ka_a4"),
+    ("write_file", lambda a: "docs/" in str(a.get("path", "")), "pr_a2"),
     ("extract_symbol", None, "rf_e1"),
     ("add_method", None, "bf_i3"),
     ("add_function", None, None),
@@ -2209,10 +2359,27 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("run_tests", None, "bf_t2"),
     ("run_tests", None, "rf_u_tests"),
     ("run_tests", None, "rf_t1"),
+    ("run_tests", None, "sf_d1"),
+    ("run_tests", None, "sf_v1"),
+    ("run_tests", None, "tg_v1"),
+    ("run_tests", None, "pr_i2"),
+    ("run_tests", None, "ih_f2"),
     ("update_issue_status", None, "bf_o1"),
     ("update_issue_status", None, "rf_u_status"),
     ("update_issue_status", None, "rf_t2"),
+    ("update_issue_status", None, "sf_v2"),
+    ("update_issue_status", None, "ih_l1"),
     ("verify_refactor", None, "rf_u_verify"),
+    ("list_symbols", None, "ka_a1"),
+    ("edit_file", None, "ih_f1"),
+    ("edit_file", None, "sf_r1"),
+    ("read_issue", None, "ih_a1"),
+    ("read_issue", None, "sf_a1"),
+    ("git_create_branch", None, "ag_b1"),
+    ("git_commit", None, "ag_c1"),
+    ("git_commit", None, "sf_c1"),
+    ("git_push", None, "ag_p1"),
+    ("github_create_pr", None, "ag_pr1"),
 ]
 
 
@@ -2266,7 +2433,7 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
     # Non-blocking tools (verify_refactor, add_import) are always
     # allowed — they're incremental/verification tools where
     # out-of-order calling is harmless.
-    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import"}
+    NON_BLOCKING_TOOLS = {"verify_refactor", "add_import", "run_tests", "read_issue", "analyze_dependencies"}
     if ids:
         valid_ids = []
         for checked_id in ids:
@@ -2299,18 +2466,20 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
 def _reconcile_todos_with_disk(agent: Any) -> list[str]:
     """Check actual file state against todos and return newly satisfiable todo IDs.
 
-    For Opdatér phase: if a 'Tilføj import fra modul.py i target.py' todo exists,
-    but the import already exists in the target file, checkmark it.
-    This prevents the LLM from being blocked by stale todos.
+    For each template, checks if work is already done on disk:
+    - Opdatér: imports already exist in target file → checkmark import todos
+    - kodeanalyse: docs/*.md already exist → checkmark write reports
+    - programmering: docs/*.md already exist → checkmark write plans
+    - bugfix: tests/temp/test_*.py already exists → checkmark test creation
     """
     import re as _re
     import os as _os
     todos = getattr(agent, '_phase_todos', None)
     if not todos:
         return []
+    template = getattr(agent, 'active_template', '')
     phase = getattr(agent, 'current_phase', '')
-    if _normalize_phase(phase).lower() not in ("opdater", "opdatering", "opdat\u00e9r"):
-        return []
+    norm_phase = _normalize_phase(phase).lower()
 
     ids = []
     for todo in todos:
@@ -2318,25 +2487,47 @@ def _reconcile_todos_with_disk(agent: Any) -> list[str]:
             continue
         text = todo.get("text", "")
         tid = todo.get("id", "")
+        if not text:
+            continue
 
-        # Match "Tilføj import fra modul.py i target.py"
-        m = _re.match(r'Tilf\u00f8j import fra ([\w./-]+\.py) i ([\w./-]+\.py)', text)
-        if not m:
-            continue
-        mod_file = m.group(1)
-        target_file = m.group(2)
-        target_path = target_file if _os.path.exists(target_file) else _os.path.join(_os.getcwd(), target_file)
-        if not _os.path.exists(target_path):
-            continue
-        try:
-            with open(target_path, 'r', encoding='utf-8', errors='replace') as f:
-                content = f.read()
-            mod_name = _os.path.splitext(mod_file)[0]
-            # Check if module is already imported (from X import ... or import X)
-            if f"from {mod_name}" in content or f"import {mod_name}" in content:
-                ids.append(tid)
-        except (OSError, UnicodeDecodeError):
+        # Check docs/*.md existence (kodeanalyse, programmering)
+        if template in ("kodeanalyse", "programmering") and "skriv" in text.lower():
+            m = _re.search(r'docs/[\w./-]+\.md', text)
+            if m:
+                doc_path = m.group(0)
+                if _os.path.exists(doc_path):
+                    ids.append(tid)
+
+        # Check tests/temp/ files (bugfix, testgenerering)
+        if template in ("bugfix", "testgenerering") and ("test" in text.lower() or "tests/temp" in text):
+            m = _re.search(r'tests/temp/[\w./-]+\.py', text)
+            if m:
+                test_path = m.group(0)
+                if _os.path.exists(test_path):
+                    ids.append(tid)
+
+        # Check import existence (refactor Opdatér)
+        if template == "refactor" and norm_phase in ("opdater", "opdatering", "opdat\u00e9r"):
+            m = _re.match(r'Tilf\u00f8j import fra ([\w./-]+\.py) i ([\w./-]+\.py)', text)
+            if m:
+                mod_file = m.group(1)
+                target_file = m.group(2)
+                target_path = target_file if _os.path.exists(target_file) else _os.path.join(_os.getcwd(), target_file)
+                if _os.path.exists(target_path):
+                    try:
+                        with open(target_path, 'r', encoding='utf-8', errors='replace') as f:
+                            content = f.read()
+                        mod_name = _os.path.splitext(mod_file)[0]
+                        if f"from {mod_name}" in content or f"import {mod_name}" in content:
+                            ids.append(tid)
+                    except (OSError, UnicodeDecodeError):
+                        pass
+
+        # Check issue status (any template with update_issue_status todo)
+        if "resolved" in text.lower() or "issue status" in text.lower():
+            # Already checked by tool call — no disk check needed
             pass
+
     return ids
 
 
