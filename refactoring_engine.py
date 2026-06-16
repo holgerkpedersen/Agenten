@@ -671,13 +671,18 @@ class RefactoringEngine:
             'symbols': symbols,
         }
 
-    def batch_extract_symbols(self, source: str, symbols: list[str], target: str) -> dict[str, Any]:
+    def batch_extract_symbols(self, source: str, symbols: list[str] | str, target: str) -> dict[str, Any]:
         """Extract multiple symbols to a target module in a single call.
 
         Each symbol is moved via move_symbol (extract + remove + add_import).
         Results include per-symbol outcomes so the LLM can see which succeeded
         and which failed without wasting iterations.
+
+        Accepts ``symbols`` both as a list of strings (preferred) and as a
+        comma-separated string (common LLM hallucination).
         """
+        if isinstance(symbols, str):
+            symbols = [s.strip() for s in symbols.split(",") if s.strip()]
         results = []
         for sym in symbols:
             try:
