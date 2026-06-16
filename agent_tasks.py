@@ -597,6 +597,104 @@ def _build_chunk_hint(agent: Any) -> str:
     return hint
 
 
+def _build_phase_reason(template: str, phase_name: str, original_prompt: str) -> str:
+    """Build an 'I'm working on X for Y. They need Z. With that:' reason block.
+
+    Gives the LLM context about WHY this phase exists, not just WHAT to do.
+    The pattern helps the LLM understand the purpose and act more intelligently.
+    """
+    phase = _normalize_phase(phase_name).lower()
+    file_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
+    target_file = file_match.group(1) if file_match else "koden"
+
+    reasons = {
+        ("refactor", "analyse"): (
+            f"Jeg arbejder p\u00e5 at opdele {target_file} i mindre moduler. "
+            f"Brugeren har brug for at forst\u00e5 symbolstrukturen og afh\u00e6ngighederne "
+            f"f\u00f8r modulopdeling."
+        ),
+        ("refactor", "plan"): (
+            f"Jeg har nu overblik over {target_file}. "
+            f"Brugeren har brug for en konkret plan for hvilke moduler der skal oprettes."
+        ),
+        ("refactor", "ekstraher"): (
+            f"Planen er klar. "
+            f"Brugeren har brug for at symboler flyttes fra {target_file} til nye modulfiler."
+        ),
+        ("refactor", "opdat\u00e9r"): (
+            f"Modulerne er oprettet. "
+            f"Brugeren har brug for at {target_file} opryddes "
+            f"\u2014 fjern flyttede symboler og tilf\u00f8j imports."
+        ),
+        ("refactor", "test"): (
+            f"Refaktoreringen er udf\u00f8rt. "
+            f"Brugeren har brug for at verificere at alle tests stadig best\u00e5r."
+        ),
+        ("bugfix", "analyse"): (
+            f"Jeg unders\u00f8ger en bugrapport. "
+            f"Brugeren har brug for at forst\u00e5 hvor fejlen opst\u00e5r."
+        ),
+        ("bugfix", "test"): (
+            f"Jeg har forst\u00e5et fejlen. "
+            f"Brugeren har brug for en test der reproducerer den."
+        ),
+        ("bugfix", "implementering"): (
+            f"Testen bekr\u00e6fter fejlen. "
+            f"Brugeren har brug for en minimal rettelse."
+        ),
+        ("bugfix", "verifikation"): (
+            f"Rettelsen er anvendt. "
+            f"Brugeren har brug for at bekr\u00e6fte at alle tests best\u00e5r."
+        ),
+        ("bugfix", "opdatering"): (
+            f"Alt virker. "
+            f"Brugeren har brug for at issuet markeres som l\u00f8st."
+        ),
+        ("selvforbedring", "analyser"): (
+            f"Jeg unders\u00f8ger hvorfor en fase fejlede. "
+            f"Brugeren har brug for at forst\u00e5 fejlkonteksten."
+        ),
+        ("selvforbedring", "diagnostic\u00e9r"): (
+            f"Jeg har overblikket. "
+            f"Brugeren har brug for at identificere rod\u00e5rsagen."
+        ),
+        ("selvforbedring", "ret"): (
+            f"Rod\u00e5rsagen er kendt. "
+            f"Brugeren har brug for at koden rettes."
+        ),
+        ("selvforbedring", "verific\u00e9r"): (
+            f"Rettelsen er anvendt. "
+            f"Brugeren har brug for at tests k\u00f8rer og issuet lukkes."
+        ),
+        ("selvforbedring", "commit"): (
+            f"Alt er verificeret. "
+            f"Brugeren har brug for at \u00e6ndringerne committes."
+        ),
+        ("issue_handler", "l\u00e6s"): (
+            f"Jeg har f\u00e5et et issue. "
+            f"Brugeren har brug for at forst\u00e5 hvad der skal laves."
+        ),
+        ("issue_handler", "afklar"): (
+            f"Jeg har l\u00e6st issuet. "
+            f"Brugeren har brug for at afklare pr\u00e6cis hvad der skal \u00e6ndres."
+        ),
+        ("issue_handler", "fix"): (
+            f"Jeg ved hvad der skal laves. "
+            f"Brugeren har brug for at koden rettes og testes."
+        ),
+        ("issue_handler", "luk"): (
+            f"Fikset er implementeret. "
+            f"Brugeren har brug for at issuet markeres som l\u00f8st."
+        ),
+    }
+
+    key = (template or "").lower(), phase
+    if key in reasons:
+        return f"## Baggrund\n{reasons[key]}\n"
+    return ""
+
+
+
 def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, chunk_hint: str) -> tuple[list[dict], str, bool]:
     """build initial messages.
     
@@ -711,10 +809,15 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     phase_block = "\n\n" + t(K.PHASE_CURRENT, agent.lang).format(phase_name=task_node.name) + \
                   t(K.PHASE_ONLY, agent.lang).format(phase_name=task_node.name)
 
+    # Build reason block — context about WHY this phase exists
+    reason_block = _build_phase_reason(getattr(agent, 'active_template', ''), task_node.name, original_prompt)
+    if not reason_block:
+        reason_block = ""
+
     if section_instr:
-        task_prompt = f"{section_instr}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
-        task_prompt = f"{task_node.name}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
     # Append phase todos as a numbered checklist — LLM must follow the order
     todos = getattr(agent, '_phase_todos', None)
