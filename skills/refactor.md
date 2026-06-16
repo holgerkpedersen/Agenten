@@ -1,0 +1,105 @@
+---
+name: refactor
+keywords: [refactor, refaktorer, opdel, module, solid, import facade, extract, flyt, oprydning]
+template: refactor
+action_types: [analyze, plan, extract, update, test]
+description: "Refactoring strategies: Extract Symbol for self-contained functions, Import Facade for 800+ line files with clear function groups, Delegation for large classes, Module Split for independent utilities. Includes decision guide for choosing the right strategy."
+---
+
+## Refactor (SOLID-opdeling)
+
+Refactor large files into smaller modules following SOLID principles. This skill describes multiple strategies so you can choose the best approach for each situation.
+
+### Refactoring Strategies
+
+#### 1. Extract Symbol (standard)
+
+Use `extract_symbol(filepath='src.py', name='funktionsnavn', target_module='ny_modul.py')` to move a single function or class to a new module. The tool:
+- Copies the function/class to the target module
+- Removes it from the source file
+- Adds an import in the source file
+- Preserves all decorators and docstrings
+
+**Best when:** The symbol is self-contained with few dependencies. The target module already exists (or you create it with `write_file` first).
+
+**Avoid when:** The function has many local dependencies or is tightly coupled to the source file's internal state.
+
+#### 2. Import Facade
+
+Rewrite the source file to become an **import facade** — a thin file that only imports and re-exports symbols from sub-modules. The original file shrinks from 1000+ lines to 50-100 lines.
+
+**Workflow:**
+1. Create sub-modules (`file_checks.py`, `text_tool_checks.py`, `symbol_checks.py`, `phase_engine.py`)
+2. Group related functions into each sub-module
+3. Add `from typing import Any` to each sub-module
+4. In the original file, replace all function bodies with imports:
+
+```python
+# sub_module.py
+from typing import Any
+
+def check_file_exists(paths: list[str], spec: dict[str, Any] | None = None) -> tuple[bool, str]:
+    ...
+
+# original.py — becomes import facade (ALDRI slet denne fil!)
+from sub_module import check_file_exists
+
+__all__ = ["check_file_exists", ...]
+```
+
+5. Preserve the original file's `__all__` and any constants/TEMPLATE configs
+6. Add cross-imports where sub-modules call each other
+
+**CRITICAL — ALDRI slet originalfilen:** Testfiler importerer fra originalfilen. Hvis du sletter den, knækker ALLE tests der importerer `from agent_phase_checks import ...`. Originalfilen skal altid bevares som import facade — selvom den kun er 50 linjer.
+
+**Best when:** The file has 800+ lines with multiple clear responsibility areas. The callers import from the original file and you want zero API changes.
+
+**Signs you need this:** The file has groups of functions with a common prefix (e.g., all `check_*` functions), or the module docstring already describes multiple responsibilities.
+
+**CRITICAL:** After writing each sub-module:
+- Add `from typing import Any` at the top
+- The module MUST be importable standalone (`python -c "import din_modul"` without errors)
+- Run `python -m pytest tests/ -q` to catch all import errors at once
+
+#### 3. Delegation (class split)
+
+Extract methods from a large class into separate classes, keeping the original class as a facade that delegates to the new classes.
+
+**Best when:** A class has multiple responsibilities that share state. The public API should remain unchanged.
+
+#### 4. Module split (peer modules)
+
+Split one module into several independent peer modules with no shared state.
+
+**Best when:** Functions are independent utility functions with no shared global state.
+
+### Strategy Decision Guide
+
+| Condition | Strategy |
+|-----------|----------|
+| Function/class is self-contained, few deps | Extract Symbol |
+| File > 800 lines, clear function groups | Import Facade |
+| Large class with shared state | Delegation |
+| Independent utility functions | Module Split |
+| Functions have circular dependencies | Resolve cycles first, then Extract |
+| Target modules don't exist yet | Use `write_file` to create them, then `extract_symbol` |
+
+### Test File Handling
+
+**Eksisterende testfiler skal IKKE ændres.** De importerer fra originalfilen, som efter refactoring stadig eksisterer (som import facade eller med imports). Testene kører mod facaden, som re-eksporterer alle flyttede symboler — så testene virker uden ændringer.
+
+**Hvis du alligevel har brug for at tilpasse tests:**
+- `update_issue_status` først, hvis testene fejler på grund af refactoring
+- Brug `edit_file` til at opdatere imports i testfiler, aldrig `write_file`
+- Kør `run_tests()` efter hver ændring
+
+### Important Rules
+
+- **ALDRI slet originalfilen.** Testfiler importerer fra den. Bevar den som import facade, selvom den kun er 50 linjer.
+- **Preserve `__all__`:** The import facade must export everything the original exported.
+- **Preserve `TEMPLATE_PHASE_CHECKS`:** Constants and template configs stay in the original file (or the main sub-module) and are re-exported.
+- **Verify imports:** Every new `.py` file must have `from typing import Any` (and `from __future__ import annotations` if using `list[str]`, `tuple[bool, str]` syntax).
+- **Test after each module:** Run `run_tests()` after creating each sub-module.
+- **No dead code:** Remove the original function bodies from the source file — do NOT leave commented-out code.
+- **`verify_refactor()`** after each batch of changes to catch syntax errors early.
+- **`write_file(overwrite="force")` kan bruges som alternativ til `remove_symbol`** når du omskriver hele filen.
