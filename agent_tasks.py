@@ -2779,7 +2779,11 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 called_tools[tool_key] = dup_count + 1
                 if dup_count >= 1:
                     consecutive_dedups += 1
-                    _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
+                    dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
+                    _add_user_msg(messages, dup_err)
+                    messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": dup_err})
+                    yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                    yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": {"success": False, "error": "Duplicate call blocked"}}
                     if consecutive_dedups >= 3:
                         _active = agent.tool_registry.active_tools or []
                         write_tools = [t for t in ("write_file", "edit_file")
