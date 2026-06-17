@@ -1336,6 +1336,18 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
             if iteration >= 3 and not getattr(agent, "_non_productive_reminder_sent", False):
                 agent._non_productive_reminder_sent = True
                 return t(K.SYS_REQUIRED_TOOLS_REFACTOR, agent.lang).format(count=iteration)
+        # For refactor Ekstraher: even when tools were called, verify actual symbol removal
+        if template == "refactor" and has_written and "ekstraher" in _normalize_phase(task_name).lower():
+            try:
+                src_file = getattr(agent, '_source_file', '') or 'api_server.py'
+                abs_src = os.path.abspath(src_file) if not os.path.isabs(src_file) else src_file
+                sym_result = agent_files.list_symbols(abs_src)
+                if sym_result.get("success"):
+                    remaining = len(sym_result.get("symbols", []))
+                    if remaining >= 50:
+                        return t(K.LOG_EXTRACT_INCOMPLETE, agent.lang).format(remaining=remaining)
+            except Exception:
+                pass
         programming_writing_phases = ("arkitekturdesign", "implementeringsplan", "kodeimplementering")
         has_written = any(k in (called_tools or {}) for k in called_tools if k.startswith("write_file") or k.startswith("edit_file"))
         if any(k in _normalize_phase(task_name).lower() for k in programming_writing_phases) and not has_written:
@@ -1880,7 +1892,7 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
     if not full_response or "ERROR" in full_response:
         if called_tools:
             called_names = {k.split("{")[0] for k in called_tools}
-            action_tools = called_names & {"write_file", "edit_file", "update_issue_status", "github_create_pr", "git_commit", "run_tests"}
+            action_tools = called_names & {"write_file", "edit_file", "update_issue_status", "github_create_pr", "git_commit", "run_tests", "extract_symbol", "batch_extract_symbols", "remove_symbol", "add_import"}
             if action_tools:
                 full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=len(called_tools))
             else:
@@ -1903,6 +1915,26 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                 task_node.status = "failed"
     else:
         task_node.status = "done"
+
+    # For refactor Ekstraher: verify that symbols were actually removed from source,
+    # not just that extract_symbol/batch_extract_symbols was called once.
+    template = getattr(agent, "active_template", "")
+    if task_node.status in ("done",) and template == "refactor":
+        phase = _normalize_phase(task_node.name).lower()
+        if "ekstraher" in phase:
+            try:
+                src_file = getattr(agent, '_source_file', '') or 'api_server.py'
+                abs_src = os.path.abspath(src_file) if not os.path.isabs(src_file) else src_file
+                sym_result = agent_files.list_symbols(abs_src)
+                if sym_result.get("success"):
+                    remaining = len(sym_result.get("symbols", []))
+                    if remaining >= 50:
+                        task_node.status = "failed"
+                        full_response = t(K.LOG_EXTRACT_INCOMPLETE, agent.lang).format(
+                            remaining=remaining
+                        )
+            except Exception:
+                pass
 
     # Auto-resolve for close phases: if the phase completed and update_issue_status
     # hasn't been called yet, call it automatically to avoid false negatives from
