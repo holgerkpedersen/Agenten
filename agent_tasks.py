@@ -811,6 +811,18 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             _engine = RefactoringEngine()
             _gr = _engine.suggest_module_groups(source=_source_file, max_group_size=8)
             if _gr.get("success") and _gr.get("groups"):
+                # Filter groups to only include symbols that actually exist in the file
+                # (suggest_module_groups may include already-extracted symbols from imports)
+                import agent_files as _af
+                _existing = set()
+                _ls = _af.list_symbols(filepath=_source_file)
+                if _ls.get("success"):
+                    _existing = {s["name"] for s in _ls.get("symbols", [])}
+                if _existing:
+                    for _g in _gr["groups"]:
+                        _g["symbols"] = [s for s in _g.get("symbols", []) if s in _existing]
+                    _gr["groups"] = [_g for _g in _gr["groups"] if _g.get("symbols")]
+
                 _lines = ["\n## Foresl\u00e5ede modulopdelinger (fra afh\u00e6ngighedsgraf)"]
                 for i, g in enumerate(_gr["groups"], 1):
                     _syms = g.get("symbols", [])
