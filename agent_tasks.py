@@ -1283,7 +1283,7 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
             if tn:
                 _all_writes.add(tn)
         has_written = any(t in _all_writes for t in
-            ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"))
+            ("write_file", "edit_file", "delete_file", "extract_symbol", "batch_extract_symbols", "remove_symbol", "add_import"))
         if any(k in _normalize_phase(task_name).lower() for k in refactor_writing_phases) and not has_written:
             iteration = getattr(agent, "_current_task_iteration", 0)
             if iteration >= 3 and not getattr(agent, "_non_productive_reminder_sent", False):
