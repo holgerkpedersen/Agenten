@@ -743,8 +743,12 @@ class RefactoringEngine:
                 target_content = _all_imports + '\n\n' + _existing_code
                 if symbol_code:
                     target_content += '\n\n' + symbol_code + '\n'
+            elif _existing_code and symbol_code:
+                target_content = _existing_code + '\n\n' + symbol_code + '\n'
             elif symbol_code:
                 target_content = symbol_code + '\n'
+            elif _existing_code:
+                target_content = _existing_code
             elif _all_imports:
                 target_content = _all_imports
             else:
