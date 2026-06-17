@@ -782,7 +782,10 @@ class RefactoringEngine:
         """
         symbols = _parse_symbols_list(symbols)
         results = []
-        for sym in symbols:
+        for i, sym in enumerate(symbols):
+            if i > 0:
+                import time
+                time.sleep(0.1)
             try:
                 r = self.move_symbol(source, sym, target)
                 results.append(r)
