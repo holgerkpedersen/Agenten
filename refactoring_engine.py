@@ -76,10 +76,43 @@ _BUILTINS: frozenset[str] = frozenset({
     'Exception', 'ValueError', 'TypeError', 'KeyError', 'IndexError',
     'AttributeError', 'ImportError', 'ModuleNotFoundError', 'StopIteration',
     'RuntimeError', 'OSError', 'IOError', 'FileNotFoundError', 'NotImplementedError',
+})
+
+_BUILTINS_TYPING: frozenset[str] = frozenset({
     'Any', 'Optional', 'List', 'Dict', 'Tuple', 'Set', 'Callable',
     'TypeVar', 'Generic', 'Protocol', 'Union', 'Final', 'ClassVar',
     'Sequence', 'Iterable', 'Iterator', 'Generator',
 })
+
+
+def _split_imports_from_code(content: str) -> tuple[str, str]:
+    """Split file content into (imports_block, code_block).
+
+    All consecutive top-level import statements at the start of the file
+    are collected into the imports_block. Everything else is code_block.
+    """
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return "", content
+
+    lines = content.split('\n')
+    last_import_end = 0
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            end = getattr(node, 'end_lineno', node.lineno) or node.lineno
+            if last_import_end == 0 or end < last_import_end + 3:
+                if end > last_import_end:
+                    last_import_end = end
+            else:
+                break
+
+    if last_import_end == 0:
+        return "", content
+
+    import_lines = lines[:last_import_end]
+    code_lines = lines[last_import_end:]
+    return '\n'.join(import_lines), '\n'.join(code_lines).strip('\n')
 
 
 class RefactoringError(Exception):
@@ -582,6 +615,9 @@ class RefactoringEngine:
                 existing_imports = set()
 
         new_imports = [i for i in needed_imports if i not in existing_imports]
+        # Filter out self-imports (importing from the target module itself)
+        _target_module = os.path.splitext(os.path.basename(target))[0]
+        new_imports = [i for i in new_imports if f"from {_target_module}" not in i]
         new_import_block = '\n'.join(new_imports)
 
         if not existing:
@@ -592,12 +628,22 @@ class RefactoringEngine:
             else:
                 target_content = ''
         else:
-            if new_imports and symbol_code:
-                target_content = existing + '\n\n' + new_import_block + '\n\n' + symbol_code + '\n'
+            # Strip existing imports from content, combine with new imports at top
+            _existing_imports, _existing_code = _split_imports_from_code(existing)
+            _all_imports = _existing_imports
+            if new_import_block:
+                if _existing_imports:
+                    _all_imports = _existing_imports + '\n' + new_import_block
+                else:
+                    _all_imports = new_import_block
+            if _all_imports and (_existing_code or symbol_code):
+                target_content = _all_imports + '\n\n' + _existing_code
+                if symbol_code:
+                    target_content += '\n\n' + symbol_code + '\n'
             elif symbol_code:
-                target_content = existing + '\n\n' + symbol_code + '\n'
-            elif new_imports:
-                target_content = existing + '\n\n' + new_import_block + '\n'
+                target_content = symbol_code + '\n'
+            elif _all_imports:
+                target_content = _all_imports
             else:
                 target_content = existing
 
