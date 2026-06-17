@@ -2608,7 +2608,8 @@ def _check_refactor_progress() -> str:
         result = _af.list_symbols("api_server.py")
         if isinstance(result, dict) and result.get("success"):
             sym_data = result.get("result", {})
-            count = sym_data.get("count", 0)
+            symbols = sym_data.get("symbols", [])
+            count = len(symbols) if isinstance(symbols, list) else 0
             parts.append("api_server.py: {} symbols tilbage (mål: ≤50)".format(count))
     except Exception:
         pass
