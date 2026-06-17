@@ -2944,7 +2944,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._produced_files = set()
     agent._recently_deleted_files = set()
     agent._read_block_hits = 0
-    agent._list_symbols_cache: dict[str, dict] = {}
+    agent._list_symbols_cache = {}
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
