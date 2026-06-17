@@ -14,6 +14,41 @@ from i18n import K
 from agent_helpers import _safe_int, _resolve_t_keys_in_result
 
 
+def _list_symbols_clean(agent: Any, filepath: str) -> dict[str, Any]:
+    """list_symbols filtered to only actually-defined symbols + suggested groups."""
+    import ast as _ast
+    result = agent_files.list_symbols(filepath=filepath)
+    if not result.get("success") or not result.get("symbols"):
+        return result
+
+    # Filter out imported-only symbols via AST
+    try:
+        with open(filepath, "r", encoding="utf-8") as _f:
+            _tree = _ast.parse(_f.read())
+        _defined = set()
+        for _node in _ast.iter_child_nodes(_tree):
+            if isinstance(_node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                _defined.add(_node.name)
+            elif isinstance(_node, _ast.ClassDef):
+                _defined.add(_node.name)
+            elif isinstance(_node, _ast.Assign):
+                for _t in _node.targets:
+                    if isinstance(_t, _ast.Name):
+                        _defined.add(_t.id)
+            elif isinstance(_node, _ast.AnnAssign):
+                if isinstance(_node.target, _ast.Name):
+                    _defined.add(_node.target.id)
+        result["symbols"] = [s for s in result["symbols"] if s.get("name") in _defined]
+        result["count"] = len(result["symbols"])
+    except Exception:
+        pass
+
+    groups = getattr(agent, '_module_groups', None)
+    if groups:
+        result["suggested_groups"] = groups
+    return result
+
+
 def register_file_tools(agent: Any) -> None:
     """Register file-related tools on the agent's tool registry.
 
@@ -48,7 +83,7 @@ def register_file_tools(agent: Any) -> None:
         "list_symbols",
         t(K.TOOL_LIST_SYMBOLS, agent.lang),
         ["filepath"],
-        lambda filepath: agent_files.list_symbols(filepath=filepath)
+        lambda filepath: _list_symbols_clean(agent, filepath)
     ))
 
     agent.tool_registry.register(Tool(
