@@ -2335,26 +2335,57 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                 })
 
         elif phase == "ekstraher":
+            # Parse module→symbols mapping from plan
+            _mod_symbols: dict[str, list[str]] = {}
+            if plan_content:
+                # Pattern 1: "### modul.py\nsymbol1, symbol2, ..."
+                for _m in _re.finditer(
+                    r'#{1,4}\s+`?([a-zA-Z_][\w./-]+\.py)`?\s*\n(.*?)(?=\n#{1,4}\s+|$)',
+                    plan_content, _re.MULTILINE | _re.DOTALL | _re.IGNORECASE
+                ):
+                    _mod = _m.group(1).strip('`')
+                    _body = _m.group(2).strip()
+                    _syms = _re.findall(r'`?([A-Za-z_]\w*)`?', _body)
+                    _mod_symbols[_mod] = [s for s in _syms if s not in ('py', 'txt', 'md') and not s.startswith(('.', '/'))][:12]
+                # Pattern 2: inline "modul.py → sym1, sym2"
+                if not _mod_symbols:
+                    for _m in _re.finditer(
+                        r'`([a-zA-Z_][\w./-]+\.py)`[^`]*?([A-Z][a-zA-Z_][\w,\s]*)',
+                        plan_content
+                    ):
+                        _mod = _m.group(1)
+                        _syms = [s.strip() for s in _m.group(2).split(',') if s.strip()]
+                        _mod_symbols[_mod] = _syms[:12]
+
             todos.extend([
-                {"id": "rf_e1", "text": "Brug batch_extract_symbols() til at flytte flere symboler ad gangen (foretrækkes)", "done": False},
-                {"id": "rf_e2", "text": "Brug kun write_file() hvis extract_symbol ikke virker", "done": False},
-                {"id": "rf_e3", "text": "Inkluder ALLE imports i nye filer (typing.Any mv.)", "done": False},
-                {"id": "rf_e4", "text": "Verificer syntaks med verify_refactor()", "done": False},
+                {"id": "rf_e1", "text": "Brug batch_extract_symbols() — stol p\u00e5 planen, kald IKKE list_symbols", "done": False},
+                {"id": "rf_e4", "text": "Verificer syntaks med verify_refactor() efter hver batch", "done": False},
             ])
-            if existing_modules:
+            if plan_modules:
+                total = len(plan_modules)
+                done_count = len(existing_modules)
                 todos.append({
-                    "id": "rf_e_existing",
-                    "text": "Allerede oprettet ({}/{}): {}".format(
-                        len(existing_modules), len(plan_modules) if plan_modules else '?',
-                        ', '.join(existing_modules)),
-                    "done": True
+                    "id": "rf_e_progress",
+                    "text": "Fremskridt: {}/{} moduler oprettet".format(done_count, total),
+                    "done": False,
                 })
+            if existing_modules:
+                for _mod in existing_modules:
+                    _syms = _mod_symbols.get(_mod, [])
+                    _sym_info = " (" + ", ".join(_syms[:6]) + (", ..." if len(_syms) > 6 else "") + ")" if _syms else ""
+                    todos.append({
+                        "id": "rf_e_done_" + _mod.replace('.py', '').replace('.', '_'),
+                        "text": "\u2705 {} f\u00e6rdig{}".format(_mod, _sym_info),
+                        "done": True,
+                    })
             to_create = [m for m in plan_modules if m not in existing_modules]
-            for mod in to_create:
+            for _mod in to_create:
+                _syms = _mod_symbols.get(_mod, [])
+                _sym_info = " (" + ", ".join(_syms[:6]) + (", ..." if len(_syms) > 6 else "") + ")" if _syms else ""
                 todos.append({
-                    "id": "rf_e_create_" + mod.replace('.py', '').replace('.', '_'),
-                    "text": "Opret modul: {}".format(mod),
-                    "done": False
+                    "id": "rf_e_create_" + _mod.replace('.py', '').replace('.', '_'),
+                    "text": "{} {}{}".format("Opret modul:" if not _syms else "Flyt til", _mod, _sym_info),
+                    "done": False,
                 })
 
         elif phase in ("opdater", "opdatering", "opdat\u00e9r"):
