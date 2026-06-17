@@ -912,10 +912,24 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     if not reason_block:
         reason_block = ""
 
+    # For refactor Ekstraher: trust instruction — LLM already has plan + symbols
+    _trust_block = ""
+    if (agent.active_template == "refactor"
+        and task_node.name.lower() == "ekstraher"
+        and plan_block
+        and _symbols_block):
+        _trust_block = (
+            "\n\n\U0001f512 DU HAR ALLEREDE ALLE DATA I PROMPTEN OVENFOR."
+            "\nRefactor_plan.md og den fulde symbol-liste er indl\u00e6st."
+            "\nDu beh\u00f8ver IKKE at kalde list_symbols \u2014 planens modulopdelinger og symbolerne er nok."
+            "\nG\u00e5 DIREKTE til batch_extract_symbols med symbol-grupperne fra planen."
+            "\nHvis et batch fejler, pr\u00f8v extract_symbol for enkelte symboler i stedet."
+        )
+
     if section_instr:
-        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{_trust_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
-        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{_trust_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
     # Append phase todos as a numbered checklist — LLM must follow the order
     todos = getattr(agent, '_phase_todos', None)

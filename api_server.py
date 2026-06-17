@@ -1217,7 +1217,40 @@ def _check_client(agent: Any) -> bool:
     return agent.stop_requested
 
 
-def _extract_retry_context(node: Any, agent: Any, full_response: str) -> dict:
+def _count_source_symbols(source_file: str = "api_server.py") -> int:
+    """Count top-level symbols in a Python source file.
+
+    Returns -1 on error (file not found, parse error).
+    """
+    try:
+        import agent_files as _af
+        res = _af.list_symbols(filepath=source_file)
+        if isinstance(res, dict) and res.get("success"):
+            sym_data = res.get("result", res)
+            return len(sym_data.get("symbols", []))
+    except Exception:
+        pass
+    return -1
+
+
+def _extract_batch_results(agent: Any) -> list[dict]:
+    """Extract successful batch_extract_symbols results from tool_log.
+
+    Returns a list of dicts with 'symbols' and 'target' keys.
+    """
+    from pathlib import PurePath as _PurePath
+    results = []
+    for entry in getattr(agent, "_tool_log", []):
+        if entry.get("tool") == "batch_extract_symbols" and entry.get("success"):
+            args = entry.get("args", {})
+            symbols = args.get("symbols", "")
+            target = _PurePath(args.get("target", "")).name
+            results.append({"symbols": symbols, "target": target})
+    return results
+
+
+def _extract_retry_context(node: Any, agent: Any, full_response: str,
+                           symbols_before: int = -1, symbols_after: int = -1) -> dict:
     """Extract failure context for retry.
 
     Captures what went wrong, what tools were called,
@@ -1239,26 +1272,63 @@ def _extract_retry_context(node: Any, agent: Any, full_response: str) -> dict:
     needed = active & required_action
     uncalled = needed - called_names
 
+    moved = max(0, symbols_before - symbols_after) if symbols_before >= 0 and symbols_after >= 0 else 0
+
     return {
         "phase": node.name,
         "failure_reason": full_response[:300],
         "called_tools": list(called_names),
         "uncalled_tools": list(uncalled),
         "tool_count": len(phase_tools),
-        "all_messages": [],  # Would require messages from solve_task_stream
+        "symbols_moved": moved,
+        "symbols_before": symbols_before,
+        "symbols_after": symbols_after,
+        "successful_batches": _extract_batch_results(agent),
+        "all_messages": [],
     }
 
 
-def _build_retry_lessons(context: dict, agent: Any) -> str:
-    """Build a 'Lessons Learned' prompt section from a failed attempt."""
+def _build_retry_lessons(context: dict, agent: Any,
+                         all_contexts: list[dict] | None = None) -> str:
+    """Build a 'Lessons Learned' prompt section from a failed attempt.
+
+    When all_contexts is provided, includes cumulative progress across
+    ALL retry attempts so the LLM knows what was already accomplished.
+    """
     lessons = []
-    lessons.append("⚠️  TIDLIGERE FORSØG MISLYKKEDES")
-    lessons.append(f"Årsag: {context.get('failure_reason', 'Ukendt')[:200]}")
+    lessons.append("\u26a0\ufe0f  TIDLIGERE FORS\u00d8G MISLYKKEDES")
+    lessons.append(f"\u00c5rsag: {context.get('failure_reason', 'Ukendt')[:200]}")
     lessons.append("")
+
+    # --- HVAD BLEV OPN\u00c5ET (selvom fors\u00f8get fejlede) ---
+    moved = context.get("symbols_moved", 0)
+    if moved > 0:
+        lessons.append("\u2705 HVAD BLEV OPN\u00c5ET:")
+        lessons.append(f"- {moved} symboler flyttet i dette fors\u00f8g")
+        after = context.get("symbols_after", -1)
+        before = context.get("symbols_before", -1)
+        if after >= 0:
+            lessons.append(f"- api_server.py: {after} symbols tilbage" +
+                           (f" (var {before})" if before >= 0 else ""))
+        batches = context.get("successful_batches", [])
+        for b in batches:
+            lessons.append(f"- batch_extract_symbols: {b['symbols']} \u2192 {b['target']}")
+        lessons.append("")
+
+        # Kumulativ fremgang p\u00e5 tv\u00e6rs af ALLE hidtidige retries
+        if all_contexts and len(all_contexts) > 1:
+            total = sum(c.get("symbols_moved", 0) for c in all_contexts)
+            first_before = all_contexts[0].get("symbols_before", -1)
+            current = context.get("symbols_after", -1)
+            lessons.append(f"\U0001f4ca SAMLET FREMGANG ({len(all_contexts)} fors\u00f8g):")
+            lessons.append(f"- {total} symboler flyttet i alt")
+            if first_before >= 0 and current >= 0:
+                lessons.append(f"- api_server.py: {first_before} \u2192 {current} symbols")
+            lessons.append("")
 
     uncalled = context.get("uncalled_tools", [])
     if uncalled:
-        lessons.append("VÆRKTØJER DER SKULLE HAVE VÆRET KALDT:")
+        lessons.append("V\u00c6RKT\u00d8JER DER SKULLE HAVE V\u00c6RET KALDT:")
         lessons.append(f"- {', '.join(uncalled)}")
         if "edit_file" in uncalled:
             lessons.append("  Brug edit_file med symbol= parameter (AST-tilstand).")
@@ -1266,18 +1336,18 @@ def _build_retry_lessons(context: dict, agent: Any) -> str:
         if "write_file" in uncalled:
             lessons.append("  Brug write_file til at oprette nye filer.")
         if "update_issue_status" in uncalled:
-            lessons.append("  Brug update_issue_status til at markere issue som løst.")
+            lessons.append("  Brug update_issue_status til at markere issue som l\u00f8st.")
         lessons.append("")
 
     called = context.get("called_tools", [])
     if called:
-        lessons.append("VÆRKTØJER DER BLEV KALDT (men ikke nok):")
+        lessons.append("V\u00c6RKT\u00d8JER DER BLEV KALDT (men ikke nok):")
         lessons.append(f"- {', '.join(called)}")
         lessons.append("")
 
     lessons.append("INSTRUKTION:")
-    lessons.append("Lær af fejlen ovenfor. Sørg for at kalde ALLE påkrævede værktøjer.")
-    lessons.append("Brug <<<DONE>>> først når fasen er fuldført med de rigtige værktøjskald.")
+    lessons.append("L\u00e6r af fejlen ovenfor. S\u00f8rg for at kalde ALLE p\u00e5kr\u00e6vede v\u00e6rkt\u00f8jer.")
+    lessons.append("Brug <<<DONE>>> f\u00f8rst n\u00e5r fasen er fuldf\u00f8rt med de rigtige v\u00e6rkt\u00f8jskald.")
 
     return "\n".join(lessons)
 
@@ -1376,14 +1446,21 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
     node.status = "running"
     full_response = ""
 
-    _MAX_RETRIES = 3
+    is_refactor = getattr(agent, 'active_template', '') == 'refactor'
+    _MAX_RETRIES = 5 if is_refactor else 3
     retry_contexts = []
+    initial_symbols = _count_source_symbols()
 
     for retry_attempt in range(_MAX_RETRIES + 1):
+        pre_symbols = _count_source_symbols()
+        if pre_symbols < 0:
+            pre_symbols = initial_symbols
+
         if retry_attempt > 0:
             if _check_client(agent):
                 return
-            lessons = _build_retry_lessons(retry_contexts[-1], agent)
+            lessons = _build_retry_lessons(retry_contexts[-1], agent,
+                                           all_contexts=retry_contexts)
             improved_prompt = lessons + "\n\n" + task_context_prompt
             agent._log("INFO", f"Genforsøg {retry_attempt}/{_MAX_RETRIES} for {node.name}",
                        f"Forrige fejl: {retry_contexts[-1].get('failure_reason','?')}")
@@ -1422,9 +1499,25 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
         node.result = full_response
 
         if node.status == "failed" and retry_attempt < _MAX_RETRIES:
-            context = _extract_retry_context(node, agent, full_response)
+            post_symbols = _count_source_symbols()
+            context = _extract_retry_context(
+                node, agent, full_response,
+                symbols_before=pre_symbols,
+                symbols_after=post_symbols,
+            )
             retry_contexts.append(context)
             node.status = "pending"
+
+            # Momentum: stop hvis sidste 2 forsøg flyttede 0 symbols
+            if len(retry_contexts) >= 2:
+                last_two_moved = sum(c.get("symbols_moved", 0) for c in retry_contexts[-2:])
+                if last_two_moved == 0:
+                    agent._log("INFO",
+                               f"Stopper retry tidligt — 0 symbols flyttet i sidste 2 forsøg",
+                               f"({retry_attempt+1}/{_MAX_RETRIES} forsøg brugt)")
+                    yield f"data: {json.dumps({'type': 'log', 'log': {'timestamp': time.time(), 'level': 'INFO', 'message': f'Stopper retry: 0 symbols flyttet i sidste 2 forsøg', 'detail': ''}})}\n\n"
+                    node.status = "failed"
+                    break
             continue
         break
 
