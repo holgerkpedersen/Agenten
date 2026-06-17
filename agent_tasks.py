@@ -540,8 +540,14 @@ def set_task_tools(agent: Any, task_name: str) -> None:
         return
     template_tools = agent_skills.TEMPLATE_TASK_TOOLS[agent.active_template]
     phase = _normalize_phase(task_name)
+    # For refactor Ekstraher: list_symbols er unødvendigt — symboler og
+    # modulopdelinger auto-injectes i prompten af _build_initial_messages.
+    # Fjern det efter tool-assignment så LLM'en ikke spilder iterationer.
+    _refactor_ekstraher = agent.active_template == "refactor" and "ekstraher" in phase
     if phase in template_tools:
         tools = list(template_tools[phase])
+        if _refactor_ekstraher:
+            tools = [t for t in tools if t != "list_symbols"]
         # programmering/kodeimplementering: adapt tool order to project context
         if agent.active_template == "programmering" and "kodeimplementering" in phase:
             is_greenfield = _is_greenfield()
@@ -554,6 +560,8 @@ def set_task_tools(agent: Any, task_name: str) -> None:
     for keyword, tools_kv in template_tools.items():
         if keyword in phase.lower():
             tools = list(tools_kv)
+            if _refactor_ekstraher:
+                tools = [t for t in tools if t != "list_symbols"]
             if agent.active_template == "programmering" and "kodeimplementering" in phase:
                 is_greenfield = _is_greenfield()
                 if is_greenfield:
@@ -562,6 +570,7 @@ def set_task_tools(agent: Any, task_name: str) -> None:
             agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
             _ensure_done_tool(agent)
             return
+    # Fallback: use generic template tools if no phase-specific match
     allowed = agent_skills.TEMPLATE_TOOLS.get(agent.active_template)
     if allowed is not None:
         agent.tool_registry.set_active_tools(allowed)
