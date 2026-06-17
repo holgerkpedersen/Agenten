@@ -836,6 +836,38 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         except Exception as _e:
             agent._log("DEBUG", f"Could not suggest module groups: {_e}", "")
 
+    # For refactor phases: inject full list_symbols output so model never needs to call it
+    _symbols_block = ""
+    if agent.active_template == "refactor" and task_node.name.lower() in ("ekstraher", "opdatér"):
+        try:
+            import agent_files as _af
+            _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
+            _source_file = _src_match.group(1) if _src_match else "api_server.py"
+            _ls = _af.list_symbols(filepath=_source_file)
+            if _ls.get("success") and _ls.get("symbols"):
+                _lines = [f"\n## Symboler i {_source_file} (auto-loaded)"]
+                for _sym in _ls["symbols"]:
+                    _name = _sym.get("name", "?")
+                    _type = _sym.get("type", "?")
+                    _sig = _sym.get("signature", "")
+                    _line = _sym.get("line", "")
+                    if _sig:
+                        _lines.append(f"  {_type} {_sig}")
+                    elif _line:
+                        _lines.append(f"  {_type} {_name} (linje {_line})")
+                    else:
+                        _lines.append(f"  {_type} {_name}")
+                    for _m in (_sym.get("methods") or []):
+                        _m_sig = _m.get("signature", "")
+                        if _m_sig:
+                            _lines.append(f"    {_m_sig}")
+                        else:
+                            _lines.append(f"    def {_m.get('name','')} (linje {_m.get('line','')})")
+                _symbols_block = "\n".join(_lines)
+                agent._log("DEBUG", f"Auto-loaded {len(_ls['symbols'])} symbols from {_source_file} into prompt", "")
+        except Exception as _e:
+            agent._log("DEBUG", f"Could not inject symbols block: {_e}", "")
+
     # For programming template's later phases, auto-load docs from earlier phases.
     PROGRAMMING_DOCS = [
         ("docs/kravanalyse.md", "Kravanalyse"),
@@ -881,9 +913,9 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         reason_block = ""
 
     if section_instr:
-        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{_group_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
-        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{_group_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
     # Append phase todos as a numbered checklist — LLM must follow the order
     todos = getattr(agent, '_phase_todos', None)
