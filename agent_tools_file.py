@@ -108,8 +108,12 @@ def register_file_tools(agent: Any) -> None:
         "extract_symbol",
         t(K.TOOL_EXTRACT_SYMBOL, agent.lang),
         ["source", "symbol_name", "target"],
-        lambda source, symbol_name, target: refactoring_engine.move_symbol(
-            source=source, symbol_name=symbol_name, target=target
+        lambda source, symbol_name, target: (
+            {"success": False, "error": f"symbol_name '{symbol_name}' ligner en liste — brug batch_extract_symbols til flere symboler. extract_symbol tager KUN et symbol ad gangen."}
+            if "," in str(symbol_name)
+            else refactoring_engine.move_symbol(
+                source=source, symbol_name=symbol_name, target=target
+            )
         )
     ))
 
