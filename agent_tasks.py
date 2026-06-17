@@ -2329,7 +2329,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
 
         elif phase == "ekstraher":
             todos.extend([
-                {"id": "rf_e1", "text": "Brug extract_symbol() til at flytte kode til nye moduler", "done": False},
+                {"id": "rf_e1", "text": "Brug batch_extract_symbols() til at flytte flere symboler ad gangen (foretrækkes)", "done": False},
                 {"id": "rf_e2", "text": "Brug kun write_file() hvis extract_symbol ikke virker", "done": False},
                 {"id": "rf_e3", "text": "Inkluder ALLE imports i nye filer (typing.Any mv.)", "done": False},
                 {"id": "rf_e4", "text": "Verificer syntaks med verify_refactor()", "done": False},
