@@ -456,6 +456,12 @@ def _apply_prune(skill_name: str, dry_run: bool, log: list[dict[str, Any]]) -> d
         log:"""
     path, _content = _load_skill_file(skill_name)
     if path:
+        # Check if skill has protected:true in YAML frontmatter — skip pruning
+        import re as _re
+        _protected = bool(_re.search(r'^protected:\s*true', _content or '', _re.MULTILINE))
+        if _protected:
+            msg = f"Skipped pruning '{skill_name}' — marked as protected"
+            return {"action": "prune", "skill": skill_name, "dry_run": dry_run, "message": msg}
         if not dry_run:
             backup = path + ".pruned"
             os.replace(path, backup)

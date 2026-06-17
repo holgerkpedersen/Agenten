@@ -3,6 +3,7 @@ name: refactor
 keywords: [refactor, refaktorer, opdel, ekstraher, solid, modul, oprydning]
 template: refactor
 action_types: [analyze, plan, extract, update, test]
+protected: true
 ---
 
 ## Refactor — SOLID-opdeling
