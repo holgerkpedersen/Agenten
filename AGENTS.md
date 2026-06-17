@@ -605,6 +605,15 @@ Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url
 
 **Regel:** `git add` + `git commit` ALLE ændringer **før** du beder brugeren om at starte serveren eller teste. Serveren auto-stasher uncommitted ændringer ved fejl — de går tabt. Sig aldrig "prøv nu" med ucommittede ændringer.
 
+### 5. Brug `git restore` — aldrig `git checkout --`
+
+**Hændelse (2026-06-17):** `git checkout -- config.py` virkede ikke pga. CRLF/LF forskelle på Windows. `config.py` forblev modificeret, serveren kunne ikke starte.
+
+**Regel:**
+- Brug ALTID `git restore <file>` i stedet for `git checkout -- <file>`
+- `git checkout` kan ikke håndtere CRLF/LF normalisering på Windows — `git restore` kan
+- Eksempel: `git restore api_server.py session_manager.py` i stedet for `git checkout -- api_server.py session_manager.py`
+
 ## Operational Principles
 
 ### 1. Verify before deploying — never assume project architecture

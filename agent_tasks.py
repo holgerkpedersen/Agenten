@@ -544,10 +544,13 @@ def set_task_tools(agent: Any, task_name: str) -> None:
     # modulopdelinger auto-injectes i prompten af _build_initial_messages.
     # Fjern det efter tool-assignment så LLM'en ikke spilder iterationer.
     _refactor_ekstraher = agent.active_template == "refactor" and "ekstraher" in phase
+    _refactor_test = agent.active_template == "refactor" and "test" in phase
     if phase in template_tools:
         tools = list(template_tools[phase])
         if _refactor_ekstraher:
             tools = [t for t in tools if t != "list_symbols"]
+        if _refactor_test:
+            tools.sort(key=lambda t: t != "edit_file")  # edit_file før run_tests
         # programmering/kodeimplementering: adapt tool order to project context
         if agent.active_template == "programmering" and "kodeimplementering" in phase:
             is_greenfield = _is_greenfield()
@@ -562,6 +565,8 @@ def set_task_tools(agent: Any, task_name: str) -> None:
             tools = list(tools_kv)
             if _refactor_ekstraher:
                 tools = [t for t in tools if t != "list_symbols"]
+            if _refactor_test:
+                tools.sort(key=lambda t: t != "edit_file")
             if agent.active_template == "programmering" and "kodeimplementering" in phase:
                 is_greenfield = _is_greenfield()
                 if is_greenfield:
@@ -3231,6 +3236,23 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         result_str = json.dumps(result, ensure_ascii=False)
                         agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), f"(cached) {result_str[:200]}")
                         messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                        continue
+                # For refactor Test: blokér run_tests hvis edit_file ikke er kaldt først
+                # (forhindrer run_tests-loop når tests fejler pga. brudte imports)
+                _is_refactor_test = (
+                    getattr(agent, 'active_template', '') == 'refactor'
+                    and getattr(task_node, 'name', '').lower() in ('test',)
+                )
+                if _is_refactor_test and tool_name == "run_tests":
+                    _edit_called = any("edit_file" in str(t) for t in called_tools)
+                    if not _edit_called:
+                        result_str = "[SYSTEM: Ret import-fejlene med edit_file FØRST, før du kører tests]"
+                        result = {"success": False, "error": "edit_file required first"}
+                        agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
+                        messages.append({"role": "user", "content": result_str})
                         yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                         yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                         continue

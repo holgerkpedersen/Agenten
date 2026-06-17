@@ -14,6 +14,7 @@ Design patterns used:
 import ast
 import json
 import os
+import hashlib
 from typing import Any
 from collections import defaultdict
 
@@ -115,6 +116,92 @@ def _split_imports_from_code(content: str) -> tuple[str, str]:
     return '\n'.join(import_lines), '\n'.join(code_lines).strip('\n')
 
 
+# Globalt register over allerede ekstraherede symboler pr. source-fil.
+# Nøgle: absolut sti til source-filen + hash af source-indhold.
+# Værdi: sæt af symbolnavne der allerede er flyttet til en target.
+# Nulstilles når source-filen ændres (ny mtime/hash).
+_extracted_registry: dict[str, set[str]] = {}
+_registry_source_hashes: dict[str, str] = {}
+
+
+def _registry_key(source: str) -> str:
+    """Generer en nøgle for registret: absolut sti + hash af source.
+
+    Hashet sikrer at registret nulstilles når source-filen revertes
+    (f.eks. mellem sessioner) så symboler kan ekstraheres igen.
+    """
+    abspath = os.path.abspath(source)
+    try:
+        with open(abspath, 'rb') as f:
+            content = f.read()
+        h = hashlib.sha256(content).hexdigest()[:16]
+        old_h = _registry_source_hashes.get(abspath)
+        if old_h and old_h != h:
+            # Filen har ændret sig (revert/ny version) — nulstil registret
+            _extracted_registry.pop(abspath, None)
+        _registry_source_hashes[abspath] = h
+        return abspath
+    except (OSError, IOError):
+        return abspath
+
+
+def _mark_extracted(source: str, symbol: str) -> None:
+    """Registrér at et symbol er blevet ekstraheret fra source."""
+    key = _registry_key(source)
+    _extracted_registry.setdefault(key, set()).add(symbol)
+
+
+def _is_already_extracted(source: str, symbol: str) -> bool:
+    """Tjek om et symbol allerede er ekstraheret fra denne source."""
+    key = _registry_key(source)
+    return symbol in _extracted_registry.get(key, set())
+
+
+def _extract_module_from_import(import_stmt: str) -> str | None:
+    """Extract module name from an import statement string.
+
+    'from flask import request' → 'flask'
+    'import os' → 'os'
+    Returns None if it can't parse.
+    """
+    try:
+        tree = ast.parse(import_stmt)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                return node.module
+            if isinstance(node, ast.Import) and node.names:
+                return node.names[0].name
+    except SyntaxError:
+        pass
+    return None
+
+
+def _has_back_import(imp_module: str, target_module: str) -> bool:
+    """Tjek om imp_module allerede importerer fra target_module.
+
+    Brugt til at forhindre circular imports: hvis target importerer
+    fra imp_module, men imp_module allerede har 'from target import X'.
+    """
+    if not os.path.exists(imp_module):
+        # Prøv med .py tilføjelse
+        imp_module_py = imp_module + '.py' if not imp_module.endswith('.py') else imp_module
+        if not os.path.exists(imp_module_py):
+            return False
+        imp_module = imp_module_py
+    target_base = os.path.splitext(os.path.basename(target_module))[0]
+    try:
+        with open(imp_module, 'r', encoding='utf-8') as f:
+            tree = ast.parse(f.read())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                mod_name = os.path.splitext(os.path.basename(node.module))[0]
+                if mod_name == target_base:
+                    return True
+        return False
+    except (OSError, SyntaxError):
+        return False
+
+
 class RefactoringError(Exception):
     """Structured error for refactoring operations with rollback support.
 
@@ -132,6 +219,7 @@ class RefactoringError(Exception):
     EXTRACTION_FAILED = "extraction_failed"
     REMOVAL_FAILED = "removal_failed"
     TARGET_SYNTAX = "target_syntax"
+    CIRCULAR_IMPORT = "circular_import"
 
     def __init__(self, message: str, category: str = "unknown",
                  filepath: str = "", snapshot: Any = None,
@@ -596,6 +684,21 @@ class RefactoringEngine:
 
         needed_imports = ImportResolver.filter_for_symbol(content, lines, used_names)
 
+        # Tjek for circular imports: hvis nogen af de nødvendige imports
+        # allerede har en `from target import ...` eller `import target`.
+        _tgt_module = os.path.splitext(os.path.basename(target))[0]
+        for imp in needed_imports:
+            _imp_mod = _extract_module_from_import(imp)
+            if _imp_mod and _has_back_import(_imp_mod, target):
+                raise RefactoringError(
+                    f"Cirkulær import: '{_imp_mod}' importerer allerede fra '{_tgt_module}'. "
+                    f"Symbol '{symbol_name}' kan ikke flyttes til {os.path.basename(target)} "
+                    f"da det ville skabe en cirkulær afhængighed.",
+                    category=RefactoringError.CIRCULAR_IMPORT,
+                    filepath=source,
+                    details={"symbol": symbol_name, "target": target, "circular_with": _imp_mod}
+                )
+
         os.makedirs(os.path.dirname(target) or '.', exist_ok=True)
 
         if os.path.exists(target):
@@ -786,8 +889,19 @@ class RefactoringEngine:
             if i > 0:
                 import time
                 time.sleep(0.1)
+            # Tjek om symbolet allerede er ekstraheret i en tidligere session
+            if _is_already_extracted(source, sym):
+                results.append({
+                    "success": True,
+                    "symbol": sym,
+                    "already_extracted": True,
+                    "error": "",
+                })
+                continue
             try:
                 r = self.move_symbol(source, sym, target)
+                if r.get("success"):
+                    _mark_extracted(source, sym)
                 results.append(r)
             except RefactoringError as e:
                 results.append({
