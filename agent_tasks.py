@@ -926,6 +926,14 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             "\nHvis et batch fejler, pr\u00f8v extract_symbol for enkelte symboler i stedet."
         )
 
+    # Når trust-block er aktiv: fjern list_symbols fra active tools så LLM'en
+    # slet ikke kan kalde det — den er nødt til at bruge batch_extract_symbols.
+    if _trust_block:
+        _active = getattr(agent, 'tool_registry', None)
+        if _active and _active.active_tools:
+            _active.active_tools = [t for t in _active.active_tools if t != "list_symbols"]
+            agent._log("DEBUG", "Fjernede list_symbols fra active tools (trust-block aktiv)", "")
+
     if section_instr:
         task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{_trust_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
@@ -1192,8 +1200,7 @@ def _build_truncation_summary(messages: list[dict], agent: Any) -> str:
         import agent_files as _af
         result = _af.list_symbols("api_server.py")
         if isinstance(result, dict) and result.get("success"):
-            sym_data = result.get("result", {})
-            symbols = sym_data.get("symbols", [])
+            symbols = result.get("symbols", [])
             count = len(symbols) if isinstance(symbols, list) else 0
             remaining_count = f"api_server.py: {count} symbols tilbage"
     except Exception:
@@ -2607,8 +2614,7 @@ def _check_refactor_progress() -> str:
         import agent_files as _af
         result = _af.list_symbols("api_server.py")
         if isinstance(result, dict) and result.get("success"):
-            sym_data = result.get("result", {})
-            symbols = sym_data.get("symbols", [])
+            symbols = result.get("symbols", [])
             count = len(symbols) if isinstance(symbols, list) else 0
             parts.append("api_server.py: {} symbols tilbage (mål: ≤50)".format(count))
     except Exception:
