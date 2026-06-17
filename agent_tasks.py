@@ -2802,6 +2802,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": dup_err})
                     yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                     yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": {"success": False, "error": "Duplicate call blocked"}}
+                    if tool_name in READ_ONLY_TOOLS and getattr(agent, '_read_escape_sent', False):
+                        agent._read_block_hits += 1
                     if consecutive_dedups >= 3:
                         _active = agent.tool_registry.active_tools or []
                         write_tools = [t for t in ("write_file", "edit_file")
