@@ -1193,15 +1193,18 @@ def _build_truncation_summary(messages: list[dict], agent: Any) -> str:
         result = _af.list_symbols("api_server.py")
         if isinstance(result, dict) and result.get("success"):
             sym_data = result.get("result", {})
-            count = sym_data.get("count", 0)
-            remaining_count = f" api_server.py: {count} symbols tilbage"
+            symbols = sym_data.get("symbols", [])
+            count = len(symbols) if isinstance(symbols, list) else 0
+            remaining_count = f"api_server.py: {count} symbols tilbage"
     except Exception:
         pass
 
-    # Build summary lines
+    # Build summary lines — always include remaining count
     if symbols_moved:
-        unique_symbols = list(dict.fromkeys(symbols_moved))  # dedupe preserving order
-        lines.append(f"Fremgang: {len(unique_symbols)} symboler flyttet til {len(modules_created)} modul(er): {', '.join(sorted(modules_created))}{remaining_count}")
+        unique_symbols = list(dict.fromkeys(symbols_moved))
+        lines.append(f"Fremgang: {len(unique_symbols)} symboler flyttet til {len(modules_created)} modul(er): {', '.join(sorted(modules_created))}")
+    if remaining_count:
+        lines.append(remaining_count)
 
     if tools_summary:
         for tool, entries in tools_summary.items():
