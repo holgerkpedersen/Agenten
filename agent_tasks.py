@@ -1060,22 +1060,141 @@ def _evaluate_rubric_check(check_str: str, called_tools: set[str]) -> bool:
     return False
 
 
-def _truncate_messages(messages: list[dict], max_chars: int) -> list[dict]:
+def _truncate_messages(messages: list[dict], max_chars: int, agent: Any | None = None) -> list[dict]:
     """truncate messages.
-    
+
+    When truncating for a refactor template, saves the full conversation to a temp file
+    and injects a compact progress summary so the LLM retains awareness of work done.
+
     Args:
         messages:
-        max_chars:"""
+        max_chars:
+        agent:"""
     total = sum(_msg_content_len(m) for m in messages)
     if total <= max_chars or len(messages) <= 3:
         return messages
     mid = "\n[... tidligere kontekst afkortet ...]"
     system = [m for m in messages if m["role"] == "system"]
     non_system = [m for m in messages if m["role"] != "system"]
-    keep_pairs = 4
+
+    # For refactor template: save full context and build progress summary
+    is_refactor = agent and getattr(agent, 'active_template', '') == 'refactor'
+    if is_refactor and agent:
+        _save_full_context_for_refactor(agent, messages)
+        summary = _build_truncation_summary(messages, agent)
+        mid += "\n\n" + summary
+
+    keep_pairs = 6 if is_refactor else 4
     tail = non_system[-keep_pairs:] if len(non_system) > keep_pairs else non_system
     insert = [{"role": "user", "content": mid}]
     return system + insert + tail
+
+
+def _save_full_context_for_refactor(agent: Any, messages: list[dict]) -> None:
+    """Save the full conversation history to a temp file for context recovery.
+
+    This allows the LLM (or diagnostics) to retrieve what happened in earlier iterations
+    when the active message window has been truncated.
+    """
+    session_id = getattr(agent, '_session_id', 'unknown')
+    log_dir = os.path.join(os.getcwd(), "logs", "llm_responses", str(session_id))
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except OSError:
+        return
+    path = os.path.join(log_dir, "full_context.json")
+    try:
+        serializable = []
+        for m in messages:
+            entry = {"role": m["role"]}
+            content = m.get("content", "")
+            if isinstance(content, str):
+                entry["content"] = content
+            elif isinstance(content, list):
+                entry["content"] = [p if not isinstance(p, dict) or p.get("type") != "image_url" else {"type": "image_url", "image_url": {"url": "[IMAGE]"}} for p in content]
+            serializable.append(entry)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(serializable, f, ensure_ascii=False)
+    except (OSError, TypeError):
+        pass
+
+
+def _build_truncation_summary(messages: list[dict], agent: Any) -> str:
+    """Build a compact summary of work done from the full message history.
+
+    Extracts tool calls and their outcomes so the LLM knows what has been accomplished
+    even after truncation removes earlier messages.
+    """
+    lines = []
+    tools_summary: dict[str, list] = {}
+    symbols_moved: list[str] = []
+    modules_created: set[str] = set()
+
+    for m in messages:
+        role = m.get("role", "")
+        content = m.get("content", "")
+        if not isinstance(content, str):
+            continue
+
+        # Extract tool calls from assistant messages with tool_calls
+        if role == "assistant" and "tool_calls" in content.lower():
+            pass  # handled via tool results below
+
+        # Extract tool results
+        if role == "tool":
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, dict):
+                    result_data = parsed.get("result", parsed)
+                    if isinstance(result_data, dict):
+                        inner = result_data.get("result", result_data)
+                        # batch_extract_symbols results
+                        if isinstance(inner, dict) and "total" in inner:
+                            target = inner.get("target", "?")
+                            succeeded = inner.get("succeeded", 0)
+                            symbols_in_batch = []
+                            for r in inner.get("results", []):
+                                sym = r.get("symbol", "")
+                                if sym:
+                                    symbols_moved.append(sym)
+                                    symbols_in_batch.append(sym)
+                            modules_created.add(os.path.basename(target))
+                            tools_summary.setdefault("batch_extract_symbols", []).append(
+                                f"✅ {succeeded} symbols → {os.path.basename(target)}"
+                            )
+                        # extract_symbol results
+                        elif isinstance(inner, dict) and "symbol" in inner:
+                            sym = inner.get("symbol", "")
+                            target = inner.get("target", "?")
+                            if sym and inner.get("success"):
+                                symbols_moved.append(sym)
+                                modules_created.add(os.path.basename(target))
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                pass
+
+    # Count remaining symbols in source file
+    remaining_count = ""
+    try:
+        import agent_files as _af
+        result = _af.list_symbols("api_server.py")
+        if isinstance(result, dict) and result.get("success"):
+            sym_data = result.get("result", {})
+            count = sym_data.get("count", 0)
+            remaining_count = f" api_server.py: {count} symbols tilbage"
+    except Exception:
+        pass
+
+    # Build summary lines
+    if symbols_moved:
+        unique_symbols = list(dict.fromkeys(symbols_moved))  # dedupe preserving order
+        lines.append(f"Fremgang: {len(unique_symbols)} symboler flyttet til {len(modules_created)} modul(er): {', '.join(sorted(modules_created))}{remaining_count}")
+
+    if tools_summary:
+        for tool, entries in tools_summary.items():
+            recent = entries[-3:]  # last 3 batches
+            lines.append(f"Seneste {tool} kald: {' | '.join(recent)}")
+
+    return "\n".join(lines) if lines else ""
 
 
 def _cont_hint(agent: Any, tools_list: str) -> str:
@@ -1160,6 +1279,12 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
             else:
                 agent._current_task_iteration = 0
                 agent._non_productive_reminder_sent = False
+                # Inject compact progress for extract_symbol
+                inner = result.get("result", {})
+                if isinstance(inner, dict) and inner.get("success"):
+                    sym = inner.get("symbol", "?")
+                    tgt = os.path.basename(inner.get("target", "?"))
+                    _add_user_msg(messages, f"[SYSTEM: ✅ {sym} flyttet til {tgt}]")
         else:
             agent._current_task_iteration = 0
             agent._non_productive_reminder_sent = False
@@ -1217,6 +1342,16 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
                     agent._hints_available.add(iid)
                 if issue_data.get("_hints_read"):
                     agent._hints_requested.add(iid)
+
+    # Inject compact progress summary after batch_extract_symbols
+    if parsed["tool"] == "batch_extract_symbols" and result.get("success"):
+        inner = result.get("result", {})
+        if isinstance(inner, dict) and inner.get("succeeded", 0):
+            target = os.path.basename(inner.get("target", "?"))
+            succeeded = inner.get("succeeded", 0)
+            symbols_in_batch = [r.get("symbol", "") for r in inner.get("results", []) if r.get("success")]
+            progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
+            _add_user_msg(messages, progress_msg)
 
     checkpoint_msg = agent_git.verify_pr_step(agent, parsed["tool"], result, task_node.name, original_prompt)
     if checkpoint_msg:
@@ -2420,41 +2555,57 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
 
 
 def _check_refactor_progress() -> str:
-    """Check which planned modules from refactor_plan.md exist on disk.
+    """Check refactor progress from plan file OR directly from api_server.py.
 
     Returns a status string like:
       'Already created (5/8): mod_a.py, mod_b.py, ...
-       Remaining (3/8): mod_c.py, mod_d.py, mod_e.py'
-    Returns empty string if refactor_plan.md doesn't exist.
+        Remaining (3/8): mod_c.py, mod_d.py, mod_e.py'
+    Falls back to counting symbols in api_server.py when no plan exists.
     """
     import os as _os
     import re as _re
-    plan_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'refactor_plan.md') if _os.environ.get('AGENT_WORKDIR') else 'refactor_plan.md'
-    if not _os.path.exists(plan_path):
-        return ''
-    try:
-        with open(plan_path, 'r', encoding='utf-8') as f:
-            plan_content = f.read()
-    except (OSError, UnicodeDecodeError):
-        return ''
-    modules = _re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content)
-    if not modules:
-        return ''
-    modules = sorted(set(modules))
-    existing = [m for m in modules if _os.path.exists(m)]
-    remaining = [m for m in modules if m not in existing]
-    total = len(modules)
-    if total == 0:
-        return ''
     parts = []
-    if existing:
-        parts.append("Allerede oprettet ({}/{}): {}".format(len(existing), total, ', '.join(existing)))
-    if remaining:
-        parts.append("Mangler ({}/{}): {}".format(len(remaining), total, ', '.join(remaining)))
+
+    # Try plan-based progress first
+    plan_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'refactor_plan.md') if _os.environ.get('AGENT_WORKDIR') else 'refactor_plan.md'
+    if _os.path.exists(plan_path):
+        try:
+            with open(plan_path, 'r', encoding='utf-8') as f:
+                plan_content = f.read()
+        except (OSError, UnicodeDecodeError):
+            plan_content = ""
+        modules = _re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content)
+        if modules:
+            modules = sorted(set(modules))
+            existing = [m for m in modules if _os.path.exists(m)]
+            remaining = [m for m in modules if m not in existing]
+            total = len(modules)
+            if existing:
+                parts.append("Allerede oprettet ({}/{}): {}".format(len(existing), total, ', '.join(existing)))
+            if remaining:
+                parts.append("Mangler ({}/{}): {}".format(len(remaining), total, ', '.join(remaining)))
+
+    # Always count symbols in api_server.py (fallback when no plan exists)
+    try:
+        import agent_files as _af
+        result = _af.list_symbols("api_server.py")
+        if isinstance(result, dict) and result.get("success"):
+            sym_data = result.get("result", {})
+            count = sym_data.get("count", 0)
+            parts.append("api_server.py: {} symbols tilbage (mål: ≤50)".format(count))
+    except Exception:
+        pass
 
     # For Opdatér phase: show symbols still in agent_core.py vs already removed
     core_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'agent_core.py') if _os.environ.get('AGENT_WORKDIR') else 'agent_core.py'
-    if _os.path.exists(core_path):
+    plan_content = ""
+    if _os.path.exists(plan_path):
+        try:
+            with open(plan_path, 'r', encoding='utf-8') as f:
+                plan_content = f.read()
+        except (OSError, UnicodeDecodeError):
+            pass
+    if _os.path.exists(core_path) and plan_content:
         try:
             with open(core_path, 'r', encoding='utf-8') as f:
                 core_content = f.read()
@@ -2939,6 +3090,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 if tool_name in WRITE_TOOLS:
                     consecutive_reads = 0
                     agent._read_block_hits = 0
+                    agent._read_escape_sent = False
                 if tool_name == "write_file" and args_val.get("path"):
                     import os as _os
                     write_path = _os.path.abspath(args_val["path"])
@@ -3121,7 +3273,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                     if error_msg:
                         _add_user_msg(messages, error_msg)
-                        messages = _truncate_messages(messages, agent.max_conversation_chars)
+                        messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                         continue
                     full_response = result.get("result", t(K.LOG_TASK_DONE, agent.lang))
                     break
@@ -3143,7 +3295,25 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 # Auto-check matching todos
                 for tid in _auto_todo_update(tool_name, args_val, agent):
                     yield {"type": "todo_update", "id": tid, "done": True}
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+
+                # Inject compact progress summary after batch_extract_symbols / extract_symbol
+                if tool_name == "batch_extract_symbols" and result.get("success"):
+                    inner = result.get("result", {})
+                    if isinstance(inner, dict) and inner.get("succeeded", 0):
+                        target = os.path.basename(inner.get("target", "?"))
+                        succeeded = inner.get("succeeded", 0)
+                        symbols_in_batch = [r.get("symbol", "") for r in inner.get("results", []) if r.get("success")]
+                        progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
+                        messages.append({"role": "user", "content": progress_msg})
+
+                if tool_name == "extract_symbol" and result.get("success"):
+                    inner = result.get("result", {})
+                    if isinstance(inner, dict) and inner.get("success"):
+                        sym = inner.get("symbol", "?")
+                        tgt = os.path.basename(inner.get("target", "?"))
+                        messages.append({"role": "user", "content": f"[SYSTEM: ✅ {sym} flyttet til {tgt}]"})
+
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 total_calls = sum(called_tools.values())
                 if total_calls >= _get_max_tool_calls(task_node.name):
                     full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
@@ -3188,7 +3358,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
         if parsed["type"] == "tool":
             tool_result = _handle_tool_call(agent, parsed, messages, called_tools, tools_list, task_node, original_prompt)
             if tool_result is None:
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 continue
             for entry in agent.agent_log[_report_logs:]:
                 yield {"type": "log", "log": entry}
@@ -3211,7 +3381,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 agent._log("INFO", msg, "")
                 full_response = msg
                 break
-            messages = _truncate_messages(messages, agent.max_conversation_chars)
+            messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
             total_calls = sum(called_tools.values())
             if total_calls >= _get_max_tool_calls(task_node.name):
                 full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
@@ -3226,10 +3396,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             # Fix 2: Don't block DONE when edit_file failed — let _check_required_tools handle it
             if agent._tests_failed and "test" not in _normalize_phase(task_node.name).lower():
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med <<<DONE>>> n\u00e5r tests fejler. Ret koden med edit_file og k\u00f8r run_tests() igen indtil ALLE tests best\u00e5r.")
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 continue
             if not _check_done_pr_requirements(agent, messages, called_tools, original_prompt, task_node.name):
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 if agent_git.is_pr_workflow(task_node.name):
                     yield {"type": "checkpoint", "message": t(K.CP_PR_FAILED, agent.lang), "tool": "done"}
                 continue
@@ -3257,22 +3427,22 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 for r in failed:
                     feedback += "\n" + t(K.RUBRIC_FAILED_DETAIL, agent.lang).format(desc=r["desc"])
                 _add_user_msg(messages, feedback)
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 continue
             missing_msg = _check_required_tools(agent, called_tools, task_node.name)
             if missing_msg:
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {missing_msg}")
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 continue
             validation_err = _validate_done_output(agent, parsed.get("result", ""), task_node.name, task_node)
             if validation_err:
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {validation_err}")
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 continue
             fix_err = _count_fix_attempts(agent, called_tools)
             if fix_err:
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {fix_err}")
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 continue
             full_response = parsed["result"]
             done_idx = response.find(agent.tool_registry.DONE_MARKER)
@@ -3298,7 +3468,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {parsed['message']}. {hint}")
             else:
                 _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {parsed['message']}. Only use <<<TOOL>>> or <<<DONE>>> — no English text before or after.")
-            messages = _truncate_messages(messages, agent.max_conversation_chars)
+            messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
             continue
 
         if i == 0 and not called_tools:
@@ -3313,14 +3483,14 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 if not config.NATIVE_TOOLS:
                     tool_for_msg = agent.tool_registry.active_tools[0] if agent.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, agent.lang)
                     _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.FIRST_TOOL_REQUIRED, agent.lang).format(tool=tool_for_msg)}")
-                messages = _truncate_messages(messages, agent.max_conversation_chars)
+                messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 continue
 
         clean = response.strip() if "ERROR" not in response else ""
         if clean:
             text_fallback = clean
         _add_user_msg(messages, t(K.TOOL_NO_RESULT, agent.lang))
-        messages = _truncate_messages(messages, agent.max_conversation_chars)
+        messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
         full_response = response
         if i >= 3 and not called_tools:
             break
