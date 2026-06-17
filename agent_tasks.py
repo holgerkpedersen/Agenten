@@ -1675,19 +1675,26 @@ def _verify_self_modification(agent: Any) -> None:
     test_summary = _parse_test_summary(result) or ""
     if not passed:
         summary = test_summary or f"exit code {result.get('exit_code', '?')}"
-        agent._log("WARNING", f"Verification FAILED \u2014 rolling back {len(modified)} file(s)",
-                   summary[:300])
 
-        for basename in sorted(modified):
-            try:
-                subprocess.run(
-                    ["git", "checkout", "--", basename],
-                    capture_output=True, text=True, timeout=30,
-                    cwd=os.path.dirname(os.path.abspath(__file__)),
-                )
-                agent._log("INFO", f"  Rolled back {basename}", "")
-            except Exception as exc:
-                agent._log("ERROR", f"  Rollback failed for {basename}", str(exc))
+        # Refactor template: skip rollback — extraction is intentional
+        if getattr(agent, 'active_template', '') == "refactor":
+            agent._log("WARNING",
+                       f"Verification FAILED \u2014 REFACTOR template, SKIPPING rollback for {len(modified)} file(s)",
+                       summary[:300])
+        else:
+            agent._log("WARNING", f"Verification FAILED \u2014 rolling back {len(modified)} file(s)",
+                       summary[:300])
+
+            for basename in sorted(modified):
+                try:
+                    subprocess.run(
+                        ["git", "checkout", "--", basename],
+                        capture_output=True, text=True, timeout=30,
+                        cwd=os.path.dirname(os.path.abspath(__file__)),
+                    )
+                    agent._log("INFO", f"  Rolled back {basename}", "")
+                except Exception as exc:
+                    agent._log("ERROR", f"  Rollback failed for {basename}", str(exc))
 
         if hasattr(agent, '_core'):
             for basename in sorted(modified):
@@ -2856,10 +2863,15 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     consecutive_same_tool = 0
                     last_tool_name = tool_name
 
-                tool_key = tool_name + str(args_val)
-                dup_count = called_tools.get(tool_key, 0)
-                called_tools[tool_key] = dup_count + 1
-                if dup_count >= 1:
+                # run_tests/list_symbols: skip dedup tracking
+                # run_tests is a side-effect tool, list_symbols manages its own cache
+                if tool_name in ("run_tests", "list_symbols"):
+                    pass
+                else:
+                    tool_key = tool_name + str(args_val)
+                    dup_count = called_tools.get(tool_key, 0)
+                    called_tools[tool_key] = dup_count + 1
+                if tool_name not in ("run_tests", "list_symbols") and dup_count >= 1:
                     consecutive_dedups += 1
                     dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
                     _add_user_msg(messages, dup_err)
@@ -2870,17 +2882,20 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         agent._read_block_hits += 1
                     if consecutive_dedups >= 3:
                         _active = agent.tool_registry.active_tools or []
-                        write_tools = [t for t in ("write_file", "edit_file")
+                        write_tools = [t for t in ("write_file", "edit_file", "delete_file", "extract_symbol", "batch_extract_symbols", "remove_symbol", "add_import", "add_method", "add_function")
                                        if t in _active]
                         if write_tools:
+                            # Prune active_tools to WRITE_TOOLS only — LLM cannot read anymore
+                            agent.tool_registry.active_tools = write_tools
+                            tools_param = agent.tool_registry.get_openai_tools_for_active() if config.NATIVE_TOOLS else []
                             reminder = (
                                 f"[SYSTEM: Du er i en l\u00f8kke med identiske resultater. "
-                                f"STOP med at l\u00e6se. BRUG et v\u00e6rkt\u00f8j der SKRIVER: "
+                                f"KUN skrivev\u00e6rkt\u00f8jer er tilg\u00e6ngelige nu: "
                                 f"{', '.join(write_tools)}. "
-                                f"Forklar HVORFOR du ikke kan skrive \u2014 hvad mangler du?]"
+                                f"Respond ONLY with a tool call.]"
                             )
                             messages.append({"role": "system", "content": reminder})
-                            agent._log("SYSTEM", "Dedup-loop escape", reminder[:120])
+                            agent._log("SYSTEM", "Dedup-loop escape", f"pruned to {write_tools}")
                             consecutive_dedups = 0
                     continue
                 consecutive_dedups = 0
