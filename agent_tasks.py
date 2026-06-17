@@ -3092,7 +3092,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     consecutive_dedups += 1
                     dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
                     _add_user_msg(messages, dup_err)
-                    messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": dup_err})
+                    messages.append({"role": "user", "content": dup_err})
                     yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                     yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": {"success": False, "error": "Duplicate call blocked"}}
                     if tool_name in READ_ONLY_TOOLS and getattr(agent, '_read_escape_sent', False):
@@ -3126,7 +3126,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         result = {"success": True, "result": "Skipped \u2014 reads blocked"}
                         agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                         agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                        messages.append({"role": "user", "content": result_str})
                         yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                         yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                         continue
@@ -3149,7 +3149,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             result = {"success": True, "result": "Skipped — force write"}
                             agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                             agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                            messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                            messages.append({"role": "user", "content": result_str})
                             yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                             yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                             continue
@@ -3165,7 +3165,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         result = {"success": False, "error": "Recently deleted file"}
                         agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                         agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                        messages.append({"role": "user", "content": result_str})
                         yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                         yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                         continue
@@ -3174,7 +3174,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     result = {"success": False, "error": "Issue already resolved"}
                     agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                     agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                    messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                    messages.append({"role": "user", "content": result_str})
                     yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                     yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                     continue
@@ -3189,7 +3189,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                                 with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
                                     content = f.read()
                                 auto_msg = f"[Auto-read {filepath}]\n{content}"
-                                messages.append({"role": "tool", "tool_call_id": f"auto-{hash(filepath)}", "content": auto_msg})
+                                messages.append({"role": "user", "content": auto_msg})
                             except (OSError, IOError):
                                 pass
                         # Re-check after auto-read
@@ -3218,7 +3218,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                             result = {"success": False, "error": "old_text not in prior read results"}
                             agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                             agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                            messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                            messages.append({"role": "user", "content": result_str})
                             yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                             yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                             continue
