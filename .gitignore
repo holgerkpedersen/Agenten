@@ -55,3 +55,7 @@ docs/**/*.*
 # Temp test files (unapproved)
 tests/temp/
 !tests/temp/.gitkeep
+
+# PID files from server
+.api_server.pid
+.api_server.winpid

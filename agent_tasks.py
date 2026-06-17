@@ -1095,7 +1095,22 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
             return None
 
     agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=parsed['tool']), str(parsed.get("args", {})))
+    # Cache list_symbols results per file
+    if parsed["tool"] == "list_symbols" and isinstance(parsed.get("args"), dict):
+        _ls_file = parsed["args"].get("filepath", "")
+        if _ls_file and _ls_file in getattr(agent, '_list_symbols_cache', {}):
+            _cached = agent._list_symbols_cache[_ls_file]
+            agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=parsed['tool']), f"(cached) cached result")
+            return {"tool": parsed["tool"], "args": parsed.get("args", {}), "result": _cached, **({"checkpoint_msg": ""} if False else {})}
     result = agent.tool_registry.execute(parsed["tool"], parsed["args"])
+    if parsed["tool"] == "list_symbols" and isinstance(result, dict) and result.get("success"):
+        _f = (parsed.get("args") or {}).get("filepath", "")
+        if _f:
+            agent._list_symbols_cache[_f] = result
+    if parsed["tool"] in ("extract_symbol", "batch_extract_symbols") and isinstance(parsed.get("args"), dict):
+        _src = parsed["args"].get("source", "")
+        if _src in getattr(agent, '_list_symbols_cache', {}):
+            del agent._list_symbols_cache[_src]
     result_str = json.dumps(result, ensure_ascii=False)
     agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=parsed['tool']), result_str)
     agent._record_tool_call(
@@ -2636,6 +2651,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._produced_files = set()
     agent._recently_deleted_files = set()
     agent._read_block_hits = 0
+    agent._list_symbols_cache: dict[str, dict] = {}
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -2817,7 +2833,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                         yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                         continue
                     consecutive_reads += 1
-                    if consecutive_reads >= 5:
+                    if consecutive_reads >= 3:
                         _active = agent.tool_registry.active_tools or []
                         write_tools = [t for t in ("write_file", "edit_file", "delete_file", "extract_symbol", "batch_extract_symbols", "remove_symbol", "add_import", "add_method", "add_function")
                                        if t in _active]
@@ -2908,7 +2924,24 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                             yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                             continue
                 agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
+                # Cache list_symbols results per file
+                if tool_name == "list_symbols" and isinstance(args_val, dict):
+                    _ls_file = args_val.get("filepath", "")
+                    if _ls_file and _ls_file in agent._list_symbols_cache:
+                        result = agent._list_symbols_cache[_ls_file]
+                        result_str = json.dumps(result, ensure_ascii=False)
+                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), f"(cached) {result_str[:200]}")
+                        messages.append({"role": "tool", "tool_call_id": tc.get("id", ""), "content": result_str})
+                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                        continue
                 result = agent.tool_registry.execute(tool_name, args_val)
+                if tool_name == "list_symbols" and isinstance(args_val, dict) and isinstance(result, dict) and result.get("success"):
+                    agent._list_symbols_cache[args_val["filepath"]] = result
+                if tool_name in ("extract_symbol", "batch_extract_symbols") and isinstance(args_val, dict):
+                    _src = args_val.get("source", "")
+                    if _src in agent._list_symbols_cache:
+                        del agent._list_symbols_cache[_src]
                 result_str = json.dumps(result, ensure_ascii=False)
                 agent._record_tool_call(
                     phase=getattr(task_node, 'name', '?'),
