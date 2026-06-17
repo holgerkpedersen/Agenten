@@ -9,8 +9,9 @@ def create_execution_backup() -> dict:
     from api_server import BASE_DIR
     ts = _uuid.uuid4().hex[:8]
     tag = f"agent-backup-{ts}"
+    # -u includes untracked files, -m adds a message
     r = _subprocess.run(
-        ["git", "stash", "push", "-m", tag],
+        ["git", "stash", "push", "-u", "-m", tag],
         capture_output=True, text=True, cwd=BASE_DIR
     )
     return {"success": r.returncode == 0, "message": r.stdout or r.stderr, "tag": tag}
@@ -26,7 +27,11 @@ def restore_execution_backup() -> dict:
     for line in r.stdout.strip().split("\n"):
         if "agent-backup-" in line:
             stash_ref = line.split(":")[0]
+            # Restore tracked files
             _subprocess.run(["git", "checkout", "--", "."], capture_output=True, text=True, cwd=BASE_DIR)
+            # Delete untracked files created during the session
+            _subprocess.run(["git", "clean", "-fd"], capture_output=True, text=True, cwd=BASE_DIR)
+            # Restore the stash
             pop = _subprocess.run(
                 ["git", "stash", "pop", stash_ref],
                 capture_output=True, text=True, cwd=BASE_DIR
