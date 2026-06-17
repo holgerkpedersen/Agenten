@@ -2079,7 +2079,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
         elif phase == "plan":
             todos.extend([
                 {"id": "rf_p1", "text": "Beslut modulopdeling", "done": False},
-                {"id": "rf_p2", "text": "Skriv refactor_plan.md med write_file() (i roden, IKKE docs/)", "done": False},
+                {"id": "rf_p2", "text": f"Skriv {_plan_path} med write_file()", "done": False},
                 {"id": "rf_p3", "text": "Inkluder alle moduler og symboler i planen", "done": False},
             ])
             if existing_modules:
