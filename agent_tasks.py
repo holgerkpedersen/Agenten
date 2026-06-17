@@ -799,6 +799,31 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             except Exception as _e:
                 agent._log("DEBUG", f"Failed to auto-load refactor context: {_e}", "")
 
+    # For refactor Ekstraher phase: auto-suggest module groups from dependency graph
+    # so the LLM can start extracting immediately without re-grouping.
+    _group_block = ""
+    if agent.active_template == "refactor" and task_node.name.lower() == "ekstraher":
+        try:
+            from refactoring_engine import RefactoringEngine
+            # Determine source file from prompt
+            _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
+            _source_file = _src_match.group(1) if _src_match else "api_server.py"
+            _engine = RefactoringEngine()
+            _gr = _engine.suggest_module_groups(source=_source_file, max_group_size=8)
+            if _gr.get("success") and _gr.get("groups"):
+                _lines = ["\n## Foresl\u00e5ede modulopdelinger (fra afh\u00e6ngighedsgraf)"]
+                for i, g in enumerate(_gr["groups"], 1):
+                    _syms = g.get("symbols", [])
+                    if isinstance(_syms, (list, tuple)):
+                        _sym_list = ", ".join(str(s) for s in _syms[:12])
+                        if len(_syms) > 12:
+                            _sym_list += f" ... (+{len(_syms)-12})"
+                        _lines.append(f"\n  Gruppe {i} ({len(_syms)} symboler): {_sym_list}")
+                _group_block = "\n".join(_lines)
+                agent._log("DEBUG", f"Auto-generated {len(_gr['groups'])} module groups for {_source_file}", "")
+        except Exception as _e:
+            agent._log("DEBUG", f"Could not suggest module groups: {_e}", "")
+
     # For programming template's later phases, auto-load docs from earlier phases.
     PROGRAMMING_DOCS = [
         ("docs/kravanalyse.md", "Kravanalyse"),
@@ -844,9 +869,9 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         reason_block = ""
 
     if section_instr:
-        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{_group_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
-        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{_group_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
     # Append phase todos as a numbered checklist — LLM must follow the order
     todos = getattr(agent, '_phase_todos', None)
