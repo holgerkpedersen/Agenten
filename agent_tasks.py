@@ -913,17 +913,19 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         reason_block = ""
 
     # For refactor Ekstraher: trust instruction — LLM already has plan + symbols
+    # Triggers when EITHER refactor_plan.md is loaded (plan_block) OR
+    # auto-generated module groups are present (_group_block).
     _trust_block = ""
     if (agent.active_template == "refactor"
         and task_node.name.lower() == "ekstraher"
-        and plan_block
+        and (plan_block or _group_block)
         and _symbols_block):
         _trust_block = (
             "\n\n\U0001f512 DU HAR ALLEREDE ALLE DATA I PROMPTEN OVENFOR."
-            "\nRefactor_plan.md og den fulde symbol-liste er indl\u00e6st."
-            "\nDu beh\u00f8ver IKKE at kalde list_symbols \u2014 planens modulopdelinger og symbolerne er nok."
-            "\nG\u00e5 DIREKTE til batch_extract_symbols med symbol-grupperne fra planen."
-            "\nHvis et batch fejler, pr\u00f8v extract_symbol for enkelte symboler i stedet."
+            "\nSymbol-listen OG modulopdelingerne er allerede indl\u00e6st."
+            "\nDu beh\u00f8ver IKKE at kalde list_symbols \u2014 du har ALLE symboler i prompten."
+            "\nG\u00e5 DIREKTE til batch_extract_symbols med symbol-grupperne nedenfor."
+            "\nKald IKKE list_symbols f\u00f8r du har pr\u00f8vet batch_extract_symbols."
         )
 
     # Når trust-block er aktiv: fjern list_symbols fra active tools så LLM'en
