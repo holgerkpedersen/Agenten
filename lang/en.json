@@ -275,7 +275,8 @@
     "red_test_passed": "✅ Red test passed — bug is already fixed. Completing Test (Red) phase.",
     "test_but_no_refactor": "⚠️ Tests pass, but the refactor was NOT done: no modules from refactor_plan.md contain real code. Call edit_file to move functions from api_server.py to the modules, then re-run run_tests.",
     "refactor_incomplete": "Refactoring is incomplete. {missing_count} module(s) still missing, or api_server.py not reduced below 1000 lines.",
-    "phase_complete": "Phase auto-completed."
+    "phase_complete": "Phase auto-completed.",
+    "stuck_auto_advance": "Phase auto-completed: stuck in read-loop after {reads} blocks in {phase}."
   },
   "errors": {
     "no_prompt": "No prompt provided",

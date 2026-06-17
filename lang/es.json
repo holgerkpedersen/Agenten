@@ -275,7 +275,8 @@
     "red_test_passed": "✅ Prueba roja pasada — el bug ya está corregido. Finalizando fase Test (Red).",
     "test_but_no_refactor": "⚠️ Las pruebas pasan, pero la refactorización NO se ha hecho: ningún módulo de refactor_plan.md contiene código real. Llama a edit_file para mover funciones de api_server.py a los módulos, y vuelve a ejecutar run_tests.",
     "refactor_incomplete": "Refactorización incompleta. Faltan {missing_count} módulo(s), o api_server.py no se ha reducido a menos de 1000 líneas.",
-    "phase_complete": "Fase completada automáticamente."
+    "phase_complete": "Fase completada automáticamente.",
+    "stuck_auto_advance": "Fase auto-completada: bloqueado en bucle de lectura tras {reads} bloqueos en {phase}."
   },
   "errors": {
     "no_prompt": "No se proporcionó ninguna tarea",

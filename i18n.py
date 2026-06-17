@@ -229,6 +229,7 @@ class K(StrEnum):
     LOG_TASK_DONE           = "log.task_done"
     LOG_TASK_FAILED         = "log.task_failed"
     LOG_AUTO_DONE           = "log.auto_done"
+    LOG_STUCK_AUTO_ADVANCE  = "log.stuck_auto_advance"
     LOG_READ_ONLY           = "log.read_only"
     LOG_REQUIRED_TOOLS_MISSING = "log.required_tools_missing"
     LOG_TESTS_PASSED_NO_RESOLVE = "log.tests_passed_no_resolve"

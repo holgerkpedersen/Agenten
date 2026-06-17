@@ -275,7 +275,8 @@
     "red_test_passed": "✅ Rød test bestået — fejlen er allerede rettet. Afslutter Test (Red) fasen.",
     "test_but_no_refactor": "⚠️ Tests består, men refaktoreringen er IKKE udført: ingen moduler fra refactor_plan.md indeholder reel kode. Kald edit_file for at flytte funktioner fra api_server.py til modulerne, og kør derefter run_tests igen.",
     "refactor_incomplete": "Refaktoreringen er ufuldstændig. {missing_count} modul(er) mangler stadig, eller api_server.py er ikke reduceret til under 1000 linjer.",
-    "phase_complete": "Fase gennemført automatisk."
+    "phase_complete": "Fase gennemført automatisk.",
+    "stuck_auto_advance": "Fasen auto-afsluttet: gensidigt læselås efter {reads} blokeringer i {phase}."
   },
   "errors": {
     "no_prompt": "Ingen prompt angivet",

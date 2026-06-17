@@ -2626,6 +2626,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     last_tool_name = ""
     last_name_arg = ""
     READ_ONLY_TOOLS = {"read_location", "read_chunk", "list_chunks", "list_files", "list_symbols", "locate", "read_issue"}
+    WRITE_TOOLS = {"write_file", "edit_file", "delete_file", "extract_symbol", "batch_extract_symbols", "remove_symbol", "add_import", "add_method", "add_function"}
     agent._write_failed = False
     agent._tests_failed = False
     agent._located_files = set()
@@ -2634,6 +2635,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._tool_log = []
     agent._produced_files = set()
     agent._recently_deleted_files = set()
+    agent._read_block_hits = 0
     _task_deadline = time.time() + EXECUTION_TIMEOUT
 
     for i in range(max_iterations):
@@ -2802,8 +2804,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 consecutive_dedups = 0
                 if tool_name in READ_ONLY_TOOLS:
                     if getattr(agent, '_read_escape_sent', False):
+                        agent._read_block_hits += 1
                         _active = agent.tool_registry.active_tools or []
-                        write_tools = [t for t in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import")
+                        write_tools = [t for t in ("write_file", "edit_file", "delete_file", "extract_symbol", "batch_extract_symbols", "remove_symbol", "add_import", "add_method", "add_function")
                                        if t in _active]
                         result_str = f"[SYSTEM: L\u00e6sning er blokeret. DU SKAL skrive kode. Brug {'/'.join(write_tools)}]"
                         result = {"success": True, "result": "Skipped \u2014 reads blocked"}
@@ -2816,7 +2819,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                     consecutive_reads += 1
                     if consecutive_reads >= 5:
                         _active = agent.tool_registry.active_tools or []
-                        write_tools = [t for t in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import")
+                        write_tools = [t for t in ("write_file", "edit_file", "delete_file", "extract_symbol", "batch_extract_symbols", "remove_symbol", "add_import", "add_method", "add_function")
                                        if t in _active]
                         if write_tools:
                             _add_user_msg(messages, (
@@ -2836,8 +2839,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                             yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                             yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                             continue
-                if tool_name in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"):
+                if tool_name in WRITE_TOOLS:
                     consecutive_reads = 0
+                    agent._read_block_hits = 0
                 if tool_name == "write_file" and args_val.get("path"):
                     import os as _os
                     write_path = _os.path.abspath(args_val["path"])
@@ -2913,7 +2917,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     success=result.get('success', False) if isinstance(result, dict) else True,
                     error=result.get('error', '') if isinstance(result, dict) else '',
                 )
-                if tool_name in ("write_file", "edit_file", "delete_file", "extract_symbol", "remove_symbol", "add_import"):
+                if tool_name in WRITE_TOOLS:
                     if tool_name == "delete_file" and isinstance(result, dict) and result.get("success"):
                         deleted_path = result.get("file", "")
                         if deleted_path:
@@ -3032,6 +3036,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     break
             if full_response:
                 break
+            if getattr(agent, '_read_block_hits', 0) >= 2:
+                full_response = t(K.LOG_STUCK_AUTO_ADVANCE, agent.lang).format(
+                    phase=task_node.name, reads=agent._read_block_hits)
+                break
             continue
 
         pending_reasoning = getattr(agent.llm, '_pending_reasoning', None)
@@ -3093,6 +3101,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             total_calls = sum(called_tools.values())
             if total_calls >= _get_max_tool_calls(task_node.name):
                 full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
+                break
+            if getattr(agent, '_read_block_hits', 0) >= 2:
+                full_response = t(K.LOG_STUCK_AUTO_ADVANCE, agent.lang).format(
+                    phase=task_node.name, reads=agent._read_block_hits)
                 break
             continue
 
