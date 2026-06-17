@@ -440,15 +440,22 @@ class CodeModifier:
                     os.replace(tmppath, path)
                     return True
 
-        # Normal insert after last import line
-        last_import_line = 0
+        # Normal insert: insert right after the first consecutive import block
+        # (standard Python convention — imports at the top of the file).
+        # Using the LAST import line breaks files like api_server.py which
+        # have a `from routes import ...` at line 2150.
+        first_import_end = 0
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 end = getattr(node, 'end_lineno', node.lineno) or node.lineno
-                if end > last_import_line:
-                    last_import_line = end
+                if first_import_end == 0 or end < first_import_end + 3:
+                    # First import or consecutive (within 2 lines)
+                    if end > first_import_end:
+                        first_import_end = end
+                else:
+                    break  # Stop at gap before scattered import
 
-        insert_at = last_import_line
+        insert_at = first_import_end if first_import_end > 0 else 0
         lines.insert(insert_at, import_stmt)
         new_content = '\n'.join(lines)
 
