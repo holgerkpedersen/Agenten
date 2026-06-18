@@ -1755,7 +1755,7 @@ def execute_resume() -> Any:
     # Vent pa at _paused_messages bliver sat (LLM skal færdiggøre sit svar)
     saved = getattr(stream_agent, '_paused_messages', None)
     if not saved:
-        _wait_until = time.time() + 30
+        _wait_until = time.time() + 60
         while time.time() < _wait_until:
             time.sleep(0.5)
             saved = getattr(stream_agent, '_paused_messages', None)
