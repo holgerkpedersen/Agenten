@@ -24,6 +24,10 @@ from session_manager import SessionManager, _guard_json_body, agent, session_man
 import agent_autoresearch
 
 log = get_logger(__name__)
+import threading
+
+_session_save_debounce: dict[str, float] = {}
+_session_save_lock = threading.Lock()
 
 _LMS_CACHE = None
 
