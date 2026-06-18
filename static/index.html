@@ -1270,6 +1270,7 @@ let currentSessionId = null;
 let currentTree = null;
 let eventSource = null;
 let _isExecuting = false;
+let _currentPhase = '';
 let panels = {};
 let showThinking = false;
 let treeEditMode = false;
@@ -1703,41 +1704,70 @@ async function approveAutoResearch(path, phaseEnc) {
 }
 
 async function updatePromptHistory(sessionId) {
-    const historyContainer = document.getElementById('historyContent');
-    if (!historyContainer) return;
-    
-    try {
-        const response = await fetch(`/api/sessions/prompts/${sessionId}`);
-        const data = await response.json();
-        
-        if (data.success && data.prompts && data.prompts.length > 0) {
-            historyContainer.innerHTML = '';
-            for (const item of data.prompts.slice().reverse()) {
-                const time = formatLogTime(item.timestamp);
-                const promptShort = item.prompt.length > 60 ? item.prompt.slice(0, 60) + '...' : item.prompt;
-                const resultShort = item.result ? (item.result.length > 100 ? item.result.slice(0, 100) + '...' : item.result) : _('no_result_yet');
-                
-                historyContainer.innerHTML += `
-                    <div class="history-item">
-                        <div class="history-prompt">
-                            📝 ${escapeHtml(promptShort)}
-                            <span style="font-size: 10px; color: #64748b; float: right;">${time}</span>
-                        </div>
-                        <div class="history-result">
-                            💡 ${_('result_label')} ${escapeHtml(resultShort)}
-                        </div>
-                        <button class="reuse-btn" onclick="reusePrompt('${escapeHtml(item.prompt).replace(/'/g, "\\'")}')">${_('reuse_prompt')}</button>
-                    </div>
-                `;
-            }
-        } else {
-            historyContainer.innerHTML = `<div style="color: #64748b;">${_('no_prompts_yet')}</div>`;
-        }
-    } catch (e) {
-        console.error(_('history_error'), e);
-        historyContainer.innerHTML = `<div style="color: #ef4444;">${_('history_error')}</div>`;
-    }
-}
+     const historyContainer = document.getElementById('historyContent');
+     if (!historyContainer) return;
+     
+     try {
+         const response = await fetch(`/api/sessions/prompts/${sessionId}`);
+         const data = await response.json();
+         
+         if (data.success && data.prompts && data.prompts.length > 0) {
+             historyContainer.innerHTML = '';
+             // Filtrér: vis kun brugerens egne prompts (skjul auto-genererede faser)
+             const userPrompts = data.prompts.filter(item => {
+                 const p = (item.prompt || '').trim();
+                 const autoPhases = ['analyse', 'plan', 'ekstraher', 'opdatér', 'test',
+                     'implementering', 'verifikation', 'opdatering', 'luk', 'fix'];
+                 return !autoPhases.includes(p.toLowerCase()) && p.length > 10;
+             });
+             const items = userPrompts.length > 0 ? userPrompts : data.prompts;
+             for (const item of items.slice().reverse()) {
+                 const time = formatLogTime(item.timestamp);
+                 const promptFull = item.prompt || '';
+                 const resultFull = item.result || _('no_result_yet');
+                 
+                 // Bestem status
+                 const hasTree = !!item.tree;
+                 const resultOk = item.result && item.result.length > 20 && !item.result.includes('fejlede');
+                 const statusIcon = hasTree ? '✅' : (resultOk ? '💡' : '⏳');
+                 const statusLabel = hasTree ? _('task_done_label') : (resultOk ? _('result_label') : _('no_result_yet'));
+                 
+                 // Unikt ID for expand/collapse
+                 const safeId = 'hist-' + String(item.timestamp || Math.random()).replace('.', '');
+                 const promptShort = promptFull.length > 80 ? promptFull.slice(0, 80) + '...' : promptFull;
+                 const resultShort = resultFull.length > 120 ? resultFull.slice(0, 120) + '...' : resultFull;
+                 const promptLong = promptFull.length > 80;
+                 const resultLong = resultFull.length > 120;
+                 
+                 historyContainer.innerHTML += `
+                     <div class="history-item">
+                         <div class="history-prompt" onclick="document.getElementById('${safeId}-prompt').style.display=document.getElementById('${safeId}-prompt').style.display==='none'?'block':'none'">
+                             ${statusIcon} ${escapeHtml(promptShort)}
+                             <span style="font-size: 10px; color: #64748b; float: right;">${time}</span>
+                         </div>
+                         ${promptLong ? `<div id="${safeId}-prompt" style="display:none;font-size:11px;padding:4px 8px;background:var(--input-bg);border-radius:4px;margin:2px 0;white-space:pre-wrap;">${escapeHtml(promptFull)}</div>` : ''}
+                         <div class="history-result">
+                             ${escapeHtml(resultShort)}
+                             ${resultLong ? `<span style="font-size:10px;color:#60a5fa;cursor:pointer;" onclick="document.getElementById('${safeId}-result').style.display=document.getElementById('${safeId}-result').style.display==='none'?'block':'none'">${_('show_more')}</span>` : ''}
+                         </div>
+                         ${resultLong ? `<div id="${safeId}-result" style="display:none;font-size:11px;padding:4px 8px;background:var(--input-bg);border-radius:4px;margin:2px 0;white-space:pre-wrap;">${escapeHtml(resultFull)}</div>` : ''}
+                         <div style="display:flex;gap:4px;margin-top:4px;">
+                             <button class="reuse-btn" onclick="reusePrompt('${escapeHtml(item.prompt).replace(/'/g, "\\'")}')">♻️ ${_('reuse')}</button>
+                         </div>
+                     </div>
+                 `;
+             }
+             if (userPrompts.length === 0 && data.prompts.length > 0) {
+                 historyContainer.innerHTML += `<div style="font-size:10px;color:#64748b;text-align:center;padding:4px;">${_('filtered_auto_prompts')}</div>`;
+             }
+         } else {
+             historyContainer.innerHTML = `<div style="color: #64748b;">${_('no_prompts_yet')}</div>`;
+         }
+     } catch (e) {
+         console.error(_('history_error'), e);
+         historyContainer.innerHTML = `<div style="color: #ef4444;">${_('history_error')}</div>`;
+     }
+ }
 
 function reusePrompt(prompt) {
     document.getElementById('promptInput').value = prompt;
@@ -2884,6 +2914,7 @@ function _clearSpinner() {
     if (taskElem && taskElem.querySelector('.loading')) {
         taskElem.innerHTML = '';
     }
+    _currentPhase = '';
 }
 
 function _activateNextTodo() {
@@ -3052,7 +3083,16 @@ async function executeWithStream() {
                 
              case 'todo_clear':
                 const tcClear = document.getElementById('todosContent');
-                if (tcClear) tcClear.innerHTML = '';
+                if (tcClear) {
+                    tcClear.innerHTML = '';
+                    if (_currentPhase) {
+                        const phaseHeader = document.createElement('div');
+                        phaseHeader.className = 'todo-phase-header';
+                        phaseHeader.style.cssText = 'font-size:12px;font-weight:bold;color:#60a5fa;padding:4px 4px 2px;border-bottom:1px solid rgba(96,165,250,0.2);margin-bottom:4px;';
+                        phaseHeader.textContent = `📌 ${_currentPhase}`;
+                        tcClear.appendChild(phaseHeader);
+                    }
+                }
                 break;
                 
              case 'todo_add':
@@ -3111,7 +3151,8 @@ async function executeWithStream() {
                 if (retryTask) retryTask.innerHTML = `📌 ${escapeHtml(data.task)} <span style="color:#f59e0b;">🔄 forsøg ${data.attempt}/${data.max}</span>`;
                 break;
 
-            case 'task_start':
+             case 'task_start':
+                 _currentPhase = data.task;
                  const currentTask = document.getElementById('currentTask');
                  let taskHtml = `📌 ${escapeHtml(data.task)}`;
                  if (data.success_criteria && data.success_criteria.length > 0) {

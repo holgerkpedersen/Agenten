@@ -430,6 +430,8 @@
     "reuse_error": "Fejl ved genbrug",
     "reusing_prompt": "Genbruger tidligere prompt",
     "no_prompts_yet": "Ingen prompts endnu. Skriv en opgave og klik \"Nedbryd til træ\"",
+    "show_more": "Vis mere",
+    "filtered_auto_prompts": "Kun brugerprompts vises — auto-genererede faser er filtreret fra",
     "history_error": "Fejl ved indlæsning af historik",
     "prompt_auto_analyze_singular": "Analyser 1 fil grundigt. Giv en struktureret analyse af koden.",
     "prompt_auto_analyze_plural": "Analyser {n} filer grundigt. Giv en struktureret analyse af koden og sammenlign dem.",

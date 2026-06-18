@@ -3,7 +3,7 @@
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from flask_cors import CORS
 from agent_core import Agent
-from session_manager import SessionManager
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
 import agent_skills
 import model_manager
 import config
@@ -19,12 +19,9 @@ from lang import t, get_ui_translations
 from i18n import K
 from agent_files import _is_safe_path
 from agent_phase_checks import TEMPLATE_PHASE_CHECKS, check_phase_done
-from config import get_logger
+from config import get_logger, log
 import agent_issues
 import agent_autoresearch
-
-
-log = get_logger(__name__)
 
 config.setup_logging()
 
@@ -89,23 +86,6 @@ def _rate_limit() -> Any:
     key = f"{client_ip}:{request.path}"
     if not rate_limiter.is_allowed(key, limit, window):
         return jsonify({"success": False, "error": "Too many requests — prøv igen om et minut"}), 429
-
-@app.before_request
-def _guard_json_body() -> Any:
-    """guard json body."""
-    if request.method in ('POST', 'PUT', 'PATCH') and request.path.startswith('/api/'):
-        if request.path in ('/api/upload', '/api/image/upload', '/api/file/upload', '/api/stop', '/api/git/backup', '/api/git/reset'):
-            return None
-        if not request.is_json:
-            return jsonify({"success": False, "error": "Content-Type must be application/json"}), 400
-
-agent = Agent()
-session_manager = SessionManager(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions"))
-current_session_id = None
-execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
-execution_status_lock = threading.Lock()
-export_folder = None
-export_folder_lock = threading.Lock()
 active_streams = {}
 active_streams_lock = threading.Lock()
 current_session_lock = threading.Lock()
@@ -832,7 +812,6 @@ def execute_without_stream() -> Any:
     if agent.task_tree is None:
         return jsonify({"success": False, "error": t(K.ERR_DECOMPOSE_FIRST, agent.lang)}), 400
     
-
 
     total_tasks = _count_tasks(agent.task_tree.root)
     completed = 0

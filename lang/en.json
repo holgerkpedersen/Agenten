@@ -430,6 +430,8 @@
     "select_session_first": "Select or create a session first",
     "reusing_prompt": "Reusing previous prompt",
     "no_prompts_yet": "No prompts yet. Write a task and click \"Decompose\"",
+    "show_more": "Show more",
+    "filtered_auto_prompts": "Showing only user prompts — auto-generated phases are filtered out",
     "history_error": "Error loading history",
     "prompt_auto_analyze_singular": "Analyze 1 file thoroughly. Give a structured analysis of the code.",
     "prompt_auto_analyze_plural": "Analyze {n} files thoroughly. Give a structured analysis of the code and compare them.",

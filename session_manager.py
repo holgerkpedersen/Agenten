@@ -10,6 +10,9 @@ from collections.abc import Callable
 from typing import Any
 from lang import t
 from i18n import K
+from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
+from typing import Any, Generator
+from agent_core import Agent
 
 SESSION_ID_PATTERN = re.compile(r'^[a-f0-9-]{8,36}$')
 MAX_SESSION_FILE_SIZE = 10 * 1024 * 1024
@@ -265,3 +268,28 @@ class SessionManager:
                 context += f"- {k.get('content', '')[:200]}\n"
             return context
         return ""
+
+
+@app.before_request
+def _guard_json_body() -> Any:
+    """guard json body."""
+    if request.method in ('POST', 'PUT', 'PATCH') and request.path.startswith('/api/'):
+        if request.path in ('/api/upload', '/api/image/upload', '/api/file/upload', '/api/stop', '/api/git/backup', '/api/git/reset'):
+            return None
+        if not request.is_json:
+            return jsonify({"success": False, "error": "Content-Type must be application/json"}), 400
+
+
+agent = Agent()
+
+session_manager = SessionManager(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions"))
+
+current_session_id = None
+
+execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
+
+execution_status_lock = threading.Lock()
+
+export_folder = None
+
+export_folder_lock = threading.Lock()

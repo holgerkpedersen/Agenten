@@ -2320,7 +2320,10 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                 pass
 
         # Extract module names from plan (only if plan is fresh)
-        plan_modules = sorted(set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))) if (plan_content and plan_fresh) else []
+        # Matcher både backtick-format (`config.py`) og heading-format (## Modul: config.py)
+        _mods = set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))
+        _mods |= set(_re.findall(r'(?:^|\n)#{1,6}\s+(?:Modul:\s*)?([a-zA-Z_][\w]*\.py)', plan_content, _re.MULTILINE | _re.IGNORECASE))
+        plan_modules = sorted(_mods) if (plan_content and plan_fresh) else []
         existing_modules = [m for m in plan_modules if _os.path.exists(m)]
 
         if phase == "analyse":
@@ -2355,9 +2358,9 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
             # Parse module→symbols mapping from plan
             _mod_symbols: dict[str, list[str]] = {}
             if plan_content:
-                # Pattern 1: "### modul.py\nsymbol1, symbol2, ..."
+                # Pattern 1: "### modul.py\nsymbol1, symbol2, ..." or "## Modul: config.py\n- symbol1\n- symbol2"
                 for _m in _re.finditer(
-                    r'#{1,4}\s+`?([a-zA-Z_][\w./-]+\.py)`?\s*\n(.*?)(?=\n#{1,4}\s+|$)',
+                    r'#{1,4}\s+(?:Modul(?:e)?:\s*)?`?([a-zA-Z_][\w./-]+\.py)`?\s*\n(.*?)(?=\n#{1,4}\s+|$)',
                     plan_content, _re.MULTILINE | _re.DOTALL | _re.IGNORECASE
                 ):
                     _mod = _m.group(1).strip('`')

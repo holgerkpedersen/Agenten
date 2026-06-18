@@ -430,6 +430,8 @@
     "select_session_first": "Seleccione o cree una sesión primero",
     "reusing_prompt": "Reutilizando tarea anterior",
     "no_prompts_yet": "Sin tareas aún. Escribe una tarea y haz clic en \"Descomponer\"",
+    "show_more": "Ver más",
+    "filtered_auto_prompts": "Mostrando solo prompts de usuario — las fases generadas automáticamente están filtradas",
     "history_error": "Error al cargar el historial",
     "prompt_auto_analyze_singular": "Analizar 1 archivo a fondo. Dar un análisis estructurado del código.",
     "prompt_auto_analyze_plural": "Analizar {n} archivos a fondo. Dar un análisis estructurado del código y compararlos.",

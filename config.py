@@ -2,6 +2,7 @@
 import logging
 import os
 import sys
+from typing import Any
 
 # Force UTF-8 on Windows consoles at import time
 for _stream in (sys.stdout, sys.stderr):
@@ -103,3 +104,56 @@ MAX_FILE_CONTEXT_CHARS = 4000  # max chars per file in initial system prompt (ag
 CHANNEL_TAG_MODELS = {
     "gemma": "\n<|channel>thought\n<channel|>",
 }
+
+
+
+def get_config(key: str, default: Any = None) -> Any:
+    """Get a configuration value by key."""
+    config = {
+        "database_url": DATABASE_URL,
+        "max_retries": MAX_RETRIES,
+        "timeout": DEFAULT_TIMEOUT,
+        "log_level": LOG_LEVEL,
+    }
+    return config.get(key, default)
+
+
+
+def is_extension_allowed(ext: str) -> bool:
+    """Check if a file extension is in the allowed list."""
+    return ext.lower() in ALLOWED_EXTENSIONS
+
+
+
+def validate_config() -> list[str]:
+    """Validate configuration and return list of warnings."""
+    warnings = []
+    if MAX_RETRIES < 1:
+        warnings.append("MAX_RETRIES should be at least 1")
+    if DEFAULT_TIMEOUT < 5:
+        warnings.append("DEFAULT_TIMEOUT is very low")
+    if not ALLOWED_EXTENSIONS:
+        warnings.append("ALLOWED_EXTENSIONS is empty")
+    return warnings
+
+
+
+def get_allowed_extensions() -> set[str]:
+    """Return a copy of the allowed extensions set."""
+    return set(ALLOWED_EXTENSIONS)
+
+
+
+def config_to_dict() -> dict[str, Any]:
+    """Return all configuration as a dictionary."""
+    return {
+        "database_url": DATABASE_URL,
+        "max_retries": MAX_RETRIES,
+        "timeout": DEFAULT_TIMEOUT,
+        "allowed_extensions": list(ALLOWED_EXTENSIONS),
+        "log_level": LOG_LEVEL,
+    }
+
+
+
+log = get_logger(__name__)
