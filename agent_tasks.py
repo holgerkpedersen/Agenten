@@ -1150,6 +1150,16 @@ def _truncate_messages(messages: list[dict], max_chars: int, agent: Any | None =
 
     keep_pairs = 6 if is_refactor else 4
     tail = non_system[-keep_pairs:] if len(non_system) > keep_pairs else non_system
+    # Ensure tail doesn't start with a bare "tool" message (LM Studio template
+    # error: "Message has tool role, but no preceding assistant with tool_calls")
+    if tail and tail[0].get("role") == "tool":
+        # Find first non-tool message to prepend
+        for i, m in enumerate(tail):
+            if m.get("role") != "tool":
+                tail = tail[i:]
+                break
+        else:
+            tail = []
     insert = [{"role": "user", "content": mid}]
     return system + insert + tail
 

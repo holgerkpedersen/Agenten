@@ -277,7 +277,18 @@ class LMStudioWrapper:
         other_msgs = [m for m in messages if m["role"] != "system"]
         mid = "\n[... tidligere kontekst afkortet ...]"
         if len(other_msgs) > 2:
-            other_msgs = [other_msgs[0], {"role": "user", "content": mid}] + other_msgs[-1:]
+            # Keep first non-system message + truncation note + last message.
+            # BUT never let a bare "tool" role be the last message — it needs a
+            # preceding assistant with tool_calls or LM Studio templates reject it.
+            last_idx = -1
+            while last_idx >= -len(other_msgs) and other_msgs[last_idx].get("role") == "tool":
+                last_idx -= 1
+            if abs(last_idx) == 1:
+                # Only tool messages remain — drop them all, just keep the note
+                other_msgs = [other_msgs[0], {"role": "user", "content": mid}]
+            else:
+                last_keep = other_msgs[last_idx] if last_idx != -1 else other_msgs[-1]
+                other_msgs = [other_msgs[0], {"role": "user", "content": mid}, last_keep]
         return system_msgs + other_msgs
 
     def generate_stream(self, prompt: str | None = None, messages: list[dict] | None = None, temperature: float = 0.7, max_tokens: int | None = None, images: list | None = None, tools: list | None = None) -> Generator[str, None, None]:
