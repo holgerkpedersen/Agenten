@@ -3131,6 +3131,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                 tool_call_msg["reasoning_content"] = pending_reasoning
             tc_names = [tc["function"]["name"] for tc in pending_tc]
             reasoning = (pending_reasoning or "")[:400].replace("\n", " ").replace("\r", "")
+            # Sørg for mellemrum efter ] i LLM's reasoning-tekst
+            reasoning = re.sub(r'\]([^\s])', r'] \1', reasoning)
             detail = f"tools: {tc_names}"
             if reasoning:
                 detail = f"{reasoning} | {detail}"
@@ -3486,6 +3488,20 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         symbols_in_batch = [r.get("symbol", "") for r in inner.get("results", []) if r.get("success")]
                         progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
                         messages.append({"role": "user", "content": progress_msg})
+                        # Opdater todo-tekst med symbol-fremskridt
+                        _todo_text = "{} færdig".format(target)
+                        _actual = _count_symbols_in_file(inner.get("target", ""))
+                        # Find matching per-modul todo og opdater tekst
+                        for _t in (getattr(agent, '_phase_todos') or []):
+                            _tid = _t.get("id", "")
+                            _tt = _t.get("text", "")
+                            if target in _tt and _tid.startswith("rf_e_create_"):
+                                import re as _re3
+                                _pm = _re3.search(r'(\d+)\s*symbols', _tt)
+                                if _pm:
+                                    _todo_text = "{} færdig — {}/{} symbols".format(target, _actual, _pm.group(1))
+                                yield {"type": "todo_update", "id": _tid, "done": True, "text": _todo_text}
+                                break
 
                 if tool_name == "extract_symbol" and result.get("success"):
                     inner = result.get("result", {})

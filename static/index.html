@@ -3207,7 +3207,7 @@ async function executeWithStream() {
                 }
                 break;
                 
-            case 'todo_update':
+             case 'todo_update':
                 const tc2 = document.getElementById('todosContent');
                 if (tc2) {
                     const item = tc2.querySelector(`[data-todo-id="${data.id}"]`);
@@ -3215,11 +3215,15 @@ async function executeWithStream() {
                         if (data.done) {
                             item.classList.add('done');
                             item.querySelector('input').checked = true;
-                            // Markér næste ikke-fuldførte todo som aktiv
                             _activateNextTodo();
                         } else {
                             item.classList.remove('done');
                             item.querySelector('input').checked = false;
+                        }
+                        // Opdater tekst hvis medfulgt
+                        if (data.text) {
+                            const textSpan = item.querySelector('.todo-text');
+                            if (textSpan) textSpan.textContent = data.text;
                         }
                     }
                 }
