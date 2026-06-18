@@ -2233,11 +2233,11 @@ function createPanels() {
             contentDiv.innerHTML = '<div class="todos-toolbar" id="todosToolbar" style="display:none;padding:2px 6px;border-bottom:1px solid var(--border);font-size:11px;"><button onclick="copyTodos()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text);">📋 Kopiér</button> <button onclick="addCustomTodo()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--accent);font-weight:bold;" title="Tilføj todo">➕</button></div>' +
                 '<div id="todosContent" class="todos-box">' +
                     '<div id="autoTodosSection">' +
-                        '<div class="todo-section-header" style="font-size:11px;font-weight:bold;color:#60a5fa;padding:4px 6px 2px;border-bottom:1px solid rgba(96,165,250,0.2);">📋 Agentens plan</div>' +
-                        '<div id="autoTodosList" style="padding:2px 4px;"><div style="color:#64748b;padding:4px;">Ingen krav endnu.</div></div>' +
+                        '<div class="todo-section-header" style="font-size:11px;font-weight:bold;color:#60a5fa;padding:4px 6px 2px;border-bottom:1px solid rgba(96,165,250,0.2);">' + _('todo.agent_header') + '</div>' +
+                        '<div id="autoTodosList" style="padding:2px 4px;"><div style="color:#64748b;padding:4px;">' + _('todo.no_criteria') + '</div></div>' +
                     '</div>' +
                     '<div id="llmTodosSection" style="display:none;">' +
-                        '<div class="todo-section-header" style="font-size:11px;font-weight:bold;color:#34d399;padding:8px 6px 2px;border-bottom:1px solid rgba(52,211,153,0.2);">🤖 LLM\'s plan</div>' +
+                        '<div class="todo-section-header" style="font-size:11px;font-weight:bold;color:#34d399;padding:8px 6px 2px;border-bottom:1px solid rgba(52,211,153,0.2);">' + _('todo.llm_header') + '</div>' +
                         '<div id="llmTodosList" style="padding:2px 4px;"></div>' +
                     '</div>' +
                     '<div id="userCommentArea" style="display:none;border-top:1px solid var(--border);padding:4px 6px;margin-top:4px;">' +
@@ -3242,6 +3242,8 @@ async function executeWithStream() {
                     llmList.innerHTML = '';
                     if (llmSection) llmSection.style.display = 'none';
                 }
+                window._agentHeaderShown = false;
+                window._llmHeaderShown = false;
                 break;
                 
              case 'todo_add':
@@ -3270,7 +3272,13 @@ async function executeWithStream() {
                         // Aktivér første ikke-fuldførte todo
                         _activateNextTodo();
                         // Also show in LLM box so user can see it in the main area
-                        if (_llmBox) _llmBox.innerHTML += `<div style="color:#60a5fa;font-size:11px;padding:1px 0;">📋 [Agent] ${escapeHtml(data.todo.text)}</div>`;
+                        if (_llmBox) {
+                            if (!window._agentHeaderShown) {
+                                _llmBox.innerHTML += `<div style="color:#60a5fa;font-size:12px;font-weight:bold;padding:4px 0 2px;border-bottom:1px solid rgba(96,165,250,0.2);margin-top:4px;">${_('todo.agent_header')}</div>`;
+                                window._agentHeaderShown = true;
+                            }
+                            _llmBox.innerHTML += `<div style="color:#60a5fa;font-size:11px;padding:1px 0 1px 12px;">${escapeHtml(data.todo.text)}</div>`;
+                        }
                         console.log('[TODO] auto_add:', data.todo.id, data.todo.text);
                     }
                 }
@@ -3316,8 +3324,14 @@ async function executeWithStream() {
                         div.dataset.todoId = data.id;
                         div.innerHTML = `<input type="checkbox" class="todo-checkbox" onchange="this.parentElement.classList.toggle('done')"> <span class="todo-text">${escapeHtml(data.text)}</span>`;
                         llmListAdd.appendChild(div);
-                        // Also show in LLM box so user can see it in the main area
-                        if (_llmBox) _llmBox.innerHTML += `<div style="color:#34d399;font-size:11px;padding:1px 0;">🤖 [LLM] ${escapeHtml(data.text)}</div>`;
+                        // Also show in LLM box
+                        if (_llmBox) {
+                            if (!window._llmHeaderShown) {
+                                _llmBox.innerHTML += `<div style="color:#34d399;font-size:12px;font-weight:bold;padding:4px 0 2px;border-bottom:1px solid rgba(52,211,153,0.2);margin-top:4px;">${_('todo.llm_header')}</div>`;
+                                window._llmHeaderShown = true;
+                            }
+                            _llmBox.innerHTML += `<div style="color:#34d399;font-size:11px;padding:1px 0 1px 12px;">${escapeHtml(data.text)}</div>`;
+                        }
                         console.log('[TODO] llm_add:', data.id, data.text);
                         _activateNextTodo();
                     }
