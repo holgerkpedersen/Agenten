@@ -3007,8 +3007,8 @@ async function resumeExecution() {
             _handleMainEvent(event);
         }
     };
-    eventSource.onerror = function() {
-        if (!_isExecuting) { eventSource = null; return; }
+     eventSource.onerror = function() {
+        if (!_isExecuting) { return; }
         _isExecuting = false;
         document.getElementById("headerBody")?.classList.remove("btn-executing");
         document.getElementById('pauseBtn').disabled = true;
@@ -3018,6 +3018,7 @@ async function resumeExecution() {
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
     };
 }
+
 
 function stopStream() {
     _isExecuting = false;
@@ -3298,7 +3299,7 @@ async function executeWithStream() {
                         outputDiv.textContent = clean;
                     }
                 }
-                if (_llmBox && __llmBox.scrollTop + _llmBox.clientHeight >= __llmBox.scrollHeight - 60) {
+                if (_llmBox && _llmBox.scrollTop + _llmBox.clientHeight >= _llmBox.scrollHeight - 60) {
                     _llmBox.scrollTop = _llmBox.scrollHeight;
                 }
                 break;
@@ -3395,7 +3396,7 @@ async function executeWithStream() {
                 addLogEntry(success ? 'TOOL' : 'ERROR', `${icon} ${data.tool}`, rtext.length > 500 ? rtext.slice(0, 500) + '…' : rtext);
                 if (_llmBox && success) {
                     _llmBox.innerHTML += `<div style="color:var(--success); margin:5px 0; padding:5px; background:var(--panel-bg); border-left:3px solid var(--success); font-size:12px;">${icon} <strong>${escapeHtml(data.tool)}</strong>: ${escapeHtml(data.result.result?.url || data.result.result?.output || 'OK').slice(0, 150)}</div>`;
-                    if (__llmBox.scrollTop + _llmBox.clientHeight >= __llmBox.scrollHeight - 60) {
+                    if (_llmBox.scrollTop + _llmBox.clientHeight >= _llmBox.scrollHeight - 60) {
                         _llmBox.scrollTop = _llmBox.scrollHeight;
                     }
                 }
@@ -3445,8 +3446,8 @@ async function executeWithStream() {
     
     eventSource.onmessage = _handleMainEvent;
     window._handleMainEvent = _handleMainEvent;
-    eventSource.onerror = function() {
-        if (!_isExecuting) { eventSource = null; return; }
+     eventSource.onerror = function() {
+        if (!_isExecuting) { return; }
         _isExecuting = false;
         document.getElementById("headerBody")?.classList.remove("btn-executing");
         document.getElementById('stopBtn').disabled = true;
@@ -3456,6 +3457,7 @@ async function executeWithStream() {
         _clearSpinner();
     };
 }
+
 
 function addCustomTodo() {
     const text = prompt('Indtast ny todo:');
