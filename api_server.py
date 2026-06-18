@@ -1460,6 +1460,8 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
                 yield f"data: {json.dumps({'type': 'output_files', 'task': node.name, 'files': event['files']})}\n\n"
             elif event["type"] == "log":
                 yield f"data: {json.dumps({'type': 'log', 'log': event['log']})}\n\n"
+            elif event["type"] == "todo_clear":
+                yield f"data: {json.dumps({'type': 'todo_clear'})}\n\n"
             elif event["type"] == "todo_add":
                 yield f"data: {json.dumps({'type': 'todo_add', 'todo': event['todo']})}\n\n"
             elif event["type"] == "todo_update":
