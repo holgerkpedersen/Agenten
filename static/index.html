@@ -2886,6 +2886,7 @@ function stopStream() {
         eventSource.close();
         eventSource = null;
     }
+    _clearSpinner();
     try { fetch('/api/execute-stop', { method: 'POST' }); } catch(e) {}
     addLogEntry('INFO', _('stream_stopped'), _('stopped_by_user'));
     document.getElementById('replyInput').style.display = 'none';
