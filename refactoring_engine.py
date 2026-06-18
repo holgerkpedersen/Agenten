@@ -15,8 +15,22 @@ import ast
 import json
 import os
 import hashlib
+import time as _time
 from typing import Any
 from collections import defaultdict
+
+
+def _atomic_replace(src: str, dst: str, max_retries: int = 8) -> None:
+    """Replace dst with src atomically, retrying on Windows file locks."""
+    for attempt in range(max_retries):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt < max_retries - 1:
+                _time.sleep(0.15 * (attempt + 1))
+            else:
+                raise
 
 
 def _parse_symbols_list(symbols: str | list[str]) -> list[str]:
@@ -248,7 +262,7 @@ class FileSnapshot:
         tmppath = self.path + '.tmp'
         with open(tmppath, 'w', encoding='utf-8') as f:
             f.write(self.content)
-        os.replace(tmppath, self.path)
+        _atomic_replace(tmppath, self.path)
 
 
 class ImportVisitor(ast.NodeVisitor):
@@ -492,7 +506,7 @@ class CodeModifier:
         tmppath = path + '.tmp'
         with open(tmppath, 'w', encoding='utf-8') as f:
             f.write(new_content)
-        os.replace(tmppath, path)
+        _atomic_replace(tmppath, path)
 
         return new_content
 
@@ -558,7 +572,7 @@ class CodeModifier:
                     tmppath = path + '.tmp'
                     with open(tmppath, 'w', encoding='utf-8') as f:
                         f.write(new_content)
-                    os.replace(tmppath, path)
+                    _atomic_replace(tmppath, path)
                     return True
 
         # Normal insert: insert right after the first consecutive import block
@@ -593,7 +607,7 @@ class CodeModifier:
         tmppath = path + '.tmp'
         with open(tmppath, 'w', encoding='utf-8') as f:
             f.write(new_content)
-        os.replace(tmppath, path)
+        _atomic_replace(tmppath, path)
 
         return True
 
@@ -656,7 +670,7 @@ class RefactoringEngine:
         tmppath = path + '.tmp'
         with open(tmppath, 'w', encoding='utf-8') as f:
             f.write(content)
-        os.replace(tmppath, path)
+        _atomic_replace(tmppath, path)
 
     def extract_symbol(self, source: str, symbol_name: str, target: str) -> dict[str, Any]:
         """Strategy-based extraction: copy a symbol + its imports to a new file.
