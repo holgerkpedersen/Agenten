@@ -1107,10 +1107,7 @@ async function switchLLMLang(lang) {
 }
 
 async function redecomposeTree(lang) {
-    if (_isExecuting) {
-        alert('Stop den aktuelle udførelse før du gen-nedbryder.');
-        return;
-    }
+    if (_guardExecution('Stop den aktuelle udførelse før du gen-nedbryder.')) return;
     if (!currentSessionId) return;
     addLogEntry('INFO', 'Re-decompose', `Gen-nedbryder træ på ${lang}...`);
     try {
@@ -1290,10 +1287,7 @@ function toggleTheme() {
 }
 
 function onTemplateChange(template) {
-    if (_isExecuting) {
-        document.getElementById('templateSelect').value = currentTemplate;
-        return;
-    }
+    if (_isExecuting) return;
     try { localStorage.setItem('agenten_template', template); } catch(e) {}
     const descDiv = document.getElementById('templateDescription');
     const key = 'template_description_' + template;
@@ -2467,10 +2461,7 @@ async function refreshSessions() {
 }
 
 async function createNewSession() {
-    if (_isExecuting) {
-        alert('Stop den aktuelle udførelse før du opretter en ny session.');
-        return;
-    }
+    if (_guardExecution('Stop den aktuelle udførelse før du opretter en ny session.')) return;
     const name = prompt(_('new_session_prompt'), `Session ${new Date().toLocaleTimeString()}`);
     if (name) {
         const response = await fetch('/api/sessions/create', {
@@ -2514,10 +2505,7 @@ async function createNewSession() {
 }
 
 async function reuseCurrentSession() {
-    if (_isExecuting) {
-        alert('Stop den aktuelle udførelse før du genbruger sessionen.');
-        return;
-    }
+    if (_guardExecution('Stop den aktuelle udførelse før du genbruger sessionen.')) return;
     if (!currentSessionId) {
         addLogEntry('ERROR', _('reuse_no_session'), _('select_session_first'));
         return;
@@ -2592,10 +2580,7 @@ async function reuseCurrentSession() {
 }
 
 async function loadSelectedSession() {
-    if (_isExecuting) {
-        alert('Stop den aktuelle udførelse før du skifter session.');
-        return;
-    }
+    if (_guardExecution('Stop den aktuelle udførelse før du skifter session.')) return;
     const select = document.getElementById('sessionSelect');
     const sessionId = select.value;
     if (!sessionId) {
@@ -2807,10 +2792,7 @@ async function saveCurrentSession() {
 }
 
 async function decompose() {
-    if (_isExecuting) {
-        alert('Stop den aktuelle udførelse før du nedbryder træet.');
-        return;
-    }
+    if (_guardExecution('Stop den aktuelle udførelse før du nedbryder træet.')) return;
     const prompt = document.getElementById('promptInput').value;
     if (!prompt) {
         alert(_('enter_task'));
@@ -2889,6 +2871,14 @@ async function decompose() {
     }
 }
 
+function _guardExecution(msg) {
+    if (_isExecuting) {
+        alert(msg || 'Stop den aktuelle udførelse først.');
+        return true;
+    }
+    return false;
+}
+
 function _clearSpinner() {
     const taskElem = document.getElementById('currentTask');
     if (taskElem && taskElem.querySelector('.loading')) {
@@ -2920,10 +2910,7 @@ function stopStream() {
 }
 
 async function undoBackup() {
-    if (_isExecuting) {
-        alert('Kan ikke fortryde mens en udførelse er i gang. Stop først.');
-        return;
-    }
+    if (_guardExecution('Kan ikke fortryde mens en udførelse er i gang. Stop først.')) return;
     const undoBtn = document.getElementById('undoBtn');
     if (undoBtn) {
         undoBtn.disabled = true;
@@ -2988,10 +2975,7 @@ async function resetExecution() {
 }
 
 async function deleteTree() {
-    if (_isExecuting) {
-        alert('Stop den aktuelle udførelse før du sletter træet.');
-        return;
-    }
+    if (_guardExecution('Stop den aktuelle udførelse før du sletter træet.')) return;
     if (!currentTree) {
         alert(_('no_tree_to_delete'));
         return;
