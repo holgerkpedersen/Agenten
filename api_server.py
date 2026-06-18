@@ -19,11 +19,15 @@ from lang import t, get_ui_translations
 from i18n import K
 from agent_files import _is_safe_path
 from agent_phase_checks import TEMPLATE_PHASE_CHECKS, check_phase_done
-from config import get_logger, log, BASE_DIR, STATIC_DIR, VERSION_FILES, BUILD_INFO, UPLOAD_DIR, _IMAGE_MAGIC_BYTES
+from config import get_logger, log
 import agent_issues
 import agent_autoresearch
 
 config.setup_logging()
+
+# ============ KONFIGURATION ============
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, 'static')
 
 os.makedirs(STATIC_DIR, exist_ok=True)
 
@@ -94,6 +98,9 @@ def _file_mtime(path: str) -> str:
         path:"""
     try: return datetime.fromtimestamp(os.path.getmtime(os.path.join(BASE_DIR, path))).strftime("%H:%M:%S")
     except OSError: return "?"
+
+VERSION_FILES = ["api_server.py", "agent_core.py", "llm_wrapper.py", "tools.py", "lang.py", "i18n.py"]
+BUILD_INFO = {f: _file_mtime(f) for f in VERSION_FILES}
 BUILD_INFO["started"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 log.info("Startet: %s | api_server=%s | llm=%s", BUILD_INFO['started'], BUILD_INFO['api_server.py'], BUILD_INFO['llm_wrapper.py'])
@@ -269,6 +276,8 @@ def list_folder_contents() -> Any:
 
 # ============ FIL-LÆSNING ENDPOINTS ============
 import tempfile
+
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -280,6 +289,15 @@ def sanitize_filename(filename: str) -> str:
     result = "".join(c for c in filename if c.isalnum() or c in '._- ')
     # Replace spaces with underscores for URL safety
     return result.replace(' ', '_')
+
+
+_IMAGE_MAGIC_BYTES = {
+    b'\x89PNG\r\n\x1a\n': 'png',
+    b'\xff\xd8\xff': 'jpg',
+    b'GIF8': 'gif',
+    b'RIFF': 'webp',
+    b'BM': 'bmp',
+}
 
 
 def _validate_image_content(file_bytes: bytes, ext: str) -> bool:
@@ -723,6 +741,7 @@ def pause_execution() -> Any:
                 sa._pause_requested = True
                 return jsonify({"success": True})
     return jsonify({"success": False, "error": "Ingen aktiv stream at pause"})
+
 
 @app.route("/api/reply", methods=["POST"])
 def user_reply() -> Any:
@@ -1737,15 +1756,10 @@ def execute_resume() -> Any:
 
     def generate_resume(agent: Any) -> Generator[str, None, None]:
         _ui = ui_lang
-        # Send resume context
-        yield f"data: {json.dumps({'type': 'log', 'log': {'level': 'INFO', 'message': '▶️ Udførelse genoptaget', 'detail': ''}})}\n\n"
-
-        # Re-inject the saved conversation with a resume instruction
-        resume_msg = {"role": "user", "content": "Udførelsen blev pauset. Fortsæt hvor du slap. Kald det næste værktøj eller afslut med <<<DONE>>>."}
-        agent._paused_messages = None  # Clear saved state
+        yield f"data: {json.dumps({'type': 'log', 'log': {'level': 'INFO', 'message': '\u25b6\ufe0f Udf\u00f8relse genoptaget', 'detail': ''}})}\n\n"
+        resume_msg = {"role": "user", "content": "Udf\u00f8relsen blev pauset. Forts\u00e6t hvor du slap. Kald det n\u00e6ste v\u00e6rkt\u00f8j eller afslut med <<<DONE>>>."}
+        agent._paused_messages = None
         agent._pause_requested = False
-
-        # Start solving from the paused task
         yield from agent.solve_task_stream(
             paused_task or agent.task_tree.root if agent.task_tree else None,
             paused_original,
