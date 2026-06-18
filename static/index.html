@@ -505,6 +505,10 @@
             opacity: 0.5;
             text-decoration: line-through;
         }
+        .todo-item.active {
+            background: rgba(96, 165, 250, 0.15);
+            border-left: 2px solid #60a5fa;
+        }
         .todo-checkbox {
             cursor: pointer;
             margin-top: 1px;
@@ -1536,6 +1540,7 @@ function updateTreeDisplay() {
         html += `</div>`;
         html += renderTree(currentTree);
         treeContainer.innerHTML = html;
+        _activateNextTodo();
     }
 }
 
@@ -2866,6 +2871,16 @@ function _clearSpinner() {
     }
 }
 
+function _activateNextTodo() {
+    const tc = document.getElementById('todosContent');
+    if (!tc) return;
+    // Remove active class from all items
+    tc.querySelectorAll('.todo-item.active').forEach(el => el.classList.remove('active'));
+    // Find first non-done item and mark as active
+    const next = tc.querySelector('.todo-item:not(.done)');
+    if (next) next.classList.add('active');
+}
+
 function stopStream() {
     if (eventSource) {
         eventSource.close();
@@ -3015,7 +3030,7 @@ async function executeWithStream() {
                 addLogEntry(data.log.level, data.log.message, data.log.detail);
                 break;
                 
-            case 'todo_add':
+             case 'todo_add':
                 const tc = document.getElementById('todosContent');
                 if (tc) {
                     const existing = tc.querySelector(`[data-todo-id="${data.todo.id}"]`);
@@ -3035,6 +3050,8 @@ async function executeWithStream() {
                         // Show copy toolbar
                         const tb = document.getElementById('todosToolbar');
                         if (tb) tb.style.display = '';
+                        // Aktivér første ikke-fuldførte todo
+                        _activateNextTodo();
                     }
                 }
                 break;
@@ -3047,6 +3064,8 @@ async function executeWithStream() {
                         if (data.done) {
                             item.classList.add('done');
                             item.querySelector('input').checked = true;
+                            // Markér næste ikke-fuldførte todo som aktiv
+                            _activateNextTodo();
                         } else {
                             item.classList.remove('done');
                             item.querySelector('input').checked = false;
@@ -3055,9 +3074,10 @@ async function executeWithStream() {
                 }
                 break;
                 
-            case 'start':
+             case 'start':
                 if (llmBox) llmBox.innerHTML = `<div style="color:#60a5fa;">🎬 ${_('N_tasks').replace('{n}', data.total_tasks)}</div>`;
                 addLogEntry('INFO', _('streaming_started'), _('N_tasks').replace('{n}', data.total_tasks));
+                _activateNextTodo();
                 break;
 
             case 'retry':
