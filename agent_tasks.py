@@ -2856,7 +2856,10 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
         # extract_symbol / batch_extract_symbols -> matches "Flyt symbol ... til ..."
         if tool_name in ("extract_symbol", "batch_extract_symbols"):
             sym = args_val.get("symbol_name", "")
-            if sym and (sym in ttext or "extract" in ttext.lower()):
+            target = args_val.get("target", "")
+            if target and (target in ttext or os.path.basename(target) in ttext):
+                ids.append(tid)
+            elif sym and (sym in ttext or "extract" in ttext.lower()):
                 ids.append(tid)
             # rf_e2: write_file fallback is not needed when extract_symbol works
             # rf_e3: extract_symbol always includes imports

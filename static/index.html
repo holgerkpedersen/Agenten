@@ -2218,7 +2218,7 @@ function createPanels() {
         } else if (def.id === 'history') {
             contentDiv.innerHTML = '<div id="historyContent" class="history-box"><div style="color: #64748b;"></div></div>';
         } else if (def.id === 'todos') {
-            contentDiv.innerHTML = '<div class="todos-toolbar" id="todosToolbar" style="display:none;padding:2px 6px;border-bottom:1px solid var(--border);font-size:11px;"><button onclick="copyTodos()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text);">📋 Kopiér</button></div><div id="todosContent" class="todos-box"><div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div></div>';
+            contentDiv.innerHTML = '<div class="todos-toolbar" id="todosToolbar" style="display:none;padding:2px 6px;border-bottom:1px solid var(--border);font-size:11px;"><button onclick="copyTodos()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text);">📋 Kopiér</button> <button onclick="addCustomTodo()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--accent);font-weight:bold;" title="Tilføj todo">➕</button></div><div id="todosContent" class="todos-box"><div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div></div>';
         }
     }
     
@@ -3429,6 +3429,25 @@ async function executeWithStream() {
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
         _clearSpinner();
     };
+}
+
+function addCustomTodo() {
+    const text = prompt('Indtast ny todo:');
+    if (!text || !text.trim()) return;
+    const tc = document.getElementById('todosContent');
+    if (!tc) return;
+    const div = document.createElement('div');
+    div.className = 'todo-item';
+    const id = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    div.dataset.todoId = id;
+    div.innerHTML = '<input type="checkbox" class="todo-checkbox" onchange="this.parentElement.classList.toggle(\'done\')"> <span class="todo-text">' + escapeHtml(text.trim()) + '</span>';
+    // Remove placeholder if present
+    const placeholder = tc.querySelector('div[style*="color: #64748b"]');
+    if (placeholder) placeholder.remove();
+    tc.appendChild(div);
+    _activateNextTodo();
+    const tb = document.getElementById('todosToolbar');
+    if (tb) tb.style.display = '';
 }
 
 function copyTodos() {

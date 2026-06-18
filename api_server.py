@@ -1733,20 +1733,30 @@ def execute_stream() -> Any:
 
 @app.route("/api/execute-resume", methods=["GET"])
 def execute_resume() -> Any:
-    """Resume paused execution — re-send saved messages with a resume prompt."""
+    """Resume paused execution — re-send saved messages with a resume prompt.
+    
+    Returns SSE even on errors, so the frontend EventSource never fires onerror
+    (which would hide the pause/resume buttons prematurely).
+    """
     global current_session_id
     if not current_session_id:
-        return jsonify({"success": False, "error": "Ingen aktiv session"}), 400
+        def _no_session():
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Ingen aktiv session'})}\n\n"
+        return Response(stream_with_context(_no_session()), mimetype='text/event-stream')
 
     session_id = current_session_id
     with active_streams_lock:
         stream_agent = active_streams.get(session_id)
     if not stream_agent:
-        return jsonify({"success": False, "error": "Ingen pause-status fundet"}), 400
+        def _no_agent():
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Ingen pause-status fundet — vent til LLM er f\u00e6rdig med at pause'})}\n\n"
+        return Response(stream_with_context(_no_agent()), mimetype='text/event-stream')
 
     saved = getattr(stream_agent, '_paused_messages', None)
     if not saved:
-        return jsonify({"success": False, "error": "Ingen gemt kontekst at genoptage"}), 400
+        def _no_msgs():
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Ingen gemt kontekst endnu — vent til LLM er f\u00e6rdig med at pause'})}\n\n"
+        return Response(stream_with_context(_no_msgs()), mimetype='text/event-stream')
 
     paused_task = getattr(stream_agent, '_paused_task', None)
     paused_original = getattr(stream_agent, '_paused_original_prompt', '')
