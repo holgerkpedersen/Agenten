@@ -2982,7 +2982,7 @@ def _reconcile_llm_todos(agent: Any) -> list[str]:
         m = _re.search(r'([a-zA-Z_][\w./-]+\.py)', text)
         if m:
             fpath = m.group(1)
-            if _os.path.exists(fpath) and _count_symbols_in_file(fpath) > 0:
+            if _os.path.exists(fpath) and _os.path.getsize(fpath) > 0:
                 _actual = _count_symbols_in_file(fpath)
                 if "lt_total" in tid:
                     # Only mark total done when all other module todos are done
@@ -3125,9 +3125,9 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
                 _exists = _os.path.exists(mod)
                 _todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
                 if phase == "ekstraher":
+                    _actual = _count_symbols_in_file(mod) if _exists else 0
                     _text = f"[{_tgt_mods.index(mod)+1}/{len(_tgt_mods)}] Flyt symboler til {mod} med batch_extract_symbols"
-                    if _exists:
-                        _actual = _count_symbols_in_file(mod) if _exists else 0
+                    if _exists and _actual > 0:
                         _text += f" ({_actual} symbols)"
                 elif phase == "plan":
                     _text = f"Planlæg indhold af {mod}"
@@ -3140,7 +3140,8 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
             _total_done = all(_os.path.exists(m) for m in _tgt_mods)
             agent._llm_todos.append({"id": "lt_total", "text": _total_text, "done": _total_done, "parent_id": None, "phase": phase})
             events.append({"type": "llm_todo_add", "id": "lt_total", "text": _total_text, "parent_id": None})
-            agent._llm_has_planned = True
+            # Don't set _llm_has_planned — auto-populated todos are a template,
+            # LLM should still call plan_phase to create its OWN detailed plan.
             return events
 
     # ── For other phases: leave LLM's plan empty — LLM creates its own ──
@@ -3303,7 +3304,11 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                 elif i >= 1:
                     _any_updated = any(t.get("done") for t in (getattr(agent, '_llm_todos') or []))
                     if not _any_updated:
-                        budget_msg += "\n\n💡 Har du en plan? Brug **list_todos** for at se din status. Mangler du en plan, kald **plan_phase(fasenavn, mål)**."
+                        _has_auto = bool(getattr(agent, '_llm_todos', None))
+                        if _has_auto:
+                            budget_msg += "\n\n💡 Du har en skabelon til planen. Gør den mere detaljeret med **create_todo** — tilføj symbolnavne og tool-kald. Brug **update_todo** for at markere fremdrift."
+                        else:
+                            budget_msg += "\n\n💡 Har du en plan? Brug **list_todos** for at se din status. Mangler du en plan, kald **plan_phase(fasenavn, mål)**."
                 messages.append({"role": "user", "content": budget_msg})
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)
