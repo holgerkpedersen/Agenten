@@ -532,6 +532,7 @@
         }
         
         .reuse-btn {
+
             margin-top: 5px;
             font-size: 10px;
             padding: 2px 8px;
@@ -660,6 +661,12 @@
         .issue-type-testing { background: var(--accent); color: white; }
         .issue-type-performance { background: #06b6d4; color: white; }
         .issue-type-maintainability { background: var(--text-muted); color: white; }
+        /* Under udførelse: deaktivér alle knapper undtagen Stop, Gem, Opdater */
+        .btn-executing button:not(#stopBtn):not(#saveSess):not(#refreshSess) {
+            pointer-events: none;
+            opacity: 0.4;
+            filter: grayscale(0.6);
+        }
     </style>
 </head>
 <body>
@@ -2938,6 +2945,7 @@ function _activateNextTodo() {
 
 function stopStream() {
     _isExecuting = false;
+    document.getElementById("headerBody")?.classList.remove("btn-executing");
     if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -3077,6 +3085,7 @@ async function executeWithStream() {
     
     eventSource = new EventSource('/api/execute-stream');
     _isExecuting = true;
+    document.getElementById("headerBody")?.classList.add("btn-executing");
     let currentOutputs = {};
     
     eventSource.onmessage = function(event) {
@@ -3315,6 +3324,7 @@ async function executeWithStream() {
                 
              case 'complete':
                 _isExecuting = false;
+                document.getElementById("headerBody")?.classList.remove("btn-executing");
                 const budgetComplete = document.getElementById('budgetDisplay');
                 if (budgetComplete) budgetComplete.style.display = 'none';
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
@@ -3330,6 +3340,7 @@ async function executeWithStream() {
                 
              case 'error':
                 _isExecuting = false;
+                document.getElementById("headerBody")?.classList.remove("btn-executing");
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
@@ -3342,6 +3353,7 @@ async function executeWithStream() {
     
     eventSource.onerror = function() {
         _isExecuting = false;
+        document.getElementById("headerBody")?.classList.remove("btn-executing");
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
         _clearSpinner();
     };
