@@ -161,15 +161,20 @@ def auto_detect_workdir(file_chunks: dict | None = None, prompt: str = "") -> st
 
 
 def _resolve_path(path: str) -> str:
-    """Resolve a path relative to the workdir when outside Agenten cwd, otherwise relative to cwd."""
+    """Resolve a path relative to the workdir when AGENT_WORKDIR is set, otherwise relative to cwd.
+    
+    When AGENT_WORKDIR is set, ALWAYS prefer the workdir — even if the file
+    doesn't exist there yet (it will be created). Never fall through to CWD
+    for non-existent paths, as that causes Agenten framework files (e.g.
+    ``config.py``) to be returned when the user intends to create a new
+    module in their project.
+    """
     if os.path.isabs(path):
         return os.path.abspath(path)
     workdir = _resolve_workdir()
     cwd = os.path.abspath('.')
     if os.path.normcase(workdir) != os.path.normcase(cwd):
-        joined = os.path.abspath(os.path.join(workdir, path))
-        if os.path.exists(joined):
-            return joined
+        return os.path.abspath(os.path.join(workdir, path))
     return os.path.abspath(path)
 
 

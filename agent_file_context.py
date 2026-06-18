@@ -62,9 +62,10 @@ def _auto_load_location_file(agent: Agent, prompt: str) -> None:
         if not filename.endswith('.py'):
             continue
         workdir = os.environ.get('AGENT_WORKDIR', '')
-        probe_paths = [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]
         if workdir:
-            probe_paths.append(os.path.join(workdir, filename))
+            probe_paths = [os.path.join(workdir, filename), os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]
+        else:
+            probe_paths = [filename, os.path.join(base_dir, filename), os.path.join(os.getcwd(), filename)]
         for path in probe_paths:
             if os.path.exists(path):
                 try:
