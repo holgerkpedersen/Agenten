@@ -67,7 +67,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             ],
             "require_all": False,
             "min_matches": 1,
-            "description": "FORM\u00c5L: Fjern flyttet kode fra original fil, tilf\u00f8j imports til nye moduler. Kr\u00e6ver: api_server.py importerer fra mindst \u00e9t nyt modul.",
+            "description": "FORM\u00c5L: Fjern flyttet kode fra original fil, tilf\u00f8j imports til nye moduler. Kr\u00e6ver: {source_file} importerer fra mindst \u00e9t nyt modul.",
             "description_key": "phase_check.refactor.opdater",
         },
         "Test": {
@@ -371,6 +371,7 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
     # Dynamic path resolution: replace hardcoded api_server.py with the
     # actual target file from refactor_plan.md header or original prompt.
     # This ensures phase checks work for any REFAC-xxx, not just api_server.
+    _target = None
     if "api_server.py" in str(spec):
         _plan_path = None
         if base_dir:
@@ -403,6 +404,16 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
                     spec[k] = v.replace("api_server.py", _target)
                 elif isinstance(v, list):
                     spec[k] = [item.replace("api_server.py", _target) if isinstance(item, str) else item for item in v]
+
+    # Replace {source_file} placeholder in description with resolved target
+    _src_display = _target or "api_server.py"
+    if "{source_file}" in str(spec):
+        spec = dict(spec)
+        for k, v in list(spec.items()):
+            if isinstance(v, str) and "{source_file}" in v:
+                spec[k] = v.replace("{source_file}", _src_display)
+            elif isinstance(v, list):
+                spec[k] = [item.replace("{source_file}", _src_display) if isinstance(item, str) else item for item in v]
 
     check_type = spec.get("type")
     if check_type == "file_exists":

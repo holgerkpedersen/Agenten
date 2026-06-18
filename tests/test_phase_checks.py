@@ -526,7 +526,7 @@ class TestCheckPhaseDoneExtended(unittest.TestCase):
     def test_refactor_opdater_uses_explicit_description(self):
         cfg = TEMPLATE_PHASE_CHECKS.get("refactor", {}).get("Opdat\u00e9r")
         self.assertIn("description", cfg)
-        self.assertIn("api_server.py", cfg["description"])
+        self.assertIn("{source_file}", cfg["description"])
 
 
 class TestSymbolsCoveredByModules(unittest.TestCase):

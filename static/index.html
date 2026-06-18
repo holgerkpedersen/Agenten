@@ -662,7 +662,7 @@
         .issue-type-performance { background: #06b6d4; color: white; }
         .issue-type-maintainability { background: var(--text-muted); color: white; }
         /* Under udførelse: deaktivér alle knapper undtagen Stop, Gem, Opdater */
-        .btn-executing button:not(#stopBtn):not(#saveSess):not(#refreshSess) {
+        .btn-executing button:not(#stopBtn):not(#pauseBtn):not(#resumeBtn):not(#saveSess):not(#refreshSess) {
             pointer-events: none;
             opacity: 0.4;
             filter: grayscale(0.6);
@@ -761,6 +761,8 @@
             <button onclick="executeWithStream()" id="executeBtn" data-i18n-title="execute_btn" style="background:#10b981;">⚡ Udfør</button>
             <input type="text" id="replyInput" placeholder="Svar til LLM..." style="display:none;width:120px;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')sendReply()">
             <button onclick="sendReply()" id="replyBtn" data-i18n-title="reply_btn" style="display:none;background:var(--accent);color:white;">✉</button>
+            <button onclick="pauseExecution()" id="pauseBtn" data-i18n-title="pause" style="display:none;background:#f59e0b;color:white;">⏸ Pause</button>
+            <button onclick="resumeExecution()" id="resumeBtn" data-i18n-title="resume" style="display:none;background:#10b981;color:white;">▶️ Genoptag</button>
             <button onclick="stopStream()" id="stopBtn" data-i18n-title="stop_exec" style="background:#ef4444;">⏹ Stop</button>
             <button onclick="undoBackup()" id="undoBtn" data-i18n-title="undo_btn" style="display:none;background:#f59e0b;color:white;">↶ Fortryd</button>
         </div>
@@ -2961,9 +2963,69 @@ function _activateNextTodo() {
     if (next) next.classList.add('active');
 }
 
+async function pauseExecution() {
+    try {
+        await fetch('/api/execute-pause', { method: 'POST' });
+    } catch(e) {}
+    document.getElementById('pauseBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'none';
+    document.getElementById('resumeBtn').style.display = 'inline-block';
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+    }
+    addLogEntry('INFO', 'Udførelse pauset', 'Tryk Genoptag for at fortsætte');
+    document.getElementById('replyInput').style.display = 'none';
+    document.getElementById('replyBtn').style.display = 'none';
+}
+
+async function resumeExecution() {
+    document.getElementById('resumeBtn').style.display = 'none';
+    document.getElementById('stopBtn').style.display = 'inline-block';
+    document.getElementById('pauseBtn').style.display = 'inline-block';
+    
+    eventSource = new EventSource('/api/execute-resume');
+    _isExecuting = true;
+    document.getElementById("headerBody")?.classList.add("btn-executing");
+    
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        switch(data.type) {
+            case 'log':
+                addLogEntry(data.log.level, data.log.message, data.log.detail);
+                break;
+            case 'todo_add':
+            case 'todo_update':
+            case 'llm_chunk':
+            case 'tool_call':
+            case 'tool_result':
+            case 'budget':
+            case 'start':
+            case 'task_start':
+            case 'task_done':
+            case 'retry':
+            case 'complete':
+            case 'error':
+                _handleStreamEvent(data);
+                break;
+        }
+    };
+    eventSource.onerror = function() {
+        _isExecuting = false;
+        document.getElementById("headerBody")?.classList.remove("btn-executing");
+        document.getElementById('pauseBtn').style.display = 'none';
+        document.getElementById('resumeBtn').style.display = 'none';
+        document.getElementById('stopBtn').style.display = 'inline-block';
+        _clearSpinner();
+        addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
+    };
+}
+
 function stopStream() {
     _isExecuting = false;
     document.getElementById("headerBody")?.classList.remove("btn-executing");
+    document.getElementById('pauseBtn').style.display = 'none';
+    document.getElementById('resumeBtn').style.display = 'none';
     if (eventSource) {
         eventSource.close();
         eventSource = null;

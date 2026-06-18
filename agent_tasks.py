@@ -2898,13 +2898,14 @@ def _reconcile_todos_with_disk(agent: Any) -> list[str]:
     return ids
 
 
-def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Generator[dict, None, None]:
+def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_messages: list[dict] | None = None) -> Generator[dict, None, None]:
     """solve task stream.
     
     Args:
         agent:
         task_node:
         original_prompt:
+        saved_messages: Optional saved conversation to resume from pause.
     
     Yields:
         ..."""
@@ -2923,8 +2924,14 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
     agent._checkpoint_branch = ""
     agent._rubric_retried = False
 
-    chunk_hint = _build_chunk_hint(agent)
-    messages, tools_list, has_file_ctx = _build_initial_messages(agent, task_node, original_prompt, chunk_hint)
+    # If resuming from pause, use saved messages directly
+    if saved_messages:
+        messages = list(saved_messages)
+        tools_list = ', '.join([k for k in agent.tool_registry.tools if agent.tool_registry.active_tools is None or k in agent.tool_registry.active_tools])
+        has_file_ctx = False
+    else:
+        chunk_hint = _build_chunk_hint(agent)
+        messages, tools_list, has_file_ctx = _build_initial_messages(agent, task_node, original_prompt, chunk_hint)
 
     _report_logs = len(agent.agent_log)
 
@@ -3017,8 +3024,6 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)
             for chunk in agent.llm.generate_stream(messages=messages, temperature=0.3, max_tokens=agent.max_tokens, images=agent.images, tools=tools_param):
-                if agent.stop_requested:
-                    break
                 response += chunk
                 yield {"type": "chunk", "chunk": chunk}
         except GeneratorExit:
@@ -3026,6 +3031,11 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
             raise
 
         if agent.stop_requested:
+            if getattr(agent, '_pause_requested', False):
+                agent._paused_messages = list(messages)
+                agent._paused_task = task_node
+                agent._paused_original_prompt = original_prompt
+                agent._pause_requested = False
             break
 
         if response.startswith("[ERROR:") or response.startswith("ERROR:"):
