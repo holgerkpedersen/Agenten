@@ -1153,13 +1153,13 @@ def _truncate_messages(messages: list[dict], max_chars: int, agent: Any | None =
     # Ensure tail doesn't start with a bare "tool" message (LM Studio template
     # error: "Message has tool role, but no preceding assistant with tool_calls")
     if tail and tail[0].get("role") == "tool":
-        # Find first non-tool message to prepend
-        for i, m in enumerate(tail):
-            if m.get("role") != "tool":
-                tail = tail[i:]
-                break
-        else:
-            tail = []
+        # Walk back to include the preceding assistant message so the pair is complete
+        cut_point = len(non_system) - keep_pairs
+        if cut_point > 0:
+            for i in range(cut_point - 1, -1, -1):
+                if non_system[i].get("role") == "assistant":
+                    tail = non_system[i:]
+                    break
     insert = [{"role": "user", "content": mid}]
     return system + insert + tail
 

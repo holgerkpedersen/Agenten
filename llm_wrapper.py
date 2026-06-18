@@ -277,18 +277,29 @@ class LMStudioWrapper:
         other_msgs = [m for m in messages if m["role"] != "system"]
         mid = "\n[... tidligere kontekst afkortet ...]"
         if len(other_msgs) > 2:
-            # Keep first non-system message + truncation note + last message.
-            # BUT never let a bare "tool" role be the last message — it needs a
-            # preceding assistant with tool_calls or LM Studio templates reject it.
-            last_idx = -1
-            while last_idx >= -len(other_msgs) and other_msgs[last_idx].get("role") == "tool":
-                last_idx -= 1
-            if abs(last_idx) == 1:
-                # Only tool messages remain — drop them all, just keep the note
-                other_msgs = [other_msgs[0], {"role": "user", "content": mid}]
+            # Keep first non-system message + truncation note.
+            # Then find the LAST complete assistant+tool pair to avoid LM Studio
+            # "tool role without tool_calls" errors. Walk backwards from the end
+            # and locate the last assistant message that either has tool_calls or
+            # is a plain text response.
+            last_pair_start = -1
+            for i in range(len(other_msgs) - 1, -1, -1):
+                role = other_msgs[i].get("role")
+                if role == "assistant":
+                    last_pair_start = i
+                    break
+                if role in ("user", "system"):
+                    last_pair_start = i
+                    break
+            if last_pair_start >= 0 and last_pair_start < len(other_msgs) - 1:
+                # Keep from last_pair_start to end (entire last pair)
+                other_msgs = [other_msgs[0], {"role": "user", "content": mid}] + other_msgs[last_pair_start:]
+            elif last_pair_start >= 0:
+                # Last message is assistant or user, keep it
+                other_msgs = [other_msgs[0], {"role": "user", "content": mid}, other_msgs[last_pair_start]]
             else:
-                last_keep = other_msgs[last_idx] if last_idx != -1 else other_msgs[-1]
-                other_msgs = [other_msgs[0], {"role": "user", "content": mid}, last_keep]
+                # Only tool messages remain — drop them all
+                other_msgs = [other_msgs[0], {"role": "user", "content": mid}]
         return system_msgs + other_msgs
 
     def generate_stream(self, prompt: str | None = None, messages: list[dict] | None = None, temperature: float = 0.7, max_tokens: int | None = None, images: list | None = None, tools: list | None = None) -> Generator[str, None, None]:
