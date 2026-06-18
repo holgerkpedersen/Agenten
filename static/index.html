@@ -661,11 +661,17 @@
         .issue-type-testing { background: var(--accent); color: white; }
         .issue-type-performance { background: #06b6d4; color: white; }
         .issue-type-maintainability { background: var(--text-muted); color: white; }
-        /* Under udførelse: deaktivér alle knapper undtagen Stop, Gem, Opdater */
+        /* Under udførelse: deaktivér alle knapper undtagen Stop, Pause, Gem, Opdater */
         .btn-executing button:not(#stopBtn):not(#pauseBtn):not(#resumeBtn):not(#saveSess):not(#refreshSess) {
             pointer-events: none;
             opacity: 0.4;
             filter: grayscale(0.6);
+        }
+        /* Deaktiveret knap-stil */
+        button:disabled {
+            opacity: 0.35;
+            filter: grayscale(0.7);
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -761,10 +767,10 @@
             <button onclick="executeWithStream()" id="executeBtn" data-i18n-title="execute_btn" style="background:#10b981;">⚡ Udfør</button>
             <input type="text" id="replyInput" placeholder="Svar til LLM..." style="display:none;width:120px;padding:6px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;" onkeydown="if(event.key==='Enter')sendReply()">
             <button onclick="sendReply()" id="replyBtn" data-i18n-title="reply_btn" style="display:none;background:var(--accent);color:white;">✉</button>
-            <button onclick="pauseExecution()" id="pauseBtn" data-i18n-title="pause" style="display:none;background:#f59e0b;color:white;">⏸ Pause</button>
-            <button onclick="resumeExecution()" id="resumeBtn" data-i18n-title="resume" style="display:none;background:#10b981;color:white;">▶️ Genoptag</button>
-            <button onclick="stopStream()" id="stopBtn" data-i18n-title="stop_exec" style="background:#ef4444;">⏹ Stop</button>
-            <button onclick="undoBackup()" id="undoBtn" data-i18n-title="undo_btn" style="display:none;background:#f59e0b;color:white;">↶ Fortryd</button>
+            <button onclick="pauseExecution()" id="pauseBtn" data-i18n-title="pause" disabled style="background:#f59e0b;color:white;">⏸ Pause</button>
+            <button onclick="resumeExecution()" id="resumeBtn" data-i18n-title="resume" disabled style="background:#10b981;color:white;">▶️ Genoptag</button>
+            <button onclick="stopStream()" id="stopBtn" data-i18n-title="stop_exec" disabled style="background:#ef4444;">⏹ Stop</button>
+            <button onclick="undoBackup()" id="undoBtn" data-i18n-title="undo_btn" disabled style="background:#f59e0b;color:white;">↶ Fortryd</button>
         </div>
         <div id="imagePreview" style="display:none; gap:4px; flex-wrap:wrap; margin:2px 0;"></div>
         <div style="display:flex;align-items:center;gap:8px;margin:2px 0;">
@@ -2968,9 +2974,9 @@ async function pauseExecution() {
     try {
         await fetch('/api/execute-pause', { method: 'POST' });
     } catch(e) {}
-    document.getElementById('pauseBtn').style.display = 'none';
-    document.getElementById('stopBtn').style.display = 'none';
-    document.getElementById('resumeBtn').style.display = 'inline-block';
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = true;
+    document.getElementById('resumeBtn').disabled = false;
     if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -2981,9 +2987,9 @@ async function pauseExecution() {
 }
 
 async function resumeExecution() {
-    document.getElementById('resumeBtn').style.display = 'none';
-    document.getElementById('stopBtn').style.display = 'inline-block';
-    document.getElementById('pauseBtn').style.display = 'inline-block';
+    document.getElementById('resumeBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = false;
     
     eventSource = new EventSource('/api/execute-resume');
     _isExecuting = true;
@@ -2998,9 +3004,9 @@ async function resumeExecution() {
     eventSource.onerror = function() {
         _isExecuting = false;
         document.getElementById("headerBody")?.classList.remove("btn-executing");
-        document.getElementById('pauseBtn').style.display = 'none';
-        document.getElementById('resumeBtn').style.display = 'none';
-        document.getElementById('stopBtn').style.display = 'inline-block';
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('resumeBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
         _clearSpinner();
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
     };
@@ -3009,8 +3015,8 @@ async function resumeExecution() {
 function stopStream() {
     _isExecuting = false;
     document.getElementById("headerBody")?.classList.remove("btn-executing");
-    document.getElementById('pauseBtn').style.display = 'none';
-    document.getElementById('resumeBtn').style.display = 'none';
+    document.getElementById('pauseBtn').disabled = true;
+    document.getElementById('resumeBtn').disabled = true;
     if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -3035,7 +3041,7 @@ async function undoBackup() {
         const result = await resp.json();
         if (result.success) {
             addLogEntry('INFO', 'Fortryd', 'Git backup genoprettet — reloader...');
-            if (undoBtn) undoBtn.style.display = 'none';
+            if (undoBtn) undoBtn.disabled = true;
             setTimeout(() => location.reload(), 1500);
         } else {
             addLogEntry('ERROR', 'Fortryd fejlede', result.message);
@@ -3126,7 +3132,6 @@ async function executeWithStream() {
         if (backup.success) {
             const undoBtn = document.getElementById('undoBtn');
             if (undoBtn) {
-                undoBtn.style.display = 'inline-block';
                 undoBtn.disabled = false;
                 undoBtn.textContent = '↶ Fortryd';
             }
@@ -3151,8 +3156,9 @@ async function executeWithStream() {
     eventSource = new EventSource('/api/execute-stream');
     _isExecuting = true;
     document.getElementById("headerBody")?.classList.add("btn-executing");
-    document.getElementById('pauseBtn').style.display = 'inline-block';
-    document.getElementById('resumeBtn').style.display = 'none';
+    document.getElementById('stopBtn').disabled = false;
+    document.getElementById('pauseBtn').disabled = false;
+    document.getElementById('resumeBtn').disabled = true;
     _currentOutputs = {};
     
     function _handleMainEvent(event) {
@@ -3396,8 +3402,10 @@ async function executeWithStream() {
              case 'complete':
                 _isExecuting = false;
                 document.getElementById("headerBody")?.classList.remove("btn-executing");
-                document.getElementById('pauseBtn').style.display = 'none';
-                document.getElementById('resumeBtn').style.display = 'none';
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = true;
+                document.getElementById('resumeBtn').disabled = true;
+                _enableUndo();
                 const budgetComplete = document.getElementById('budgetDisplay');
                 if (budgetComplete) budgetComplete.style.display = 'none';
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
@@ -3414,8 +3422,10 @@ async function executeWithStream() {
              case 'error':
                 _isExecuting = false;
                 document.getElementById("headerBody")?.classList.remove("btn-executing");
-                document.getElementById('pauseBtn').style.display = 'none';
-                document.getElementById('resumeBtn').style.display = 'none';
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = true;
+                document.getElementById('resumeBtn').disabled = true;
+                _enableUndo();
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
@@ -3430,6 +3440,9 @@ async function executeWithStream() {
     eventSource.onerror = function() {
         _isExecuting = false;
         document.getElementById("headerBody")?.classList.remove("btn-executing");
+        document.getElementById('stopBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('resumeBtn').disabled = true;
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
         _clearSpinner();
     };
