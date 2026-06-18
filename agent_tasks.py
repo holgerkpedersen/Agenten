@@ -2960,6 +2960,8 @@ def _reconcile_llm_todos(agent: Any) -> list[str]:
 
     For refactor Ekstraher: checks if target module files exist with content.
     """
+    import re as _re
+    import os as _os
     llm_todos = getattr(agent, '_llm_todos', None)
     if not llm_todos:
         return []
