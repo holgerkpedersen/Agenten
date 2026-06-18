@@ -3077,8 +3077,8 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
     import os as _os
     import re as _re
 
-    agent._llm_has_planned = True
     agent._llm_todos = []
+    agent._llm_has_planned = False
     events.append({"type": "llm_todo_clear"})
 
     template = getattr(agent, 'active_template', '') or ''
@@ -3122,22 +3122,14 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
             _total_done = all(_os.path.exists(m) for m in _tgt_mods)
             agent._llm_todos.append({"id": "lt_total", "text": _total_text, "done": _total_done, "parent_id": None, "phase": phase})
             events.append({"type": "llm_todo_add", "id": "lt_total", "text": _total_text, "parent_id": None})
+            agent._llm_has_planned = True
             return events
 
-    # ── Fallback: mirror auto-generated _phase_todos ──
-    phase_todos = getattr(agent, '_phase_todos', None) or []
-    for todo in phase_todos:
-        todo_id = "lt_" + (todo.get("id", "") or _re.sub(r'[^a-zA-Z0-9]', '', todo.get("text", ""))[:12])
-        text = todo.get("text", phase)
-        done = todo.get("done", False)
-        agent._llm_todos.append({"id": todo_id, "text": text, "done": done, "parent_id": None, "phase": phase})
-        events.append({"type": "llm_todo_add", "id": todo_id, "text": text, "parent_id": None})
-
-    if not phase_todos:
-        fallback = f"Gennemfør fasen: {task_node.name}"
-        agent._llm_todos.append({"id": "lt_fallback", "text": fallback, "done": False, "parent_id": None, "phase": phase})
-        events.append({"type": "llm_todo_add", "id": "lt_fallback", "text": fallback, "parent_id": None})
-
+    # ── For other phases: leave LLM's plan empty — LLM creates its own ──
+    # _llm_has_planned is left False so the budget nudge tells the LLM
+    # to call plan_phase/create_todo to build its own plan.
+    agent._llm_todos = []
+    agent._llm_has_planned = False
     return events
 
 
@@ -3290,7 +3282,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                 elif i >= 1:
                     _any_updated = any(t.get("done") for t in (getattr(agent, '_llm_todos') or []))
                     if not _any_updated:
-                        budget_msg += "\n\n💡 Brug **update_todo(todo_id='lt_xxx', done=true)** for at markere fremdrift i din plan."
+                        budget_msg += "\n\n💡 Har du en plan? Brug **list_todos** for at se din status. Mangler du en plan, kald **plan_phase(fasenavn, mål)**."
                 messages.append({"role": "user", "content": budget_msg})
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)
