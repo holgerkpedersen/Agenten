@@ -3017,6 +3017,11 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
     import os as _os
     import re as _re
     plan_path = getattr(agent, '_refactor_plan_path', '') or 'refactor_plan.md'
+    # Resolve relative to AGENT_WORKDIR if set (not raw CWD)
+    if not _os.path.isabs(plan_path):
+        _wd = _os.environ.get('AGENT_WORKDIR', '')
+        if _wd:
+            plan_path = _os.path.normpath(_os.path.join(_wd, plan_path))
     if not _os.path.exists(plan_path):
         return events
 
