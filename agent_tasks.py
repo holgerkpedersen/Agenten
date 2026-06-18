@@ -2889,8 +2889,6 @@ def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: 
             target = args_val.get("target", "")
             if target and (target in ttext or os.path.basename(target) in ttext):
                 ids.append(tid)
-            if "extract" in ttext.lower() or "imports" in ttext.lower():
-                ids.append(tid)
 
         # list_symbols -> matches "List alle symboler" or "list_symbols"
         if tool_name == "list_symbols" and ("list_symbols" in ttext.lower() or "list alle symboler" in ttext.lower()):
@@ -2977,7 +2975,7 @@ def _reconcile_llm_todos(agent: Any) -> list[str]:
         m = _re.search(r'([a-zA-Z_][\w./-]+\.py)', text)
         if m:
             fpath = m.group(1)
-            if _os.path.exists(fpath):
+            if _os.path.exists(fpath) and _count_symbols_in_file(fpath) > 0:
                 _actual = _count_symbols_in_file(fpath)
                 if "lt_total" in tid:
                     # Only mark total done when all other module todos are done
