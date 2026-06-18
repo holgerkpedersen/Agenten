@@ -3004,6 +3004,7 @@ async function resumeExecution() {
         }
     };
     eventSource.onerror = function() {
+        if (!_isExecuting) { eventSource = null; return; }
         _isExecuting = false;
         document.getElementById("headerBody")?.classList.remove("btn-executing");
         document.getElementById('pauseBtn').disabled = true;
@@ -3440,6 +3441,7 @@ async function executeWithStream() {
     
     eventSource.onmessage = _handleMainEvent;
     eventSource.onerror = function() {
+        if (!_isExecuting) { eventSource = null; return; }
         _isExecuting = false;
         document.getElementById("headerBody")?.classList.remove("btn-executing");
         document.getElementById('stopBtn').disabled = true;

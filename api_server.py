@@ -1778,11 +1778,17 @@ def execute_resume() -> Any:
         resume_msg = {"role": "user", "content": "Udf\u00f8relsen blev pauset. Forts\u00e6t hvor du slap. Kald det n\u00e6ste v\u00e6rkt\u00f8j eller afslut med <<<DONE>>>."}
         agent._paused_messages = None
         agent._pause_requested = False
-        yield from agent.solve_task_stream(
-            paused_task or agent.task_tree.root if agent.task_tree else None,
-            paused_original,
-            saved_messages=saved + [resume_msg],
-        )
+        try:
+            yield from agent.solve_task_stream(
+                paused_task or agent.task_tree.root if agent.task_tree else None,
+                paused_original,
+                saved_messages=saved + [resume_msg],
+            )
+            yield f"data: {json.dumps({'type': 'complete', 'message': 'Genoptagelse fuldf\u00f8rt'})}\n\n"
+        except GeneratorExit:
+            pass
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
 
     return Response(stream_with_context(generate_resume(stream_agent)), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
 
