@@ -270,7 +270,6 @@ class SessionManager:
         return ""
 
 
-@app.before_request
 def _guard_json_body() -> Any:
     """guard json body."""
     if request.method in ('POST', 'PUT', 'PATCH') and request.path.startswith('/api/'):
