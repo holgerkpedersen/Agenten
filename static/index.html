@@ -1107,6 +1107,10 @@ async function switchLLMLang(lang) {
 }
 
 async function redecomposeTree(lang) {
+    if (_isExecuting) {
+        alert('Stop den aktuelle udførelse før du gen-nedbryder.');
+        return;
+    }
     if (!currentSessionId) return;
     addLogEntry('INFO', 'Re-decompose', `Gen-nedbryder træ på ${lang}...`);
     try {
@@ -1268,6 +1272,7 @@ setTimeout(loadLayoutFromLocal, 500);
 let currentSessionId = null;
 let currentTree = null;
 let eventSource = null;
+let _isExecuting = false;
 let panels = {};
 let showThinking = false;
 let treeEditMode = false;
@@ -1285,6 +1290,10 @@ function toggleTheme() {
 }
 
 function onTemplateChange(template) {
+    if (_isExecuting) {
+        document.getElementById('templateSelect').value = currentTemplate;
+        return;
+    }
     try { localStorage.setItem('agenten_template', template); } catch(e) {}
     const descDiv = document.getElementById('templateDescription');
     const key = 'template_description_' + template;
@@ -2575,6 +2584,10 @@ async function reuseCurrentSession() {
 }
 
 async function loadSelectedSession() {
+    if (_isExecuting) {
+        alert('Stop den aktuelle udførelse før du skifter session.');
+        return;
+    }
     const select = document.getElementById('sessionSelect');
     const sessionId = select.value;
     if (!sessionId) {
@@ -2786,6 +2799,10 @@ async function saveCurrentSession() {
 }
 
 async function decompose() {
+    if (_isExecuting) {
+        alert('Stop den aktuelle udførelse før du nedbryder træet.');
+        return;
+    }
     const prompt = document.getElementById('promptInput').value;
     if (!prompt) {
         alert(_('enter_task'));
@@ -2882,6 +2899,7 @@ function _activateNextTodo() {
 }
 
 function stopStream() {
+    _isExecuting = false;
     if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -2894,6 +2912,10 @@ function stopStream() {
 }
 
 async function undoBackup() {
+    if (_isExecuting) {
+        alert('Kan ikke fortryde mens en udførelse er i gang. Stop først.');
+        return;
+    }
     const undoBtn = document.getElementById('undoBtn');
     if (undoBtn) {
         undoBtn.disabled = true;
@@ -2958,6 +2980,10 @@ async function resetExecution() {
 }
 
 async function deleteTree() {
+    if (_isExecuting) {
+        alert('Stop den aktuelle udførelse før du sletter træet.');
+        return;
+    }
     if (!currentTree) {
         alert(_('no_tree_to_delete'));
         return;
@@ -3017,6 +3043,7 @@ async function executeWithStream() {
     if (progressContainer) progressContainer.style.display = 'block';
     
     eventSource = new EventSource('/api/execute-stream');
+    _isExecuting = true;
     let currentOutputs = {};
     
     eventSource.onmessage = function(event) {
@@ -3239,6 +3266,7 @@ async function executeWithStream() {
                 break;
                 
              case 'complete':
+                _isExecuting = false;
                 const budgetComplete = document.getElementById('budgetDisplay');
                 if (budgetComplete) budgetComplete.style.display = 'none';
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
@@ -3253,6 +3281,7 @@ async function executeWithStream() {
                 break;
                 
              case 'error':
+                _isExecuting = false;
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
@@ -3264,6 +3293,7 @@ async function executeWithStream() {
     };
     
     eventSource.onerror = function() {
+        _isExecuting = false;
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
         _clearSpinner();
     };
