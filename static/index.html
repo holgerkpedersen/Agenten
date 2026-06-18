@@ -2909,12 +2909,21 @@ function _guardExecution(msg) {
     return false;
 }
 
+function _enableUndo() {
+    const btn = document.getElementById('undoBtn');
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = '↶ Fortryd';
+    }
+}
+
 function _clearSpinner() {
     const taskElem = document.getElementById('currentTask');
     if (taskElem && taskElem.querySelector('.loading')) {
         taskElem.innerHTML = '';
     }
     _currentPhase = '';
+    _enableUndo();
 }
 
 function _activateNextTodo() {
@@ -2929,6 +2938,7 @@ function _activateNextTodo() {
 
 function stopStream() {
     _isExecuting = false;
+    _enableUndo();
     if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -3044,8 +3054,8 @@ async function executeWithStream() {
             const undoBtn = document.getElementById('undoBtn');
             if (undoBtn) {
                 undoBtn.style.display = 'inline-block';
-                undoBtn.disabled = false;
-                undoBtn.textContent = '↶ Fortryd';
+                undoBtn.disabled = true;
+                undoBtn.textContent = '↶ Fortryd (vent til færdig)';
             }
         }
     } catch(e) {
