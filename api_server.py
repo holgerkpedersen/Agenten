@@ -1752,10 +1752,18 @@ def execute_resume() -> Any:
             yield f"data: {json.dumps({'type': 'error', 'message': 'Ingen pause-status fundet — vent til LLM er f\u00e6rdig med at pause'})}\n\n"
         return Response(stream_with_context(_no_agent()), mimetype='text/event-stream')
 
+    # Vent pa at _paused_messages bliver sat (LLM skal færdiggøre sit svar)
     saved = getattr(stream_agent, '_paused_messages', None)
     if not saved:
+        _wait_until = time.time() + 30
+        while time.time() < _wait_until:
+            time.sleep(0.5)
+            saved = getattr(stream_agent, '_paused_messages', None)
+            if saved:
+                break
+    if not saved:
         def _no_msgs():
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Ingen gemt kontekst endnu — vent til LLM er f\u00e6rdig med at pause'})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Ingen gemt kontekst — pausen blev ikke fuldført'})}\n\n"
         return Response(stream_with_context(_no_msgs()), mimetype='text/event-stream')
 
     paused_task = getattr(stream_agent, '_paused_task', None)
