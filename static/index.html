@@ -3166,6 +3166,8 @@ async function executeWithStream() {
     eventSource = new EventSource('/api/execute-stream');
     _isExecuting = true;
     document.getElementById("headerBody")?.classList.add("btn-executing");
+    document.getElementById('pauseBtn').style.display = 'inline-block';
+    document.getElementById('resumeBtn').style.display = 'none';
     let currentOutputs = {};
     
     eventSource.onmessage = function(event) {

@@ -24,7 +24,6 @@ def create_execution_backup() -> dict:
 
 def restore_execution_backup() -> dict:
     """Pop the most recent agent-backup stash, restoring pre-execution state."""
-    # Try workdir git first, then fall back to Agenten's git (for stashes created before _git_dir fix)
     _candidates = []
     _wd = _os.environ.get("AGENT_WORKDIR", "")
     if _wd and _os.path.isdir(_os.path.join(_wd, ".git")):
