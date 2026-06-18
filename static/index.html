@@ -3405,6 +3405,8 @@ async function executeWithStream() {
              case 'complete':
                 _isExecuting = false;
                 document.getElementById("headerBody")?.classList.remove("btn-executing");
+                document.getElementById('pauseBtn').style.display = 'none';
+                document.getElementById('resumeBtn').style.display = 'none';
                 const budgetComplete = document.getElementById('budgetDisplay');
                 if (budgetComplete) budgetComplete.style.display = 'none';
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
@@ -3421,6 +3423,8 @@ async function executeWithStream() {
              case 'error':
                 _isExecuting = false;
                 document.getElementById("headerBody")?.classList.remove("btn-executing");
+                document.getElementById('pauseBtn').style.display = 'none';
+                document.getElementById('resumeBtn').style.display = 'none';
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
