@@ -597,7 +597,7 @@
   "write_file_first": "\n\n🚫 BLOCKERET: Test (Red)-fasen kræver at du FØRST skriver testen. Kald write_file NU — du har allerede læst nok i Analyse-fasen.",
   "validation_done_too_short": "Resultatet er for kort ({0} tegn). Skriv en mere detaljeret analyse med konkrete ændringer, kodeeksempler og begrundelser.",
   "validation_done_missing_keywords": "Fasen '{0}' kræver nøgleord i resultatet: {1}. Tilføj venligst de nødvendige detaljer.",
-  "todo.plan_start": "DIN OPGAVEPLAN\nDu har allerede en opgaveplan med konkrete trin. Brug **update_todo(todo_id='lt_xxx', done=true)** til at markere fuldførte trin. Brug **create_todo** til at tilføje ekstra delopgaver og **delete_todo** til at fjerne forældede. **list_todos** viser både din plan og Agentens officielle krav.",
+  "todo.plan_start": "DIN OPGAVEPLAN\nDu har en opgaveplan med trin i en bestemt rækkefølge. Udfør trinene ÉN FOR ÉN i den angivne rækkefølge. **list_todos** viser din plan og Agentens krav. Brug **update_todo(todo_id='lt_xxx', done=true)** til at markere fuldførte trin. Brug **create_todo** til at tilføje ekstra delopgaver.",
   "todo.plan_not_called": "⚠️ Brug **update_todo(todo_id='lt_xxx', done=true)** for at markere fremdrift i din opgaveplan.",
   "todo.agent_header": "Agentens opgavekrav (følg rækkefølgen)",
   "todo.llm_header": "Din personlige opgaveplan",

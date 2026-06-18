@@ -2469,7 +2469,9 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
             _ekstraher_src = _src_match.group(1) if _src_match else "api_server.py"
 
             todos.extend([
-                {"id": "rf_e1", "text": "Brug batch_extract_symbols() til at flytte symboler fra {}".format(_ekstraher_src), "done": False},
+                {"id": "rf_e1", "text": "Følg refactor_plan.md nøjagtigt — opfyld ALLE moduler deri", "done": False},
+                {"id": "rf_e2", "text": "Brug batch_extract_symbols() til at flytte symboler fra {} til hvert modul".format(_ekstraher_src), "done": False},
+                {"id": "rf_e3", "text": "Rækkefølge: batch_extract_symbols → verify_refactor → næste modul", "done": False},
                 {"id": "rf_e4", "text": "Verificer syntaks med verify_refactor() efter hver batch", "done": False},
             ])
             # Brug plan_modules eller _mod_symbols keys (fra sektions-headers) som modul-liste
@@ -3105,7 +3107,7 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
                 _exists = _os.path.exists(mod)
                 _todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
                 if phase == "ekstraher":
-                    _text = f"Flyt symboler til {mod} med batch_extract_symbols"
+                    _text = f"[{_tgt_mods.index(mod)+1}/{len(_tgt_mods)}] Flyt symboler til {mod} med batch_extract_symbols"
                     if _exists:
                         _actual = _count_symbols_in_file(mod) if _exists else 0
                         _text += f" ({_actual} symbols)"
