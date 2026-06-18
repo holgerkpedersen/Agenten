@@ -1864,10 +1864,8 @@
       "location": "api_server.py",
       "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
       "proposed_fix": "Opdel api_server.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
-      "status": "resolved",
-      "related": [],
-      "updated_at": "2026-06-18T00:45:39",
-      "resolution_note": "api_server.py reduceret til 100 linjer (fra 2196). Alle symboler flyttet til moduler: session_manager.py, stream_handler. Opdateringsfasen fuldført."
+      "status": "open",
+      "related": []
     },
     {
       "id": "REFAC-016",
