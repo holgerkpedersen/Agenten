@@ -2698,10 +2698,14 @@ async function loadSelectedSession() {
         }
         
         // Clear stale todos — they'll be regenerated when a phase starts
-        const tc = document.getElementById('todosContent');
-        if (tc) {
-            tc.innerHTML = '<div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div>';
-        }
+        const tc = document.getElementById('autoTodosList');
+        if (tc) tc.innerHTML = '<div style="color:#64748b;padding:4px;">Ingen krav endnu.</div>';
+        const ll = document.getElementById('llmTodosList');
+        if (ll) ll.innerHTML = '';
+        const ls = document.getElementById('llmTodosSection');
+        if (ls) ls.style.display = 'none';
+        const uca = document.getElementById('userCommentArea');
+        if (uca) uca.style.display = 'none';
         const tb = document.getElementById('todosToolbar');
         if (tb) tb.style.display = 'none';
         
