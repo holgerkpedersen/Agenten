@@ -70,6 +70,12 @@ def _load_all_issues() -> dict[str, Any]:
     # If workdir points to same file as framework, no merge needed
     if os.path.abspath(_get_framework_issues_path()) == os.path.abspath(workdir_path):
         return workdir
+    # If AGENT_WORKDIR is set and is NOT Agenten itself, only show workdir issues
+    _wd = os.environ.get("AGENT_WORKDIR", "")
+    if _wd:
+        _agent_dir = os.path.dirname(os.path.abspath(__file__))
+        if os.path.abspath(_wd) != _agent_dir:
+            return workdir
 
     # Merge: framework issues first, workdir overwrites on ID conflict
     seen_ids: set[str] = set()
