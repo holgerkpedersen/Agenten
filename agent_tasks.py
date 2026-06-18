@@ -2841,57 +2841,72 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
 ]
 
 
-def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
-    """Check if a tool call matches any active todo and returns todo_ids to mark done."""
-    if not hasattr(agent, '_phase_todos'):
+def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: list[dict] | None) -> list[str]:
+    """Match a tool call against todo text and return matching todo IDs."""
+    if not todo_list:
         return []
     ids = []
 
     # Static mapping: simple tool->todo matches
     for tname, arg_check, todo_id in _TODO_TOOL_MAP:
         if tool_name == tname and todo_id:
-            if any(t.get("id") == todo_id for t in agent._phase_todos):
+            if any(t.get("id") == todo_id for t in todo_list):
                 if arg_check is None or arg_check(args_val):
                     ids.append(todo_id)
 
     # Dynamic mapping: match tool calls against todo text patterns
-    for todo in getattr(agent, '_phase_todos', []):
+    for todo in todo_list:
         tid = todo.get("id", "")
         ttext = todo.get("text", "")
 
-        # remove_symbol -> matches "Fjern `symbol` fra agent_core.py"
         if tool_name == "remove_symbol":
             sym = args_val.get("symbol_name", "")
             if sym and sym in ttext and "Fjern" in ttext:
                 ids.append(tid)
 
-        # add_import -> matches "Tilføj import fra ... i agent_core.py"
         if tool_name == "add_import":
             mod = args_val.get("module", "")
             if mod and mod in ttext and "import" in ttext:
                 ids.append(tid)
 
-        # write_file -> matches "Opret modul: modul.py"
         if tool_name == "write_file":
             path = args_val.get("path", "")
             fname = os.path.basename(path) if path else ""
             if fname and fname in ttext and "Opret" in ttext:
                 ids.append(tid)
 
-        # extract_symbol / batch_extract_symbols -> matches "Flyt symbol ... til ..."
         if tool_name in ("extract_symbol", "batch_extract_symbols"):
-            sym = args_val.get("symbol_name", "")
             target = args_val.get("target", "")
             if target and (target in ttext or os.path.basename(target) in ttext):
                 ids.append(tid)
-            elif sym and (sym in ttext or "extract" in ttext.lower()):
+            if "extract" in ttext.lower() or "imports" in ttext.lower():
                 ids.append(tid)
-            # rf_e2: write_file fallback is not needed when extract_symbol works
-            # rf_e3: extract_symbol always includes imports
-            if "write_file" in ttext and "extract_symbol" in ttext:
-                ids.append(tid)
-            if "imports" in ttext.lower() or "typing" in ttext.lower():
-                ids.append(tid)
+
+        # list_symbols -> matches "List alle symboler" or "list_symbols"
+        if tool_name == "list_symbols" and ("list_symbols" in ttext.lower() or "list alle symboler" in ttext.lower()):
+            ids.append(tid)
+
+        # read_location -> matches "læs" or "read_location"
+        if tool_name == "read_location" and ("read_location" in ttext.lower() or "læs" in ttext.lower() or "metoder" in ttext.lower()):
+            ids.append(tid)
+
+        # run_tests -> matches "kør test" or "run_tests"
+        if tool_name == "run_tests" and ("run_tests" in ttext.lower() or "test" in ttext.lower()):
+            ids.append(tid)
+
+        # analyze_dependencies -> matches "analyser afhængigheder"
+        if tool_name == "analyze_dependencies" and ("afhængighed" in ttext.lower() or "dependencies" in ttext.lower()):
+            ids.append(tid)
+
+    return ids
+
+
+def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
+    """Check if a tool call matches any active todo and returns todo_ids to mark done."""
+    if not hasattr(agent, '_phase_todos'):
+        return []
+    ids = []
+    ids = _match_tool_to_todos(tool_name, args_val, agent, getattr(agent, '_phase_todos', None))
 
     # Sequential order validation: only allow checkmarking the FIRST
     # unfinished todo that has a tool mapping. Soft todos (analysis/
@@ -3617,9 +3632,13 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 _report_logs = len(agent.agent_log)
                 yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                 yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
-                # Auto-check matching todos
+                # Auto-check matching todos (both auto and LLM-driven)
                 for tid in _auto_todo_update(tool_name, args_val, agent):
                     yield {"type": "todo_update", "id": tid, "done": True}
+                _llm = getattr(agent, '_llm_todos', None)
+                if _llm:
+                    for tids in _match_tool_to_todos(tool_name, args_val, agent, _llm):
+                        yield {"type": "llm_todo_update", "id": tids, "done": True, "text": None}
 
                 # Inject compact progress summary after batch_extract_symbols / extract_symbol
                 if tool_name == "batch_extract_symbols" and result.get("success"):
@@ -3712,6 +3731,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 agent._pending_sse_events = []
             for tid in _auto_todo_update(tool_result["tool"], tool_result["args"], agent):
                 yield {"type": "todo_update", "id": tid, "done": True}
+            _llm = getattr(agent, '_llm_todos', None)
+            if _llm:
+                for tids in _match_tool_to_todos(tool_result["tool"], tool_result["args"], agent, _llm):
+                    yield {"type": "llm_todo_update", "id": tids, "done": True, "text": None}
             # State-based reconciliation: checkmark todos if work is already done on disk
             for tid in _reconcile_todos_with_disk(agent):
                 if tid:
