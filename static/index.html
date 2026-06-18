@@ -2859,6 +2859,13 @@ async function decompose() {
     }
 }
 
+function _clearSpinner() {
+    const taskElem = document.getElementById('currentTask');
+    if (taskElem && taskElem.querySelector('.loading')) {
+        taskElem.innerHTML = '';
+    }
+}
+
 function stopStream() {
     if (eventSource) {
         eventSource.close();
@@ -3210,7 +3217,7 @@ async function executeWithStream() {
                 renderOutputFiles();
                 break;
                 
-            case 'complete':
+             case 'complete':
                 const budgetComplete = document.getElementById('budgetDisplay');
                 if (budgetComplete) budgetComplete.style.display = 'none';
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
@@ -3221,20 +3228,23 @@ async function executeWithStream() {
                 eventSource.close();
                 document.getElementById('replyInput').style.display = 'none';
                 document.getElementById('replyBtn').style.display = 'none';
+                _clearSpinner();
                 break;
                 
-            case 'error':
+             case 'error':
                 if (llmBox) llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
                 document.getElementById('replyInput').style.display = 'none';
                 document.getElementById('replyBtn').style.display = 'none';
+                _clearSpinner();
                 break;
         }
     };
     
     eventSource.onerror = function() {
         addLogEntry('ERROR', 'Forbindelse tabt', 'Genopretter...');
+        _clearSpinner();
     };
 }
 
