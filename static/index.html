@@ -2975,6 +2975,7 @@ function _activateNextTodo() {
 }
 
 async function pauseExecution() {
+    addLogEntry('INFO', 'Pause', 'Bruger trykkede Pause — venter på at LLM færdiggør...');
     try {
         await fetch('/api/execute-pause', { method: 'POST' });
     } catch(e) {}
@@ -2991,6 +2992,7 @@ async function pauseExecution() {
 }
 
 async function resumeExecution() {
+    addLogEntry('INFO', 'Genoptag', 'Bruger trykkede Genoptag — forsøger at genoptage...');
     document.getElementById('resumeBtn').disabled = true;
     document.getElementById('stopBtn').disabled = false;
     document.getElementById('pauseBtn').disabled = false;
@@ -3156,7 +3158,7 @@ async function executeWithStream() {
     _llmBox = document.getElementById('llmContent');
     if (_llmBox) _llmBox.innerHTML = '<div class="loading"></div> ' + _('connecting');
     _progressContainer = document.getElementById('progressContainer');
-    if (_progressContainer) progressContainer.style.display = 'block';
+    if (_progressContainer) _progressContainer.style.display = 'block';
     
     eventSource = new EventSource('/api/execute-stream');
     _isExecuting = true;
@@ -3296,7 +3298,7 @@ async function executeWithStream() {
                         outputDiv.textContent = clean;
                     }
                 }
-                if (_llmBox && _llmBox.scrollTop + llmBox.clientHeight >= llmBox.scrollHeight - 60) {
+                if (_llmBox && __llmBox.scrollTop + _llmBox.clientHeight >= __llmBox.scrollHeight - 60) {
                     _llmBox.scrollTop = _llmBox.scrollHeight;
                 }
                 break;
@@ -3366,34 +3368,34 @@ async function executeWithStream() {
             case 'autoresearch':
                 if (data.action === 'start') {
                     addLogEntry('AUTOR', `🔬 Auto-research: kører ${data.issue_id} — ${data.title || ''}`, '');
-                    if (_llmBox) __llmBox.innerHTML += `<div style="color:#a78bfa;margin:10px 0;padding:8px;background:rgba(167,139,250,0.1);border-left:3px solid #a78bfa;">🔬 <strong>${data.issue_id}</strong>: ${escapeHtml(data.title || 'Auto-research')} — starter selvforbedring</div>`;
+                    if (_llmBox) _llmBox.innerHTML += `<div style="color:#a78bfa;margin:10px 0;padding:8px;background:rgba(167,139,250,0.1);border-left:3px solid #a78bfa;">🔬 <strong>${data.issue_id}</strong>: ${escapeHtml(data.title || 'Auto-research')} — starter selvforbedring</div>`;
                 } else if (data.action === 'phase_done') {
                     addLogEntry('AUTOR', `✅ Auto-research: ${data.phase} gennemført`, data.issue_id);
                 } else if (data.action === 'phase_failed') {
                     addLogEntry('AUTOR', `❌ Auto-research: ${data.phase} fejlede`, data.issue_id);
-                    if (_llmBox) __llmBox.innerHTML += `<div style="color:#ef4444;margin:5px 0;padding:5px;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;">❌ Auto-research: ${escapeHtml(data.phase)} fejlede</div>`;
+                    if (_llmBox) _llmBox.innerHTML += `<div style="color:#ef4444;margin:5px 0;padding:5px;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;">❌ Auto-research: ${escapeHtml(data.phase)} fejlede</div>`;
                 } else if (data.action === 'complete') {
                     if (data.success) {
                         addLogEntry('AUTOR', `✅ Auto-research: ${data.issue_id} gennemført!`, '');
-                        if (_llmBox) __llmBox.innerHTML += `<div style="color:var(--success);margin:10px 0;padding:8px;background:rgba(16,185,129,0.1);border-left:3px solid var(--success);">✅ <strong>${data.issue_id}</strong>: Fix gennemført</div>`;
+                        if (_llmBox) _llmBox.innerHTML += `<div style="color:var(--success);margin:10px 0;padding:8px;background:rgba(16,185,129,0.1);border-left:3px solid var(--success);">✅ <strong>${data.issue_id}</strong>: Fix gennemført</div>`;
                     } else {
                         addLogEntry('AUTOR', `❌ Auto-research: ${data.issue_id} fejlede`, 'Nogle faser kunne ikke gennemføres');
-                        if (_llmBox) __llmBox.innerHTML += `<div style="color:#ef4444;margin:10px 0;padding:8px;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;">❌ <strong>${data.issue_id}</strong>: Fix kunne ikke gennemføres</div>`;
+                        if (_llmBox) _llmBox.innerHTML += `<div style="color:#ef4444;margin:10px 0;padding:8px;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;">❌ <strong>${data.issue_id}</strong>: Fix kunne ikke gennemføres</div>`;
                     }
                 } else if (data.action === 'created') {
                     addLogEntry('AUTOR', `🔬 CORE-issue oprettet: ${data.issue_id}`, 'Starter selvforbedring...');
                 } else if (data.action === 'verifying') {
                     addLogEntry('AUTOR', `🧪 Auto-research: kører tests for ${data.issue_id}`, '');
-                    if (_llmBox) __llmBox.innerHTML += `<div style="color:#f59e0b;margin:5px 0;padding:5px;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;">🧪 Auto-research: kører tests for ${escapeHtml(data.issue_id)}...</div>`;
+                    if (_llmBox) _llmBox.innerHTML += `<div style="color:#f59e0b;margin:5px 0;padding:5px;background:rgba(245,158,11,0.1);border-left:3px solid #f59e0b;">🧪 Auto-research: kører tests for ${escapeHtml(data.issue_id)}...</div>`;
                 }
                 break;
                 const success = data.result?.success;
                 const icon = success ? '✅' : '❌';
                 const rtext = JSON.stringify(data.result, null, 2);
                 addLogEntry(success ? 'TOOL' : 'ERROR', `${icon} ${data.tool}`, rtext.length > 500 ? rtext.slice(0, 500) + '…' : rtext);
-                if (llmBox && success) {
+                if (_llmBox && success) {
                     _llmBox.innerHTML += `<div style="color:var(--success); margin:5px 0; padding:5px; background:var(--panel-bg); border-left:3px solid var(--success); font-size:12px;">${icon} <strong>${escapeHtml(data.tool)}</strong>: ${escapeHtml(data.result.result?.url || data.result.result?.output || 'OK').slice(0, 150)}</div>`;
-                    if (llmBox.scrollTop + llmBox.clientHeight >= llmBox.scrollHeight - 60) {
+                    if (__llmBox.scrollTop + _llmBox.clientHeight >= __llmBox.scrollHeight - 60) {
                         _llmBox.scrollTop = _llmBox.scrollHeight;
                     }
                 }
@@ -3413,8 +3415,8 @@ async function executeWithStream() {
                 _enableUndo();
                 const budgetComplete = document.getElementById('budgetDisplay');
                 if (budgetComplete) budgetComplete.style.display = 'none';
-                if (_llmBox) __llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
-                if (_progressContainer) progressContainer.style.display = 'none';
+                if (_llmBox) _llmBox.innerHTML += `<div style="color:var(--success); margin-top: 15px;">${_('all_done')}</div>`;
+                if (_progressContainer) _progressContainer.style.display = 'none';
                 addLogEntry('INFO', _('stream_done'), _('all_executed'));
                 saveCurrentSession();
                 updatePromptHistory(currentSessionId);
@@ -3431,7 +3433,7 @@ async function executeWithStream() {
                 document.getElementById('pauseBtn').disabled = true;
                 document.getElementById('resumeBtn').disabled = true;
                 _enableUndo();
-                if (_llmBox) __llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
+                if (_llmBox) _llmBox.innerHTML += `<div style="color:var(--danger);">❌ ${_('error_prefix')}${data.message}</div>`;
                 addLogEntry('ERROR', _('stream_error'), data.message);
                 eventSource.close();
                 document.getElementById('replyInput').style.display = 'none';
