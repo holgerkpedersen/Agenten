@@ -267,7 +267,9 @@
             transition: background 0.2s;
         }
         
-        button:hover { background: var(--accent-hover); }
+        button:hover:not(:disabled) { background: var(--accent-hover); filter: brightness(1.15); }
+        button:not(:disabled) { cursor: pointer; }
+        button:disabled { cursor: not-allowed; filter: grayscale(0.6); opacity: 0.45; }
         
         textarea {
             width: 100%;
