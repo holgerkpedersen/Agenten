@@ -3403,6 +3403,12 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     if _src in agent._list_symbols_cache:
                         del agent._list_symbols_cache[_src]
                 result_str = json.dumps(result, ensure_ascii=False)
+                # Flush pending SSE events immediately (e.g. llm_todo_add from plan_phase)
+                _pending_flush = getattr(agent, '_pending_sse_events', None)
+                if _pending_flush:
+                    for evt in _pending_flush:
+                        yield evt
+                    agent._pending_sse_events = []
                 agent._record_tool_call(
                     phase=getattr(task_node, 'name', '?'),
                     tool=tool_name,
@@ -3503,11 +3509,21 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                         continue
                     full_response = result.get("result", t(K.LOG_TASK_DONE, agent.lang))
+                    _pending_flush = getattr(agent, '_pending_sse_events', None)
+                    if _pending_flush:
+                        for evt in _pending_flush:
+                            yield evt
+                        agent._pending_sse_events = []
                     break
                 msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=full_response)
                 if msg:
                     agent._log("INFO", msg, "")
                     full_response = msg
+                    _pending_flush = getattr(agent, '_pending_sse_events', None)
+                    if _pending_flush:
+                        for evt in _pending_flush:
+                            yield evt
+                        agent._pending_sse_events = []
                     break
                 messages.append({
                     "role": "tool",
@@ -3606,6 +3622,12 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             _report_logs = len(agent.agent_log)
             yield {"type": "tool_call", "tool": tool_result["tool"], "args": tool_result["args"]}
             yield {"type": "tool_result", "tool": tool_result["tool"], "result": tool_result["result"]}
+            # Flush pending SSE events (e.g. llm_todo_add from plan_phase)
+            _pending_flush = getattr(agent, '_pending_sse_events', None)
+            if _pending_flush:
+                for evt in _pending_flush:
+                    yield evt
+                agent._pending_sse_events = []
             for tid in _auto_todo_update(tool_result["tool"], tool_result["args"], agent):
                 yield {"type": "todo_update", "id": tid, "done": True}
             # State-based reconciliation: checkmark todos if work is already done on disk
@@ -3621,15 +3643,30 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             if msg:
                 agent._log("INFO", msg, "")
                 full_response = msg
+                _pending_flush = getattr(agent, '_pending_sse_events', None)
+                if _pending_flush:
+                    for evt in _pending_flush:
+                        yield evt
+                    agent._pending_sse_events = []
                 break
             messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
             total_calls = sum(called_tools.values())
             if total_calls >= _get_max_tool_calls(task_node.name):
                 full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
+                _pending_flush = getattr(agent, '_pending_sse_events', None)
+                if _pending_flush:
+                    for evt in _pending_flush:
+                        yield evt
+                    agent._pending_sse_events = []
                 break
             if getattr(agent, '_read_block_hits', 0) >= 2:
                 full_response = t(K.LOG_STUCK_AUTO_ADVANCE, agent.lang).format(
                     phase=task_node.name, reads=agent._read_block_hits)
+                _pending_flush = getattr(agent, '_pending_sse_events', None)
+                if _pending_flush:
+                    for evt in _pending_flush:
+                        yield evt
+                    agent._pending_sse_events = []
                 break
             continue
 
