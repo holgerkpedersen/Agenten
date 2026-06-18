@@ -2467,6 +2467,10 @@ async function refreshSessions() {
 }
 
 async function createNewSession() {
+    if (_isExecuting) {
+        alert('Stop den aktuelle udførelse før du opretter en ny session.');
+        return;
+    }
     const name = prompt(_('new_session_prompt'), `Session ${new Date().toLocaleTimeString()}`);
     if (name) {
         const response = await fetch('/api/sessions/create', {
@@ -2510,6 +2514,10 @@ async function createNewSession() {
 }
 
 async function reuseCurrentSession() {
+    if (_isExecuting) {
+        alert('Stop den aktuelle udførelse før du genbruger sessionen.');
+        return;
+    }
     if (!currentSessionId) {
         addLogEntry('ERROR', _('reuse_no_session'), _('select_session_first'));
         return;
