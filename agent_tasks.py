@@ -3077,8 +3077,21 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
     import os as _os
     import re as _re
 
+    template = getattr(agent, 'active_template', '') or ''
+    phase = _normalize_phase(task_node.name).lower()
+
+    # Bevar eksisterende LLM-todos hvis vi er i samme fase (retry).
+    # Nulstil KUN ved fase-skift, så LLM's plan overlever iterationer.
+    _prev_phase = getattr(agent, '_llm_todo_phase', '')
+    if _prev_phase == phase and getattr(agent, '_llm_todos', None):
+        # Retry — bevar planen, genudsender bare eksisterende todos
+        for todo in agent._llm_todos:
+            events.append({"type": "llm_todo_add", "id": todo.get("id",""), "text": todo.get("text",""), "parent_id": None})
+        return events
+
     agent._llm_todos = []
     agent._llm_has_planned = False
+    agent._llm_todo_phase = phase
     events.append({"type": "llm_todo_clear"})
 
     template = getattr(agent, 'active_template', '') or ''
