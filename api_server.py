@@ -169,7 +169,11 @@ def index() -> Any:
     """index."""
     index_path = os.path.join(STATIC_DIR, 'index.html')
     if os.path.exists(index_path):
-        return send_from_directory(STATIC_DIR, 'index.html')
+        resp = send_from_directory(STATIC_DIR, 'index.html')
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
     else:
         return """
         <!DOCTYPE html>
@@ -194,7 +198,11 @@ def serve_static(path: str) -> Any:
     
     Args:
         path:"""
-    return send_from_directory(STATIC_DIR, path)
+    resp = send_from_directory(STATIC_DIR, path)
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 # ============ FILHÅNDTERING ENDPOINTS ============
 @app.route("/api/folder/set", methods=["POST"])
