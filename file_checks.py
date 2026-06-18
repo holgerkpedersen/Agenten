@@ -86,7 +86,7 @@ import re
 
 
 
-def _extract_modules_from_plan(plan_content: str, ext: str = ".py", allow_nested: bool = False) -> list[str]:
+def _extract_modules_from_plan(plan_content: str, ext: str = ".py", allow_nested: bool = False, source_file: str = "") -> list[str]:
     """Extract module filenames from a refactor plan markdown.
 
     The plan format from the LLM typically looks like:
@@ -108,6 +108,7 @@ def _extract_modules_from_plan(plan_content: str, ext: str = ".py", allow_nested
     if not plan_content:
         return []
     seen: set[str] = set()
+    _src_base = os.path.basename(source_file).lower() if source_file else ""
     ext_pattern = re.escape(ext)
     heading_pat = re.compile(
         rf"^\s*#{1,6}\s+[\d\.\)]*\s*([\w./-]+{ext_pattern})\b",
@@ -129,6 +130,7 @@ from file_checks import _extract_modules_from_plan
 
 
 def check_files_from_plan(spec: dict[str, Any], base_dir: str | None = None) -> tuple[bool, str]:
+    source_file = spec.get("source_file", "")
     """Return ``(passed, message)`` for a files_from_plan check.
 
     Spec keys:
@@ -153,7 +155,7 @@ def check_files_from_plan(spec: dict[str, Any], base_dir: str | None = None) -> 
             plan_content = f.read()
     except OSError as e:
         return False, f"files_from_plan: kunne ikke læse {plan_path}: {e}"
-    modules = _extract_modules_from_plan(plan_content, ext=ext, allow_nested=allow_nested)
+    modules = _extract_modules_from_plan(plan_content, ext=ext, allow_nested=allow_nested, source_file=source_file)
     if len(modules) < min_files:
         return False, (
             f"files_from_plan: fandt kun {len(modules)} modulnavne i {plan_path} "

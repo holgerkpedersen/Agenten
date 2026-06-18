@@ -99,7 +99,7 @@ def _has_real_code(filepath: str, min_lines: int = 20) -> bool:
 
 
 def _extract_modules_from_plan(
-    plan_content: str, ext: str = ".py", allow_nested: bool = False
+    plan_content: str, ext: str = ".py", allow_nested: bool = False, source_file: str = ""
 ) -> list[str]:
     """Extract module filenames from a refactor plan markdown.
 
@@ -159,6 +159,7 @@ def check_files_from_plan(
         - ``base_dir`` (optional) — override the cwd for both the plan and the module
           files. If not provided, uses ``os.getcwd()``.
     """
+    source_file = spec.get("source_file", "")
     base = base_dir or os.environ.get("AGENT_WORKDIR") or os.getcwd()
 
     plan_rel = spec.get("plan_path", "refactor_plan.md")

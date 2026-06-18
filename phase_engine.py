@@ -28,6 +28,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "plan_path": "refactor_plan.md",
             "ext": ".py",
             "min_files": 5,
+            "source_file": "api_server.py",
             "description": "FORM\u00c5L: Beslut modulopdeling og skriv plan. Kr\u00e6ver: refactor_plan.md med mindst 5 *.py-moduler.",
             "description_key": "phase_check.refactor.plan",
         },
@@ -41,6 +42,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                     "plan_path": "refactor_plan.md",
                     "ext": ".py",
                     "min_files": 1,
+                    "source_file": "api_server.py",
                 },
                 {
                     "type": "symbols_covered",
