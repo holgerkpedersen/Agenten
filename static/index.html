@@ -3072,6 +3072,10 @@ async function undoBackup() {
         undoBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Fortryder...';
     }
     try {
+        // Clear execution state from session first
+        try {
+            await fetch('/api/sessions/clear-execution', { method: 'POST' });
+        } catch(e) { /* non-critical */ }
         const resp = await fetch('/api/git/reset', { method: 'POST' });
         const result = await resp.json();
         if (result.success) {

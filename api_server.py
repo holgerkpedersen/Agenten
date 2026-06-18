@@ -589,6 +589,32 @@ def delete_session(session_id: str) -> Any:
         return jsonify({"success": True, "deleted": session_id})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
+
+@app.route("/api/sessions/clear-execution", methods=["POST"])
+def clear_execution_state() -> Any:
+    """Clear execution-related state from the current session.
+
+    Called before undo to prevent stale execution data (todos, logs,
+    task tree) from persisting after git stash pop + reload.
+    """
+    global current_session_id
+    if not current_session_id:
+        return jsonify({"success": False, "error": "Ingen aktiv session"}), 400
+    session_data = session_manager.load_session(current_session_id) or {}
+    # Remove execution artifacts but keep the prompt/tree structure
+    session_data.pop("agent_log", None)
+    session_data.pop("execution_log", None)
+    session_data.pop("tool_log", None)
+    session_data.pop("llm_todos", None)
+    session_data["issue_resolved"] = False
+    session_manager.save_session(current_session_id, session_data)
+    # Also reset in-memory state on global agent
+    agent.agent_log = []
+    agent.execution_log = []
+    if hasattr(agent, '_llm_todos'):
+        del agent._llm_todos
+    return jsonify({"success": True})
+
 @app.route("/api/tools/token", methods=["GET", "POST"])
 def manage_token() -> Any:
     """manage token."""
