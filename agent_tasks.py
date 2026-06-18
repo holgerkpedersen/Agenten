@@ -998,9 +998,13 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     agent._log("DEBUG", f"clean_prompt length: {len(clean_prompt)}", f"starts with: {clean_prompt[:100]}")
     agent._log("DEBUG", f"system_prompt length: {len(system_prompt)}", f"contains file content: {'###' in system_prompt}")
 
+    # Build user guidance — the "call plan_phase" instruction goes FIRST
     tools_list = ', '.join([k for k in agent.tool_registry.tools if agent.tool_registry.active_tools is None or k in agent.tool_registry.active_tools])
     lang_instr = t(K.ANSWER_IN, agent.lang)
     user_guidance = f"{lang_instr}. "
+    # Prominent instruction to build a plan (BEFORE tool guidance)
+    if "plan_phase" in getattr(agent.tool_registry, 'active_tools', []) or getattr(agent.tool_registry, 'active_tools', None) is None:
+        user_guidance += t(K.TODO_PLAN_START, agent.lang) + " "
     if chunk_hint:
         user_guidance += chunk_hint.strip() + " "
     if tools_list:
@@ -1042,10 +1046,6 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     filtered_hints = [h for tool_name, h in tool_hints.items() if tool_name in active_tool_set]
     if filtered_hints:
         user_guidance += "\n\n## VÆRKTØJSGUIDE" + "".join(filtered_hints)
-
-    # Opfordring til at lave sin egen opgaveplan via plan_phase
-    if "plan_phase" in active_tool_set:
-        user_guidance += "\n\n## " + t(K.TODO_PLAN_START, agent.lang)
 
     messages = [{"role": "system", "content": system_prompt}]
     if file_ctx:
@@ -3132,9 +3132,12 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                         budget_msg += "\n\nR\u00e6kkef\u00f8lge: 1) list_symbols 2) remove_symbol 3) add_import 4) verify_refactor 5) run_tests 6) update_issue_status"
                     elif phase_lower == "ekstraher":
                         budget_msg += "\n\nRækkefølge: 1) list_symbols 2) extract_symbol (gentag) 3) add_function/add_method kun hvis nødvendigt 4) verify_refactor"
-                # If LLM hasn't called plan_phase yet, nudge it
-                if i >= 2 and not getattr(agent, '_llm_has_planned', False):
-                    budget_msg += "\n\n" + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
+                # If LLM hasn't called plan_phase yet, nudge it (from iteration 0)
+                if not getattr(agent, '_llm_has_planned', False):
+                    if i == 0:
+                        budget_msg += "\n\n🧠 " + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
+                    elif i >= 2:
+                        budget_msg += "\n\n" + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
                 messages.append({"role": "user", "content": budget_msg})
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)
