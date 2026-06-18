@@ -628,6 +628,21 @@ class RefactoringEngine:
                 category=RefactoringError.FILE_NOT_FOUND,
                 filepath=p
             )
+        # Na r AGENT_WORKDIR er sat, accept e r kun stier inden for workdir
+        # eller Agenten frameworket (sidstna vnte er altid tilladt).
+        _wd = os.environ.get("AGENT_WORKDIR", "")
+        if _wd:
+            _norm_p = os.path.normcase(os.path.realpath(p))
+            _norm_wd = os.path.normcase(os.path.realpath(_wd))
+            _norm_agent = os.path.normcase(os.path.realpath(os.path.dirname(os.path.abspath(__file__))))
+            _in_wd = _norm_p.startswith(_norm_wd + os.sep) or _norm_p == _norm_wd
+            _in_agent = _norm_p.startswith(_norm_agent + os.sep) or _norm_p == _norm_agent
+            if not _in_wd and not _in_agent:
+                raise RefactoringError(
+                    f"Adgang n -gtet: '{p}' er uden for arbejdsmappen '{_wd}'",
+                    category=RefactoringError.FILE_NOT_FOUND,
+                    filepath=p
+                )
         return p
 
     def _read(self, path: str) -> tuple[str, list[str]]:
