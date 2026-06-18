@@ -544,12 +544,13 @@ def set_task_tools(agent: Any, task_name: str) -> None:
     # modulopdelinger auto-injectes i prompten af _build_initial_messages.
     # Fjern det efter tool-assignment så LLM'en ikke spilder iterationer.
     _refactor_ekstraher = agent.active_template == "refactor" and "ekstraher" in phase
-    _refactor_test = agent.active_template == "refactor" and "test" in phase
+    # Sorter edit_file før run_tests for alle test/verifikation faser
+    _edit_before_tests = any(k in phase for k in ("test", "verifikation", "green"))
     if phase in template_tools:
         tools = list(template_tools[phase])
         if _refactor_ekstraher:
             tools = [t for t in tools if t != "list_symbols"]
-        if _refactor_test:
+        if _edit_before_tests:
             tools.sort(key=lambda t: t != "edit_file")  # edit_file før run_tests
         # programmering/kodeimplementering: adapt tool order to project context
         if agent.active_template == "programmering" and "kodeimplementering" in phase:
@@ -565,7 +566,7 @@ def set_task_tools(agent: Any, task_name: str) -> None:
             tools = list(tools_kv)
             if _refactor_ekstraher:
                 tools = [t for t in tools if t != "list_symbols"]
-            if _refactor_test:
+            if _edit_before_tests:
                 tools.sort(key=lambda t: t != "edit_file")
             if agent.active_template == "programmering" and "kodeimplementering" in phase:
                 is_greenfield = _is_greenfield()
