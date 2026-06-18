@@ -1280,6 +1280,7 @@ let currentTree = null;
 let eventSource = null;
 let _isExecuting = false;
 let _currentPhase = '';
+let _currentOutputs = {};
 let panels = {};
 let showThinking = false;
 let treeEditMode = false;
@@ -2989,25 +2990,9 @@ async function resumeExecution() {
     document.getElementById("headerBody")?.classList.add("btn-executing");
     
     eventSource.onmessage = function(event) {
-        const data = JSON.parse(event.data);
-        switch(data.type) {
-            case 'log':
-                addLogEntry(data.log.level, data.log.message, data.log.detail);
-                break;
-            case 'todo_add':
-            case 'todo_update':
-            case 'llm_chunk':
-            case 'tool_call':
-            case 'tool_result':
-            case 'budget':
-            case 'start':
-            case 'task_start':
-            case 'task_done':
-            case 'retry':
-            case 'complete':
-            case 'error':
-                _handleStreamEvent(data);
-                break;
+        // Genbrug main EventSource's onmessage for at undgå duplikering
+        if (typeof _handleMainEvent === 'function') {
+            _handleMainEvent(event);
         }
     };
     eventSource.onerror = function() {
@@ -3168,9 +3153,9 @@ async function executeWithStream() {
     document.getElementById("headerBody")?.classList.add("btn-executing");
     document.getElementById('pauseBtn').style.display = 'inline-block';
     document.getElementById('resumeBtn').style.display = 'none';
-    let currentOutputs = {};
+    _currentOutputs = {};
     
-    eventSource.onmessage = function(event) {
+    function _handleMainEvent(event) {
         const data = JSON.parse(event.data);
         
         switch(data.type) {
@@ -3276,8 +3261,8 @@ async function executeWithStream() {
                 
             case 'progress_chunk':
             case 'llm_chunk':
-                if (!currentOutputs[data.task]) {
-                    currentOutputs[data.task] = '';
+                if (!_currentOutputs[data.task]) {
+                    _currentOutputs[data.task] = '';
                     if (llmBox) {
                         llmBox.innerHTML += `<div style="margin-bottom: 15px;">
                             <strong style="color:#a78bfa;">💭 ${escapeHtml(data.task)}</strong>
@@ -3285,8 +3270,8 @@ async function executeWithStream() {
                         </div>`;
                     }
                 }
-                currentOutputs[data.task] += data.chunk;
-                let clean = currentOutputs[data.task];
+                _currentOutputs[data.task] += data.chunk;
+                let clean = _currentOutputs[data.task];
                 clean = clean.replace(/<think>[\s\S]*?<\/think>/g, '');
                 clean = stripHarmony(clean);
                 if (showThinking) {
@@ -3317,7 +3302,7 @@ async function executeWithStream() {
                 if (taskElem) taskElem.innerHTML = `<span style="color:${doneColor};">${doneIcon} ${escapeHtml(data.task)} ${isFail ? 'fejlede' : (isSkipped ? 'sprunget over' : 'færdig')}</span>`;
                 
                 if (llmBox) {
-                    const output = stripHarmony(currentOutputs[data.task] || data.result || '');
+                    const output = stripHarmony(_currentOutputs[data.task] || data.result || '');
                     const existing = llmBox.querySelector(`[data-task="${data.task}"]`);
                     const borderColor = isFail ? 'var(--error, #ef4444)' : (isSkipped ? '#f59e0b' : 'var(--success)');
                     const resultDiv = `<div style="white-space:pre-wrap;margin-top:5px;padding:8px;background:var(--input-bg);border-radius:6px;border-left:3px solid ${borderColor};">${escapeHtml(output)}</div>`;
@@ -3435,8 +3420,9 @@ async function executeWithStream() {
                 _clearSpinner();
                 break;
         }
-    };
+    }
     
+    eventSource.onmessage = _handleMainEvent;
     eventSource.onerror = function() {
         _isExecuting = false;
         document.getElementById("headerBody")?.classList.remove("btn-executing");
