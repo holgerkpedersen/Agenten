@@ -905,7 +905,9 @@ const LANG_FALLBACK = {
     task_started: 'Påbegynder opgave',
     all_done: '✅ Alle opgaver færdige!',
     stream_done: 'Streaming færdig',
+    stream_paused: 'Streaming pauseret',
     all_executed: 'Alle opgaver udført',
+    execution_paused: 'Udførsel pauseret',
     stream_error: 'Streaming fejl',
     error_prefix: 'Fejl: ',
     prompt_filled_from: 'Prompt udfyldt fra',
@@ -3405,6 +3407,22 @@ async function executeWithStream() {
             case 'output_files':
                 producedFiles = data.files || [];
                 renderOutputFiles();
+                break;
+                
+             case 'paused':
+                _isExecuting = false;
+                document.getElementById("headerBody")?.classList.remove("btn-executing");
+                document.getElementById('stopBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = true;
+                document.getElementById('resumeBtn').disabled = false;
+                _enableUndo();
+                const budgetPaused = document.getElementById('budgetDisplay');
+                if (budgetPaused) budgetPaused.style.display = 'none';
+                if (_llmBox) _llmBox.innerHTML += `<div style="color:var(--warning); margin-top: 15px;">⏸️ ${_('stream_paused')}</div>`;
+                if (_progressContainer) _progressContainer.style.display = 'none';
+                addLogEntry('INFO', _('stream_paused'), _('execution_paused'));
+                saveCurrentSession();
+                _clearSpinner();
                 break;
                 
              case 'complete':

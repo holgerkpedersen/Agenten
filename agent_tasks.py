@@ -3038,6 +3038,12 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
     for i in range(max_iterations):
         agent._current_task_iteration = i + 1
         if agent.stop_requested:
+            if getattr(agent, '_pause_requested', False):
+                agent._paused_messages = list(messages)
+                agent._paused_task = task_node
+                agent._paused_original_prompt = original_prompt
+                agent._pause_requested = False
+                yield {"type": "paused"}
             break
 
         if time.time() > _task_deadline:
@@ -3111,6 +3117,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                 agent._paused_task = task_node
                 agent._paused_original_prompt = original_prompt
                 agent._pause_requested = False
+                yield {"type": "paused"}
             break
 
         if response.startswith("[ERROR:") or response.startswith("ERROR:"):
