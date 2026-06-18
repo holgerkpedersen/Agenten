@@ -2815,6 +2815,25 @@ def _check_refactor_progress(agent: Any | None = None, prompt: str = "") -> str:
     return '\n'.join(parts)
 
 
+def _all_planned_modules_exist(args: dict) -> bool:
+    """Check if ALL modules listed in refactor_plan.md exist on disk.
+
+    Used as arg_check for batch_extract_symbols → rf_e1 mapping so
+    'Følg refactor_plan.md nøjagtigt — opfyld ALLE moduler deri'
+    is only marked done when every planned module file exists.
+    """
+    import os as _os
+    plan_path = os.path.join(os.getcwd(), "refactor_plan.md")
+    if not _os.path.exists(plan_path):
+        return False
+    try:
+        from file_checks import _parse_refactor_plan_modules
+        mods = _parse_refactor_plan_modules(plan_path)
+        return bool(mods) and all(_os.path.exists(m) for m in mods)
+    except Exception:
+        return False
+
+
 # Tool-to-todo mapping: (tool_name, arg_check_func_or_none) -> todo_id
 _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("read_issue", None, "bf_a1"),
@@ -2827,7 +2846,9 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("write_file", lambda a: "docs/" in str(a.get("path", "")) and a.get("path","").endswith(".md"), "ka_a4"),
     ("write_file", lambda a: "docs/" in str(a.get("path", "")), "pr_a2"),
     ("extract_symbol", None, "rf_e1"),
-    ("batch_extract_symbols", None, "rf_e1"),
+    # rf_e1 ("Følg refactor_plan.md nøjagtigt — opfyld ALLE moduler deri")
+    # ma kun markeres done naar ALLE planlagte moduler eksisterer.
+    ("batch_extract_symbols", lambda a: _all_planned_modules_exist(a), "rf_e1"),
     ("add_method", None, "bf_i3"),
     ("add_function", None, None),
     ("verify_refactor", None, "rf_e4"),

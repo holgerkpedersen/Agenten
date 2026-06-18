@@ -3232,13 +3232,15 @@ async function executeWithStream() {
                     const header = tcClear.querySelector('.todo-section-header');
                     if (header) {
                         const phaseTag = tcClear.querySelector('.todo-phase-tag');
-                        if (!phaseTag) {
-                            const tag = document.createElement('div');
-                            tag.className = 'todo-phase-tag';
-                            if (_currentPhase) {
+                        if (_currentPhase) {
+                            if (phaseTag) {
+                                phaseTag.textContent = `📌 ${_currentPhase}`;
+                            } else {
+                                const tag = document.createElement('div');
+                                tag.className = 'todo-phase-tag';
                                 tag.textContent = `📌 ${_currentPhase}`;
+                                header.parentNode.insertBefore(tag, header.nextSibling);
                             }
-                            header.parentNode.insertBefore(tag, header.nextSibling);
                         }
                     }
                 }
