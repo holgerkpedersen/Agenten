@@ -1107,7 +1107,7 @@ async function switchLLMLang(lang) {
 }
 
 async function redecomposeTree(lang) {
-    if (_guardExecution('Stop den aktuelle udførelse før du gen-nedbryder.')) return;
+    if (_isExecuting) stopStream();
     if (!currentSessionId) return;
     addLogEntry('INFO', 'Re-decompose', `Gen-nedbryder træ på ${lang}...`);
     try {
@@ -1288,7 +1288,7 @@ function toggleTheme() {
 }
 
 function onTemplateChange(template) {
-    if (_isExecuting) return;
+    if (_isExecuting) stopStream();
     try { localStorage.setItem('agenten_template', template); } catch(e) {}
     const descDiv = document.getElementById('templateDescription');
     const key = 'template_description_' + template;
@@ -2491,7 +2491,7 @@ async function refreshSessions() {
 }
 
 async function createNewSession() {
-    if (_guardExecution('Stop den aktuelle udførelse før du opretter en ny session.')) return;
+    if (_isExecuting) stopStream();
     const name = prompt(_('new_session_prompt'), `Session ${new Date().toLocaleTimeString()}`);
     if (name) {
         const response = await fetch('/api/sessions/create', {
@@ -2535,7 +2535,7 @@ async function createNewSession() {
 }
 
 async function reuseCurrentSession() {
-    if (_guardExecution('Stop den aktuelle udførelse før du genbruger sessionen.')) return;
+    if (_isExecuting) stopStream();
     if (!currentSessionId) {
         addLogEntry('ERROR', _('reuse_no_session'), _('select_session_first'));
         return;
@@ -2610,7 +2610,7 @@ async function reuseCurrentSession() {
 }
 
 async function loadSelectedSession() {
-    if (_guardExecution('Stop den aktuelle udførelse før du skifter session.')) return;
+    if (_isExecuting) stopStream();
     const select = document.getElementById('sessionSelect');
     const sessionId = select.value;
     if (!sessionId) {
@@ -2822,7 +2822,7 @@ async function saveCurrentSession() {
 }
 
 async function decompose() {
-    if (_guardExecution('Stop den aktuelle udførelse før du nedbryder træet.')) return;
+    if (_isExecuting) stopStream();
     const prompt = document.getElementById('promptInput').value;
     if (!prompt) {
         alert(_('enter_task'));
@@ -3016,7 +3016,7 @@ async function resetExecution() {
 }
 
 async function deleteTree() {
-    if (_guardExecution('Stop den aktuelle udførelse før du sletter træet.')) return;
+    if (_isExecuting) stopStream();
     if (!currentTree) {
         alert(_('no_tree_to_delete'));
         return;
