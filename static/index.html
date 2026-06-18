@@ -2938,7 +2938,6 @@ function _activateNextTodo() {
 
 function stopStream() {
     _isExecuting = false;
-    _enableUndo();
     if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -2951,7 +2950,8 @@ function stopStream() {
 }
 
 async function undoBackup() {
-    if (_guardExecution('Kan ikke fortryde mens en udførelse er i gang. Stop først.')) return;
+    // Stop eventuel kørende udførelse før backup gendannes
+    if (_isExecuting) stopStream();
     const undoBtn = document.getElementById('undoBtn');
     if (undoBtn) {
         undoBtn.disabled = true;
@@ -3054,8 +3054,8 @@ async function executeWithStream() {
             const undoBtn = document.getElementById('undoBtn');
             if (undoBtn) {
                 undoBtn.style.display = 'inline-block';
-                undoBtn.disabled = true;
-                undoBtn.textContent = '↶ Fortryd (vent til færdig)';
+                undoBtn.disabled = false;
+                undoBtn.textContent = '↶ Fortryd';
             }
         }
     } catch(e) {
