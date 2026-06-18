@@ -10,11 +10,14 @@ _BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
 
 
 def create_execution_backup() -> dict:
-    """Stash all uncommitted changes before execution."""
+    """Stash all uncommitted changes before execution,
+    including gitignored session files via --include-untracked."""
     _wd = _os.environ.get("AGENT_WORKDIR", "")
     _git_dir = _wd if _wd and _os.path.isdir(_os.path.join(_wd, ".git")) else _BASE_DIR
     ts = _uuid.uuid4().hex[:8]
     tag = f"agent-backup-{ts}"
+    # Force-add gitignored session files so stash captures them
+    _subprocess.run(["git", "add", "sessions/"], capture_output=True, text=True, cwd=_git_dir)
     r = _subprocess.run(
         ["git", "stash", "push", "-u", "-m", tag],
         capture_output=True, text=True, cwd=_git_dir
@@ -23,7 +26,7 @@ def create_execution_backup() -> dict:
 
 
 def restore_execution_backup() -> dict:
-    """Pop the most recent agent-backup stash, restoring pre-execution state."""
+    """Hard-reset to HEAD, then drop the backup stash (state is restored by reset)."""
     _candidates = []
     _wd = _os.environ.get("AGENT_WORKDIR", "")
     if _wd and _os.path.isdir(_os.path.join(_wd, ".git")):
@@ -31,20 +34,42 @@ def restore_execution_backup() -> dict:
     _candidates.append(_BASE_DIR)
 
     for _git_dir in _candidates:
-        r = _subprocess.run(
+        # Hard reset — alle tracked filer tilbage til HEAD
+        r1 = _subprocess.run(
+            ["git", "reset", "--hard", "HEAD"],
+            capture_output=True, text=True, cwd=_git_dir
+        )
+        # Remove untracked files (inkl. nye filer oprettet under execution)
+        r2 = _subprocess.run(
+            ["git", "clean", "-fd"],
+            capture_output=True, text=True, cwd=_git_dir
+        )
+        # Slet det tilsvarende stash (behøves ikke efter hard reset)
+        r3 = _subprocess.run(
             ["git", "stash", "list"],
             capture_output=True, text=True, cwd=_git_dir
         )
-        for line in r.stdout.strip().split("\n"):
+        for line in r3.stdout.strip().split("\n"):
             if "agent-backup-" in line:
                 stash_ref = line.split(":")[0]
-                _subprocess.run(["git", "checkout", "--", "."], capture_output=True, text=True, cwd=_git_dir)
-                _subprocess.run(["git", "clean", "-fd"], capture_output=True, text=True, cwd=_git_dir)
-                pop = _subprocess.run(
-                    ["git", "stash", "pop", stash_ref],
+                _subprocess.run(
+                    ["git", "stash", "drop", stash_ref],
                     capture_output=True, text=True, cwd=_git_dir
                 )
-                return {"success": pop.returncode == 0, "message": pop.stdout or pop.stderr}
+        reset_ok = r1.returncode == 0
+        msg = r1.stderr.strip() or "Git reset — working tree restored to HEAD"
+        # Also try to restore session files (gitignored, so may not be in index)
+        _subprocess.run(
+            ["git", "checkout", "--", "sessions/"],
+            capture_output=True, text=True, cwd=_git_dir
+        )
+        # Also try to restore AGENT_WORKDIR session files
+        if _wd and _wd != _git_dir:
+            _subprocess.run(
+                ["git", "checkout", "--", "sessions/"],
+                capture_output=True, text=True, cwd=_wd
+            )
+        return {"success": reset_ok, "message": msg}
     return {"success": False, "message": "Ingen agent-backup fundet"}
 
 
