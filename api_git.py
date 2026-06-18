@@ -10,14 +10,11 @@ _BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
 
 
 def create_execution_backup() -> dict:
-    """Stash all uncommitted changes before execution,
-    including gitignored session files via --include-untracked."""
+    """Stash all uncommitted changes before execution."""
     _wd = _os.environ.get("AGENT_WORKDIR", "")
     _git_dir = _wd if _wd and _os.path.isdir(_os.path.join(_wd, ".git")) else _BASE_DIR
     ts = _uuid.uuid4().hex[:8]
     tag = f"agent-backup-{ts}"
-    # Force-add gitignored session files so stash captures them
-    _subprocess.run(["git", "add", "sessions/"], capture_output=True, text=True, cwd=_git_dir)
     r = _subprocess.run(
         ["git", "stash", "push", "-u", "-m", tag],
         capture_output=True, text=True, cwd=_git_dir
