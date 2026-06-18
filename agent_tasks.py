@@ -1187,6 +1187,28 @@ def _detect_module_deps(module_path: str, all_modules: list[str]) -> list[str]:
     return deps
 
 
+def _resolve_source_file(agent: Any, prompt: str = "") -> str:
+    """Resolve the source file being refactored from prompt or agent state.
+
+    Priority:
+    1. agent._source_file (set by _build_initial_messages)
+    2. 'Location: filename.py' in prompt
+    3. First 'filename.py' in prompt  
+    4. Fallback to 'api_server.py'
+    """
+    src = getattr(agent, '_source_file', '') or ''
+    if src:
+        return src
+    import re as _re
+    m = _re.search(r'Location:\s*([a-zA-Z_][\w./-]+\.py)', prompt)
+    if m:
+        return m.group(1)
+    m = _re.search(r'([a-zA-Z_][\w./-]+\.py)', prompt)
+    if m:
+        return m.group(1)
+    return "api_server.py"
+
+
 def _build_truncation_summary(messages: list[dict], agent: Any) -> str:
     """Build a compact summary of work done from the full message history.
 
@@ -1244,11 +1266,12 @@ def _build_truncation_summary(messages: list[dict], agent: Any) -> str:
     remaining_count = ""
     try:
         import agent_files as _af
-        result = _af.list_symbols("api_server.py")
+        _src = _resolve_source_file(agent, getattr(agent, 'original_prompt', ''))
+        result = _af.list_symbols(_src)
         if isinstance(result, dict) and result.get("success"):
             symbols = result.get("symbols", [])
             count = len(symbols) if isinstance(symbols, list) else 0
-            remaining_count = f"api_server.py: {count} symbols tilbage"
+            remaining_count = f"{_src}: {count} symbols tilbage"
     except Exception:
         pass
 
@@ -2676,17 +2699,19 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
     return todos
 
 
-def _check_refactor_progress() -> str:
-    """Check refactor progress from plan file OR directly from api_server.py.
+def _check_refactor_progress(agent: Any | None = None, prompt: str = "") -> str:
+    """Check refactor progress from plan file OR directly from source file.
 
     Returns a status string like:
       'Already created (5/8): mod_a.py, mod_b.py, ...
         Remaining (3/8): mod_c.py, mod_d.py, mod_e.py'
-    Falls back to counting symbols in api_server.py when no plan exists.
+    Falls back to counting symbols in source file when no plan exists.
     """
     import os as _os
     import re as _re
     parts = []
+
+    _src = _resolve_source_file(agent, prompt) if agent else "api_server.py"
 
     # Try plan-based progress first
     plan_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'refactor_plan.md') if _os.environ.get('AGENT_WORKDIR') else 'refactor_plan.md'
@@ -2707,14 +2732,14 @@ def _check_refactor_progress() -> str:
             if remaining:
                 parts.append("Mangler ({}/{}): {}".format(len(remaining), total, ', '.join(remaining)))
 
-    # Always count symbols in api_server.py (fallback when no plan exists)
+    # Always count symbols in source file (fallback when no plan exists)
     try:
         import agent_files as _af
-        result = _af.list_symbols("api_server.py")
+        result = _af.list_symbols(_src)
         if isinstance(result, dict) and result.get("success"):
             symbols = result.get("symbols", [])
             count = len(symbols) if isinstance(symbols, list) else 0
-            parts.append("api_server.py: {} symbols tilbage (mål: ≤50)".format(count))
+            parts.append("{}: {} symbols tilbage (mål: ≤50)".format(_src, count))
     except Exception:
         pass
 
@@ -3059,7 +3084,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     budget_msg += " (\u26a0\ufe0f Knaphed)"
                 # For refactor phases: inject progress and suggested order
                 if getattr(agent, 'active_template', '') == 'refactor':
-                    progress = _check_refactor_progress()
+                    progress = _check_refactor_progress(agent, original_prompt)
                     if progress:
                         budget_msg += f"\n\n{progress}"
                     phase_lower = _normalize_phase(task_node.name).lower()
