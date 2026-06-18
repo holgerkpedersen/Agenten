@@ -2996,6 +2996,80 @@ def _reconcile_todos_with_disk(agent: Any) -> list[str]:
     return ids
 
 
+def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
+    """Parse refactor_plan.md and auto-generate LLM-driven todos.
+
+    For refactor-template phases (Plan, Ekstraher, Opdatér), reads the
+    plan file and creates per-module todos so the LLM has a ready-made
+    checklist without needing to call ``plan_phase`` manually.
+
+    Returns a list of event dicts (llm_todo_clear, llm_todo_add) that the
+    caller can yield.
+    """
+    events: list[dict] = []
+    template = getattr(agent, 'active_template', '') or ''
+    if template != 'refactor':
+        return events
+    phase = _normalize_phase(task_node.name).lower()
+    if phase not in ('plan', 'ekstraher', 'opdatering', 'opdatér', 'opdater'):
+        return events
+
+    import os as _os
+    import re as _re
+    plan_path = getattr(agent, '_refactor_plan_path', '') or 'refactor_plan.md'
+    if not _os.path.exists(plan_path):
+        return events
+
+    try:
+        with open(plan_path, 'r', encoding='utf-8') as _f:
+            plan_content = _f.read()
+    except (OSError, UnicodeDecodeError):
+        return events
+
+    # Extract module names (same patterns as _generate_phase_todos)
+    _mods = set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))
+    _mods |= set(_re.findall(r'(?:^|\n)#{1,6}\s+(?:Modul:\s*)?([a-zA-Z_][\w]*\.py)', plan_content, _re.MULTILINE | _re.IGNORECASE))
+    plan_modules = sorted(_mods) if plan_content else []
+
+    if not plan_modules:
+        return events
+
+    # Clear existing LLM todos
+    agent._llm_todos = []
+    agent._llm_has_planned = True
+    events.append({"type": "llm_todo_clear"})
+
+    for mod in plan_modules:
+        exists = _os.path.exists(mod)
+        todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
+        text = f"Opret {mod} med batch_extract_symbols" if phase == "ekstraher" else \
+               f"Planlæg indhold af {mod}" if phase == "plan" else \
+               f"Opdatér referencer i {mod}"
+        entry = {
+            "id": todo_id,
+            "text": text,
+            "done": exists,
+            "parent_id": None,
+            "phase": phase,
+        }
+        if not hasattr(agent, '_llm_todos') or agent._llm_todos is None:
+            agent._llm_todos = []
+        agent._llm_todos.append(entry)
+        events.append({"type": "llm_todo_add", "id": todo_id, "text": text, "parent_id": None})
+
+    entry_total = {
+        "id": "lt_total",
+        "text": f"Verificér at alle {len(plan_modules)} moduler er korrekt oprettet",
+        "done": all(_os.path.exists(m) for m in plan_modules),
+        "parent_id": None,
+        "phase": phase,
+    }
+    agent._llm_todos.append(entry_total)
+    events.append({"type": "llm_todo_add", "id": "lt_total", "text": entry_total["text"], "parent_id": None})
+
+    return events
+
+
 def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_messages: list[dict] | None = None) -> Generator[dict, None, None]:
     """solve task stream.
     
@@ -3013,6 +3087,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
     yield {"type": "todo_clear"}
     for todo in agent._phase_todos:
         yield {"type": "todo_add", "todo": todo}
+    # Auto-populate LLM todos from refactor_plan.md
+    for evt in _auto_populate_llm_todos(agent, task_node):
+        yield evt
     agent._task_start_time = time.time()
     agent.current_phase = _normalize_phase(task_node.name)
     agent._log("INFO", t(K.LOG_TASK_START, agent.lang), f"{task_node.name} (model: {agent.llm.model})")
