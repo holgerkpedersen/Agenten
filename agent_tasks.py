@@ -2907,6 +2907,8 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str) -> Gener
         ..."""
     task_node.status = "running"
     agent._phase_todos = _generate_phase_todos(getattr(agent, 'active_template', '') or '', task_node.name, getattr(agent, 'original_prompt', ''), agent)
+    # Ryd gamle todos før nye fase-specifikke todos tilføjes
+    yield {"type": "todo_clear"}
     for todo in agent._phase_todos:
         yield {"type": "todo_add", "todo": todo}
     agent._task_start_time = time.time()

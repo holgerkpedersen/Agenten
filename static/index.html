@@ -3050,6 +3050,11 @@ async function executeWithStream() {
                 addLogEntry(data.log.level, data.log.message, data.log.detail);
                 break;
                 
+             case 'todo_clear':
+                const tcClear = document.getElementById('todosContent');
+                if (tcClear) tcClear.innerHTML = '';
+                break;
+                
              case 'todo_add':
                 const tc = document.getElementById('todosContent');
                 if (tc) {
