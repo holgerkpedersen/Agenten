@@ -1,40 +1,37 @@
 import subprocess as _subprocess
 import uuid as _uuid
+import os as _os
 from typing import Any
 from flask import jsonify
+
+_BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
 
 
 def create_execution_backup() -> dict:
     """Stash all uncommitted changes before execution."""
-    from api_server import BASE_DIR
     ts = _uuid.uuid4().hex[:8]
     tag = f"agent-backup-{ts}"
-    # -u includes untracked files, -m adds a message
     r = _subprocess.run(
         ["git", "stash", "push", "-u", "-m", tag],
-        capture_output=True, text=True, cwd=BASE_DIR
+        capture_output=True, text=True, cwd=_BASE_DIR
     )
     return {"success": r.returncode == 0, "message": r.stdout or r.stderr, "tag": tag}
 
 
 def restore_execution_backup() -> dict:
     """Pop the most recent agent-backup stash, restoring pre-execution state."""
-    from api_server import BASE_DIR
     r = _subprocess.run(
         ["git", "stash", "list"],
-        capture_output=True, text=True, cwd=BASE_DIR
+        capture_output=True, text=True, cwd=_BASE_DIR
     )
     for line in r.stdout.strip().split("\n"):
         if "agent-backup-" in line:
             stash_ref = line.split(":")[0]
-            # Restore tracked files
-            _subprocess.run(["git", "checkout", "--", "."], capture_output=True, text=True, cwd=BASE_DIR)
-            # Delete untracked files created during the session
-            _subprocess.run(["git", "clean", "-fd"], capture_output=True, text=True, cwd=BASE_DIR)
-            # Restore the stash
+            _subprocess.run(["git", "checkout", "--", "."], capture_output=True, text=True, cwd=_BASE_DIR)
+            _subprocess.run(["git", "clean", "-fd"], capture_output=True, text=True, cwd=_BASE_DIR)
             pop = _subprocess.run(
                 ["git", "stash", "pop", stash_ref],
-                capture_output=True, text=True, cwd=BASE_DIR
+                capture_output=True, text=True, cwd=_BASE_DIR
             )
             return {"success": pop.returncode == 0, "message": pop.stdout or pop.stderr}
     return {"success": False, "message": "Ingen agent-backup fundet"}
@@ -46,10 +43,8 @@ def git_backup() -> Any:
         result = create_execution_backup()
         return jsonify(result)
     except Exception as e:
-        import traceback
         import logging
-        log = logging.getLogger(__name__)
-        log.error("Git backup failed", exc_info=True)
+        logging.getLogger(__name__).error("Git backup failed: %s", e)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
