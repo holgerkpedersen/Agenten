@@ -1158,6 +1158,35 @@ def _save_full_context_for_refactor(agent: Any, messages: list[dict]) -> None:
         pass
 
 
+def _count_symbols_in_file(filepath: str) -> int:
+    """Count top-level symbols in a Python file."""
+    try:
+        import agent_files as _af
+        result = _af.list_symbols(filepath)
+        if isinstance(result, dict) and result.get("success"):
+            return result.get("count", 0)
+    except Exception:
+        pass
+    return 0
+
+
+def _detect_module_deps(module_path: str, all_modules: list[str]) -> list[str]:
+    """Detect which planned modules a module depends on via imports."""
+    if not os.path.exists(module_path):
+        return []
+    try:
+        with open(module_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except (OSError, IOError):
+        return []
+    deps = []
+    for mod in all_modules:
+        mod_name = os.path.splitext(os.path.basename(mod))[0]
+        if mod != module_path and mod_name in content:
+            deps.append(mod)
+    return deps
+
+
 def _build_truncation_summary(messages: list[dict], agent: Any) -> str:
     """Build a compact summary of work done from the full message history.
 
@@ -2366,7 +2395,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                     _mod = _m.group(1).strip('`')
                     _body = _m.group(2).strip()
                     _syms = _re.findall(r'`?([A-Za-z_]\w*)`?', _body)
-                    _mod_symbols[_mod] = [s for s in _syms if s not in ('py', 'txt', 'md') and not s.startswith(('.', '/'))][:12]
+                    _mod_symbols[_mod] = [s for s in _syms if s not in ('py', 'txt', 'md') and not s.startswith(('.', '/'))]
                 # Pattern 2: inline "modul.py → sym1, sym2"
                 if not _mod_symbols:
                     for _m in _re.finditer(
@@ -2375,7 +2404,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                     ):
                         _mod = _m.group(1)
                         _syms = [s.strip() for s in _m.group(2).split(',') if s.strip()]
-                        _mod_symbols[_mod] = _syms[:12]
+                        _mod_symbols[_mod] = _syms
 
             # Bestem kildefil fra prompt eller plan
             _src_match = _re.search(r"([a-zA-Z_][\w.]+\.py)", prompt or "")
@@ -2396,22 +2425,33 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                     "text": "Fremskridt: {}/{} moduler oprettet ({})".format(done_count, total, ', '.join(_all_plan_mods)),
                     "done": False,
                 })
+            # Ta l faktiske symboler i eksisterende moduler for status
             if _existing_mods:
                 for _mod in _existing_mods:
-                    _syms = _mod_symbols.get(_mod, [])
-                    _sym_info = " (" + ", ".join(_syms[:6]) + (", ..." if len(_syms) > 6 else "") + ")" if _syms else ""
+                    _planned = _mod_symbols.get(_mod, [])
+                    _actual = _count_symbols_in_file(_mod)
+                    if _planned:
+                        _done_count = min(_actual, len(_planned))
+                        _status = "{}/{} symbols i filen".format(_done_count, len(_planned))
+                    elif _actual > 0:
+                        _status = "{} symbols i filen".format(_actual)
+                    else:
+                        _status = "f\u00e6rdig"
                     todos.append({
                         "id": "rf_e_done_" + _mod.replace('.py', '').replace('.', '_'),
-                        "text": "\u2705 {} f\u00e6rdig{}".format(_mod, _sym_info),
+                        "text": "\u2705 {} f\u00e6rdig \u2014 {}".format(_mod, _status),
                         "done": True,
                     })
             to_create = [m for m in _all_plan_mods if m not in _existing_mods]
-            for _mod in to_create:
+            for idx, _mod in enumerate(to_create, 1):
                 _syms = _mod_symbols.get(_mod, [])
-                _sym_info = " (" + ", ".join(_syms[:6]) + (", ..." if len(_syms) > 6 else "") + ")" if _syms else ""
+                _count_info = " ({} symbols)".format(len(_syms)) if _syms else ""
+                # Afha ngighedsdetektion
+                _deps = _detect_module_deps(_mod, _all_plan_mods)
+                _dep_info = " \u2014 afh\u00e6nger af: " + ", ".join(_deps) if _deps else ""
                 todos.append({
                     "id": "rf_e_create_" + _mod.replace('.py', '').replace('.', '_'),
-                    "text": "{} {}{}".format("Opret modul:" if not _syms else "Flyt til", _mod, _sym_info),
+                    "text": "[{}] Flyt til {}{}{}".format(idx, _mod, _count_info, _dep_info),
                     "done": False,
                 })
 
