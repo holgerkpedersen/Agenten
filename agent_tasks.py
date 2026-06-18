@@ -2945,6 +2945,40 @@ def _auto_todo_update(tool_name: str, args_val: dict, agent: Any) -> list[str]:
     return ids
 
 
+def _reconcile_llm_todos(agent: Any) -> list[str]:
+    """Check actual disk state against LLM todos and return newly satisfiable llm todo IDs.
+
+    For refactor Ekstraher: checks if target module files exist with content.
+    """
+    llm_todos = getattr(agent, '_llm_todos', None)
+    if not llm_todos:
+        return []
+    ids = []
+    for todo in llm_todos:
+        if todo.get("done"):
+            continue
+        text = todo.get("text", "")
+        tid = todo.get("id", "")
+        if not text or not tid:
+            continue
+        # Check if file mentioned in text exists
+        m = _re.search(r'([a-zA-Z_][\w./-]+\.py)', text)
+        if m:
+            fpath = m.group(1)
+            if _os.path.exists(fpath):
+                _actual = _count_symbols_in_file(fpath)
+                if "lt_total" in tid:
+                    # Only mark total done when all other module todos are done
+                    _other_undone = [t for t in llm_todos if t.get("id") != tid and not t.get("done")]
+                    if not _other_undone:
+                        ids.append(tid)
+                else:
+                    ids.append(tid)
+                    # Also update text with symbol count
+                    todo["text"] = f"Flyt symboler til {fpath} med batch_extract_symbols ({_actual} symbols)"
+    return ids
+
+
 def _reconcile_todos_with_disk(agent: Any) -> list[str]:
     """Check actual file state against todos and return newly satisfiable todo IDs.
 
@@ -3038,35 +3072,45 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
     template = getattr(agent, 'active_template', '') or ''
     phase = _normalize_phase(task_node.name).lower()
 
-    # ── Refactor-template: try module-based todos from refactor_plan.md ──
+    # ── Refactor-template: file-based todos from refactor_plan.md ──
     if template == 'refactor' and phase in ('plan', 'ekstraher', 'opdatering', 'opdatér', 'opdater'):
         plan_path = getattr(agent, '_refactor_plan_path', '') or 'refactor_plan.md'
         if not _os.path.isabs(plan_path):
             _wd = _os.environ.get('AGENT_WORKDIR', '')
             if _wd:
                 plan_path = _os.path.normpath(_os.path.join(_wd, plan_path))
-        if _os.path.exists(plan_path):
-            try:
-                with open(plan_path, 'r', encoding='utf-8') as _f:
-                    plan_content = _f.read()
-            except (OSError, UnicodeDecodeError):
-                plan_content = ''
-            _mods = set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))
-            _mods |= set(_re.findall(r'(?:^|\n)#{1,6}\s+(?:Modul:\s*)?([a-zA-Z_][\w]*\.py)', plan_content, _re.MULTILINE | _re.IGNORECASE))
-            plan_modules = sorted(_mods) if plan_content else []
-            if plan_modules:
-                for mod in plan_modules:
-                    exists = _os.path.exists(mod)
-                    todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
-                    text = f"Opret {mod} med batch_extract_symbols" if phase == "ekstraher" else \
-                           f"Planlæg indhold af {mod}" if phase == "plan" else \
-                           f"Opdatér referencer i {mod}"
-                    agent._llm_todos.append({"id": todo_id, "text": text, "done": exists, "parent_id": None, "phase": phase})
-                    events.append({"type": "llm_todo_add", "id": todo_id, "text": text, "parent_id": None})
-                total_done = all(_os.path.exists(m) for m in plan_modules)
-                agent._llm_todos.append({"id": "lt_total", "text": f"Verificér at alle {len(plan_modules)} moduler er korrekt oprettet", "done": total_done, "parent_id": None, "phase": phase})
-                events.append({"type": "llm_todo_add", "id": "lt_total", "text": f"Verificér at alle {len(plan_modules)} moduler er korrekt oprettet", "parent_id": None})
-                return events
+        try:
+            from file_checks import _parse_refactor_plan_modules, _extract_modules_from_plan
+            _all_mods = _parse_refactor_plan_modules(plan_path)
+        except Exception:
+            _all_mods = []
+        if _all_mods:
+            # Filter out the source file (the file being refactored)
+            _src_match = _re.search(r"([a-zA-Z_][\w.]+\.py)", getattr(agent, 'original_prompt', '') or '')
+            _src = _src_match.group(1) if _src_match else ''
+            _tgt_mods = [m for m in _all_mods if _src not in m] if _src else _all_mods
+            if not _tgt_mods:
+                _tgt_mods = _all_mods
+            for mod in _tgt_mods:
+                _exists = _os.path.exists(mod)
+                _todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
+                if phase == "ekstraher":
+                    _text = f"Flyt symboler til {mod} med batch_extract_symbols"
+                    if _exists:
+                        _actual = _count_symbols_in_file(mod) if _exists else 0
+                        _text += f" ({_actual} symbols)"
+                elif phase == "plan":
+                    _text = f"Planlæg indhold af {mod}"
+                else:
+                    _text = f"Opdatér referencer i {mod}"
+                agent._llm_todos.append({"id": _todo_id, "text": _text, "done": _exists, "parent_id": None, "phase": phase})
+                events.append({"type": "llm_todo_add", "id": _todo_id, "text": _text, "parent_id": None})
+            _n = len(_tgt_mods)
+            _total_text = f"Verificér at alle {_n} moduler er korrekt oprettet" if _n != 1 else "Verificér at modulet er korrekt oprettet"
+            _total_done = all(_os.path.exists(m) for m in _tgt_mods)
+            agent._llm_todos.append({"id": "lt_total", "text": _total_text, "done": _total_done, "parent_id": None, "phase": phase})
+            events.append({"type": "llm_todo_add", "id": "lt_total", "text": _total_text, "parent_id": None})
+            return events
 
     # ── Fallback: mirror auto-generated _phase_todos ──
     phase_todos = getattr(agent, '_phase_todos', None) or []
@@ -3671,6 +3715,14 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         tgt = os.path.basename(inner.get("target", "?"))
                         messages.append({"role": "user", "content": f"[SYSTEM: ✅ {sym} flyttet til {tgt}]"})
 
+                # Disk-based reconciliation (both auto and LLM todos)
+                for tid in _reconcile_todos_with_disk(agent):
+                    if tid:
+                        yield {"type": "todo_update", "id": tid, "done": True}
+                for lid in _reconcile_llm_todos(agent):
+                    if lid:
+                        yield {"type": "llm_todo_update", "id": lid, "done": True, "text": None}
+
                 messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 total_calls = sum(called_tools.values())
                 if total_calls >= _get_max_tool_calls(task_node.name):
@@ -3739,6 +3791,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             for tid in _reconcile_todos_with_disk(agent):
                 if tid:
                     yield {"type": "todo_update", "id": tid, "done": True}
+            # Disk-based reconciliation for LLM todos (file existence, symbol counts)
+            for lid in _reconcile_llm_todos(agent):
+                if lid:
+                    yield {"type": "llm_todo_update", "id": lid, "done": True, "text": None}
             _track_produced_file(agent, tool_result)
             if agent._produced_files:
                 yield {"type": "output_files", "files": sorted(agent._produced_files)}
