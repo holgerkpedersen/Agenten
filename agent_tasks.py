@@ -982,9 +982,11 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         llm_todo_lines = []
         for todo in llm_todos:
             status = " [✓]" if todo.get("done") else ""
-            llm_todo_lines.append(f"  [{status}] {todo.get('text', '')}")
+            tid = todo.get("id", "")
+            llm_todo_lines.append(f"  [{status}] `{tid}` {todo.get('text', '')}")
         if llm_todo_lines:
-            task_prompt += f"\n\n## {t(K.TODO_LLM_HEADER, agent.lang)}\n" + "\n".join(llm_todo_lines)
+            task_prompt += f"\n\n## {t(K.TODO_LLM_HEADER, agent.lang)}\n" + "\n".join(llm_todo_lines) + \
+                           f"\n\nBrug **update_todo(todo_id='lt_xxx', done=true)** for at markere fremdrift."
 
     agent._refresh_skills()
     agent._match_skills(clean_prompt)
@@ -2997,80 +2999,73 @@ def _reconcile_todos_with_disk(agent: Any) -> list[str]:
 
 
 def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
-    """Parse refactor_plan.md and auto-generate LLM-driven todos.
+    """Auto-generate LLM-driven todos from phase context.
 
-    For refactor-template phases (Plan, Ekstraher, Opdatér), reads the
-    plan file and creates per-module todos so the LLM has a ready-made
-    checklist without needing to call ``plan_phase`` manually.
+    For ALL templates and phases, creates a pre-populated checklist
+    mirroring the Agent's auto-todos (``_phase_todos``) so the LLM
+    has a ready-made plan.  The LLM can then call ``update_todo`` to
+    mark progress and ``create_todo`` to add custom steps.
 
-    Returns a list of event dicts (llm_todo_clear, llm_todo_add) that the
-    caller can yield.
+    For refactor-template phases that have a ``refactor_plan.md``,
+    per-module tasks are created instead for finer granularity.
+
+    Returns a list of event dicts (llm_todo_clear, llm_todo_add) that
+    the caller can yield.
     """
     events: list[dict] = []
-    template = getattr(agent, 'active_template', '') or ''
-    if template != 'refactor':
-        return events
-    phase = _normalize_phase(task_node.name).lower()
-    if phase not in ('plan', 'ekstraher', 'opdatering', 'opdatér', 'opdater'):
-        return events
-
     import os as _os
     import re as _re
-    plan_path = getattr(agent, '_refactor_plan_path', '') or 'refactor_plan.md'
-    # Resolve relative to AGENT_WORKDIR if set (not raw CWD)
-    if not _os.path.isabs(plan_path):
-        _wd = _os.environ.get('AGENT_WORKDIR', '')
-        if _wd:
-            plan_path = _os.path.normpath(_os.path.join(_wd, plan_path))
-    if not _os.path.exists(plan_path):
-        return events
 
-    try:
-        with open(plan_path, 'r', encoding='utf-8') as _f:
-            plan_content = _f.read()
-    except (OSError, UnicodeDecodeError):
-        return events
-
-    # Extract module names (same patterns as _generate_phase_todos)
-    _mods = set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))
-    _mods |= set(_re.findall(r'(?:^|\n)#{1,6}\s+(?:Modul:\s*)?([a-zA-Z_][\w]*\.py)', plan_content, _re.MULTILINE | _re.IGNORECASE))
-    plan_modules = sorted(_mods) if plan_content else []
-
-    if not plan_modules:
-        return events
-
-    # Clear existing LLM todos
-    agent._llm_todos = []
     agent._llm_has_planned = True
+    agent._llm_todos = []
     events.append({"type": "llm_todo_clear"})
 
-    for mod in plan_modules:
-        exists = _os.path.exists(mod)
-        todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
-        text = f"Opret {mod} med batch_extract_symbols" if phase == "ekstraher" else \
-               f"Planlæg indhold af {mod}" if phase == "plan" else \
-               f"Opdatér referencer i {mod}"
-        entry = {
-            "id": todo_id,
-            "text": text,
-            "done": exists,
-            "parent_id": None,
-            "phase": phase,
-        }
-        if not hasattr(agent, '_llm_todos') or agent._llm_todos is None:
-            agent._llm_todos = []
-        agent._llm_todos.append(entry)
+    template = getattr(agent, 'active_template', '') or ''
+    phase = _normalize_phase(task_node.name).lower()
+
+    # ── Refactor-template: try module-based todos from refactor_plan.md ──
+    if template == 'refactor' and phase in ('plan', 'ekstraher', 'opdatering', 'opdatér', 'opdater'):
+        plan_path = getattr(agent, '_refactor_plan_path', '') or 'refactor_plan.md'
+        if not _os.path.isabs(plan_path):
+            _wd = _os.environ.get('AGENT_WORKDIR', '')
+            if _wd:
+                plan_path = _os.path.normpath(_os.path.join(_wd, plan_path))
+        if _os.path.exists(plan_path):
+            try:
+                with open(plan_path, 'r', encoding='utf-8') as _f:
+                    plan_content = _f.read()
+            except (OSError, UnicodeDecodeError):
+                plan_content = ''
+            _mods = set(_re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content))
+            _mods |= set(_re.findall(r'(?:^|\n)#{1,6}\s+(?:Modul:\s*)?([a-zA-Z_][\w]*\.py)', plan_content, _re.MULTILINE | _re.IGNORECASE))
+            plan_modules = sorted(_mods) if plan_content else []
+            if plan_modules:
+                for mod in plan_modules:
+                    exists = _os.path.exists(mod)
+                    todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
+                    text = f"Opret {mod} med batch_extract_symbols" if phase == "ekstraher" else \
+                           f"Planlæg indhold af {mod}" if phase == "plan" else \
+                           f"Opdatér referencer i {mod}"
+                    agent._llm_todos.append({"id": todo_id, "text": text, "done": exists, "parent_id": None, "phase": phase})
+                    events.append({"type": "llm_todo_add", "id": todo_id, "text": text, "parent_id": None})
+                total_done = all(_os.path.exists(m) for m in plan_modules)
+                agent._llm_todos.append({"id": "lt_total", "text": f"Verificér at alle {len(plan_modules)} moduler er korrekt oprettet", "done": total_done, "parent_id": None, "phase": phase})
+                events.append({"type": "llm_todo_add", "id": "lt_total", "text": f"Verificér at alle {len(plan_modules)} moduler er korrekt oprettet", "parent_id": None})
+                return events
+
+    # ── Fallback: mirror auto-generated _phase_todos ──
+    phase_todos = getattr(agent, '_phase_todos', None) or []
+    for todo in phase_todos:
+        todo_id = "lt_" + (todo.get("id", "") or _re.sub(r'[^a-zA-Z0-9]', '', todo.get("text", ""))[:12])
+        text = todo.get("text", phase)
+        done = todo.get("done", False)
+        agent._llm_todos.append({"id": todo_id, "text": text, "done": done, "parent_id": None, "phase": phase})
         events.append({"type": "llm_todo_add", "id": todo_id, "text": text, "parent_id": None})
 
-    entry_total = {
-        "id": "lt_total",
-        "text": f"Verificér at alle {len(plan_modules)} moduler er korrekt oprettet",
-        "done": all(_os.path.exists(m) for m in plan_modules),
-        "parent_id": None,
-        "phase": phase,
-    }
-    agent._llm_todos.append(entry_total)
-    events.append({"type": "llm_todo_add", "id": "lt_total", "text": entry_total["text"], "parent_id": None})
+    if not phase_todos:
+        fallback = f"Gennemfør fasen: {task_node.name}"
+        agent._llm_todos.append({"id": "lt_fallback", "text": fallback, "done": False, "parent_id": None, "phase": phase})
+        events.append({"type": "llm_todo_add", "id": "lt_fallback", "text": fallback, "parent_id": None})
 
     return events
 
@@ -3220,6 +3215,11 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                         budget_msg += "\n\n🧠 " + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
                     elif i >= 2:
                         budget_msg += "\n\n" + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
+                # Also nudge to update_todo if LLM isn't marking progress
+                elif i >= 1:
+                    _any_updated = any(t.get("done") for t in (getattr(agent, '_llm_todos') or []))
+                    if not _any_updated:
+                        budget_msg += "\n\n💡 Brug **update_todo(todo_id='lt_xxx', done=true)** for at markere fremdrift i din plan."
                 messages.append({"role": "user", "content": budget_msg})
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)
