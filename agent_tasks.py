@@ -1758,6 +1758,11 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
     task_name = getattr(task_node, "name", "") or ""
     phase = _normalize_phase(task_name).lower()
 
+    # Bloker auto-complete for Analyse og Plan hvis LLM'en ikke har
+    # oprettet sin egen opgaveplan endnu (kræver plan_phase kaldt).
+    if phase in ("analyse", "plan") and not getattr(agent, '_llm_has_planned', False):
+        return None
+
     if tool_name == "run_tests" and not agent._tests_failed:
         if "test" in phase:
             if _refactor_actually_moved_code(agent):
@@ -3289,8 +3294,11 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                 if not getattr(agent, '_llm_has_planned', False):
                     if i == 0:
                         budget_msg += "\n\n🧠 " + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
-                    elif i >= 2:
-                        budget_msg += "\n\n" + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
+                    elif i >= 1:
+                        # Stærkere tvang: system-besked i stedet for blot budget-note
+                        msg = t(K.TODO_PLAN_NOT_CALLED, agent.lang)
+                        messages.append({"role": "system", "content": msg})
+                        budget_msg += "\n\n⛔ " + msg
                 # Also nudge to update_todo if LLM isn't marking progress
                 elif i >= 1:
                     _any_updated = any(t.get("done") for t in (getattr(agent, '_llm_todos') or []))
