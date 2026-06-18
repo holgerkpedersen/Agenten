@@ -24,22 +24,28 @@ def create_execution_backup() -> dict:
 
 def restore_execution_backup() -> dict:
     """Pop the most recent agent-backup stash, restoring pre-execution state."""
+    # Try workdir git first, then fall back to Agenten's git (for stashes created before _git_dir fix)
+    _candidates = []
     _wd = _os.environ.get("AGENT_WORKDIR", "")
-    _git_dir = _wd if _wd and _os.path.isdir(_os.path.join(_wd, ".git")) else _BASE_DIR
-    r = _subprocess.run(
-        ["git", "stash", "list"],
-        capture_output=True, text=True, cwd=_git_dir
-    )
-    for line in r.stdout.strip().split("\n"):
-        if "agent-backup-" in line:
-            stash_ref = line.split(":")[0]
-            _subprocess.run(["git", "checkout", "--", "."], capture_output=True, text=True, cwd=_git_dir)
-            _subprocess.run(["git", "clean", "-fd"], capture_output=True, text=True, cwd=_git_dir)
-            pop = _subprocess.run(
-                ["git", "stash", "pop", stash_ref],
-                capture_output=True, text=True, cwd=_git_dir
-            )
-            return {"success": pop.returncode == 0, "message": pop.stdout or pop.stderr}
+    if _wd and _os.path.isdir(_os.path.join(_wd, ".git")):
+        _candidates.append(_wd)
+    _candidates.append(_BASE_DIR)
+
+    for _git_dir in _candidates:
+        r = _subprocess.run(
+            ["git", "stash", "list"],
+            capture_output=True, text=True, cwd=_git_dir
+        )
+        for line in r.stdout.strip().split("\n"):
+            if "agent-backup-" in line:
+                stash_ref = line.split(":")[0]
+                _subprocess.run(["git", "checkout", "--", "."], capture_output=True, text=True, cwd=_git_dir)
+                _subprocess.run(["git", "clean", "-fd"], capture_output=True, text=True, cwd=_git_dir)
+                pop = _subprocess.run(
+                    ["git", "stash", "pop", stash_ref],
+                    capture_output=True, text=True, cwd=_git_dir
+                )
+                return {"success": pop.returncode == 0, "message": pop.stdout or pop.stderr}
     return {"success": False, "message": "Ingen agent-backup fundet"}
 
 
