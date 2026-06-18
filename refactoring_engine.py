@@ -612,8 +612,16 @@ class RefactoringEngine:
     def __init__(self, base_dir: str | None = None):
         self.base_dir = base_dir or os.getcwd()
 
+    def _resolve(self, path: str) -> str:
+        """Resolve a path relative to AGENT_WORKDIR if set, else CWD."""
+        if not os.path.isabs(path):
+            wd = os.environ.get("AGENT_WORKDIR", "")
+            if wd:
+                return os.path.normpath(os.path.join(wd, path))
+        return os.path.abspath(path)
+
     def _abs(self, path: str) -> str:
-        p = os.path.abspath(path)
+        p = self._resolve(path)
         if not os.path.exists(p):
             raise RefactoringError(
                 f"File not found: {p}",
@@ -629,7 +637,7 @@ class RefactoringEngine:
         return content, content.split('\n')
 
     def _write(self, path: str, content: str) -> None:
-        path = os.path.abspath(path)
+        path = self._resolve(path)
         tmppath = path + '.tmp'
         with open(tmppath, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -651,7 +659,7 @@ class RefactoringEngine:
         Raises RefactoringError if extraction cannot be performed.
         """
         source = self._abs(source)
-        target = os.path.abspath(target)
+        target = self._resolve(target)
 
         content, lines = self._read(source)
 
@@ -937,7 +945,7 @@ class RefactoringEngine:
         If any step fails, all prior steps are rolled back.
         """
         source = self._abs(source)
-        target = os.path.abspath(target)
+        target = self._resolve(target)
         short_name = symbol_name.split('.')[-1]
         target_module = os.path.splitext(os.path.basename(target))[0]
 
