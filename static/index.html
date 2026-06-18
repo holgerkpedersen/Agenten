@@ -715,7 +715,7 @@
             <select id="sessionSelect" class="session-select">
                 <option value="" id="selectSessionOpt">-- Vælg eller opret ny --</option>
             </select>
-            <span id="sessionIdDisplay" style="font-size:11px;color:var(--text-dim);margin-left:6px;user-select:all;cursor:pointer;" data-i18n-title="copy_session_id"></span>
+            <span id="sessionIdDisplay" onclick="copySessionId()" style="font-size:11px;color:var(--text-dim);margin-left:6px;user-select:all;cursor:pointer;" data-i18n-title="copy_session_id"></span>
             <button onclick="refreshSessions()" id="refreshSess" data-i18n-title="refresh_sessions">🔄</button>
             <button onclick="loadSelectedSession()" id="loadSess" data-i18n-title="load_session">📂 Indlæs</button>
             <button onclick="saveCurrentSession()" id="saveSess" data-i18n-title="save_session">💾 Gem</button>
@@ -2430,6 +2430,24 @@ function resetLayout() {
         }
     }
     saveLayoutToSession();
+}
+
+function copySessionId() {
+    const id = currentSessionId;
+    if (!id) return;
+    navigator.clipboard.writeText(id).then(() => {
+        addLogEntry('INFO', 'Session ID kopieret', id);
+    }).catch(() => {
+        // Fallback: select text
+        const el = document.getElementById('sessionIdDisplay');
+        if (el) {
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+        }
+    });
 }
 
 function updateSessionIdDisplay() {
