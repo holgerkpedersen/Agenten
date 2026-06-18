@@ -2745,11 +2745,14 @@ async function loadSelectedSession() {
 }
 
 async function saveCurrentSession() {
+    // Capture prompt FØR createNewSession (som cleanner promptInput)
+    const currentPrompt = document.getElementById('promptInput').value;
     if (!currentSessionId) {
         await createNewSession();
+        // Gendan prompt efter createNewSession har cleannet den
+        document.getElementById('promptInput').value = currentPrompt;
     }
     const layout = getCurrentLayout();
-    const currentPrompt = document.getElementById('promptInput').value;
     const fileContext = loadedFilesContent.map(f => ({ filename: f.filename, filepath: f.filepath, content: f.content || '' }));
     const response = await fetch('/api/sessions/save', {
         method: 'POST',
