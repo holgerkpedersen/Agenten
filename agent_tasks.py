@@ -535,6 +535,15 @@ def set_task_tools(agent: Any, task_name: str) -> None:
     Args:
         agent:
         task_name:"""
+    _TODO_TOOLS = {"plan_phase", "create_todo", "update_todo", "delete_todo", "list_todos"}
+
+    def _inject_todo_tools(tools: list[str]) -> list[str]:
+        """Add universal todo tools to a tool list if missing."""
+        for t in _TODO_TOOLS:
+            if t not in tools:
+                tools.append(t)
+        return tools
+
     if not agent.active_template or agent.active_template not in agent_skills.TEMPLATE_TASK_TOOLS:
         _ensure_done_tool(agent)
         return
@@ -557,7 +566,7 @@ def set_task_tools(agent: Any, task_name: str) -> None:
             is_greenfield = _is_greenfield()
             if is_greenfield:
                 tools.sort(key=lambda t: t != "write_file")  # write_file first
-        agent.tool_registry.set_active_tools(tools)
+        agent.tool_registry.set_active_tools(_inject_todo_tools(tools))
         agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
         _ensure_done_tool(agent)
         return
@@ -572,14 +581,14 @@ def set_task_tools(agent: Any, task_name: str) -> None:
                 is_greenfield = _is_greenfield()
                 if is_greenfield:
                     tools.sort(key=lambda t: t != "write_file")  # write_file first
-            agent.tool_registry.set_active_tools(tools)
+            agent.tool_registry.set_active_tools(_inject_todo_tools(tools))
             agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
             _ensure_done_tool(agent)
             return
     # Fallback: use generic template tools if no phase-specific match
     allowed = agent_skills.TEMPLATE_TOOLS.get(agent.active_template)
     if allowed is not None:
-        agent.tool_registry.set_active_tools(allowed)
+        agent.tool_registry.set_active_tools(_inject_todo_tools(list(allowed)))
     _ensure_done_tool(agent)
 
 

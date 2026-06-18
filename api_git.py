@@ -54,8 +54,9 @@ def git_backup() -> Any:
         result = create_execution_backup()
         return jsonify(result)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error("Git backup failed", exc_info=True)
+        import traceback
+        log = logging.getLogger(__name__)
+        log.error("Git backup failed: %s", traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
 
 
