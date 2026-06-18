@@ -42,8 +42,15 @@ def restore_execution_backup() -> dict:
 
 def git_backup() -> Any:
     """Create execution backup (git stash)."""
-    result = create_execution_backup()
-    return jsonify(result)
+    try:
+        result = create_execution_backup()
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        import logging
+        log = logging.getLogger(__name__)
+        log.error("Git backup failed", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 def git_reset() -> Any:
