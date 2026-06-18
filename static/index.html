@@ -3212,15 +3212,23 @@ async function executeWithStream() {
                 const autoList = document.getElementById('autoTodosList');
                 const llmList = document.getElementById('llmTodosList');
                 const llmSection = document.getElementById('llmTodosSection');
+                const tcClear = document.getElementById('todosContent');
+                if (tcClear) {
+                    const header = tcClear.querySelector('.todo-section-header');
+                    if (header) {
+                        const phaseTag = tcClear.querySelector('.todo-phase-tag');
+                        if (!phaseTag) {
+                            const tag = document.createElement('div');
+                            tag.className = 'todo-phase-tag';
+                            if (_currentPhase) {
+                                tag.textContent = `📌 ${_currentPhase}`;
+                            }
+                            header.parentNode.insertBefore(tag, header.nextSibling);
+                        }
+                    }
+                }
                 if (autoList) {
                     autoList.innerHTML = '';
-                    if (_currentPhase) {
-                        const phaseHeader = document.createElement('div');
-                        phaseHeader.className = 'todo-phase-header';
-                        phaseHeader.style.cssText = 'font-size:11px;color:var(--text-dim);padding:2px 4px 4px;border-bottom:1px solid rgba(96,165,250,0.15);margin-bottom:4px;';
-                        phaseHeader.textContent = `📌 ${_currentPhase}`;
-                        autoList.appendChild(phaseHeader);
-                    }
                 }
                 if (llmList) {
                     llmList.innerHTML = '';
@@ -3253,6 +3261,9 @@ async function executeWithStream() {
                         if (uca) uca.style.display = '';
                         // Aktivér første ikke-fuldførte todo
                         _activateNextTodo();
+                        // Also show in LLM box so user can see it in the main area
+                        if (_llmBox) _llmBox.innerHTML += `<div style="color:#60a5fa;font-size:11px;padding:1px 0;">📋 [Agent] ${escapeHtml(data.todo.text)}</div>`;
+                        console.log('[TODO] auto_add:', data.todo.id, data.todo.text);
                     }
                 }
                 break;
@@ -3297,6 +3308,9 @@ async function executeWithStream() {
                         div.dataset.todoId = data.id;
                         div.innerHTML = `<input type="checkbox" class="todo-checkbox" onchange="this.parentElement.classList.toggle('done')"> <span class="todo-text">${escapeHtml(data.text)}</span>`;
                         llmListAdd.appendChild(div);
+                        // Also show in LLM box so user can see it in the main area
+                        if (_llmBox) _llmBox.innerHTML += `<div style="color:#34d399;font-size:11px;padding:1px 0;">🤖 [LLM] ${escapeHtml(data.text)}</div>`;
+                        console.log('[TODO] llm_add:', data.id, data.text);
                         _activateNextTodo();
                     }
                 }
