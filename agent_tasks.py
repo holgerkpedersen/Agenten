@@ -2377,20 +2377,27 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                         _syms = [s.strip() for s in _m.group(2).split(',') if s.strip()]
                         _mod_symbols[_mod] = _syms[:12]
 
+            # Bestem kildefil fra prompt eller plan
+            _src_match = _re.search(r"([a-zA-Z_][\w.]+\.py)", prompt or "")
+            _ekstraher_src = _src_match.group(1) if _src_match else "api_server.py"
+
             todos.extend([
-                {"id": "rf_e1", "text": "Brug batch_extract_symbols() — stol p\u00e5 planen, kald IKKE list_symbols", "done": False},
+                {"id": "rf_e1", "text": "Brug batch_extract_symbols() til at flytte symboler fra {}".format(_ekstraher_src), "done": False},
                 {"id": "rf_e4", "text": "Verificer syntaks med verify_refactor() efter hver batch", "done": False},
             ])
-            if plan_modules:
-                total = len(plan_modules)
-                done_count = len(existing_modules)
+            # Brug plan_modules eller _mod_symbols keys (fra sektions-headers) som modul-liste
+            _all_plan_mods = plan_modules or sorted(_mod_symbols.keys())
+            _existing_mods = [m for m in _all_plan_mods if _os.path.exists(m)]
+            if _all_plan_mods:
+                total = len(_all_plan_mods)
+                done_count = len(_existing_mods)
                 todos.append({
                     "id": "rf_e_progress",
-                    "text": "Fremskridt: {}/{} moduler oprettet".format(done_count, total),
+                    "text": "Fremskridt: {}/{} moduler oprettet ({})".format(done_count, total, ', '.join(_all_plan_mods)),
                     "done": False,
                 })
-            if existing_modules:
-                for _mod in existing_modules:
+            if _existing_mods:
+                for _mod in _existing_mods:
                     _syms = _mod_symbols.get(_mod, [])
                     _sym_info = " (" + ", ".join(_syms[:6]) + (", ..." if len(_syms) > 6 else "") + ")" if _syms else ""
                     todos.append({
@@ -2398,7 +2405,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                         "text": "\u2705 {} f\u00e6rdig{}".format(_mod, _sym_info),
                         "done": True,
                     })
-            to_create = [m for m in plan_modules if m not in existing_modules]
+            to_create = [m for m in _all_plan_mods if m not in _existing_mods]
             for _mod in to_create:
                 _syms = _mod_symbols.get(_mod, [])
                 _sym_info = " (" + ", ".join(_syms[:6]) + (", ..." if len(_syms) > 6 else "") + ")" if _syms else ""
