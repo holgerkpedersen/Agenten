@@ -4,6 +4,8 @@ import os as _os
 from typing import Any
 from flask import jsonify
 
+# Projektrod — defineret lokalt for at undgå lazy import fra api_server
+# som kan udløse AssertionError (CORS efter første request).
 _BASE_DIR = _os.path.dirname(_os.path.abspath(__file__))
 
 
@@ -44,7 +46,7 @@ def git_backup() -> Any:
         return jsonify(result)
     except Exception as e:
         import logging
-        logging.getLogger(__name__).error("Git backup failed: %s", e)
+        logging.getLogger(__name__).error("Git backup failed", exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
