@@ -3246,9 +3246,11 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     and getattr(task_node, 'name', '').lower() in ('test',)
                 )
                 if _is_refactor_test and tool_name == "run_tests":
+                    tests_ran = any("run_tests" in str(t) for t in called_tools)
                     _edit_called = any("edit_file" in str(t) for t in called_tools)
-                    if not _edit_called:
-                        result_str = "[SYSTEM: Ret import-fejlene med edit_file FØRST, før du kører tests]"
+                    if tests_ran and not _edit_called:
+                        result_str = "[SYSTEM: Tests kørte og fejlede Brug edit_file til at rette import-stierne, før du kører tests igen. Desuden ligger originalfilen i git, så du kan finde eventuelt manglende symboler der]"
+                        #OLD: result_str = "[SYSTEM: Ret import-fejlene med edit_file FØRST, før du kører tests]"
                         result = {"success": False, "error": "edit_file required first"}
                         agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
                         agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
