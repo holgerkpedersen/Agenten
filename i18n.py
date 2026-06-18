@@ -119,6 +119,11 @@ class K(StrEnum):
     TOOL_CONVERT_PDF                    = "tools.convert_pdf_html5"
     TOOL_SEARCH_WEB                     = "tools.search_web"
     TOOL_ANALYZE_OWN_LOGS               = "tools.analyze_own_logs"
+    TOOL_PLAN_PHASE                      = "tools.plan_phase"
+    TOOL_CREATE_TODO                     = "tools.create_todo"
+    TOOL_UPDATE_TODO                     = "tools.update_todo"
+    TOOL_DELETE_TODO                     = "tools.delete_todo"
+    TOOL_LIST_TODOS                      = "tools.list_todos"
 
     SYS_AVAILABLE_FILES                 = "system.available_files"
     SYS_DELEGATIONS_HEADER              = "system.delegations_header"
@@ -181,6 +186,13 @@ class K(StrEnum):
     WRITE_FILE_FIRST      = "write_file_first"
     VALIDATION_DONE_TOO_SHORT = "validation_done_too_short"
     VALIDATION_DONE_MISSING_KEYWORDS = "validation_done_missing_keywords"
+
+    # === LLM-driven todos ===
+    TODO_PLAN_START       = "todo.plan_start"
+    TODO_PLAN_NOT_CALLED  = "todo.plan_not_called"
+    TODO_AGENT_HEADER     = "todo.agent_header"
+    TODO_LLM_HEADER       = "todo.llm_header"
+    TODO_ORDER_INSTRUCTION = "todo.order_instruction"
 
     # === System prompt fragments ===
     SYS_EXAMPLE_PREFIX  = "sys_example_prefix"

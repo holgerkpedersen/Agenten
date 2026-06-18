@@ -489,6 +489,10 @@ def load_session(session_id: str) -> Any:
             agent.images = _normalize_images(session_data.get("images", []))
         from agent_files import auto_detect_workdir
         auto_detect_workdir(session_data.get("file_chunks"), session_data.get("original_prompt", ""))
+        # Restore LLM todos from session
+        llm_todos = session_data.get("llm_todos")
+        if llm_todos is not None:
+            agent._llm_todos = llm_todos
         # Re-validate prompt against current code — append fresh VALIDERING entry
         agent.lang = session_data.get("lang", agent.lang)
         prompt_text = session_data.get("original_prompt", "") or ""
@@ -549,6 +553,7 @@ def save_current_session() -> Any:
             "images": getattr(source, 'images', None) or existing.get("images", []),
             "created": existing.get("created", datetime.now().isoformat()),
             "learned_knowledge": existing.get("learned_knowledge", []),
+            "llm_todos": getattr(source, '_llm_todos', None) or existing.get("llm_todos"),
             "decompose_model": data.get("decompose_model") or existing.get("decompose_model") or getattr(source.decompose_llm, 'model', ''),
             "execute_model": data.get("execute_model") or existing.get("execute_model") or getattr(source.llm, 'model', ''),
         })
@@ -1481,6 +1486,17 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
                 yield f"data: {json.dumps({'type': 'todo_add', 'todo': event['todo']})}\n\n"
             elif event["type"] == "todo_update":
                 yield f"data: {json.dumps({'type': 'todo_update', 'id': event['id'], 'done': event['done']})}\n\n"
+            elif event["type"] == "llm_todo_clear":
+                yield f"data: {json.dumps({'type': 'llm_todo_clear'})}\n\n"
+            elif event["type"] == "llm_todo_add":
+                yield f"data: {json.dumps({'type': 'llm_todo_add', 'id': event['id'], 'text': event['text']})}\n\n"
+            elif event["type"] == "llm_todo_update":
+                payload = {"type": "llm_todo_update", "id": event["id"], "done": event["done"]}
+                if event.get("text"):
+                    payload["text"] = event["text"]
+                yield f"data: {json.dumps(payload)}\n\n"
+            elif event["type"] == "llm_todo_delete":
+                yield f"data: {json.dumps({'type': 'llm_todo_delete', 'id': event['id']})}\n\n"
             elif event["type"] == "budget":
                 yield f"data: {json.dumps({'type': 'budget', 'iteration': event['iteration'], 'max': event['max'], 'remaining': event['remaining']})}\n\n"
             elif event["type"] == "done":
@@ -1574,6 +1590,7 @@ def _save_session_data(current_session_id: str | None, stream_agent: Any, ui_lan
             "decompose_model": stream_agent.decompose_llm.model,
             "execute_model": stream_agent.llm.model,
             "issue_resolved": stream_agent.issue_resolved,
+            "llm_todos": getattr(stream_agent, '_llm_todos', None),
         })
         return data
     try:

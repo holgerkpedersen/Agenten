@@ -2230,7 +2230,24 @@ function createPanels() {
         } else if (def.id === 'history') {
             contentDiv.innerHTML = '<div id="historyContent" class="history-box"><div style="color: #64748b;"></div></div>';
         } else if (def.id === 'todos') {
-            contentDiv.innerHTML = '<div class="todos-toolbar" id="todosToolbar" style="display:none;padding:2px 6px;border-bottom:1px solid var(--border);font-size:11px;"><button onclick="copyTodos()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text);">📋 Kopiér</button> <button onclick="addCustomTodo()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--accent);font-weight:bold;" title="Tilføj todo">➕</button></div><div id="todosContent" class="todos-box"><div style="color: #64748b;padding:8px;">📋 Ingen todos endnu — start en fase for at se opgaver.</div></div>';
+            contentDiv.innerHTML = '<div class="todos-toolbar" id="todosToolbar" style="display:none;padding:2px 6px;border-bottom:1px solid var(--border);font-size:11px;"><button onclick="copyTodos()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--text);">📋 Kopiér</button> <button onclick="addCustomTodo()" style="background:none;border:none;cursor:pointer;padding:2px 6px;color:var(--accent);font-weight:bold;" title="Tilføj todo">➕</button></div>' +
+                '<div id="todosContent" class="todos-box">' +
+                    '<div id="autoTodosSection">' +
+                        '<div class="todo-section-header" style="font-size:11px;font-weight:bold;color:#60a5fa;padding:4px 6px 2px;border-bottom:1px solid rgba(96,165,250,0.2);">📋 Agentens plan</div>' +
+                        '<div id="autoTodosList" style="padding:2px 4px;"><div style="color:#64748b;padding:4px;">Ingen krav endnu.</div></div>' +
+                    '</div>' +
+                    '<div id="llmTodosSection" style="display:none;">' +
+                        '<div class="todo-section-header" style="font-size:11px;font-weight:bold;color:#34d399;padding:8px 6px 2px;border-bottom:1px solid rgba(52,211,153,0.2);">🤖 LLM\'s plan</div>' +
+                        '<div id="llmTodosList" style="padding:2px 4px;"></div>' +
+                    '</div>' +
+                    '<div id="userCommentArea" style="display:none;border-top:1px solid var(--border);padding:4px 6px;margin-top:4px;">' +
+                        '<div style="font-size:10px;color:var(--text-dim);margin-bottom:2px;">💬 Besked til LLM</div>' +
+                        '<div style="display:flex;gap:4px;">' +
+                            '<input id="userCommentInput" type="text" placeholder="Skriv en besked..." style="flex:1;padding:3px 6px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);outline:none;">' +
+                            '<button onclick="sendUserComment()" style="background:var(--accent);border:none;padding:3px 10px;border-radius:4px;color:white;cursor:pointer;font-size:11px;white-space:nowrap;">Send</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
         }
     }
     
@@ -2967,13 +2984,21 @@ function _clearSpinner() {
 }
 
 function _activateNextTodo() {
-    const tc = document.getElementById('todosContent');
-    if (!tc) return;
-    // Remove active class from all items
-    tc.querySelectorAll('.todo-item.active').forEach(el => el.classList.remove('active'));
-    // Find first non-done item and mark as active
-    const next = tc.querySelector('.todo-item:not(.done)');
-    if (next) next.classList.add('active');
+    // Scan both auto and LLM todo lists
+    const containers = ['autoTodosList', 'llmTodosList'];
+    let found = false;
+    for (const id of containers) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.querySelectorAll('.todo-item.active').forEach(e => e.classList.remove('active'));
+        if (!found) {
+            const next = el.querySelector('.todo-item:not(.done)');
+            if (next) {
+                next.classList.add('active');
+                found = true;
+            }
+        }
+    }
 }
 
 async function pauseExecution() {
@@ -3184,21 +3209,27 @@ async function executeWithStream() {
                 break;
                 
              case 'todo_clear':
-                const tcClear = document.getElementById('todosContent');
-                if (tcClear) {
-                    tcClear.innerHTML = '';
+                const autoList = document.getElementById('autoTodosList');
+                const llmList = document.getElementById('llmTodosList');
+                const llmSection = document.getElementById('llmTodosSection');
+                if (autoList) {
+                    autoList.innerHTML = '';
                     if (_currentPhase) {
                         const phaseHeader = document.createElement('div');
                         phaseHeader.className = 'todo-phase-header';
-                        phaseHeader.style.cssText = 'font-size:12px;font-weight:bold;color:#60a5fa;padding:4px 4px 2px;border-bottom:1px solid rgba(96,165,250,0.2);margin-bottom:4px;';
+                        phaseHeader.style.cssText = 'font-size:11px;color:var(--text-dim);padding:2px 4px 4px;border-bottom:1px solid rgba(96,165,250,0.15);margin-bottom:4px;';
                         phaseHeader.textContent = `📌 ${_currentPhase}`;
-                        tcClear.appendChild(phaseHeader);
+                        autoList.appendChild(phaseHeader);
                     }
+                }
+                if (llmList) {
+                    llmList.innerHTML = '';
+                    if (llmSection) llmSection.style.display = 'none';
                 }
                 break;
                 
              case 'todo_add':
-                const tc = document.getElementById('todosContent');
+                const tc = document.getElementById('autoTodosList');
                 if (tc) {
                     const existing = tc.querySelector(`[data-todo-id="${data.todo.id}"]`);
                     if (!existing) {
@@ -3217,6 +3248,9 @@ async function executeWithStream() {
                         // Show copy toolbar
                         const tb = document.getElementById('todosToolbar');
                         if (tb) tb.style.display = '';
+                        // Show user comment area
+                        const uca = document.getElementById('userCommentArea');
+                        if (uca) uca.style.display = '';
                         // Aktivér første ikke-fuldførte todo
                         _activateNextTodo();
                     }
@@ -3224,7 +3258,7 @@ async function executeWithStream() {
                 break;
                 
              case 'todo_update':
-                const tc2 = document.getElementById('todosContent');
+                const tc2 = document.getElementById('autoTodosList');
                 if (tc2) {
                     const item = tc2.querySelector(`[data-todo-id="${data.id}"]`);
                     if (item) {
@@ -3236,11 +3270,68 @@ async function executeWithStream() {
                             item.classList.remove('done');
                             item.querySelector('input').checked = false;
                         }
-                        // Opdater tekst hvis medfulgt
                         if (data.text) {
                             const textSpan = item.querySelector('.todo-text');
                             if (textSpan) textSpan.textContent = data.text;
                         }
+                    }
+                }
+                break;
+                
+             case 'llm_todo_clear':
+                const llmListClear = document.getElementById('llmTodosList');
+                const llmSectionClear = document.getElementById('llmTodosSection');
+                if (llmListClear) llmListClear.innerHTML = '';
+                if (llmSectionClear) llmSectionClear.style.display = 'none';
+                break;
+                
+             case 'llm_todo_add':
+                const llmListAdd = document.getElementById('llmTodosList');
+                const llmSectionAdd = document.getElementById('llmTodosSection');
+                if (llmListAdd && llmSectionAdd) {
+                    llmSectionAdd.style.display = '';
+                    const existing = llmListAdd.querySelector(`[data-todo-id="${escapeHtml(data.id)}"]`);
+                    if (!existing) {
+                        const div = document.createElement('div');
+                        div.className = 'todo-item';
+                        div.dataset.todoId = data.id;
+                        div.innerHTML = `<input type="checkbox" class="todo-checkbox" onchange="this.parentElement.classList.toggle('done')"> <span class="todo-text">${escapeHtml(data.text)}</span>`;
+                        llmListAdd.appendChild(div);
+                        _activateNextTodo();
+                    }
+                }
+                break;
+                
+             case 'llm_todo_update':
+                const llmListUpd = document.getElementById('llmTodosList');
+                if (llmListUpd) {
+                    const item = llmListUpd.querySelector(`[data-todo-id="${escapeHtml(data.id)}"]`);
+                    if (item) {
+                        if (data.done) {
+                            item.classList.add('done');
+                            item.querySelector('input').checked = true;
+                            _activateNextTodo();
+                        } else {
+                            item.classList.remove('done');
+                            item.querySelector('input').checked = false;
+                        }
+                        if (data.text) {
+                            const textSpan = item.querySelector('.todo-text');
+                            if (textSpan) textSpan.textContent = data.text;
+                        }
+                    }
+                }
+                break;
+                
+             case 'llm_todo_delete':
+                const llmListDel = document.getElementById('llmTodosList');
+                if (llmListDel) {
+                    const item = llmListDel.querySelector(`[data-todo-id="${escapeHtml(data.id)}"]`);
+                    if (item) item.remove();
+                    const remaining = llmListDel.querySelectorAll('.todo-item');
+                    if (remaining.length === 0) {
+                        const sec = document.getElementById('llmTodosSection');
+                        if (sec) sec.style.display = 'none';
                     }
                 }
                 break;
@@ -3480,36 +3571,67 @@ async function executeWithStream() {
 function addCustomTodo() {
     const text = prompt('Indtast ny todo:');
     if (!text || !text.trim()) return;
-    const tc = document.getElementById('todosContent');
+    const tc = document.getElementById('autoTodosList');
     if (!tc) return;
     const div = document.createElement('div');
     div.className = 'todo-item';
     const id = 'custom-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
     div.dataset.todoId = id;
     div.innerHTML = '<input type="checkbox" class="todo-checkbox" onchange="this.parentElement.classList.toggle(\'done\')"> <span class="todo-text">' + escapeHtml(text.trim()) + '</span>';
-    // Remove placeholder if present
     const placeholder = tc.querySelector('div[style*="color: #64748b"]');
     if (placeholder) placeholder.remove();
     tc.appendChild(div);
     _activateNextTodo();
     const tb = document.getElementById('todosToolbar');
     if (tb) tb.style.display = '';
+    const uca = document.getElementById('userCommentArea');
+    if (uca) uca.style.display = '';
+}
+
+function sendUserComment() {
+    const input = document.getElementById('userCommentInput');
+    if (!input) return;
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    addLogEntry('USER', '💬 Kommentar', msg);
+    // Use pending_reply mechanism: POST to /api/reply
+    fetch('/api/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg }),
+    }).then(r => r.json()).then(data => {
+        if (!data.success) {
+            addLogEntry('ERROR', '💬 Kommentar fejlede', data.error || 'Ukendt fejl');
+        }
+    }).catch(e => {
+        addLogEntry('ERROR', '💬 Kommentar fejlede', e.message);
+    });
 }
 
 function copyTodos() {
-    const tc = document.getElementById('todosContent');
-    if (!tc) return;
-    const items = tc.querySelectorAll('.todo-item');
-    if (!items.length) return;
-    const lines = [];
-    items.forEach((item, i) => {
-        const textEl = item.querySelector('.todo-text');
-        const text = textEl ? textEl.textContent.trim() : '';
-        const done = item.classList.contains('done');
-        const status = done ? '[x]' : '[ ]';
-        lines.push(`${status} ${text}`);
-    });
-    const text = `## Opgaveplan\n\n` + lines.join('\n');
+    const sections = [
+        { listId: 'autoTodosList', header: '## Agentens opgavekrav' },
+        { listId: 'llmTodosList', header: '## LLM\'s plan' },
+    ];
+    const allLines = [];
+    for (const sec of sections) {
+        const list = document.getElementById(sec.listId);
+        if (!list) continue;
+        const items = list.querySelectorAll('.todo-item');
+        if (items.length === 0) continue;
+        allLines.push(sec.header);
+        items.forEach((item) => {
+            const textEl = item.querySelector('.todo-text');
+            const text = textEl ? textEl.textContent.trim() : '';
+            const done = item.classList.contains('done');
+            const status = done ? '[x]' : '[ ]';
+            allLines.push(`${status} ${text}`);
+        });
+        allLines.push('');
+    }
+    if (allLines.length === 0) return;
+    const text = allLines.join('\n');
     navigator.clipboard.writeText(text).then(() => {
         const tb = document.getElementById('todosToolbar');
         if (tb) {

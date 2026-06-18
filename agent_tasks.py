@@ -964,8 +964,18 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             status = " [✓]" if todo.get("done") else ""
             todo_lines.append(f"  {i}. {todo.get('text', '')}{status}")
         if todo_lines:
-            task_prompt += "\n\n## Opgaveplan (følg rækkefølgen)\n" + "\n".join(todo_lines) + \
-                           "\n\nUdfør hvert trin i rækkefølge. Spring IKKE frem til et senere trin før de foregående er gennemført."
+            task_prompt += f"\n\n## {t(K.TODO_AGENT_HEADER, agent.lang)}\n" + "\n".join(todo_lines) + \
+                           f"\n\n{t(K.TODO_ORDER_INSTRUCTION, agent.lang)}"
+
+    # Append LLM's own todos (personal checklist)
+    llm_todos = getattr(agent, '_llm_todos', None)
+    if llm_todos:
+        llm_todo_lines = []
+        for todo in llm_todos:
+            status = " [✓]" if todo.get("done") else ""
+            llm_todo_lines.append(f"  [{status}] {todo.get('text', '')}")
+        if llm_todo_lines:
+            task_prompt += f"\n\n## {t(K.TODO_LLM_HEADER, agent.lang)}\n" + "\n".join(llm_todo_lines)
 
     agent._refresh_skills()
     agent._match_skills(clean_prompt)
@@ -1023,6 +1033,10 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     filtered_hints = [h for tool_name, h in tool_hints.items() if tool_name in active_tool_set]
     if filtered_hints:
         user_guidance += "\n\n## VÆRKTØJSGUIDE" + "".join(filtered_hints)
+
+    # Opfordring til at lave sin egen opgaveplan via plan_phase
+    if "plan_phase" in active_tool_set:
+        user_guidance += "\n\n## " + t(K.TODO_PLAN_START, agent.lang)
 
     messages = [{"role": "system", "content": system_prompt}]
     if file_ctx:
@@ -3037,6 +3051,14 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
 
     for i in range(max_iterations):
         agent._current_task_iteration = i + 1
+
+        # Flush pending SSE events from tool calls (e.g. todo CRUD)
+        _pending = getattr(agent, '_pending_sse_events', None)
+        if _pending:
+            for evt in _pending:
+                yield evt
+            agent._pending_sse_events = []
+
         if agent.stop_requested:
             if getattr(agent, '_pause_requested', False):
                 agent._paused_messages = list(messages)
@@ -3100,7 +3122,10 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     if phase_lower in ("opdatering", "opdat\u00e9r", "opdater"):
                         budget_msg += "\n\nR\u00e6kkef\u00f8lge: 1) list_symbols 2) remove_symbol 3) add_import 4) verify_refactor 5) run_tests 6) update_issue_status"
                     elif phase_lower == "ekstraher":
-                        budget_msg += "\n\nR\u00e6kkef\u00f8lge: 1) list_symbols 2) extract_symbol (gentag) 3) add_function/add_method kun hvis n\u00f8dvendigt 4) verify_refactor"
+                        budget_msg += "\n\nRækkefølge: 1) list_symbols 2) extract_symbol (gentag) 3) add_function/add_method kun hvis nødvendigt 4) verify_refactor"
+                # If LLM hasn't called plan_phase yet, nudge it
+                if i >= 2 and not getattr(agent, '_llm_has_planned', False):
+                    budget_msg += "\n\n" + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
                 messages.append({"role": "user", "content": budget_msg})
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)

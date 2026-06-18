@@ -50,6 +50,7 @@ from agent_decomposition import _decompose_via_llm
 from agent_tools_github import register_github_tools
 from agent_tools_git import register_git_tools
 from agent_tools_file import register_file_tools
+from agent_tools_todo import register_todo_tools
 from agent_phase_checks import check_phase_done, TEMPLATE_PHASE_CHECKS
 from file_checks import check_file_exists
 from phase_engine import check_all_of, TEMPLATE_PHASE_CHECKS
@@ -130,6 +131,7 @@ class Agent:
         register_github_tools(self)
         register_git_tools(self)
         register_file_tools(self)
+        register_todo_tools(self)
         self._register_agent_tools()
 
     def _register_agent_tools(self) -> None:
