@@ -82,6 +82,11 @@ Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (35 værktøjer
 
 | Værktøj | Handling |
 |---------|----------|
+| `plan_phase` | Opret detaljeret opgaveplan med tool-kald og steps |
+| `create_todo` | Tilføj ny todo til LLM's personlige plan |
+| `update_todo` | Markér todo som done eller opdatér tekst |
+| `delete_todo` | Fjern en todo fra planen |
+| `list_todos` | Vis både Agentens succeskriterier og LLM's handlingsplan |
 | `list_chunks` | List alle indlæste filer |
 | `read_chunk` | Læs en chunk af en stor fil |
 | `locate` | Find aktuel linje for PYTHON funktion/klasse/variabel via AST — IKKE værktøjsnavn (tool) |
@@ -201,6 +206,12 @@ Flask API (api_server.py)
 
 ## 📝 Features
 
+- **LLM-drevne todos**: LLM'en kan selv oprette og styre sin opgaveplan via `plan_phase`, `create_todo`, `update_todo`, `delete_todo`, `list_todos`. Todos vises i Opgaveplan-panelet og inline i LLM-output.
+- **Auto-populerede LLM-todos**: I refactor-template genereres per-module todos automatisk fra `refactor_plan.md`, så LLM'en har en færdig plan.
+- **refactor_analyse.md**: Analyse-fasen gemmer sin output i `refactor_analyse.md`, som auto-indlæses i Plan-fasen — sparer 3-5 iterationer ved at undgå genlæsning af symboler/funktioner.
+- **Instruktioner er agnostiske**: Sektionsinstruktioner bruger `{source_file}` i stedet for hardcoded `api_server.py` — virker for enhver fil.
+- **Opdatér-fasen auto-genererer patterns**: `code_contains` regex patterns genereres dynamisk fra `refactor_plan.md` modulnavne.
+- **Fortryd rydder execution-state**: Session-filer ryddes for agent_log, execution_log, llm_todos før git reset.
 - **Autonom bugfix**: 🐛 Bugfix (TDD) skabelon → Analyse → Test → Implementering → Verifikation → Opdatering
 - **Autonom refactoring**: 🔧 Refactor-skabelon → Analyse → Plan → Ekstraher → Opdatér → Test
 - **Testgenerering**: 🧪 Generer tests for utestede klasser/funktioner/metoder
@@ -229,6 +240,8 @@ Flask API (api_server.py)
 - **Phase checks & auto-advance**: Deterministiske succeskriterier for faser. Systemet auto-afslutter når alle moduler findes eller planen er skrevet.
 - **Refactor template iteration limits**: Højere budget (15-12 iterationer) til at håndtere store refaktor arbejdsbelastninger.
 - **739 tests**: pytest suite med test af alle moduler (alle passerer på 11s)
+- **agents.md**: Knowledge base opdateret med entries 34-57+ (LLM-todos, AGENT_WORKDIR, refactor_analyse, m.fl.)
+- **Cache-Control: no-cache**: Static routes undgår browser-caching af index.html
 
 ## 📋 Requirements
 

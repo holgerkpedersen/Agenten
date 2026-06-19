@@ -82,6 +82,11 @@ Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作（35 个工具）：
 
 | 工具 | 操作 |
 |------|------|
+| `plan_phase` | 创建详细的任务计划，包含工具调用和步骤 |
+| `create_todo` | 向LLM的个人计划添加新待办事项 |
+| `update_todo` | 标记待办完成或更新文本 |
+| `delete_todo` | 从计划中删除待办事项 |
+| `list_todos` | 显示Agent的成功标准和LLM的行动计划 |
 | `list_chunks` | 列出所有已加载的文件 |
 | `read_chunk` | 读取大文件的一个块 |
 | `locate` | 通过AST查找PYTHON函数/类/变量的当前行 — 非工具名称 |
@@ -201,6 +206,12 @@ Flask API (api_server.py)
 
 ## 📝 功能特点
 
+- **LLM驱动任务**: LLM通过 `plan_phase`, `create_todo`, `update_todo`, `delete_todo`, `list_todos` 创建和管理自己的任务计划。显示在任务面板和LLM输出中。
+- **自动填充LLM任务**: 重构模板从 `refactor_plan.md` 自动生成每个模块的任务。
+- **refactor_analyse.md**: 分析阶段将输出保存到 `refactor_analyse.md`，计划阶段自动加载 — 节省3-5次迭代。
+- **无关的指令**: 章节指令使用 `{source_file}` 代替硬编码的 `api_server.py`，适用于任何文件。
+- **更新阶段自动生成模式**: `code_contains` 正则表达式模式从 `refactor_plan.md` 的模块名称动态生成。
+- **撤消清除执行状态**: 会话文件在 git reset 前被清理（agent_log, execution_log, llm_todos）。
 - **自主Bug修复**：🐛 Bugfix (TDD) 模板 → 分析 → 测试 → 实施 → 验证 → 更新
 - **自主重构**：🔧 重构模板 → 分析 → 计划 → 提取 → 更新 → 测试
 - **测试生成**：🧪 为未测试的类/函数/方法生成测试

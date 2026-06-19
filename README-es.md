@@ -82,6 +82,11 @@ El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>
 
 | Herramienta | Acción |
 |-------------|--------|
+| `plan_phase` | Crear plan detallado de tareas con llamadas a herramientas y pasos |
+| `create_todo` | Añadir nueva tarea al plan personal del LLM |
+| `update_todo` | Marcar tarea como completada o actualizar texto |
+| `delete_todo` | Eliminar tarea del plan |
+| `list_todos` | Mostrar criterios de éxito del Agent y plan de acción del LLM |
 | `list_chunks` | Lista todos los archivos cargados |
 | `read_chunk` | Lee un fragmento de un archivo grande |
 | `locate` | Encuentra la línea actual de función/clase/variable PYTHON vía AST — NO es nombre de herramienta |
@@ -201,6 +206,12 @@ API Flask (api_server.py)
 
 ## 📝 Características
 
+- **Tareas impulsadas por LLM**: El LLM crea y gestiona su propio plan mediante `plan_phase`, `create_todo`, `update_todo`, `delete_todo`, `list_todos`. Se muestra en el panel de tareas y en línea en la salida del LLM.
+- **Tareas LLM auto-generadas**: La plantilla refactor genera tareas por módulo automáticamente desde `refactor_plan.md`.
+- **refactor_analyse.md**: La fase de análisis guarda su salida en `refactor_analyse.md`, que se carga automáticamente en la fase Plan — ahorra 3-5 iteraciones al evitar releer símbolos/funciones.
+- **Instrucciones agnósticas**: Las instrucciones de sección usan `{source_file}` en lugar de `api_server.py`.
+- **La fase Opdatér genera patrones automáticamente**: Los patrones regex `code_contains` se generan dinámicamente desde los nombres de módulo en `refactor_plan.md`.
+- **Deshacer limpia el estado de ejecución**: Los archivos de sesión se limpian (agent_log, execution_log, llm_todos) antes del git reset.
 - **Bugfix autónomo**: 🐛 Plantilla Bugfix (TDD) → Análisis → Prueba → Implementación → Verificación → Actualización
 - **Refactorización autónoma**: 🔧 Refactor → Análisis → Plan → Extraer → Actualizar → Probar
 - **Generación de pruebas**: 🧪 Genera pruebas para clases/funciones/métodos no probados
@@ -228,7 +239,7 @@ API Flask (api_server.py)
 - **Corrección persistencia de sesiones**: Fuga de `current_session_id` entre archivos de prueba corregida, debounce en `_save_session_data` eliminado (siempre guarda al final SSE), serialización de árbol ahora incluye el campo `result`
 - **Checks de fases y autoavance**: Criterios de éxito determinísticos para las fases. El sistema se completa automáticamente cuando todos los módulos existen o la planificación está escrita.
 - **Límites de iteraciones para plantilla Refactor**: Presupuesto más alto (15-12 iteraciones) para manejar grandes cargas de trabajo de refactorización.
-- **384 pruebas**: Suite pytest que cubre todos los módulos
+- **739 pruebas**: Suite pytest que cubre todos los módulos
 
 ## 📋 Requisitos
 

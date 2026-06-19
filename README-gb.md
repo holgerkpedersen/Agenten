@@ -82,6 +82,11 @@ The agent can perform system operations via `<<<TOOL>>>` markers (35 tools):
 
 | Tool | Action |
 |------|--------|
+| `plan_phase` | Create detailed task plan with tool calls and steps |
+| `create_todo` | Add a new todo to the LLM's personal plan |
+| `update_todo` | Mark todo done or update text |
+| `delete_todo` | Remove a todo from the plan |
+| `list_todos` | Show both Agent's success criteria and LLM's action plan |
 | `list_chunks` | List all loaded files |
 | `read_chunk` | Read a chunk of a large file |
 | `locate` | Find current line of PYTHON function/class/variable via AST — NOT tool name |
@@ -201,6 +206,12 @@ Flask API (api_server.py)
 
 ## 📝 Features
 
+- **LLM-driven todos**: LLM creates and manages its own task plan via `plan_phase`, `create_todo`, `update_todo`, `delete_todo`, `list_todos`. Shown in the task plan panel and inline in LLM output.
+- **Auto-populated LLM todos**: Refactor template generates per-module todos automatically from `refactor_plan.md`.
+- **refactor_analyse.md**: Analysis phase saves output to `refactor_analyse.md`, auto-loaded in Plan phase — saves 3-5 iterations by avoiding re-reading symbols/functions.
+- **Agnostic instructions**: Section instructions use `{source_file}` instead of hardcoded `api_server.py`.
+- **Opdatér phase auto-generates patterns**: `code_contains` regex patterns are dynamically generated from `refactor_plan.md` module names.
+- **Undo clears execution state**: Session files are cleaned (agent_log, execution_log, llm_todos) before git reset.
 - **Autonomous bugfix**: 🐛 Bugfix (TDD) template → Analysis → Test → Implementation → Verification → Update
 - **Autonomous refactoring**: 🔧 Refactor template → Analysis → Plan → Extract → Update → Test
 - **Test generation**: 🧪 Generate tests for untested classes/functions/methods
@@ -229,6 +240,8 @@ Flask API (api_server.py)
 - **Phase checks & auto-advance**: Deterministic success criteria for phases. System auto-completes when all modules exist or plan is written.
 - **Refactor template iteration limits**: Higher budget (15-12 iterations) to handle large refactor workloads.
 - **739 tests**: pytest suite covering all modules (all pass in 11s)
+- **AGENTS.md**: Knowledge base updated with entries 34-57+ (LLM todos, AGENT_WORKDIR, refactor_analyse, etc.)
+- **Cache-Control: no-cache**: Static routes avoid browser caching of index.html
 
 ## 📋 Requirements
 
