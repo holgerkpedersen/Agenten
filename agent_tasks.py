@@ -1559,6 +1559,18 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
             progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
             _add_user_msg(messages, progress_msg)
 
+            # Check for missing dependencies after batch_extract_symbols
+            missing_deps = inner.get("missing_dependencies", []) if isinstance(inner, dict) else []
+            if missing_deps:
+                deps_str = ', '.join(missing_deps)
+                source_name = os.path.basename(inner.get("source", "?"))
+                warning = (
+                    f"[SYSTEM: ⚠️ ADVARSEL — {target} refererer symboler der kun "
+                    f"findes i {source_name}: {deps_str}. Ekstraher disse symboler "
+                    f"først eller tilføj imports for at undgå NameError.]"
+                )
+                _add_user_msg(messages, warning)
+
     checkpoint_msg = agent_git.verify_pr_step(agent, parsed["tool"], result, task_node.name, original_prompt)
     if checkpoint_msg:
         _add_user_msg(messages, f"!!! CHECKPOINT - {checkpoint_msg}")
@@ -2994,6 +3006,8 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
 
 def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: list[dict] | None) -> list[str]:
     """Match a tool call against todo text and return matching todo IDs."""
+    # Reset cross-call flag — only set True if THIS call has a deviation
+    agent._batch_had_deviation = False
     if not todo_list:
         return []
     ids = []
@@ -3029,7 +3043,39 @@ def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: 
         if tool_name in ("extract_symbol", "batch_extract_symbols"):
             target = args_val.get("target", "")
             if target and (target in ttext or os.path.basename(target) in ttext):
-                ids.append(tid)
+                # Check planned symbols vs called symbols
+                _planned = getattr(agent, '_planned_symbols_per_target', {})
+                if _planned and target in _planned and tool_name == "batch_extract_symbols":
+                    _planned_syms = set(_planned[target])
+                    _called = args_val.get("symbols", "")
+                    if isinstance(_called, str):
+                        _called_syms = set(s.strip() for s in _called.replace("'", "").replace('"', '').split(',') if s.strip())
+                    elif isinstance(_called, (list, tuple)):
+                        _called_syms = set(str(s).strip() for s in _called if str(s).strip())
+                    else:
+                        _called_syms = set()
+                    _missing = _planned_syms - _called_syms
+                    if _missing:
+                        # Don't mark the todo as done — LLM hasn't covered all planned symbols
+                        agent._log("ADVARSEL",
+                            f"Planafvigelse for {target}: mangler {len(_missing)} plannede symboler",
+                            f"Kaldte: {sorted(_called_syms)}\nMangler: {sorted(_missing)}")
+                        # Store warning for handle_tool_call to inject
+                        if not hasattr(agent, '_plan_warnings'):
+                            agent._plan_warnings = []
+                        agent._plan_warnings.append({
+                            "target": target,
+                            "missing": sorted(_missing),
+                            "called": sorted(_called_syms),
+                            "planned": sorted(_planned_syms),
+                            "deviation": True,
+                        })
+                        # Also set persistent flag so batch_extract_symbols section can detect it
+                        agent._batch_had_deviation = True
+                    else:
+                        ids.append(tid)
+                else:
+                    ids.append(tid)
 
         # list_symbols -> matches "List alle symboler" or "list_symbols"
         if tool_name == "list_symbols" and ("list_symbols" in ttext.lower() or "list alle symboler" in ttext.lower()):
@@ -3885,6 +3931,21 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 if _llm:
                     for tids in _match_tool_to_todos(tool_name, args_val, agent, _llm):
                         yield {"type": "llm_todo_update", "id": tids, "done": True, "text": None}
+                # Inject plan deviation warnings BEFORE auto-advance (så LLM ser dem)
+                _plan_warnings = getattr(agent, '_plan_warnings', None)
+                if _plan_warnings:
+                    for _pw in _plan_warnings:
+                        _missing_str = ', '.join(_pw["missing"])
+                        _target = _pw["target"]
+                        warning_msg = (
+                            f"[SYSTEM: ⚠️ PLANAFVIGELSE — du planlagde at ekstrahere "
+                            f"{len(_pw['planned'])} symboler til {_target}, men kaldte kun "
+                            f"{len(_pw['called'])}. Mangler: {_missing_str}. "
+                            f"Kald batch_extract_symbols IGEN for at ekstrahere de resterende "
+                            f"symboler, eller opdater din plan med plan_phase().]"
+                        )
+                        messages.append({"role": "user", "content": warning_msg})
+                    agent._plan_warnings = []
                 # Auto-advance check (EFTER todo matching så todos opdateres før break)
                 msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=full_response)
                 if msg:
@@ -3906,6 +3967,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         symbols_in_batch = [r.get("symbol", "") for r in inner.get("results", []) if r.get("success")]
                         progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
                         messages.append({"role": "user", "content": progress_msg})
+
+                        # Check if this call had a plan deviation (warning already injected above)
+                        _has_missing = getattr(agent, '_batch_had_deviation', False)
+
                         # Opdater todo-tekst med symbol-fremskridt
                         _todo_text = "{} færdig".format(target)
                         _actual = _count_symbols_in_file(inner.get("target", ""))
@@ -3918,7 +3983,9 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                                 _pm = _re3.search(r'(\d+)\s*symbols', _tt)
                                 if _pm:
                                     _todo_text = "{} færdig — {}/{} symbols".format(target, _actual, _pm.group(1))
-                                yield {"type": "todo_update", "id": _tid, "done": True, "text": _todo_text}
+                                # Only mark as done if no plan deviation
+                                if not _has_missing:
+                                    yield {"type": "todo_update", "id": _tid, "done": True, "text": _todo_text}
                                 break
 
                 if tool_name == "extract_symbol" and result.get("success"):

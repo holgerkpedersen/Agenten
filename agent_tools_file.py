@@ -199,11 +199,14 @@ def register_file_tools(agent: Any) -> None:
         )
     ))
 
+    def _verify_refactor_wrapper(source: str, source_for_deps: str | None = None) -> dict:
+        return refactoring_engine.verify_refactor(source=source, source_for_deps=source_for_deps)
+
     agent.tool_registry.register(Tool(
         "verify_refactor",
         t(K.TOOL_VERIFY_REFACTOR, agent.lang),
         ["source"],
-        lambda source: refactoring_engine.verify_refactor(source=source)
+        _verify_refactor_wrapper
     ))
 
     agent.tool_registry.register(Tool(
