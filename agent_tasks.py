@@ -301,7 +301,7 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
                 per_module.setdefault(current_mod, []).append(sym)
 
     parts: list[str] = []
-    parts.append("\n\n## STATUS: Symboler i api_server.py vs plan")
+    parts.append(f"\n\n## STATUS: Symboler i {source_file} vs plan")
 
     for mod_name in sorted(modules):
         mod_path = os.path.join(_wd2, mod_name)
@@ -322,7 +322,7 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
 
         parts.append(f"\n### {mod_name}")
         if in_source:
-            parts.append(f"  I api_server.py (skal flyttes til {mod_name}): {', '.join(in_source)}")
+            parts.append(f"  I {source_file} (skal flyttes til {mod_name}): {', '.join(in_source)}")
         if in_target:
             parts.append(f"  ALLEREDE i {mod_name}: {', '.join(in_target)}")
         if missing:
@@ -1881,7 +1881,7 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
         if not has_changes:
             tool_failed = True
     if not tool_failed:
-        PRODUCTIVE_TOOLS = {"write_file", "edit_file", "run_tests", "update_issue_status"}
+        PRODUCTIVE_TOOLS = {"write_file", "edit_file", "run_tests", "update_issue_status", "batch_extract_symbols", "extract_symbol", "verify_refactor"}
         if tool_name in PRODUCTIVE_TOOLS:
             try:
                 passed, reason = agent_phase_checks.check_phase_done(
@@ -2843,30 +2843,28 @@ def _check_refactor_progress(agent: Any | None = None, prompt: str = "") -> str:
     except Exception:
         pass
 
-    # For Opdatér phase: show symbols still in agent_core.py vs already removed
-    core_path = _os.path.join(_os.environ.get('AGENT_WORKDIR', ''), 'agent_core.py') if _os.environ.get('AGENT_WORKDIR') else 'agent_core.py'
-    plan_content = ""
+    # For Opdatér phase: show symbols still in source vs already removed
     if _os.path.exists(plan_path):
         try:
             with open(plan_path, 'r', encoding='utf-8') as f:
                 plan_content = f.read()
         except (OSError, UnicodeDecodeError):
-            pass
-    if _os.path.exists(core_path) and plan_content:
+            plan_content = ""
+    if _os.path.exists(_src) and plan_content:
         try:
-            with open(core_path, 'r', encoding='utf-8') as f:
-                core_content = f.read()
-            core_nodes = _re.findall(r'^def (\w+)|^class (\w+)', core_content, _re.MULTILINE)
-            core_symbols = sorted(set(n[0] or n[1] for n in core_nodes))
+            with open(_src, 'r', encoding='utf-8') as f:
+                src_content = f.read()
+            src_nodes = _re.findall(r'^def (\w+)|^class (\w+)', src_content, _re.MULTILINE)
+            src_symbols = sorted(set(n[0] or n[1] for n in src_nodes))
             plan_symbols = _re.findall(r'`(\w+)`[^`]*flyttes|`(\w+)`[^`]*rykkes|symbol_name=\'(\w+)\'', plan_content)
             planned = sorted(set(s for t in plan_symbols for s in t if s))
-            if planned and core_symbols:
-                still_in_core = [s for s in planned if s in core_symbols]
-                already_removed = [s for s in planned if s not in core_symbols]
-                if still_in_core:
-                    parts.append("Skal fjernes fra agent_core.py ({}): {}".format(len(still_in_core), ', '.join(still_in_core)))
+            if planned and src_symbols:
+                still_in_src = [s for s in planned if s in src_symbols]
+                already_removed = [s for s in planned if s not in src_symbols]
+                if still_in_src:
+                    parts.append("Skal fjernes fra {} ({}): {}".format(_src, len(still_in_src), ', '.join(still_in_src)))
                 if already_removed:
-                    parts.append("Allerede fjernet fra agent_core.py ({}): {}".format(len(already_removed), ', '.join(already_removed)))
+                    parts.append("Allerede fjernet fra {} ({}): {}".format(_src, len(already_removed), ', '.join(already_removed)))
         except (OSError, UnicodeDecodeError):
             pass
 

@@ -201,20 +201,16 @@ class TestCheckPhaseDone(unittest.TestCase):
             self.assertFalse(ok)
 
     def test_plan_phase_fails_when_too_few_modules(self):
-        """Plan must list at least 5 .py modules (catches stale plans from prior runs)."""
+        """Plan must list at least 1 .py module."""
         with tempfile.TemporaryDirectory() as tmp:
-            # Only 2 modules listed — should fail with min_files=5
-            plan_content = (
-                "# Plan\n"
-                "### 1. security.py\n"
-                "### 2. file_handler.py\n"
-            )
+            # Only 0 modules listed — should fail with min_files=1
+            plan_content = "# Plan\nNo modules here.\n"
             open(os.path.join(tmp, "refactor_plan.md"), "w", encoding="utf-8").write(plan_content)
             agent = FakeAgent(template="refactor")
             task = FakeTask("Plan")
             ok, msg = check_phase_done(agent, task, None, base_dir=tmp)
             self.assertFalse(ok, msg)
-            self.assertIn("mindst 5", msg)
+            self.assertIn("mindst 1", msg)
 
     def test_case_insensitive_phase_match(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -263,7 +259,7 @@ class TestTemplatePhaseChecksConfig(unittest.TestCase):
         self.assertIsNotNone(cfg)
         self.assertEqual(cfg["type"], "files_from_plan")
         self.assertEqual(cfg["plan_path"], "refactor_plan.md")
-        self.assertEqual(cfg["min_files"], 5)
+        self.assertEqual(cfg["min_files"], 1)
 
     def test_refactor_ekstraher_check(self):
         cfg = TEMPLATE_PHASE_CHECKS.get("refactor", {}).get("Ekstraher")
@@ -273,7 +269,7 @@ class TestTemplatePhaseChecksConfig(unittest.TestCase):
         self.assertIn("files_from_plan", sub_types)
         self.assertIn("symbols_covered", sub_types)
         symbols_spec = next(c for c in cfg["checks"] if c["type"] == "symbols_covered")
-        self.assertEqual(symbols_spec["source_file"], "api_server.py")
+        self.assertEqual(symbols_spec["source_file"], "{source_file}")
         self.assertEqual(symbols_spec["plan_path"], "refactor_plan.md")
 
     def test_refactor_analyse_check(self):

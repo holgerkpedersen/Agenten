@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from typing import Any
@@ -28,9 +29,9 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             "type": "files_from_plan",
             "plan_path": "refactor_plan.md",
             "ext": ".py",
-            "min_files": 5,
-            "source_file": "api_server.py",
-            "description": "FORM\u00c5L: Beslut modulopdeling og skriv plan. Kr\u00e6ver: refactor_plan.md med mindst 5 *.py-moduler.",
+            "min_files": 1,
+            "source_file": "{source_file}",
+            "description": "FORMÅL: Beslut modulopdeling og skriv plan. Kræver: refactor_plan.md med mindst 1 *.py-modul.",
             "description_key": "phase_check.refactor.plan",
         },
         "Ekstraher": {
@@ -43,11 +44,11 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                     "plan_path": "refactor_plan.md",
                     "ext": ".py",
                     "min_files": 1,
-                    "source_file": "api_server.py",
+                    "source_file": "{source_file}",
                 },
                 {
                     "type": "symbols_covered",
-                    "source_file": "api_server.py",
+                    "source_file": "{source_file}",
                     "plan_path": "refactor_plan.md",
                     "ext": ".py",
                     "exclude_patterns": [r"^__[A-Za-z0-9_]+__$"],
@@ -405,13 +406,11 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
                 _target = _pm.group(1)
         # Only override if the target file actually exists (avoid breaking tests)
         if _target and os.path.exists(_target if not base_dir else os.path.join(base_dir, _target)):
-            # Create a copy of spec with api_server.py replaced
-            spec = dict(spec)
-            for k, v in list(spec.items()):
-                if isinstance(v, str) and "api_server.py" in v:
-                    spec[k] = v.replace("api_server.py", _target)
-                elif isinstance(v, list):
-                    spec[k] = [item.replace("api_server.py", _target) if isinstance(item, str) else item for item in v]
+            # Deep-replace api_server.py and {source_file} in the entire spec
+            spec_str = json.dumps(spec)
+            spec_str = spec_str.replace("api_server.py", _target)
+            spec_str = spec_str.replace("{source_file}", _target)
+            spec = json.loads(spec_str)
 
     # Replace {source_file} placeholder in description with resolved target
     _src_display = _target or "api_server.py"

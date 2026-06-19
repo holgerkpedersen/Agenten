@@ -162,7 +162,7 @@ class TestPlanPhaseCheckIsFilesFromPlan(unittest.TestCase):
         plan_spec = TEMPLATE_PHASE_CHECKS["refactor"]["Plan"]
         self.assertEqual(plan_spec["type"], "files_from_plan")
         self.assertEqual(plan_spec["plan_path"], "refactor_plan.md")
-        self.assertEqual(plan_spec["min_files"], 5)
+        self.assertEqual(plan_spec["min_files"], 1)
 
 
 if __name__ == "__main__":

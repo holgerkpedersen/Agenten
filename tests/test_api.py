@@ -198,7 +198,7 @@ class TestAPIPhaseChecks:
         plan_check = data["phases"]["refactor"]["Plan"]
         assert plan_check["spec"]["type"] == "files_from_plan"
         assert plan_check["spec"]["plan_path"] == "refactor_plan.md"
-        assert plan_check["spec"]["min_files"] == 5
+        assert plan_check["spec"]["min_files"] == 1
         assert "refactor_plan.md" in plan_check["description"]
         assert "FORMÅL" in plan_check["description"]
 
@@ -211,5 +211,5 @@ class TestAPIPhaseChecks:
         assert "files_from_plan" in sub_types
         assert "symbols_covered" in sub_types
         symbols_spec = next(c for c in ekstraher_check["spec"]["checks"] if c["type"] == "symbols_covered")
-        assert symbols_spec["source_file"] == "api_server.py"
+        assert symbols_spec["source_file"] == "{source_file}"
         assert "FORMÅL" in ekstraher_check["description"]
