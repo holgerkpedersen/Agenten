@@ -3138,10 +3138,17 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
     # Nulstil KUN ved fase-skift, så LLM's plan overlever iterationer.
     _prev_phase = getattr(agent, '_llm_todo_phase', '')
     if _prev_phase == phase and getattr(agent, '_llm_todos', None):
-        # Retry — bevar planen, genudsender bare eksisterende todos
-        for todo in agent._llm_todos:
-            events.append({"type": "llm_todo_add", "id": todo.get("id",""), "text": todo.get("text",""), "parent_id": None})
-        return events
+        if getattr(agent, '_llm_todos', None):
+            # Retry — bevar planen, genudsender bare eksisterende todos
+            agent._llm_has_planned = True
+            import logging
+            logging.getLogger(__name__).info("LLM-todos bevaret ved retry (%s, %d items)", _prev_phase, len(agent._llm_todos))
+            for todo in agent._llm_todos:
+                events.append({"type": "llm_todo_add", "id": todo.get("id",""), "text": todo.get("text",""), "parent_id": None})
+            return events
+        else:
+            import logging
+            logging.getLogger(__name__).info("LLM-todos TØMT ved retry (%s) — genopretter", _prev_phase)
 
     agent._llm_todos = []
     agent._llm_has_planned = False

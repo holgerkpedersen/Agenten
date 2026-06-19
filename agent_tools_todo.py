@@ -38,8 +38,29 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
     existing LLM todos and creates a fresh set based on the phase goal.
     The optional ``steps`` parameter (newline-separated) allows the LLM
     to seed the plan with concrete steps.
+
+    If the LLM already has a plan (e.g. from a retry), the existing plan
+    is preserved and ``steps`` is merged in as additional todos.
     """
     todos = _ensure_llm_todos(agent)
+    # If LLM already has a plan (preserved from retry), merge steps in
+    # instead of clearing everything.
+    if getattr(agent, '_llm_has_planned', False) and agent._llm_todos:
+        if steps and steps.strip():
+            lines = [s.strip() for s in steps.strip().split("\n") if s.strip()]
+            for line in lines:
+                todo_id = "lt_" + uuid.uuid4().hex[:8]
+                agent._llm_todos.append({
+                    "id": todo_id, "text": line, "done": False,
+                    "parent_id": None, "phase": phase_name,
+                })
+                _emit(agent, "llm_todo_add", {"id": todo_id, "text": line, "parent_id": None})
+        return {
+            "success": True,
+            "todos": list(agent._llm_todos),
+            "count": len(agent._llm_todos),
+        }
+
     # Clear previous LLM todos
     agent._llm_todos = []
     agent._llm_has_planned = True
