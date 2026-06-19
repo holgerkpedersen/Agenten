@@ -816,13 +816,32 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             if prev_results:
                 sibling_block = "\n\n## Resultater fra tidligere faser\n" + "\n\n".join(prev_results)
 
+    plan_block = ""
+
+    # For refactor template's Plan phase, auto-load docs/refactor_analyse.md
+    # so the LLM doesn't waste iterations re-reading symbol/functions.
+    if (agent.active_template == "refactor" and
+        task_node.name.lower() == "plan" and
+        not any("refactor_analyse" in str(c) for c in agent.file_chunks.values())):
+        _analyse_path = "docs/refactor_analyse.md"
+        _wd = os.environ.get('AGENT_WORKDIR', '')
+        if _wd:
+            _analyse_path = os.path.join(_wd, _analyse_path)
+        if os.path.exists(_analyse_path):
+            try:
+                with open(_analyse_path, encoding="utf-8") as _af:
+                    _analyse_content = _af.read()
+                plan_block = "\n\n📄 **Analyse fra forrige fase (auto-indlæst):**\n```\n" + _analyse_content[:3000] + "\n```\n\nBrug denne analyse som grundlag — du behøver IKKE læse symboler eller funktioner igen."
+                agent._log("DEBUG", f"Auto-loaded {_analyse_path} ({len(_analyse_content)} chars) for Plan", "")
+            except Exception as _e:
+                agent._log("DEBUG", f"Failed to auto-load analyse: {_e}", "")
+
     # For refactor template's Ekstraher and Opdatér phases, auto-load
     # refactor_plan.md + symbol-status so the LLM knows EXACTLY which
     # symbols need extraction/cleanup — no list_symbols needed.
-    plan_block = ""
-    if (agent.active_template == "refactor" and
-        task_node.name.lower() in ("ekstraher", "opdatér") and
-        not any("plan.md" in str(c) for c in agent.file_chunks.values())):
+    if not plan_block and (agent.active_template == "refactor" and
+                           task_node.name.lower() in ("ekstraher", "opdatér") and
+                           not any("plan.md" in str(c) for c in agent.file_chunks.values())):
         plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
         if os.path.exists(plan_path):
             try:
@@ -2442,20 +2461,22 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
         if phase == "analyse":
             todos.extend([
                 {"id": "rf_a1", "text": "List alle symboler med list_symbols()", "done": False},
-                {"id": "rf_a2", "text": "L\u00e6s de vigtigste metoder med read_location()", "done": False},
-                {"id": "rf_a3", "text": "Analyser afh\u00e6ngigheder med analyze_dependencies()", "done": False},
-                {"id": "rf_a4", "text": "Identificer SOLID-overtr\u00e6delser", "done": False},
-                {"id": "rf_a5", "text": "Kortl\u00e6g ansvarsomr\u00e5der for modulopdeling", "done": False},
+                {"id": "rf_a2", "text": "Læs de vigtigste metoder med read_location()", "done": False},
+                {"id": "rf_a3", "text": "Analyser afhængigheder med analyze_dependencies()", "done": False},
+                {"id": "rf_a4", "text": "Identificer SOLID-overtrædelser", "done": False},
+                {"id": "rf_a5", "text": "Kortlæg ansvarsområder for modulopdeling", "done": False},
+                {"id": "rf_a6", "text": "Gem analyse i docs/refactor_analyse.md med write_file()", "done": False},
             ])
             if plan_modules:
                 todos.append({
                     "id": "rf_a_modules",
-                    "text": "Planen n\u00e6vner {} moduler: {}".format(len(plan_modules), ', '.join(plan_modules)),
+                    "text": "Planen nævner {} moduler: {}".format(len(plan_modules), ', '.join(plan_modules)),
                     "done": False
                 })
 
         elif phase == "plan":
             todos.extend([
+                {"id": "rf_p0", "text": "Læs docs/refactor_analyse.md for at få analyse-resultater", "done": False},
                 {"id": "rf_p1", "text": "Beslut modulopdeling", "done": False},
                 {"id": "rf_p2", "text": f"Skriv {_plan_path} med write_file()", "done": False},
                 {"id": "rf_p3", "text": "Inkluder alle moduler og symboler i planen", "done": False},
@@ -2864,6 +2885,7 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     ("read_location", None, "bf_a3"),
     ("analyze_dependencies", None, "rf_a3"),
     ("write_file", lambda a: "refactor_plan" in str(a.get("path", "")), "rf_p2"),
+    ("write_file", lambda a: "refactor_analyse" in str(a.get("path", "")), "rf_a6"),
     ("write_file", lambda a: "tests/temp" in str(a.get("path", "")), "bf_t1"),
     ("write_file", lambda a: "docs/" in str(a.get("path", "")) and a.get("path","").endswith(".md"), "ka_a4"),
     ("write_file", lambda a: "docs/" in str(a.get("path", "")), "pr_a2"),
