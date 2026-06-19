@@ -2322,6 +2322,24 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
             except Exception:
                 pass
 
+    # For refactor Analyse: verify that refactor_analyse.md was actually written.
+    # Prevents phases from being marked "done" when the model ran out of iterations
+    # before calling write_file.
+    if task_node.status in ("done",) and template == "refactor":
+        _phase_analyse = _normalize_phase(task_node.name).lower()
+        if "analyse" in _phase_analyse:
+            _a_path = "refactor_analyse.md"
+            _a_wd = os.environ.get('AGENT_WORKDIR', '')
+            if _a_wd:
+                _a_path = os.path.join(_a_wd, _a_path)
+            if not os.path.exists(_a_path):
+                task_node.status = "failed"
+                full_response = (
+                    "Analyse kan ikke afsluttes: refactor_analyse.md blev ikke skrevet. "
+                    "Filen skal gemmes med write_file(path='refactor_analyse.md', content='...') "
+                    "som sidste handling før <<<DONE>>>."
+                )
+
     # Auto-resolve for close phases: if the phase completed and update_issue_status
     # hasn't been called yet, call it automatically to avoid false negatives from
     # _check_required_tools (which requires update_issue_status for close phases).
