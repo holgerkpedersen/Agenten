@@ -1130,6 +1130,8 @@ async function switchLLMLang(lang) {
             await redecomposeTree(lang);
         }
     }
+    await loadPhaseChecks(currentTemplate);
+    updateTreeDisplay();
 }
 
 async function redecomposeTree(lang) {
@@ -1510,7 +1512,8 @@ function renderTree(node, path = []) {
     let phaseCheckHtml = '';
     if (currentTemplate && phaseChecksByTemplate[currentTemplate]) {
         const phaseName = (node.name || '').toLowerCase();
-        const cacheKey = currentTemplate + '|' + currentLang;
+        const _pcRenderLang = currentLLMLang || currentLang || 'da';
+        const cacheKey = currentTemplate + '|' + _pcRenderLang;
         const phases = phaseChecksByTemplate[cacheKey] || phaseChecksByTemplate[currentTemplate] || {};
         for (const [key, info] of Object.entries(phases)) {
             if (key.toLowerCase() === phaseName) {
@@ -1548,12 +1551,13 @@ async function loadPhaseChecks(template) {
         phaseChecksByTemplate = {};
         return;
     }
-    const cacheKey = template + '|' + currentLang;
+    const _pcLang = currentLLMLang || currentLang || 'da';
+    const cacheKey = template + '|' + _pcLang;
     if (phaseChecksByTemplate[cacheKey]) {
         return;
     }
     try {
-        const resp = await fetch(`/api/phase-checks?template=${encodeURIComponent(template)}&lang=${encodeURIComponent(currentLang)}`);
+        const resp = await fetch(`/api/phase-checks?template=${encodeURIComponent(template)}&lang=${encodeURIComponent(_pcLang)}`);
         const data = await resp.json();
         if (data.success && data.phases) {
             phaseChecksByTemplate[cacheKey] = data.phases[template] || {};
