@@ -3092,6 +3092,10 @@ async function undoBackup() {
         undoBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Fortryder...';
     }
     try {
+        // Create a fresh backup of current state before reset
+        try {
+            await fetch('/api/git/backup', { method: 'POST' });
+        } catch(e) { /* non-critical */ }
         // Clear execution state from session first
         try {
             await fetch('/api/sessions/clear-execution', { method: 'POST' });
@@ -3184,19 +3188,11 @@ async function executeWithStream() {
         if (!currentTree) return;
     }
     
-    // Create git backup before execution — show undo button
-    try {
-        const resp = await fetch('/api/git/backup', { method: 'POST' });
-        const backup = await resp.json();
-        if (backup.success) {
-            const undoBtn = document.getElementById('undoBtn');
-            if (undoBtn) {
-                undoBtn.disabled = false;
-                undoBtn.textContent = '↶ Fortryd';
-            }
-        }
-    } catch(e) {
-        addLogEntry('WARNING', 'Backup fejlede', e.message);
+    // Enable undo button (no git stash — files on disk are preserved)
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        undoBtn.disabled = false;
+        undoBtn.textContent = '↶ Fortryd';
     }
     
     stopStream();
