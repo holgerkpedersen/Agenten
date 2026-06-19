@@ -2319,6 +2319,7 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                         pass
 
     missing_msg = _check_required_tools(agent, called_tools, task_node.name)
+    agent._log("DEBUG", f"_finalize: status={task_node.status}, missing_msg={'None' if missing_msg is None else missing_msg[:60]}", "")
     if missing_msg:
         task_node.status = "failed"
         full_response = missing_msg
