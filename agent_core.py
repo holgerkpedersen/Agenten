@@ -556,7 +556,9 @@ class Agent:
         # Build entity map from loaded file_chunks for structured LLM context
         try:
             import agent_entity_map
-            fc_paths = [os.path.join(os.getcwd(), k.replace("file_", "", 1)) for k in getattr(self, 'file_chunks', {}) or {}]
+            import agent_files as _af
+            _wd = _af._resolve_workdir()
+            fc_paths = [os.path.join(_wd, k.replace("file_", "", 1)) for k in getattr(self, 'file_chunks', {}) or {}]
             self._entity_map = agent_entity_map.build_entity_map(fc_paths)
         except Exception:
             self._entity_map = None

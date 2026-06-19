@@ -17,7 +17,7 @@ def check_file_exists(paths: list[str], spec: dict[str, Any] | None = None, base
     require_all = True
     if spec is not None:
         require_all = bool(spec.get("require_all", True))
-    base = base_dir or os.getcwd()
+    base = base_dir or os.environ.get('AGENT_WORKDIR') or os.getcwd()
     def _resolve(p: str) -> str:
         return p if os.path.isabs(p) else os.path.join(base, p)
     resolved = [_resolve(p) for p in paths]

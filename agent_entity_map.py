@@ -267,7 +267,8 @@ def _find_cross_references(files: dict[str, Any]) -> dict[str, Any]:
         )
         if not has_any:
             # Check if Any is actually used
-            fp = os.path.join(os.getcwd(), basename) if not basename.startswith("/") else basename
+            _wd = os.environ.get('AGENT_WORKDIR') or os.getcwd()
+            fp = os.path.join(_wd, basename) if not basename.startswith("/") else basename
             if os.path.exists(fp):
                 try:
                     with open(fp, "r", encoding="utf-8") as f:

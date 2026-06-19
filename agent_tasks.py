@@ -207,7 +207,8 @@ def _refactor_actually_moved_code(agent: Any) -> bool:
     template = getattr(agent, "active_template", "") or ""
     if template != "refactor":
         return True
-    plan_path = os.path.join(os.getcwd(), "refactor_plan.md")
+    _wd = agent_files._resolve_workdir()
+    plan_path = os.path.join(_wd, "refactor_plan.md")
     if not os.path.exists(plan_path):
         return False
     try:
@@ -220,7 +221,7 @@ def _refactor_actually_moved_code(agent: Any) -> bool:
     for mod in modules:
         if not mod or "/" in mod or "\\" in mod:
             continue
-        path = os.path.join(os.getcwd(), mod)
+        path = os.path.join(_wd, mod)
         if not _apc._has_real_code(path, min_lines=20):
             return False
     # Check that the source file (from plan header) has been reduced
@@ -235,7 +236,7 @@ def _refactor_actually_moved_code(agent: Any) -> bool:
     except (OSError, UnicodeDecodeError):
         pass
     if _target_file:
-        _target_path = os.path.join(os.getcwd(), _target_file)
+        _target_path = os.path.join(_wd, _target_file)
         if os.path.exists(_target_path):
             try:
                 with open(_target_path, encoding="utf-8") as f:
@@ -247,7 +248,7 @@ def _refactor_actually_moved_code(agent: Any) -> bool:
                 return False
     else:
         # Fallback: check api_server.py (legacy refactors)
-        _api_path = os.path.join(os.getcwd(), "api_server.py")
+        _api_path = os.path.join(_wd, "api_server.py")
         if os.path.exists(_api_path):
             try:
                 with open(_api_path, encoding="utf-8") as f:
@@ -271,6 +272,8 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
     modules = agent_phase_checks._parse_refactor_plan_modules(plan_path)
     if not modules:
         return ""
+
+    _wd2 = agent_files._resolve_workdir()
 
     try:
         with open(plan_path, encoding="utf-8") as f:
@@ -301,7 +304,7 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
     parts.append("\n\n## STATUS: Symboler i api_server.py vs plan")
 
     for mod_name in sorted(modules):
-        mod_path = os.path.join(os.getcwd(), mod_name)
+        mod_path = os.path.join(_wd2, mod_name)
         planned_syms = per_module.get(mod_name, [])
         if not planned_syms:
             continue
@@ -1799,7 +1802,7 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
     # Phase output verification — prevent auto-complete when no output was produced
     if tool_name in ("write_file",):
         if "plan" in phase:
-            plan_path = getattr(agent, '_refactor_plan_path', '') or os.path.join(os.getcwd(), "refactor_plan.md")
+            plan_path = getattr(agent, '_refactor_plan_path', '') or os.path.join(agent_files._resolve_workdir(), "refactor_plan.md")
             if not os.path.exists(plan_path) or os.path.getsize(plan_path) == 0:
                 agent._log("DEBUG", "Plan output verification", f"{plan_path} mangler eller er tom — afslutter IKKE auto-complete")
                 return None
@@ -2019,7 +2022,7 @@ def _run_full_test_suite(agent: Any) -> bool:
         import subprocess
         result = subprocess.run(
             ["python", "-m", "pytest", "tests/", "-q"],
-            capture_output=True, text=True, timeout=120, cwd=os.getcwd()
+            capture_output=True, text=True, timeout=120, cwd=agent_files._resolve_workdir()
         )
         if result.returncode == 0:
             return True
@@ -3083,7 +3086,7 @@ def _reconcile_todos_with_disk(agent: Any) -> list[str]:
             if m:
                 mod_file = m.group(1)
                 target_file = m.group(2)
-                target_path = target_file if _os.path.exists(target_file) else _os.path.join(_os.getcwd(), target_file)
+                target_path = target_file if _os.path.exists(target_file) else _os.path.join(agent_files._resolve_workdir(), target_file)
                 if _os.path.exists(target_path):
                     try:
                         with open(target_path, 'r', encoding='utf-8', errors='replace') as f:

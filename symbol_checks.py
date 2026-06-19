@@ -66,7 +66,7 @@ def check_symbols_covered_by_modules(spec: dict[str, Any], base_dir: str | None 
     source_rel = spec.get("source_file", "")
     if not source_rel:
         return False, "symbols_covered: source_file mangler"
-    base = base_dir or os.getcwd()
+    base = base_dir or os.environ.get('AGENT_WORKDIR') or os.getcwd()
     source_path = source_rel if os.path.isabs(source_rel) else os.path.join(base, source_rel)
     if not os.path.exists(source_path):
         return False, f"symbols_covered: kildefil {source_path} findes ikke"

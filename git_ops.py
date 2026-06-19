@@ -210,7 +210,7 @@ def _run_git(args: list[str], cwd: str | None = None) -> dict[str, Any]:
         args:
         cwd:"""
     if cwd is None:
-        cwd = os.getcwd()
+        cwd = os.environ.get('AGENT_WORKDIR') or os.getcwd()
 
     safe_path = os.path.realpath(cwd)
     cmd = ["git"] + args

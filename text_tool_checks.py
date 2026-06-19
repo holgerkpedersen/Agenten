@@ -129,7 +129,7 @@ def check_code_contains(spec: dict[str, Any], base_dir: str | None = None) -> tu
     rel = spec.get("path", "")
     if not rel:
         return False, "code_contains: path mangler"
-    base = base_dir or os.getcwd()
+    base = base_dir or os.environ.get('AGENT_WORKDIR') or os.getcwd()
     full = rel if os.path.isabs(rel) else os.path.join(base, rel)
     patterns = spec.get("patterns", []) or []
     if not patterns:
