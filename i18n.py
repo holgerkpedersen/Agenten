@@ -193,6 +193,7 @@ class K(StrEnum):
     TODO_AGENT_HEADER     = "todo.agent_header"
     TODO_LLM_HEADER       = "todo.llm_header"
     TODO_ORDER_INSTRUCTION = "todo.order_instruction"
+    TODO_NO_CRITERIA       = "todo.no_criteria"
 
     # === System prompt fragments ===
     SYS_EXAMPLE_PREFIX  = "sys_example_prefix"
