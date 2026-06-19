@@ -818,12 +818,12 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
 
     plan_block = ""
 
-    # For refactor template's Plan phase, auto-load docs/refactor_analyse.md
+    # For refactor template's Plan phase, auto-load refactor_analyse.md
     # so the LLM doesn't waste iterations re-reading symbol/functions.
     if (agent.active_template == "refactor" and
         task_node.name.lower() == "plan" and
         not any("refactor_analyse" in str(c) for c in agent.file_chunks.values())):
-        _analyse_path = "docs/refactor_analyse.md"
+        _analyse_path = "refactor_analyse.md"
         _wd = os.environ.get('AGENT_WORKDIR', '')
         if _wd:
             _analyse_path = os.path.join(_wd, _analyse_path)
@@ -2465,7 +2465,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                 {"id": "rf_a3", "text": "Analyser afhængigheder med analyze_dependencies()", "done": False},
                 {"id": "rf_a4", "text": "Identificer SOLID-overtrædelser", "done": False},
                 {"id": "rf_a5", "text": "Kortlæg ansvarsområder for modulopdeling", "done": False},
-                {"id": "rf_a6", "text": "Gem analyse i docs/refactor_analyse.md med write_file()", "done": False},
+                {"id": "rf_a6", "text": "Gem analyse i refactor_analyse.md med write_file()", "done": False},
             ])
             if plan_modules:
                 todos.append({
@@ -2476,7 +2476,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
 
         elif phase == "plan":
             todos.extend([
-                {"id": "rf_p0", "text": "Læs docs/refactor_analyse.md for at få analyse-resultater", "done": False},
+                {"id": "rf_p0", "text": "Læs refactor_analyse.md for at få analyse-resultater", "done": False},
                 {"id": "rf_p1", "text": "Beslut modulopdeling", "done": False},
                 {"id": "rf_p2", "text": f"Skriv {_plan_path} med write_file()", "done": False},
                 {"id": "rf_p3", "text": "Inkluder alle moduler og symboler i planen", "done": False},
