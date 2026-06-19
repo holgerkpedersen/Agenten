@@ -1738,6 +1738,12 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
     if template == "refactor" and "run_tests" in called_names and not getattr(agent, '_tests_failed', False):
         required -= {"edit_file", "verify_refactor"}
     uncalled = required - called_names
+    import logging as _llog
+    _llog.getLogger(__name__).debug(
+        f"_check_req: template={template} phase={_normalize_phase(task_name).lower() if task_name else '?'} "
+        f"called_names={sorted(called_names)} required={sorted(required)} uncalled={sorted(uncalled)} "
+        f"issue_resolved={getattr(agent,'issue_resolved',False)} tests_failed={getattr(agent,'_tests_failed',None)}"
+    )
     # write_file and extract_symbol are alternatives — calling either satisfies the requirement
     if "write_file" in uncalled and "extract_symbol" in called_names:
         uncalled.discard("write_file")
