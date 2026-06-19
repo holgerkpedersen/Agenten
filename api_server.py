@@ -1555,7 +1555,10 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
             node.status = "pending"
 
             # Momentum: stop hvis sidste 2 forsøg flyttede 0 symbols
-            if len(retry_contexts) >= 2:
+            # (kun relevant for Ekstraher/Opdatér — ikke for Analyse/Plan/Test)
+            _rphase = _normalize_phase(node.name).lower()
+            _is_extraction_phase = any(k in _rphase for k in ["ekstraher", "opdatér", "extract", "update"])
+            if _is_extraction_phase and len(retry_contexts) >= 2:
                 last_two_moved = sum(c.get("symbols_moved", 0) for c in retry_contexts[-2:])
                 if last_two_moved == 0:
                     agent._log("INFO",
