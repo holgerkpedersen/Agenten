@@ -25,124 +25,153 @@ PASS = "✓"
 FAIL = "✗"
 
 
-def create_test_registry(lang: str = "da") -> ToolRegistry:
+def create_test_registry() -> ToolRegistry:
     """Create a minimal tool registry for testing."""
-    reg = ToolRegistry(lang)
+    reg = ToolRegistry()
     reg.register(Tool(
         "list_symbols",
         "List ALL top-level symbols in a Python file via AST",
         ["filepath"],
-        lambda filepath="": {"success": True, "symbols": [{"name": "hello", "type": "function"}], "count": 1},
+        lambda filepath: {"success": True, "symbols": [{"name": "hello", "type": "function"}], "count": 1},
     ))
     reg.register(Tool(
         "read_location",
         "Read a specific function/class via AST",
         ["filepath", "name"],
-        lambda filepath, name, line_no=None: {"success": True, "name": name, "content": f"def {name}():\n    pass"},
-        optional_params=["line_no"],
+        lambda filepath, name: {"success": True, "name": name, "content": f"def {name}():\n    pass"},
     ))
     reg.register(Tool(
         "write_file",
         "Create a NEW file with content",
         ["path", "content"],
-        lambda path, content, overwrite=False: {"success": True, "path": path, "chars": len(content)},
-        optional_params=["overwrite"],
+        lambda path, content: {"success": True, "path": path, "chars": len(content)},
     ))
     reg.register(Tool(
         "run_tests",
         "Run pytest and return results",
         [],
-        lambda test_path="": {"success": True, "exit_code": 0, "summary": "52 passed in 0.18s"},
-        optional_params=["test_path"],
+        lambda: {"success": True, "exit_code": 0, "summary": "52 passed in 0.18s"},
     ))
     reg.register(Tool(
         "done",
         "Signal that the task/phase is complete",
         ["result"],
-        lambda result="": result,
-        optional_params=["result"],
+        lambda result: result,
     ))
     return reg
+
+
+def _call_llm_direct(model: str, base_url: str, prompt: str, tools: list) -> tuple[str, list]:
+    """Call LLM via direct API (non-streaming) and return (response_text, tool_calls_list)."""
+    import requests as _req
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 200,
+        "stream": False,
+    }
+    if tools:
+        body["tools"] = tools
+    try:
+        r = _req.post(f"{base_url}/v1/chat/completions", json=body, timeout=30)
+        if r.status_code != 200:
+            return f"[HTTP {r.status_code}]", []
+        data = r.json()
+        choice = data.get("choices", [{}])[0]
+        msg = choice.get("message", {})
+        response = msg.get("content", "") or ""
+        tc = msg.get("tool_calls", []) or []
+        return response, tc
+    except Exception as e:
+        return f"[ERROR: {e}]", []
 
 
 def test_native_calling(model: str, base_url: str) -> list[dict]:
     """Test native function calling."""
     results = []
-    llm = LMStudioWrapper(model=model, base_url=base_url)
     reg = create_test_registry()
     tools = reg.get_openai_tools_for_active()
 
     # Test 1: Simple tool call (list_symbols)
     prompt = "List all symbols in fil.py using list_symbols"
     try:
-        response = llm.generate(prompt, tools=tools)
-        tc = getattr(llm, '_pending_tool_calls', [])
-        passed = len(tc) > 0 and tc[0]["function"]["name"] == "list_symbols"
+        test_response, tc = _call_llm_direct(model, base_url, prompt, tools)
+        passed = len(tc) > 0 and tc[0].get("function", {}).get("name") == "list_symbols"
         results.append({
             "test": "list_symbols kald",
             "prompt": prompt,
             "passed": passed,
-            "response": response[:200] if response else "(ingen output)",
             "tool_calls": len(tc),
-            "tool_name": tc[0]["function"]["name"] if tc else "ingen",
+            "tool_name": tc[0].get("function", {}).get("name", "ingen") if tc else "ingen",
+            "args": json.dumps(tc[0].get("function", {}).get("arguments", ""))[:100] if tc else "",
+            "response": test_response[:80] if test_response else "(tom)",
         })
     except Exception as e:
-        results.append({"test": "list_symbols kald", "prompt": prompt, "passed": False, "error": str(e)[:200]})
+        import traceback
+        results.append({"test": "list_symbols kald", "prompt": prompt, "passed": False, "error": str(e)[:200], "traceback": traceback.format_exc()[-200:]})
 
     # Test 2: Tool with parameters (read_location)
     prompt = 'Brug read_location(filepath="test.py", name="hello") til at læse funktionen'
     try:
-        response = llm.generate(prompt, tools=tools)
-        tc = getattr(llm, '_pending_tool_calls', [])
+        resp, tc = _call_llm_direct(model, base_url, prompt, tools)
         passed = False
         if tc:
-            fn = tc[0]["function"]
-            args = json.loads(fn.get("arguments", "{}"))
-            passed = fn["name"] == "read_location" and "filepath" in args and "name" in args
+            fn = tc[0].get("function", {})
+            try:
+                args = fn.get("arguments", {})
+                if isinstance(args, str):
+                    args = json.loads(args)
+                passed = fn.get("name") == "read_location" and "filepath" in args and "name" in args
+            except (json.JSONDecodeError, TypeError):
+                pass
         results.append({
             "test": "read_location med args",
             "prompt": prompt,
             "passed": passed,
-            "response": response[:200] if response else "(ingen output)",
             "tool_calls": len(tc),
-            "args": json.dumps(args) if tc else "ingen",
+            "tool_name": tc[0].get("function", {}).get("name", "ingen") if tc else "ingen",
+            "response": resp[:80] if resp else "(tom)",
         })
     except Exception as e:
         results.append({"test": "read_location med args", "prompt": prompt, "passed": False, "error": str(e)[:200]})
 
     # Test 3: write_file med optional parameter
-    prompt = 'Skriv en fil test.py med print("hello") — brug overwrite=true'
+    prompt = 'Skriv en fil test.py med print("hello")'
     try:
-        response = llm.generate(prompt, tools=tools)
-        tc = getattr(llm, '_pending_tool_calls', [])
+        resp, tc = _call_llm_direct(model, base_url, prompt, tools)
         passed = False
         if tc:
-            fn = tc[0]["function"]
-            args = json.loads(fn.get("arguments", "{}"))
-            passed = fn["name"] == "write_file" and "path" in args and "content" in args
+            fn = tc[0].get("function", {})
+            try:
+                args = fn.get("arguments", {})
+                if isinstance(args, str):
+                    args = json.loads(args)
+                passed = fn.get("name") == "write_file" and "path" in args and "content" in args
+            except (json.JSONDecodeError, TypeError):
+                pass
         results.append({
-            "test": "write_file med overwrite",
+            "test": "write_file med args",
             "prompt": prompt,
             "passed": passed,
-            "response": response[:200] if response else "(ingen output)",
             "tool_calls": len(tc),
-            "args": json.dumps(args) if tc else "ingen",
+            "tool_name": tc[0].get("function", {}).get("name", "ingen") if tc else "ingen",
+            "response": resp[:80] if resp else "(tom)",
         })
     except Exception as e:
-        results.append({"test": "write_file med overwrite", "prompt": prompt, "passed": False, "error": str(e)[:200]})
+        results.append({"test": "write_file med args", "prompt": prompt, "passed": False, "error": str(e)[:200]})
 
     # Test 4: Multiple tool calls in one response
     prompt = "List symbols in fil.py AND read the function 'hello' — gør begge i samme svar"
     try:
-        response = llm.generate(prompt, tools=tools)
-        tc = getattr(llm, '_pending_tool_calls', [])
+        resp, tc = _call_llm_direct(model, base_url, prompt, tools)
         passed = len(tc) >= 2
         results.append({
             "test": "Flere tool-kald i samme svar",
             "prompt": prompt,
             "passed": passed,
             "tool_calls": len(tc),
-            "names": [t["function"]["name"] for t in tc] if tc else [],
+            "names": [t.get("function", {}).get("name", "?") for t in tc] if tc else [],
+            "response": resp[:80] if resp else "(tom)",
         })
     except Exception as e:
         results.append({"test": "Flere tool-kald i samme svar", "prompt": prompt, "passed": False, "error": str(e)[:200]})

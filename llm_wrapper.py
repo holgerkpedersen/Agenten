@@ -102,7 +102,9 @@ class LMStudioWrapper:
     # The system falls back to text-mode tools (<<<TOOL>>> markers)
     # when the active model matches one of these prefixes.
     NATIVE_TOOLS_BLACKLIST: list[str] = [
-        "nex-n2-mini",       # Model claims tool support but produces garbled responses
+        # Models known NOT to support OpenAI native function calling.
+        # Add model name prefixes here to force text-mode tools.
+        # Test with: python scripts/benchmark_tools.py --model <name> --native
     ]
 
     IMAGE_FORMATS = {
