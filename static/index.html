@@ -3664,11 +3664,16 @@ function sendUserComment() {
 }
 
 function copyTodos() {
+    const allLines = [];
+    // Add phase context header
+    if (_currentPhase) {
+        allLines.push(`## ${_currentPhase}`);
+        allLines.push('');
+    }
     const sections = [
         { listId: 'autoTodosList', header: '## Agentens opgavekrav' },
-        { listId: 'llmTodosList', header: '## LLM\'s plan' },
+        { listId: 'llmTodosList', header: "## LLM's plan" },
     ];
-    const allLines = [];
     for (const sec of sections) {
         const list = document.getElementById(sec.listId);
         if (!list) continue;
