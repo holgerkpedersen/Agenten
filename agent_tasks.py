@@ -2849,6 +2849,10 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
     # rf_e1 ("Følg refactor_plan.md nøjagtigt — opfyld ALLE moduler deri")
     # ma kun markeres done naar ALLE planlagte moduler eksisterer.
     ("batch_extract_symbols", lambda a: _all_planned_modules_exist(a), "rf_e1"),
+    ("batch_extract_symbols", None, "rf_e2"),
+    ("batch_extract_symbols", None, "rf_e3"),
+    ("extract_symbol", None, "rf_e2"),
+    ("extract_symbol", None, "rf_e3"),
     ("add_method", None, "bf_i3"),
     ("add_function", None, None),
     ("verify_refactor", None, "rf_e4"),
@@ -2999,21 +3003,23 @@ def _reconcile_llm_todos(agent: Any) -> list[str]:
         tid = todo.get("id", "")
         if not text or not tid:
             continue
+
+        # lt_total: mark done when all other module todos are done
+        if "lt_total" in tid:
+            _other_undone = [t for t in llm_todos if t.get("id") != tid and not t.get("done")]
+            if not _other_undone:
+                ids.append(tid)
+            continue
+
         # Check if file mentioned in text exists
         m = _re.search(r'([a-zA-Z_][\w./-]+\.py)', text)
         if m:
             fpath = m.group(1)
             if _os.path.exists(fpath) and _os.path.getsize(fpath) > 0:
                 _actual = _count_symbols_in_file(fpath)
-                if "lt_total" in tid:
-                    # Only mark total done when all other module todos are done
-                    _other_undone = [t for t in llm_todos if t.get("id") != tid and not t.get("done")]
-                    if not _other_undone:
-                        ids.append(tid)
-                else:
-                    ids.append(tid)
-                    # Also update text with symbol count
-                    todo["text"] = f"Flyt symboler til {fpath} med batch_extract_symbols ({_actual} symbols)"
+                ids.append(tid)
+                # Also update text with symbol count
+                todo["text"] = f"Flyt symboler til {fpath} med batch_extract_symbols ({_actual} symbols)"
     return ids
 
 
