@@ -56,7 +56,8 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
         },
         "Opdat\u00e9r": {
             "type": "code_contains",
-            "path": "api_server.py",
+            "path": "{source_file}",
+            "patterns_auto": True,
             "patterns": [
                 "from\\s+routes\\b",
                 "from\\s+session_manager\\b",
@@ -68,7 +69,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             ],
             "require_all": False,
             "min_matches": 1,
-            "description": "FORM\u00c5L: Fjern flyttet kode fra original fil, tilf\u00f8j imports til nye moduler. Kr\u00e6ver: {source_file} importerer fra mindst \u00e9t nyt modul.",
+            "description": "FORMÅL: Fjern flyttet kode fra original fil, tilføj imports til nye moduler. Kræver: {source_file} importerer fra mindst ét nyt modul.",
             "description_key": "phase_check.refactor.opdater",
         },
         "Test": {
@@ -373,12 +374,18 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
     # actual target file from refactor_plan.md header or original prompt.
     # This ensures phase checks work for any REFAC-xxx, not just api_server.
     _target = None
-    if "api_server.py" in str(spec):
+    if "api_server.py" in str(spec) or "{source_file}" in str(spec):
         _plan_path = None
         if base_dir:
             _plan_candidate = os.path.join(base_dir, "refactor_plan.md")
             if os.path.exists(_plan_candidate):
                 _plan_path = _plan_candidate
+        if not _plan_path:
+            _wd = os.environ.get('AGENT_WORKDIR', '')
+            if _wd:
+                _plan_candidate = os.path.join(_wd, "refactor_plan.md")
+                if os.path.exists(_plan_candidate):
+                    _plan_path = _plan_candidate
         if not _plan_path and os.path.exists("refactor_plan.md"):
             _plan_path = "refactor_plan.md"
         _target = None
@@ -415,6 +422,45 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
                 spec[k] = v.replace("{source_file}", _src_display)
             elif isinstance(v, list):
                 spec[k] = [item.replace("{source_file}", _src_display) if isinstance(item, str) else item for item in v]
+
+    # Auto-generate import patterns from refactor_plan.md module names
+    if spec.get("patterns_auto") and "code_contains" in spec.get("type", ""):
+        _plan_src = None
+        if base_dir:
+            _cand = os.path.join(base_dir, "refactor_plan.md")
+            if os.path.exists(_cand):
+                _plan_src = _cand
+        if not _plan_src:
+            _wd = os.environ.get('AGENT_WORKDIR', '')
+            _plan_src = os.path.join(_wd, "refactor_plan.md") if _wd else "refactor_plan.md"
+        if os.path.exists(_plan_src):
+            try:
+                from file_checks import _parse_refactor_plan_modules
+                _mods = _parse_refactor_plan_modules(_plan_src)
+                if _mods:
+                    _new_patterns = []
+                    for _mod in _mods:
+                        _mod_name = os.path.splitext(_mod)[0]
+                        _new_patterns.append(r"from\s+" + re.escape(_mod_name) + r"\b")
+                    if _new_patterns:
+                        spec["patterns"] = _new_patterns
+                        agent._log("DEBUG", f"Auto-generated {len(_new_patterns)} import patterns from {_plan_src}: {_new_patterns[:3]}...", "")
+            except Exception as _e:
+                agent._log("DEBUG", f"Could not auto-generate patterns from plan: {_e}", "")
+
+    # For Opdatér: if source file has 0 symbols remaining (all moved to modules),
+    # auto-complete immediately — nothing to update.
+    if spec.get("type") == "code_contains" and _src_display and _src_display != "api_server.py":
+        _src_path = _src_display
+        if base_dir and not os.path.isabs(_src_path):
+            _src_path = os.path.join(base_dir, _src_path)
+        if os.path.exists(_src_path):
+            try:
+                _src_count = sum(1 for line in open(_src_path, encoding="utf-8") if "def " in line or "class " in line or "    def " in line)
+                if _src_count <= 1:
+                    return True, f"code_contains: kun {_src_count} def/class tilbage — alt allerede flyttet"
+            except (OSError, UnicodeDecodeError):
+                pass
 
     check_type = spec.get("type")
     if check_type == "file_exists":
