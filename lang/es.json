@@ -620,7 +620,7 @@
   "phase_check.code_contains_min": "La fase se completa automáticamente cuando al menos {min_matches} de {n} patrones coinciden en `{path}`.",
   "phase_check.min_text_length": "La fase se completa automáticamente cuando el LLM ha producido al menos {min_chars} caracteres de análisis.",
   "phase_check.symbols_covered": "La fase se completa automáticamente cuando todos los símbolos de `{source}` están definidos en exactamente uno de los módulos mencionados en `{plan}`.",
-  "phase_check.refactor.analyse": "PROPÓSITO: Comprender la estructura del archivo grande y sus responsabilidades. Requiere: al menos 500 caracteres de análisis + 3 funciones leídas con read_location.",
+  "phase_check.refactor.analyse": "PROPÓSITO: Comprender la estructura del archivo grande y sus responsabilidades. Requiere: refactor_analyse.md guardado.",
   "phase_check.refactor.plan": "PROPÓSITO: Decidir la división de módulos y escribir el plan. Requiere: refactor_plan.md con al menos 5 módulos *.py.",
   "phase_check.refactor.ekstraher": "PROPÓSITO: Crear nuevos archivos de módulo con código del archivo original. Requiere: todos los módulos *.py planificados creados + todos los símbolos distribuidos.",
   "phase_check.refactor.opdater": "PROPÓSITO: Eliminar código movido del archivo original, agregar imports a nuevos módulos. Requiere: api_server.py importa desde al menos un nuevo módulo.",

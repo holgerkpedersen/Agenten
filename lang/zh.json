@@ -618,7 +618,7 @@
     "phase_check.code_contains_min": "当 {n} 个模式中至少有 {min_matches} 个在 `{path}` 中匹配时,阶段自动完成。",
     "phase_check.min_text_length": "当LLM产生了至少 {min_chars} 个字符的分析时,阶段自动完成。",
     "phase_check.symbols_covered": "当 `{source}` 中的所有符号都定义在 `{plan}` 中提到的恰好一个模块中时,阶段自动完成。",
-    "phase_check.refactor.analyse": "目的: 理解大文件的结构和职责。要求: 至少500个字符的分析 + 使用read_location读取3个函数。",
+    "phase_check.refactor.analyse": "目的: 理解大文件的结构和职责。要求: refactor_analyse.md已保存。",
     "phase_check.refactor.plan": "目的: 决定模块划分并编写计划。要求: refactor_plan.md 包含至少5个 *.py 模块。",
     "phase_check.refactor.ekstraher": "目的: 从原始文件创建新的模块文件。要求: 所有计划的 *.py 模块已创建 + 所有符号已分配。",
     "phase_check.refactor.opdater": "目的: 从原始文件删除已移动的代码,添加新模块的导入。要求: api_server.py 从至少一个新模块导入。",

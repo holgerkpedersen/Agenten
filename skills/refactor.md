@@ -12,7 +12,7 @@ Opdel store filer i mindre moduler ved at flytte symboler. Hver fase bygger på 
 
 ### Workflow
 
- 1. **Analyse**: Brug `list_symbols()` og `read_location()` for at forstå strukturen. **SIDSTE HANDLING: Gem analysen i `refactor_analyse.md` med `write_file()`** — Plan-fasen læser denne fil.
+  1. **Analyse**: Brug `list_symbols()` og `read_location()` for at forstå strukturen. **SIDSTE HANDLING: Gem analysen i `refactor_analyse.md`** (i roden, **ikke** i `docs/`) med `write_file(path='refactor_analyse.md')` — Plan-fasen læser denne fil.
 
  2. **Plan**: Læs `refactor_analyse.md` (auto-indlæst) for at få analysen. Brug `write_file()` til at skrive `refactor_plan.md` med modulnavne og hvilke symboler der flyttes til hvert modul. Systemet auto-afslutter fasen når filen findes.
 

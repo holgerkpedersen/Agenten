@@ -392,6 +392,17 @@ def write_file(path: str, content: str, overwrite: bool = False) -> dict[str, An
     if not is_safe_location(path):
         return {"success": False, "error": f"Adgang n\u00e6gtet: stien er uden for projektmappen: {path}"}
     
+    # Auto-redirect docs/refactor_analyse.md → refactor_analyse.md and
+    # docs/refactor_plan.md → refactor_plan.md. LLM tends to write to docs/
+    # despite instructions saying "ikke docs/".
+    refactor_files = {"refactor_analyse.md", "refactor_plan.md"}
+    basename = os.path.basename(path)
+    if basename in refactor_files and ("\\docs\\" in path or "/docs/" in path):
+        parent_dir = os.path.dirname(path)
+        docs_parent = os.path.dirname(parent_dir)
+        new_path = os.path.join(docs_parent, basename)
+        path = new_path
+    
     dirname = os.path.dirname(path)
     if dirname:
         os.makedirs(dirname, exist_ok=True)

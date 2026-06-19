@@ -17,7 +17,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
     "refactor": {
         "Analyse": {
             "type": "all_of",
-            "description": "FORMÅL: Forstå den store fils struktur og ansvarsområder. Kræver: mindst 500 tegn analyse + 3 funktioner læst med read_location + refactor_analyse.md gemt.",
+            "description": "FORMÅL: Forstå den store fils struktur og ansvarsområder. Kræver: refactor_analyse.md gemt.",
             "description_key": "phase_check.refactor.analyse",
             "checks": [
                 {"type": "min_text_length", "min_chars": 500},

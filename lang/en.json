@@ -624,7 +624,7 @@
   "phase_check.code_contains_min": "Phase auto-completes when at least {min_matches} of {n} patterns match in `{path}`.",
   "phase_check.min_text_length": "Phase auto-completes when LLM has produced at least {min_chars} characters of analysis.",
   "phase_check.symbols_covered": "Phase auto-completes when all symbols from `{source}` are defined in exactly one of the modules listed in `{plan}`.",
-  "phase_check.refactor.analyse": "PURPOSE: Understand the large file's structure and responsibilities. Requires: at least 500 chars of analysis + 3 functions read with read_location.",
+  "phase_check.refactor.analyse": "PURPOSE: Understand the large file's structure and responsibilities. Requires: refactor_analyse.md saved.",
   "phase_check.refactor.plan": "PURPOSE: Decide module split and write plan. Requires: refactor_plan.md with at least 5 *.py modules.",
   "phase_check.refactor.ekstraher": "PURPOSE: Create new module files with code from the original file. Requires: all planned *.py modules created + all symbols distributed.",
   "phase_check.refactor.opdater": "PURPOSE: Remove moved code from original file, add imports to new modules. Requires: api_server.py imports from at least one new module.",

@@ -31,6 +31,13 @@ def _emit(agent: Any, event_type: str, data: dict) -> None:
 
 # ── tools ────────────────────────────────────────────────────────────────
 
+def _sanitize_refactor_path(text: str) -> str:
+    """Replace docs/refactor*.md → refactor*.md in plan text."""
+    return text.replace("docs/refactor_analyse.md", "refactor_analyse.md") \
+               .replace("docs/refactor_plan.md", "refactor_plan.md") \
+               .replace("docs/refactor", "refactor")
+
+
 def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None = None) -> dict[str, Any]:
     """Analyze the phase and create a structured plan with todos.
 
@@ -49,6 +56,7 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
         if steps and steps.strip():
             lines = [s.strip() for s in steps.strip().split("\n") if s.strip()]
             for line in lines:
+                line = _sanitize_refactor_path(line)
                 # Skip if duplicate text already exists
                 if any(t.get("text","").strip() == line for t in agent._llm_todos):
                     continue
@@ -63,6 +71,7 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
             "success": True,
             "todos": list(agent._llm_todos),
             "count": len(agent._llm_todos),
+            "note": "✅ Din plan er oprettet. Brug IKKE create_todo/update_todo — disse er allerede todo'er fra plan_phase. Udfør dem ét ad gangen.",
         }
 
     # Clear previous LLM todos
@@ -74,6 +83,7 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
     if steps and steps.strip():
         lines = [s.strip() for s in steps.strip().split("\n") if s.strip()]
         for line in lines:
+            line = _sanitize_refactor_path(line)
             todo_id = "lt_" + uuid.uuid4().hex[:8]
             agent._llm_todos.append({
                 "id": todo_id,
@@ -99,6 +109,7 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
         "success": True,
         "todos": list(agent._llm_todos),
         "count": len(agent._llm_todos),
+        "note": "✅ Din plan er oprettet. Brug IKKE create_todo/update_todo — disse er allerede todo'er fra plan_phase. Udfør dem ét ad gangen.",
     }
 
 

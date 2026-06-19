@@ -624,7 +624,7 @@
   "phase_check.code_contains_min": "Fasen afsluttes automatisk når mindst {min_matches} af {n} mønstre matcher i `{path}`.",
   "phase_check.min_text_length": "Fasen afsluttes automatisk når LLM har produceret mindst {min_chars} tegn analyse.",
   "phase_check.symbols_covered": "Fasen afsluttes automatisk når alle symboler fra `{source}` er defineret i præcis ét af modulerne nævnt i `{plan}`.",
-  "phase_check.refactor.analyse": "FORMÅL: Forstå den store fils struktur og ansvarsområder. Kræver: mindst 500 tegn analyse + 3 funktioner læst med read_location.",
+  "phase_check.refactor.analyse": "FORMÅL: Forstå den store fils struktur og ansvarsområder. Kræver: refactor_analyse.md gemt.",
   "phase_check.refactor.plan": "FORMÅL: Beslut modulopdeling og skriv plan. Kræver: refactor_plan.md med mindst 5 *.py-moduler.",
   "phase_check.refactor.ekstraher": "FORMÅL: Opret nye modulfiler med kode fra den originale fil. Kræver: alle planlagte *.py-moduler oprettet + alle symboler fordelt.",
   "phase_check.refactor.opdater": "FORMÅL: Fjern flyttet kode fra original fil, tilføj imports til nye moduler. Kræver: api_server.py importerer fra mindst ét nyt modul.",
