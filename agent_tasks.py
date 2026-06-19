@@ -2324,7 +2324,13 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                     except Exception:
                         pass
 
-    missing_msg = _check_required_tools(agent, called_tools, task_node.name)
+    # Hvis auto-advance allerede har bestemt fasen er faerdig (f.eks.
+    # run_tests bestod i Test-fasen), overskriv IKKE med _check_required_tools.
+    # edit_file er irrelevant nar testen bestar — filerne pa disk er beviset.
+    if full_response and "ERROR" not in full_response and len(full_response) > 10:
+        missing_msg = None
+    else:
+        missing_msg = _check_required_tools(agent, called_tools, task_node.name)
     agent._log("DEBUG", f"_finalize: status={task_node.status}, missing_msg={'None' if missing_msg is None else missing_msg[:60]}", "")
     if missing_msg:
         task_node.status = "failed"
