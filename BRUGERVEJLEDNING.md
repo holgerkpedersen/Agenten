@@ -1,6 +1,6 @@
 # 🧠 Agenten — Brugervejledning
 
-Agenten er din egen lille AI-hjælper. Den kan læse filer, skrive kode, lave opsummeringer, analysere projekter, og meget mere. Du bestemmer hvad den skal lave — så klarer den resten.
+Agenten er din egen lille AI-hjælper. Den kan læse filer, skrive kode, lave opsummeringer, analysere projekter, refaktorere kode og meget mere. Du bestemmer hvad den skal lave — så klarer den resten.
 
 ---
 
@@ -24,6 +24,7 @@ Når du åbner Agenten, ser du flere vinduer (paneler). Nederst på siden er der
 |-------|-------------|
 | **📁 Opgavetræ** | Oversigt over alle del-opgaver som Agenten har delt dit spørgsmål op i |
 | **📡 LLM Output** | Her ser du Agentens "tanker" — hvad den svarer og hvilke værktøjer den bruger |
+| **📋 Opgaveplan** | Viser Agentens succeskriterier og LLM's handlingsplan med checkboxes |
 | **📋 Agent Log** | En detaljeret log over alt hvad Agenten gør (trin for trin) |
 | **📜 Prompt Historik** | Tidligere beskeder du har sendt til Agenten |
 
@@ -43,6 +44,7 @@ Du skriver en besked i chatten, og Agenten svarer. Det er ligesom at chatte med 
 - "Find fejl i koden"
 - "Hvad gør den her funktion?"
 - "Opret en ny todo-app med Flask"
+- "Opdel api_server.py i mindre moduler (refactor)"
 - "Lav en branch, commit og push til GitHub"
 
 ---
@@ -60,7 +62,37 @@ Før du skriver din besked, kan du vælge en **skabelon** i dropdown-menuen. Ska
 | 🔀 **PR Agenten** | Når du vil oprette en Pull Request på GitHub |
 | 🐍 **Programmeringsopgave** | Når du vil have Agenten til at skrive kode til dig |
 | 🏗️ **Python Arkitektur** | Når du skal designe hvordan et program skal bygges |
-| 👤 **Agenten (3 tasks)** | Når du vil have Agenten til at undersøge noget og komme med en plan |
+| 🖼️ **Billedanalyse** | Når du vil have analyseret et billede |
+| 🔧 **Refaktorering** | Når du vil opdele en stor fil i mindre moduler (SOLID) |
+| 🧪 **Testgenerering** | Når du vil generere tests for din kode |
+| 🐛 **Bugfix (TDD)** | Når du har en fejl der skal rettes |
+| 📋 **Issue Handler** | Når du vil arbejde med issues fra listen |
+| 🔄 **Selvforbedring** | Når Agenten selv har fundet noget der skal forbedres |
+
+### 🔧 Refaktorering (detaljeret)
+
+Refactor-skabelonen bruger en 5-trins proces til at opdele store filer:
+
+1. **Analyse** — Agenten læser filen og gemmer analysen i `refactor_analyse.md`
+2. **Plan** — Agenten skriver `refactor_plan.md` med modulopdeling og symboler
+3. **Ekstraher** — Agenten flytter symboler til nye moduler med `batch_extract_symbols`
+4. **Opdatér** — Agenten rydder op i den originale fil (fjerner flyttet kode, tilføjer imports)
+5. **Test** — Kører tests for at verificere at alt virker
+
+Når du genindlæser en session, tjekker Agenten automatisk om fasens succeskriterier allerede er opfyldt (f.eks. om alle modulfiler findes). Hvis ja, springes LLM-kald over — fasen markeres "done" med det samme.
+
+---
+
+## 📋 Opgaveplan
+
+Opgaveplan-panelet viser to lister:
+
+- **🎯 Agentens succeskriterier** — Systemets krav til fasen (f.eks. "Følg refactor_plan.md", "Verificer syntaks")
+- **📋 LLM's handlingsplan** — Agentens egen plan med konkrete tool-kald, symbolnavne og rækkefølge
+
+**LLM's plan** oprettes af Agenten selv via `plan_phase` (i Analyse/Plan) eller auto-genereres fra `refactor_plan.md` (i Ekstraher/Opdatér). Du kan kopiere begge lister med **📋 Kopiér** knappen.
+
+**Forbedr planen:** Hvis du vil have Agenten til at lave en mere detaljeret plan, kan du skrive en besked i kommentarfeltet nederst i panelet — beskeden sendes direkte til Agenten.
 
 ---
 
@@ -86,6 +118,15 @@ Agenten har **værktøjer** — små programmer den kan bruge til at udføre opg
 ### 📝 Fil værktøjer
 - Læs store filer stykke for stykke (`read_chunk`)
 - **Skriv filer til disk** (`write_file`) — Agenten kan skrive kode direkte til dine filer!
+- **Redigér eksisterende filer** (`edit_file`) — præcis search-and-replace
+- **Flyt symboler mellem filer** (`extract_symbol`, `batch_extract_symbols`, `remove_symbol`, `add_import`)
+
+### 📋 Planlægningsværktøjer
+- **Opret opgaveplan** (`plan_phase`) — lav en detaljeret plan med tool-kald
+- **Tilføj todo** (`create_todo`) — tilføj trin til planen
+- **Markér todo færdig** (`update_todo`) — opdater fremdrift
+- **Fjern todo** (`delete_todo`) — fjern forældede trin
+- **Se plan** (`list_todos`) — vis både succeskriterier og handlingsplan
 
 Når Agenten skriver en `.py` fil, tjekker den automatisk:
 - ✅ **Stavefejl i koden** — opdager syntaxfejl
@@ -97,12 +138,15 @@ Når Agenten skriver en `.py` fil, tjekker den automatisk:
 ## 🧠 Hvordan virker det?
 
 1. Du skriver en besked
-2. Agenten deler opgaven op i mindre del-opgaver
-3. Agenten løser én del-opgave ad gangen
+2. Agenten deler opgaven op i mindre del-opgaver (**Nedbryd**)
+3. Hver del-opgave løses trin for trin (**Udfør**)
 4. Hvis den har brug for et værktøj, bruger den det
 5. Til sidst samler den alle svar og giver dig resultatet
 
 Det hele foregår i **real-time** — du kan følge med i hvad den laver.
+
+### Fortryd
+Under udførelse kan du klikke **↶ Fortryd** for at nulstille alle ændringer. Dette gendanner filer til sidste commit og rydder sessionens eksekveringsdata.
 
 ---
 
@@ -114,6 +158,14 @@ Du vælger sprog i dropdown-menuen øverst. Agenten svarer på samme sprog som d
 
 ---
 
+## 🖼️ Billedanalyse
+
+Upload et billede via **🖼 knappen** eller "Gennemse" + "Læs fil" før du klikker Nedbryd. Agenten analyserer billedet i 5 trin og gemmer resultatet som en `.md` fil.
+
+Understøttede formater: `.png`, `.jpg`, `.webp`, `.gif`, `.bmp`. WebP konverteres automatisk til PNG for bedre kompatibilitet.
+
+---
+
 ## 💾 Gem og genoptag
 
 Agenten gemmer automatisk alt arbejde i **sessioner**. Det betyder at:
@@ -121,20 +173,21 @@ Agenten gemmer automatisk alt arbejde i **sessioner**. Det betyder at:
 - Du kan lukke browseren og fortsætte senere
 - Du kan hente gamle sessioner frem fra listen
 - Du kan omdøbe sessioner, så du kan finde dem igen
+- LLM's opgaveplan gemmes og gendannes når sessionen indlæses
 
 ---
 
-## 🧪 Eksempel: Få Agenten til at lave en hjemmeside
+## 🧪 Eksempel: Refaktorér en stor fil
 
-1. Vælg skabelonen **"🐍 Programmeringsopgave"**
-2. Skriv: "Lav en simpel gætte-et-tal hjemmeside med Flask"
-3. Agenten laver:
-   - En plan
-   - Koden til backend (Python/Flask)
-   - Koden til frontend (HTML/JavaScript)
-   - Skriver det hele til filer via `write_file`
-4. Hvis der mangler pakker, skriver den dem automatisk i `requirements.txt`
-5. Hvis HTML'en bruger en adresse der ikke findes i Python-koden, advarer Agenten dig
+1. Vælg skabelonen **"🔧 Refaktorering"**
+2. Skriv: "Opdel api_server.py i mindre moduler efter SOLID-principperne"
+3. Agenten:
+   - **Analyserer** filen og gemmer analysen i `refactor_analyse.md`
+   - **Planlægger** modulopdeling i `refactor_plan.md`
+   - **Ekstraherer** symboler til nye `.py` filer med `batch_extract_symbols`
+   - **Opdaterer** originalfilen (fjerner flyttet kode, tilføjer imports)
+   - **Kører tests** for at verificere at alt virker
+4. Hvis du genindlæser sessionen senere, tjekker Agenten automatisk hvilke faser der allerede er udført
 
 ---
 
@@ -143,6 +196,7 @@ Agenten gemmer automatisk alt arbejde i **sessioner**. Det betyder at:
 **Agenten svarer ikke:** Tjek at LM Studio kører på `http://localhost:1234`
 **Det går for langsomt:** Prøv en mindre model i LM Studio
 **Underlig kode:** Prøv at vælge en anden model — nogle modeller er bedre til at programmere end andre
+**Filer forsvinder efter Fortryd:** Fortryd opretter en backup før nulstilling — ændringer kan gendannes via git stash
 
 ---
 
