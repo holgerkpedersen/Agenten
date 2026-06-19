@@ -3273,6 +3273,24 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
     agent._checkpoint_branch = ""
     agent._rubric_retried = False
 
+    # Quick phase-completion check: hvis deterministisk check allerede
+    # passerer (filer findes, tests består osv.), skip LLM helt.
+    # Dette gør at faser markeret "failed" pga. tidligere bugs kan
+    # auto-complete når den underliggende betingelse er opfyldt.
+    if agent.active_template:
+        try:
+            _done_passed, _done_reason = agent_phase_checks.check_phase_done(
+                agent, task_node, called_tools={},
+                tool_name="", full_response="",
+            )
+            if _done_passed:
+                agent._log("INFO", f"✅ Fase allerede opfyldt", _done_reason)
+                task_node.status = "done"
+                yield {"type": "complete", "message": _done_reason[:200]}
+                return
+        except Exception as _exc:
+            agent._log("DEBUG", f"Fast phase-check skipped: {_exc}", "")
+
     # If resuming from pause, use saved messages directly
     if saved_messages:
         messages = list(saved_messages)
