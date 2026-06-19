@@ -474,10 +474,17 @@ class TestCheckPhaseDoneExtended(unittest.TestCase):
     def test_min_text_length_dispatch(self):
         agent = FakeAgent(template="refactor")
         task = FakeTask("Analyse")
-        ok, msg = check_phase_done(agent, task, full_response="x" * 600, tool_name="read_location")
-        self.assertTrue(ok, msg)
-        self.assertIn("all_of", msg)
-        self.assertIn("2 sub-checks bestod", msg)
+        # Create refactor_analyse.md so the file_exists check passes
+        _path = "refactor_analyse.md"
+        try:
+            open(_path, "w").write("test analysis")
+            ok, msg = check_phase_done(agent, task, full_response="x" * 600, tool_name="read_location")
+            self.assertTrue(ok, msg)
+            self.assertIn("all_of", msg)
+            self.assertIn("3 sub-checks bestod", msg)
+        finally:
+            if os.path.exists(_path):
+                os.remove(_path)
 
     def test_min_text_length_fail(self):
         agent = FakeAgent(template="refactor")

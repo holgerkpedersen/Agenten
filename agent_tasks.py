@@ -479,6 +479,21 @@ def _validate_done_completion(
             yields_to_emit
         )
 
+    # Block done() in Analyse if refactor_analyse.md hasn't been written yet
+    if _phase_check == "analyse":
+        if getattr(agent, 'active_template', '') == 'refactor':
+            _analyse_path = "refactor_analyse.md"
+            _wd = os.environ.get('AGENT_WORKDIR', '')
+            if _wd:
+                _analyse_path = os.path.join(_wd, _analyse_path)
+            if not os.path.exists(_analyse_path):
+                return (
+                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du kan ikke afslutte Analyse "
+                    f"før du har gemt din analyse. Skriv til `refactor_analyse.md` med "
+                    f"**write_file(path='refactor_analyse.md', content='...')** som sidste handling.",
+                    yields_to_emit
+                )
+
     if not _check_done_pr_requirements(agent, messages, called_tools, original_prompt, task_node.name):
         if agent_git.is_pr_workflow(task_node.name):
             yields_to_emit.append(("checkpoint", {

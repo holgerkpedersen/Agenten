@@ -16,11 +16,12 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
     "refactor": {
         "Analyse": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Forst\u00e5 den store fils struktur og ansvarsomr\u00e5der. Kr\u00e6ver: mindst 500 tegn analyse + 3 funktioner l\u00e6st med read_location.",
+            "description": "FORMÅL: Forstå den store fils struktur og ansvarsområder. Kræver: mindst 500 tegn analyse + 3 funktioner læst med read_location + refactor_analyse.md gemt.",
             "description_key": "phase_check.refactor.analyse",
             "checks": [
                 {"type": "min_text_length", "min_chars": 500},
                 {"type": "tool_called", "tools": ["read_location"], "min_count": 3},
+                {"type": "file_exists", "paths": ["refactor_analyse.md"], "min_files": 1},
             ],
         },
         "Plan": {
