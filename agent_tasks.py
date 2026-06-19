@@ -1193,12 +1193,20 @@ def _save_full_context_for_refactor(agent: Any, messages: list[dict]) -> None:
     try:
         serializable = []
         for m in messages:
-            entry = {"role": m["role"]}
-            content = m.get("content", "")
-            if isinstance(content, str):
-                entry["content"] = content
-            elif isinstance(content, list):
-                entry["content"] = [p if not isinstance(p, dict) or p.get("type") != "image_url" else {"type": "image_url", "image_url": {"url": "[IMAGE]"}} for p in content]
+            role = m["role"]
+            content = m.get("content")
+            tool_calls = m.get("tool_calls")
+            # Skip empty assistant blocks (content=None, no tool_calls)
+            if role == "assistant" and not content and not tool_calls:
+                continue
+            entry = {"role": role}
+            if content:
+                if isinstance(content, str):
+                    entry["content"] = content
+                elif isinstance(content, list):
+                    entry["content"] = [p if not isinstance(p, dict) or p.get("type") != "image_url" else {"type": "image_url", "image_url": {"url": "[IMAGE]"}} for p in content]
+            if tool_calls:
+                entry["tool_calls"] = tool_calls
             serializable.append(entry)
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(serializable, f, ensure_ascii=False)
