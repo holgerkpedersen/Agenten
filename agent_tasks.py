@@ -3855,16 +3855,6 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                             yield evt
                         agent._pending_sse_events = []
                     break
-                msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=full_response)
-                if msg:
-                    agent._log("INFO", msg, "")
-                    full_response = msg
-                    _pending_flush = getattr(agent, '_pending_sse_events', None)
-                    if _pending_flush:
-                        for evt in _pending_flush:
-                            yield evt
-                        agent._pending_sse_events = []
-                    break
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id", ""),
@@ -3882,6 +3872,17 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 if _llm:
                     for tids in _match_tool_to_todos(tool_name, args_val, agent, _llm):
                         yield {"type": "llm_todo_update", "id": tids, "done": True, "text": None}
+                # Auto-advance check (EFTER todo matching så todos opdateres før break)
+                msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=full_response)
+                if msg:
+                    agent._log("INFO", msg, "")
+                    full_response = msg
+                    _pending_flush = getattr(agent, '_pending_sse_events', None)
+                    if _pending_flush:
+                        for evt in _pending_flush:
+                            yield evt
+                        agent._pending_sse_events = []
+                    break
 
                 # Inject compact progress summary after batch_extract_symbols / extract_symbol
                 if tool_name == "batch_extract_symbols" and result.get("success"):
