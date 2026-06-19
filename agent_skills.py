@@ -116,7 +116,7 @@ TEMPLATE_PHASE_ITERATION_LIMITS = {
         "Kodeimplementering": 20,
     },
     "refactor": {
-        "Analyse": 6,    # plan_phase + list_symbols + read_location(x3) + write refactor_analyse.md
+        "Analyse": 8,    # plan_phase + list_symbols + read_location(x3-5) + write refactor_analyse.md
         "Plan": 8,       # Read + write refactor_plan.md (auto-advances)
         "Ekstraher": 15, # extract_symbol does all the work in 1 call per symbol; 34+ symbols in plan
         "Opdat\u00e9r": 16,  # ~5-8 remove_symbol + add_import + verify_refactor
