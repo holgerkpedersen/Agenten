@@ -384,7 +384,12 @@ def _validate_done_output(agent: Any, result_text: str | dict, task_name: str, t
         task_name:"""
     if isinstance(result_text, dict):
         result_text = result_text.get("result", str(result_text))
-    if not isinstance(result_text, str) or len(result_text.strip()) < 50:
+    # For refactor Ekstraher/Opdatér phases, don't require long done() text —
+    # the files on disk ARE the validation. Only require 20 chars minimum.
+    _phase_v = _normalize_phase(task_name).lower()
+    _template_v = getattr(agent, 'active_template', '') or ''
+    _min_len = 20 if (_template_v == "refactor" and _phase_v in ("ekstraher", "opdatér")) else 50
+    if not isinstance(result_text, str) or len(result_text.strip()) < _min_len:
         return t(K.VALIDATION_DONE_TOO_SHORT, agent.lang).format(len(result_text) if result_text else 0)
     
     # Check success criteria if provided
@@ -533,6 +538,21 @@ def _validate_done_completion(
     missing_msg = _check_required_tools(agent, called_tools, task_node.name)
     if missing_msg:
         return (f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {missing_msg}", yields_to_emit)
+
+    # If the deterministic phase check passes, allow done() regardless of
+    # output format/shortness — the files on disk are the real proof of work.
+    _done_check_passed = False
+    try:
+        _dcp, _dcr = agent_phase_checks.check_phase_done(
+            agent, task_node, called_tools=called_tools,
+            tool_name="done", full_response=result_text,
+        )
+        if _dcp:
+            _done_check_passed = True
+    except Exception:
+        pass
+    if _done_check_passed:
+        return (None, yields_to_emit)
 
     validation_err = _validate_done_output(agent, result_text, task_node.name, task_node)
     if validation_err:
@@ -880,6 +900,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             # Determine source file from prompt
             _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
             _source_file = _src_match.group(1) if _src_match else "api_server.py"
+            agent._source_file = _source_file
             _engine = RefactoringEngine()
             _gr = _engine.suggest_module_groups(source=_source_file, max_group_size=8)
             if _gr.get("success") and _gr.get("groups"):
@@ -915,6 +936,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             import agent_files as _af
             _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
             _source_file = _src_match.group(1) if _src_match else "api_server.py"
+            agent._source_file = _source_file
             _ls = _af.list_symbols(filepath=_source_file)
             if _ls.get("success") and _ls.get("symbols"):
                 _lines = [f"\n## Symboler i {_source_file} (auto-loaded)"]
@@ -1659,7 +1681,11 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
         if template == "refactor" and has_written and "ekstraher" in _normalize_phase(task_name).lower():
             try:
                 src_file = getattr(agent, '_source_file', '') or 'api_server.py'
-                abs_src = os.path.abspath(src_file) if not os.path.isabs(src_file) else src_file
+                _wd_src = os.environ.get('AGENT_WORKDIR', '')
+                if _wd_src and not os.path.isabs(src_file):
+                    abs_src = os.path.join(_wd_src, src_file)
+                else:
+                    abs_src = src_file if os.path.isabs(src_file) else os.path.abspath(src_file)
                 sym_result = agent_files.list_symbols(abs_src)
                 if sym_result.get("success"):
                     remaining = len(sym_result.get("symbols", []))
