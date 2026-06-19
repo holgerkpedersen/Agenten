@@ -405,7 +405,16 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
             if _pm and _pm.group(1) != "api_server.py":
                 _target = _pm.group(1)
         # Only override if the target file actually exists (avoid breaking tests)
-        if _target and os.path.exists(_target if not base_dir else os.path.join(base_dir, _target)):
+        _target_exists = False
+        if _target:
+            _target_candidates = [_target]
+            if base_dir:
+                _target_candidates.insert(0, os.path.join(base_dir, _target))
+            _wd = os.environ.get('AGENT_WORKDIR', '')
+            if _wd and not base_dir:
+                _target_candidates.insert(0, os.path.join(_wd, _target))
+            _target_exists = any(os.path.exists(p) for p in _target_candidates)
+        if _target_exists:
             # Deep-replace api_server.py and {source_file} in the entire spec
             spec_str = json.dumps(spec)
             spec_str = spec_str.replace("api_server.py", _target)

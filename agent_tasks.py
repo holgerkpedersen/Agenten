@@ -2796,6 +2796,13 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
     if not todos:
         todos.append({"id": "todo_generic", "text": f"Gennemf\u00f8r fasen: {phase_name}", "done": False})
 
+    # Add verification todo — auto-marked by reconcile when check_phase_done passes
+    todos.append({
+        "id": "verify_criteria",
+        "text": "Verific\u00e9r at fasens succeskriterier er opfyldt",
+        "done": False,
+    })
+
     return todos
 
 
@@ -3285,11 +3292,16 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
             )
             if _done_passed:
                 agent._log("INFO", f"✅ Fase allerede opfyldt", _done_reason)
+                # Mark verify_criteria as done
+                yield {"type": "todo_update", "id": "verify_criteria", "done": True}
                 task_node.status = "done"
                 yield {"type": "complete", "message": _done_reason[:200]}
                 return
+            else:
+                agent._log("DEBUG", f"Fast phase-check: fase IKKE opfyldt", _done_reason[:200] if _done_reason else "ingen grund")
         except Exception as _exc:
-            agent._log("DEBUG", f"Fast phase-check skipped: {_exc}", "")
+            import traceback
+            agent._log("DEBUG", f"Fast phase-check exception: {_exc}", traceback.format_exc()[-300:])
 
     # If resuming from pause, use saved messages directly
     if saved_messages:
