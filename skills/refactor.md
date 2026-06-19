@@ -8,13 +8,13 @@ protected: true
 
 ## Refactor — SOLID-opdeling
 
-Opdel store filer i mindre moduler ved at flytte symboler. Systemet auto-indlæser `refactor_plan.md` og symbol-listen — stol på dem.
+Opdel store filer i mindre moduler ved at flytte symboler. Hver fase bygger på den forrige.
 
 ### Workflow
 
- 1. **Analyse**: Læs `refactor_plan.md` (auto-indlæst i din prompt). Den indeholder ALLE modulopdelinger og symbol-grupper. Kald IKKE `list_symbols` — du har allerede alle data.
+ 1. **Analyse**: Brug `list_symbols()` og `read_location()` for at forstå strukturen. **SIDSTE HANDLING: Gem analysen i `refactor_analyse.md` med `write_file()`** — Plan-fasen læser denne fil.
 
- 2. **Plan**: Brug `write_file()` til at skrive `refactor_plan.md` med modulnavne og hvilke symboler der flyttes til hvert modul. Systemet auto-afslutter fasen når filen findes med mindst 5 moduler.
+ 2. **Plan**: Læs `refactor_analyse.md` (auto-indlæst) for at få analysen. Brug `write_file()` til at skrive `refactor_plan.md` med modulnavne og hvilke symboler der flyttes til hvert modul. Systemet auto-afslutter fasen når filen findes.
 
  3. **Ekstraher**: Brug `batch_extract_symbols()` for at flytte symbol-grupper fra planen til nye .py filer. Ét kald per modul-gruppe. Systemet auto-afslutter når alle moduler fra planen er oprettet på disk.
 
@@ -24,7 +24,7 @@ Opdel store filer i mindre moduler ved at flytte symboler. Systemet auto-indlæs
 
 ### Regler
 
-- **Stol på planen.** `refactor_plan.md` + symbol-listen er auto-indlæst i din prompt. Du behøver IKKE `list_symbols`.
+- **Gem analysen.** `refactor_analyse.md` bruges af Plan-fasen — skriv den altid sidst i Analyse.
 - **`batch_extract_symbols` > `extract_symbol`.** Brug batch til at flytte flere symboler ad gangen til samme modul.
 - **`verify_refactor()`** efter hver batch for at tjekke syntaks.
 - **`run_tests()`** til sidst — bekræft at alle tests stadig passer.

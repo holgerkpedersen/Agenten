@@ -117,7 +117,7 @@ class TestGetMaxIterations(unittest.TestCase):
 
     def test_refactor_analyse(self):
         agent = FakeAgent([], template="refactor")
-        self.assertEqual(_get_max_iterations(agent, "Analyse"), 4)
+        self.assertEqual(_get_max_iterations(agent, "Analyse"), 6)
 
     def test_refactor_plan(self):
         agent = FakeAgent([], template="refactor")

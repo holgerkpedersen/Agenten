@@ -3409,6 +3409,15 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                             budget_msg += "\n\n💡 Du har en skabelon til planen. Gør den mere detaljeret med **create_todo** — tilføj symbolnavne og tool-kald. Brug **update_todo** for at markere fremdrift."
                         else:
                             budget_msg += "\n\n💡 Har du en plan? Brug **list_todos** for at se din status. Mangler du en plan, kald **plan_phase(fasenavn, mål)**."
+
+                # For Analyse: remind to write refactor_analyse.md if not done yet
+                if getattr(agent, 'active_template', '') == 'refactor' and _normalize_phase(task_node.name).lower() == "analyse":
+                    _apath = "refactor_analyse.md"
+                    _awd = os.environ.get('AGENT_WORKDIR', '')
+                    if _awd:
+                        _apath = os.path.join(_awd, _apath)
+                    if not os.path.exists(_apath) and i >= 1:
+                        budget_msg += "\n\n📝 **SIDSTE HANDLING: Skriv analysen til `refactor_analyse.md` med write_file()** — før du kan afslutte."
                 messages.append({"role": "user", "content": budget_msg})
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)
