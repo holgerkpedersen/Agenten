@@ -3964,9 +3964,20 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
         if parsed["type"] == "done":
             # Fix 2: Don't block DONE when edit_file failed — let _check_required_tools handle it
             if agent._tests_failed and "test" not in _normalize_phase(task_node.name).lower():
-                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med <<<DONE>>> n\u00e5r tests fejler. Ret koden med edit_file og k\u00f8r run_tests() igen indtil ALLE tests best\u00e5r.")
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med <<<DONE>>> når tests fejler. Ret koden med edit_file og kør run_tests() igen indtil ALLE tests består.")
                 messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 continue
+            # Block <<<DONE>>> in Analyse if refactor_analyse.md hasn't been written
+            _dphase = _normalize_phase(task_node.name).lower()
+            if _dphase == "analyse" and getattr(agent, 'active_template', '') == 'refactor':
+                _dpath = "refactor_analyse.md"
+                _dwd = os.environ.get('AGENT_WORKDIR', '')
+                if _dwd:
+                    _dpath = os.path.join(_dwd, _dpath)
+                if not os.path.exists(_dpath):
+                    _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du kan ikke afslutte Analyse før du har gemt din analyse. Skriv til **`refactor_analyse.md`** med write_file() først.")
+                    messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
+                    continue
             if not _check_done_pr_requirements(agent, messages, called_tools, original_prompt, task_node.name):
                 messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
                 if agent_git.is_pr_workflow(task_node.name):
