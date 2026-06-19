@@ -461,8 +461,18 @@ def _validate_done_completion(
     if agent._tests_failed and "test" not in _normalize_phase(task_node.name).lower():
         return (
             f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: DU KAN IKKE afslutte med "
-            f"<<<DONE>>>/done() n\u00e5r tests fejler. Ret koden med edit_file "
-            f"og k\u00f8r run_tests() igen indtil ALLE tests best\u00e5r.",
+            f"<<<DONE>>>/done() når tests fejler. Ret koden med edit_file "
+            f"og kør run_tests() igen indtil ALLE tests består.",
+            yields_to_emit
+        )
+
+    # Block done() in Analyse/Plan if LLM hasn't created its own plan
+    _phase_check = _normalize_phase(task_node.name).lower()
+    if _phase_check in ("analyse", "plan") and not getattr(agent, '_llm_has_planned', False):
+        return (
+            f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du kan ikke afslutte {task_node.name} "
+            f"før du har oprettet din egen opgaveplan. Kald **plan_phase(fasenavn, mål)** "
+            f"eller **create_todo** for at lave en detaljeret plan med konkrete trin.",
             yields_to_emit
         )
 
@@ -2823,7 +2833,8 @@ def _all_planned_modules_exist(args: dict) -> bool:
     is only marked done when every planned module file exists.
     """
     import os as _os
-    plan_path = os.path.join(os.getcwd(), "refactor_plan.md")
+    _wd = _os.environ.get('AGENT_WORKDIR', '') or _os.getcwd()
+    plan_path = _os.path.join(_wd, "refactor_plan.md")
     if not _os.path.exists(plan_path):
         return False
     try:
@@ -3320,13 +3331,20 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                         budget_msg += "\n\nRækkefølge: 1) list_symbols 2) extract_symbol (gentag) 3) add_function/add_method kun hvis nødvendigt 4) verify_refactor"
                 # If LLM hasn't called plan_phase yet, nudge it (from iteration 0)
                 if not getattr(agent, '_llm_has_planned', False):
-                    if i == 0:
-                        budget_msg += "\n\n🧠 " + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
-                    elif i >= 1:
-                        # Stærkere tvang: system-besked i stedet for blot budget-note
-                        msg = t(K.TODO_PLAN_NOT_CALLED, agent.lang)
-                        messages.append({"role": "system", "content": msg})
-                        budget_msg += "\n\n⛔ " + msg
+                    _has_auto_template = bool(getattr(agent, '_llm_todos', None))
+                    if _has_auto_template:
+                        # Has auto-populated template todos — nudge to detail them
+                        if i == 0:
+                            budget_msg += "\n\n🧠 Du har en skabelon til planen. Gør den mere detaljeret med **create_todo** — tilføj symbolnavne og tool-kald."
+                        elif i >= 2:
+                            budget_msg += "\n\n💡 Gør din plan mere detaljeret med **create_todo** — tilføj symbolnavne, parametre og rækkefølge."
+                    else:
+                        if i == 0:
+                            budget_msg += "\n\n🧠 " + t(K.TODO_PLAN_NOT_CALLED, agent.lang)
+                        elif i >= 1:
+                            msg = t(K.TODO_PLAN_NOT_CALLED, agent.lang)
+                            messages.append({"role": "system", "content": msg})
+                            budget_msg += "\n\n⛔ " + msg
                 # Also nudge to update_todo if LLM isn't marking progress
                 elif i >= 1:
                     _any_updated = any(t.get("done") for t in (getattr(agent, '_llm_todos') or []))
