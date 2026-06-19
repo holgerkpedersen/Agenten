@@ -1693,7 +1693,10 @@ async function markTaskDone(path, status) {
             }
             updateTreeDisplay();
             addLogEntry('INFO', `Opgave markeret: ${data.task}`, `${label} (sti: ${path})`);
-            await saveCurrentSession();
+        await saveCurrentSession();
+        // Re-enable buttons
+        document.getElementById('executeBtn').disabled = false;
+        document.getElementById('decomposeBtn').disabled = false;
         } else {
             alert('Fejl: ' + (data.error || 'Ukendt'));
         }
@@ -2897,6 +2900,10 @@ async function decompose() {
         return;
     }
     
+    // Disable both buttons while decomposing
+    document.getElementById('executeBtn').disabled = true;
+    document.getElementById('decomposeBtn').disabled = true;
+    
     const logBox = document.getElementById('logContent');
     if (logBox) logBox.innerHTML = '';
     
@@ -2967,6 +2974,8 @@ async function decompose() {
         addLogEntry('ERROR', 'Nedbrydning fejlede', data.error);
         alert(data.error || 'Ukendt fejl');
     }
+    document.getElementById('executeBtn').disabled = false;
+    document.getElementById('decomposeBtn').disabled = false;
 }
 
 function _guardExecution(msg) {
