@@ -19,6 +19,7 @@ from lang import t, get_ui_translations
 from i18n import K
 from agent_files import _is_safe_path
 from agent_phase_checks import TEMPLATE_PHASE_CHECKS, check_phase_done
+from agent_tasks import _normalize_phase
 from config import get_logger, log
 import agent_issues
 import agent_autoresearch
