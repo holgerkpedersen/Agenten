@@ -16,6 +16,24 @@ import agent_phase_checks
 import agent_autoresearch
 import config
 from typing import Any, Generator
+from llm_wrapper import LMStudioWrapper
+
+
+def _use_native_tools(agent: Any | None = None) -> bool:
+    """Check if native function calling should be used.
+    
+    Returns False when the model is in NATIVE_TOOLS_BLACKLIST
+    (models that don't support OpenAI function calling well),
+    even if config.NATIVE_TOOLS is True.
+    """
+    if not config.NATIVE_TOOLS:
+        return False
+    if agent is None:
+        return True
+    model = getattr(getattr(agent, 'llm', None), 'model', '')
+    if not model:
+        return True
+    return LMStudioWrapper._supports_native_tools(model)
 
 
 def _parse_test_summary(result: dict) -> str:
@@ -445,7 +463,7 @@ def _count_fix_attempts(agent: Any, called_tools: dict[str, int]) -> str | None:
 
 def _ensure_done_tool(agent: Any) -> None:
     """Tilføj 'done' til active_tools hvis NATIVE_TOOLS er slået til."""
-    if not config.NATIVE_TOOLS:
+    if not _use_native_tools(agent):
         return
     # active_tools=None means ALL tools — done is already registered, so nothing to do
     if agent.tool_registry.active_tools is None:
@@ -1080,7 +1098,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     if chunk_hint:
         user_guidance += chunk_hint.strip() + " "
     if tools_list:
-        if config.NATIVE_TOOLS:
+        if _use_native_tools(agent):
             user_guidance += t(K.TOOL_CONTINUATION_NATIVE, agent.lang).format(tools_list=tools_list)
         else:
             user_guidance += t(K.TOOL_CONTINUATION, agent.lang).format(tools_list=tools_list, TOOL_MARKER=agent.tool_registry.TOOL_MARKER, DONE_MARKER=agent.tool_registry.DONE_MARKER)
@@ -1409,7 +1427,7 @@ def _cont_hint(agent: Any, tools_list: str) -> str:
     Args:
         agent:
         tools_list:"""
-    if config.NATIVE_TOOLS:
+    if _use_native_tools(agent):
         return t(K.TOOL_CONTINUATION_NATIVE, agent.lang).format(tools_list=tools_list)
     return t(K.TOOL_CONTINUATION, agent.lang).format(tools_list=tools_list, TOOL_MARKER=agent.tool_registry.TOOL_MARKER, DONE_MARKER=agent.tool_registry.DONE_MARKER)
 
@@ -3417,7 +3435,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
         _report_logs = len(agent.agent_log)
 
         response = ""
-        tool_defs = agent.tool_registry.get_openai_tools_for_active() if config.NATIVE_TOOLS else []
+        tool_defs = agent.tool_registry.get_openai_tools_for_active() if _use_native_tools(agent) else []
         tools_param = tool_defs if tool_defs else None
         try:
             msg_count = len(messages)
@@ -3599,7 +3617,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                         if write_tools:
                             # Prune active_tools to WRITE_TOOLS only — LLM cannot read anymore
                             agent.tool_registry.active_tools = write_tools
-                            tools_param = agent.tool_registry.get_openai_tools_for_active() if config.NATIVE_TOOLS else []
+                            tools_param = agent.tool_registry.get_openai_tools_for_active() if _use_native_tools(agent) else []
                             reminder = (
                                 f"[SYSTEM: Du er i en l\u00f8kke med identiske resultater. "
                                 f"KUN skrivev\u00e6rkt\u00f8jer er tilg\u00e6ngelige nu: "
@@ -4118,13 +4136,13 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
         if parsed["type"] == "error":
             consecutive_errors += 1
             if consecutive_errors >= 3:
-                if config.NATIVE_TOOLS:
+                if _use_native_tools(agent):
                     yield {"type": "error", "message": f"3 consecutive format errors — stopping. Use the available tools to complete the task."}
                 else:
                     yield {"type": "error", "message": f"3 consecutive format errors — stopping. Use format: {agent.tool_registry.TOOL_MARKER}{{\"tool\":\"...\",\"args\":{{...}}}}{agent.tool_registry.END_MARKER} or {agent.tool_registry.DONE_MARKER}{{...}}{agent.tool_registry.END_MARKER}"}
                 break
             if consecutive_errors == 1:
-                if config.NATIVE_TOOLS:
+                if _use_native_tools(agent):
                     hint = f"{t(K.SYS_USE_AVAILABLE_TOOLS, agent.lang)}: {', '.join(list(called_tools.keys())[:3]) if called_tools else ', '.join(agent.tool_registry.active_tools[:3])}"
                 else:
                     hint = f"Write your response in the correct format: {agent.tool_registry.TOOL_MARKER}{{\"tool\":\"{list(called_tools.keys())[0] if called_tools else 'write_file'}\",\"args\":{{...}}}}{agent.tool_registry.END_MARKER}"
@@ -4143,7 +4161,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     full_response = text_fallback
                     break
             if parsed["type"] == "text":
-                if not config.NATIVE_TOOLS:
+                if not _use_native_tools(agent):
                     tool_for_msg = agent.tool_registry.active_tools[0] if agent.tool_registry.active_tools else t(K.SYS_FALLBACK_TOOL, agent.lang)
                     _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.FIRST_TOOL_REQUIRED, agent.lang).format(tool=tool_for_msg)}")
                 messages = _truncate_messages(messages, agent.max_conversation_chars, agent)

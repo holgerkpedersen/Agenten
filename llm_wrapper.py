@@ -98,6 +98,12 @@ class LMStudioWrapper:
             return base64.b64encode(f.read()).decode("utf-8")
 
     VISION_KEYWORDS = ["vision", "vl", "gemma", "qwen", "llava", "gpt", "claude", "gemini"]
+    # Models that DON'T support OpenAI native function calling well.
+    # The system falls back to text-mode tools (<<<TOOL>>> markers)
+    # when the active model matches one of these prefixes.
+    NATIVE_TOOLS_BLACKLIST: list[str] = [
+        "nex-n2-mini",       # Model claims tool support but produces garbled responses
+    ]
 
     IMAGE_FORMATS = {
         "qwen": "data_url",
@@ -114,6 +120,19 @@ class LMStudioWrapper:
         if not model:
             return False
         return any(kw in model.lower() for kw in cls.VISION_KEYWORDS)
+
+    @classmethod
+    def _supports_native_tools(cls, model: str | None) -> bool:
+        """Check if a model supports OpenAI native function calling.
+        
+        Returns False when the model name matches an entry in
+        NATIVE_TOOLS_BLACKLIST, causing the system to fall back
+        to text-mode tool markers (<<<TOOL>>>).
+        """
+        if not model:
+            return True
+        model_lower = model.lower()
+        return not any(banned in model_lower for banned in cls.NATIVE_TOOLS_BLACKLIST)
 
     @classmethod
     def _image_url(cls, img: str | dict[str, str], model: str | None = None) -> str:
