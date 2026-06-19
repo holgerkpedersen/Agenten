@@ -1428,6 +1428,33 @@ function renderLogDetail(detail) {
     ">[${_('show_detail')}]</span><pre id="${id}" class="log-detail-content">${escapeHtml(detail)}</pre>`;
 }
 
+function expandAllLogs() {
+    const hd = _('hide_detail');
+    document.querySelectorAll('.log-detail-content').forEach(el => el.classList.add('open'));
+    document.querySelectorAll('.log-detail-toggle').forEach(el => { el.textContent = '[' + hd + ']'; });
+}
+
+function collapseAllLogs() {
+    const sd = _('show_detail');
+    document.querySelectorAll('.log-detail-content').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('.log-detail-toggle').forEach(el => { el.textContent = '[' + sd + ']'; });
+}
+
+function copyAllLogs() {
+    const logBox = document.getElementById('logContent');
+    if (!logBox) return;
+    const text = logBox.innerText || logBox.textContent;
+    if (!text.trim()) return;
+    navigator.clipboard.writeText(text.trim()).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text.trim();
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    });
+}
+
 function addLogEntry(level, message, detail) {
     const logBox = document.getElementById('logContent');
     if (!logBox) return;
@@ -2240,7 +2267,8 @@ function createPanels() {
                 <div id="outputFilesContainer"></div>
             `;
         } else if (def.id === 'log') {
-            contentDiv.innerHTML = '<div id="logContent" class="log-box"><div style="color: #64748b;"></div></div>';
+            contentDiv.innerHTML = '<div style="display:flex;gap:4px;padding:2px 6px;border-bottom:1px solid var(--border);font-size:11px;"><button onclick="expandAllLogs()" style="background:none;border:none;cursor:pointer;padding:1px 4px;color:var(--text);" title="Expand All">⬇ Expand</button><button onclick="collapseAllLogs()" style="background:none;border:none;cursor:pointer;padding:1px 4px;color:var(--text);" title="Collapse All">⬆ Collapse</button><button onclick="copyAllLogs()" style="background:none;border:none;cursor:pointer;padding:1px 4px;color:var(--text);" title="Copy All">📋 Copy</button></div>' +
+                '<div id="logContent" class="log-box"><div style="color: #64748b;"></div></div>';
         } else if (def.id === 'history') {
             contentDiv.innerHTML = '<div id="historyContent" class="history-box"><div style="color: #64748b;"></div></div>';
         } else if (def.id === 'todos') {
