@@ -77,7 +77,7 @@ else:
 LM_PORT = _LM_PORT
 LLM_MODEL = os.environ.get("LM_MODEL", "qwen3.5-9b-mtp")
 LLM_STREAM_TIMEOUT = 900
-LLM_CONNECT_TIMEOUT = 30
+LLM_CONNECT_TIMEOUT = 120
 
 # Image upload
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB max per image file
