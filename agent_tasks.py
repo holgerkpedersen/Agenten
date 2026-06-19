@@ -797,11 +797,12 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
                         agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(phase_name.lower(), "") or \
                         agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(phase_name, "") or \
                         agent_skills.SECTION_INSTRUCTIONS.get(agent.active_template, {}).get(_normalize_phase(phase_name), "")
-    # Replace hardcoded api_server.py in section instructions with actual target file
-    if section_instr and "api_server.py" in section_instr:
+    # Replace {source_file} placeholder in section instructions with the actual
+    # target file from the prompt (e.g. refac_test.py).
+    if section_instr and "{source_file}" in section_instr:
         _file_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
-        if _file_match and _file_match.group(1) != "api_server.py":
-            section_instr = section_instr.replace("api_server.py", _file_match.group(1))
+        if _file_match:
+            section_instr = section_instr.replace("{source_file}", _file_match.group(1))
     criteria_block = ""
     header = t(K.CRITERIA_HEADER, agent.lang)
     if task_node.success_criteria:
