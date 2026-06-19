@@ -43,18 +43,22 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
     is preserved and ``steps`` is merged in as additional todos.
     """
     todos = _ensure_llm_todos(agent)
-    # If LLM already has a plan (preserved from retry), merge steps in
-    # instead of clearing everything.
-    if getattr(agent, '_llm_has_planned', False) and agent._llm_todos:
+    # If LLM already has a plan (preserved from retry or auto-populated template),
+    # merge steps in instead of clearing everything.
+    if agent._llm_todos:
         if steps and steps.strip():
             lines = [s.strip() for s in steps.strip().split("\n") if s.strip()]
             for line in lines:
+                # Skip if duplicate text already exists
+                if any(t.get("text","").strip() == line for t in agent._llm_todos):
+                    continue
                 todo_id = "lt_" + uuid.uuid4().hex[:8]
                 agent._llm_todos.append({
                     "id": todo_id, "text": line, "done": False,
                     "parent_id": None, "phase": phase_name,
                 })
                 _emit(agent, "llm_todo_add", {"id": todo_id, "text": line, "parent_id": None})
+        agent._llm_has_planned = True
         return {
             "success": True,
             "todos": list(agent._llm_todos),
@@ -99,8 +103,16 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
 
 
 def _create_todo(agent: Any, text: str, parent_id: str | None = None) -> dict[str, Any]:
-    """Add a new todo item to the LLM's personal plan."""
+    """Add a new todo item to the LLM's personal plan.
+    
+    Skips duplicates: if an existing LLM todo has the same text, returns
+    that todo's ID instead of creating a new one.
+    """
     todos = _ensure_llm_todos(agent)
+    # Check for duplicate text (case-insensitive)
+    for existing in todos:
+        if existing.get("text", "").strip().lower() == text.strip().lower():
+            return {"success": True, "id": existing["id"], "text": existing["text"], "done": existing.get("done", False), "duplicate": True}
     todo_id = "lt_" + uuid.uuid4().hex[:8]
     entry = {
         "id": todo_id,
