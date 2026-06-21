@@ -114,6 +114,26 @@ def _save_llm_log_file(agent: Any, task_name: str, iteration: int, content: str)
     return filepath
 
 
+def _resolve_refactor_plan_path(agent, plan_file="refactor_plan.md"):
+    """Resolve refactor plan path against AGENT_WORKDIR.
+    
+    Tries workdir-relative first, then falls back to agent._refactor_plan_path.
+    Returns the correct absolute path or empty string if not found.
+    """
+    wd_resolve = os.environ.get('AGENT_WORKDIR', '')
+    if wd_resolve:
+        refac_plan_path = os.path.join(wd_resolve, plan_file)
+    else:
+        refac_plan_path = plan_file
+    if not os.path.exists(refac_plan_path):
+        refac_plan_path = getattr(agent, '_refactor_plan_path', '')
+        if not refac_plan_path and plan_file:
+            refac_plan_path = plan_file
+        if refac_plan_path and not os.path.isabs(refac_plan_path) and wd_resolve:
+            refac_plan_path = os.path.join(wd_resolve, refac_plan_path)
+    return refac_plan_path if (refac_plan_path and os.path.exists(refac_plan_path)) else ""
+
+
 def _check_import_placement(filepath: str) -> str | None:
     """Check if any import statements are inside functions/classes.
     Returns a warning message if found, None otherwise."""
@@ -265,8 +285,8 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
     Reads refactor_plan.md + AST of source/target modules so the LLM
     sees EXACTLY which symbols need extraction/cleanup.
     """
-    plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
-    if not os.path.exists(plan_path):
+    plan_path = _resolve_refactor_plan_path(agent, "refactor_plan.md")
+    if not plan_path or not os.path.exists(plan_path):
         return ""
 
     modules = agent_phase_checks._parse_refactor_plan_modules(plan_path)
@@ -3319,7 +3339,7 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
 
     # ── Refactor-template: file-based todos from refactor_plan.md ──
     if template == 'refactor' and phase in ('plan', 'ekstraher', 'opdatering', 'opdatér', 'opdater'):
-        plan_path = getattr(agent, '_refactor_plan_path', '') or 'refactor_plan.md'
+        plan_path = _resolve_refactor_plan_path(agent, 'refactor_plan.md')
         if not _os.path.isabs(plan_path):
             _wd = _os.environ.get('AGENT_WORKDIR', '')
             if _wd:
@@ -3459,8 +3479,10 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
         _analyse_path = "refactor_analyse.md"
         _wd_check = os.environ.get('AGENT_WORKDIR', '')
         if _wd_check:
-            _analyse_path = os.path.join(_wd_check, _analyse_path)
-        if not os.path.exists(_analyse_path):
+            _analyse_path_abs = os.path.join(_wd_check, _analyse_path)
+        else:
+            _analyse_path_abs = _analyse_path
+        if not os.path.exists(_analyse_path_abs):
             _msg = (f"Analyse-fasen har ikke produceret `refactor_analyse.md`. "
                     f"Plan kan ikke køre uden analysen. Genstart refactor-processen.")
             agent._log("ERROR", "Plan prerequisite missing", _msg)
@@ -3470,11 +3492,20 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
 
     # Prerequisite check: Ekstraher requires refactor_plan.md from Plan
     if agent.active_template == "refactor" and _normalize_phase(task_node.name) == "ekstraher":
-        _plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
         _wd_check = os.environ.get('AGENT_WORKDIR', '')
-        if _wd_check and not os.path.isabs(_plan_path):
-            _plan_path = os.path.join(_wd_check, _plan_path)
-        if not os.path.exists(_plan_path):
+        if _wd_check:
+            _plan_path = os.path.join(_wd_check, "refactor_plan.md")
+        else:
+            _plan_path = "refactor_plan.md"
+        _check_ok = os.path.exists(_plan_path)
+        if not _check_ok:
+            # Fallback: check _refactor_plan_path (may point to session-scoped dir)
+            _alt = getattr(agent, '_refactor_plan_path', '')
+            if _alt and os.path.isabs(_alt):
+                _check_ok = os.path.exists(_alt)
+            elif _alt and _wd_check:
+                _check_ok = os.path.exists(os.path.join(_wd_check, _alt))
+        if not _check_ok:
             _msg = (f"Plan-fasen har ikke produceret `refactor_plan.md`. "
                     f"Ekstraher kan ikke køre uden planen. Genstart refactor-processen.")
             agent._log("ERROR", "Ekstraher prerequisite missing", _msg)
