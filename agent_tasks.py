@@ -2873,6 +2873,7 @@ def _check_refactor_progress(agent: Any | None = None, prompt: str = "") -> str:
     import os as _os
     import re as _re
     parts = []
+    plan_content = ""
 
     _src = _resolve_source_file(agent, prompt) if agent else "api_server.py"
 
