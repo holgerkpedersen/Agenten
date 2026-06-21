@@ -288,17 +288,8 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
                        for s in src_result["symbols"]
                        if s.get("type") in ("function", "class", "async_function")}
 
-    per_module: dict[str, list[str]] = {}
-    current_mod = None
-    for line in plan_text.splitlines():
-        m = re.match(r'^##\s*Module:\s*(\S+)', line)
-        if m:
-            current_mod = m.group(1)
-            continue
-        if current_mod and line.strip().startswith('- '):
-            sym = line.strip()[2:].strip()
-            if sym and not sym.startswith('#'):
-                per_module.setdefault(current_mod, []).append(sym)
+    from symbol_checks import _parse_plan_symbol_mapping
+    per_module = _parse_plan_symbol_mapping(plan_text)
 
     parts: list[str] = []
     parts.append(f"\n\n## STATUS: Symboler i {source_file} vs plan")
@@ -907,11 +898,20 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             except Exception as _e:
                 agent._log("DEBUG", f"Failed to auto-load refactor context: {_e}", "")
 
-    # For refactor Ekstraher phase: auto-suggest module groups from dependency graph
-    # so the LLM can start extracting immediately without re-grouping.
+    # For refactor Ekstraher phase: auto-suggest module groups from dependency graph.
+    # Only when the plan doesn't already have detailed per-module symbol lists.
     _group_block = ""
     if agent.active_template == "refactor" and task_node.name.lower() == "ekstraher":
-        try:
+        _plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
+        _plan_has_details = False
+        if os.path.exists(_plan_path):
+            try:
+                with open(_plan_path, encoding="utf-8") as _pf:
+                    _plan_has_details = bool(_parse_plan_symbol_mapping(_pf.read()))
+            except Exception:
+                pass
+        if not _plan_has_details:
+            try:
             from refactoring_engine import RefactoringEngine
             # Determine source file from prompt
             _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")

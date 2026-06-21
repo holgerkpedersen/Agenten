@@ -10,6 +10,70 @@ _DEFAULT_DUNDER = re.compile(r"^__[A-Za-z0-9_]+__$")
 import os
 
 
+def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
+    """Parse refactor plan into {module_filename: [symbol_names]}.
+
+    Handles: ## Module:, ### N. filename.py, | **file.py** | table, and
+    label-grouped bullets (- Variabler: sym1, sym2).
+    """
+    mapping: dict[str, list[str]] = {}
+    current_mod: str | None = None
+
+    for line in plan_content.splitlines():
+        # Reset on non-module headings
+        heading_m = re.match(r'^#{2,6}\s+\S', line)
+        if heading_m and '.py' not in line:
+            current_mod = None
+
+        # Format 1: ## Module: file_utils.py
+        m = re.match(r'^##\s+Module:\s*(\S+\.\w+)', line)
+        if m:
+            current_mod = m.group(1)
+            mapping.setdefault(current_mod, [])
+            continue
+
+        # Format 2: ### N. filename.py
+        m = re.match(r'^#{2,6}\s+[\d\.\)]*\s*([\w./-]+\.\w+)', line)
+        if m:
+            current_mod = m.group(1)
+            mapping.setdefault(current_mod, [])
+            continue
+
+        # Format 3: markdown table
+        m = re.match(r'^\|\s*\*{1,2}([\w./-]+\.\w+)\*{1,2}\s*\|(.+)', line)
+        if m:
+            mod = m.group(1)
+            mapping.setdefault(mod, [])
+            syms = re.findall(r'`([a-zA-Z_]\w*)`', m.group(2))
+            for s in syms:
+                if s not in mapping[mod]:
+                    mapping[mod].append(s)
+            current_mod = None
+            continue
+
+        if not line.strip():
+            continue
+
+        # Bullet items under module heading
+        stripped = line.strip()
+        prefix = '- ' if stripped.startswith('- ') else ('* ' if stripped.startswith('* ') and not stripped.startswith('**') else None)
+        if current_mod and prefix:
+            text = stripped[len(prefix):].strip()
+            text_clean = re.sub(r'\([^)]*\)', '', text)
+            label_m = re.match(r'^[a-zA-Z_]\w*:\s*', text_clean)
+            if label_m:
+                text_clean = text_clean[label_m.end():]
+            for part in text_clean.split(','):
+                part = part.strip()
+                sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                if sym_m:
+                    name = sym_m.group(1)
+                    if name and not name.startswith('__') and name not in mapping[current_mod]:
+                        mapping[current_mod].append(name)
+
+    return {k: v for k, v in mapping.items() if v}
+
+
 
 def _parse_module_symbols(path: str) -> list[dict[str, Any]]:
     """Parse a .py file and return its top-level symbols.
