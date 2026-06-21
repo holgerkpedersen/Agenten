@@ -905,45 +905,46 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         _plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
         _plan_has_details = False
         if os.path.exists(_plan_path):
+            from symbol_checks import _parse_plan_symbol_mapping as _spm
             try:
                 with open(_plan_path, encoding="utf-8") as _pf:
-                    _plan_has_details = bool(_parse_plan_symbol_mapping(_pf.read()))
+                    _plan_has_details = bool(_spm(_pf.read()))
             except Exception:
                 pass
         if not _plan_has_details:
             try:
-            from refactoring_engine import RefactoringEngine
-            # Determine source file from prompt
-            _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
-            _source_file = _src_match.group(1) if _src_match else "api_server.py"
-            agent._source_file = _source_file
-            _engine = RefactoringEngine()
-            _gr = _engine.suggest_module_groups(source=_source_file, max_group_size=8)
-            if _gr.get("success") and _gr.get("groups"):
-                # Filter groups to only include symbols that actually exist in the file
-                # (suggest_module_groups may include already-extracted symbols from imports)
-                import agent_files as _af
-                _existing = set()
-                _ls = _af.list_symbols(filepath=_source_file)
-                if _ls.get("success"):
-                    _existing = {s["name"] for s in _ls.get("symbols", [])}
-                if _existing:
-                    for _g in _gr["groups"]:
-                        _g["symbols"] = [s for s in _g.get("symbols", []) if s in _existing]
-                    _gr["groups"] = [_g for _g in _gr["groups"] if _g.get("symbols")]
+                from refactoring_engine import RefactoringEngine
+                # Determine source file from prompt
+                _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
+                _source_file = _src_match.group(1) if _src_match else "api_server.py"
+                agent._source_file = _source_file
+                _engine = RefactoringEngine()
+                _gr = _engine.suggest_module_groups(source=_source_file, max_group_size=8)
+                if _gr.get("success") and _gr.get("groups"):
+                    # Filter groups to only include symbols that actually exist in the file
+                    # (suggest_module_groups may include already-extracted symbols from imports)
+                    import agent_files as _af
+                    _existing = set()
+                    _ls = _af.list_symbols(filepath=_source_file)
+                    if _ls.get("success"):
+                        _existing = {s["name"] for s in _ls.get("symbols", [])}
+                    if _existing:
+                        for _g in _gr["groups"]:
+                            _g["symbols"] = [s for s in _g.get("symbols", []) if s in _existing]
+                        _gr["groups"] = [_g for _g in _gr["groups"] if _g.get("symbols")]
 
-                _lines = ["\n## Foresl\u00e5ede modulopdelinger (fra afh\u00e6ngighedsgraf)"]
-                for i, g in enumerate(_gr["groups"], 1):
-                    _syms = g.get("symbols", [])
-                    if isinstance(_syms, (list, tuple)):
-                        _sym_list = ", ".join(str(s) for s in _syms[:12])
-                        if len(_syms) > 12:
-                            _sym_list += f" ... (+{len(_syms)-12})"
-                        _lines.append(f"\n  Gruppe {i} ({len(_syms)} symboler): {_sym_list}")
-                _group_block = "\n".join(_lines)
-                agent._log("DEBUG", f"Auto-generated {len(_gr['groups'])} module groups for {_source_file}", "")
-        except Exception as _e:
-            agent._log("DEBUG", f"Could not suggest module groups: {_e}", "")
+                    _lines = ["\n## Foresl\u00e5ede modulopdelinger (fra afh\u00e6ngighedsgraf)"]
+                    for i, g in enumerate(_gr["groups"], 1):
+                        _syms = g.get("symbols", [])
+                        if isinstance(_syms, (list, tuple)):
+                            _sym_list = ", ".join(str(s) for s in _syms[:12])
+                            if len(_syms) > 12:
+                                _sym_list += f" ... (+{len(_syms)-12})"
+                            _lines.append(f"\n  Gruppe {i} ({len(_syms)} symboler): {_sym_list}")
+                    _group_block = "\n".join(_lines)
+                    agent._log("DEBUG", f"Auto-generated {len(_gr['groups'])} module groups for {_source_file}", "")
+            except Exception as _e:
+                agent._log("DEBUG", f"Could not suggest module groups: {_e}", "")
 
     # For refactor phases: inject full list_symbols output so model never needs to call it
     _symbols_block = ""
