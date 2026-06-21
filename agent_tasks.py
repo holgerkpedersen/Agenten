@@ -3449,6 +3449,34 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
             import traceback
             agent._log("DEBUG", f"Fast phase-check exception: {_exc}", traceback.format_exc()[-300:])
 
+    # Prerequisite check: Plan requires refactor_analyse.md from Analyse
+    if agent.active_template == "refactor" and _normalize_phase(task_node.name) == "plan":
+        _analyse_path = "refactor_analyse.md"
+        _wd_check = os.environ.get('AGENT_WORKDIR', '')
+        if _wd_check:
+            _analyse_path = os.path.join(_wd_check, _analyse_path)
+        if not os.path.exists(_analyse_path):
+            _msg = (f"Analyse-fasen har ikke produceret `refactor_analyse.md`. "
+                    f"Plan kan ikke køre uden analysen. Genstart refactor-processen.")
+            agent._log("ERROR", "Plan prerequisite missing", _msg)
+            task_node.status = "failed"
+            yield {"type": "complete", "message": _msg[:200]}
+            return
+
+    # Prerequisite check: Ekstraher requires refactor_plan.md from Plan
+    if agent.active_template == "refactor" and _normalize_phase(task_node.name) == "ekstraher":
+        _plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
+        _wd_check = os.environ.get('AGENT_WORKDIR', '')
+        if _wd_check and not os.path.isabs(_plan_path):
+            _plan_path = os.path.join(_wd_check, _plan_path)
+        if not os.path.exists(_plan_path):
+            _msg = (f"Plan-fasen har ikke produceret `refactor_plan.md`. "
+                    f"Ekstraher kan ikke køre uden planen. Genstart refactor-processen.")
+            agent._log("ERROR", "Ekstraher prerequisite missing", _msg)
+            task_node.status = "failed"
+            yield {"type": "complete", "message": _msg[:200]}
+            return
+
     # If resuming from pause, use saved messages directly
     if saved_messages:
         messages = list(saved_messages)
