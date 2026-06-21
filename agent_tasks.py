@@ -4147,7 +4147,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         yield {"type": "llm_todo_update", "id": lid, "done": True, "text": None}
 
                 messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
-                total_calls = sum(called_tools.values())
+                # Count only real-work tools toward the limit, not planning tools
+                _planning_tools = {"plan_phase", "create_todo", "update_todo", "delete_todo", "list_todos"}
+                total_calls = sum(v for k, v in called_tools.items()
+                                  if k.split("{")[0] not in _planning_tools)
                 if total_calls >= _get_max_tool_calls(task_node.name):
                     full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
                     break
