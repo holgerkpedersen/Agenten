@@ -5,7 +5,8 @@ Import facade — symboler er flyttet til moduler:
   _has_real_code, _extract_modules_from_plan, check_files_from_plan
 - text_tool_checks.py: check_text_contains, check_min_text_length,
   check_tool_called, check_code_contains
-- symbol_checks.py: _parse_module_symbols, check_symbols_covered_by_modules
+- symbol_checks.py: _parse_module_symbols, check_symbols_covered_by_modules,
+  check_plan_symbols_per_module
 - phase_engine.py: check_all_of, _resolve_phase_key, check_phase_done, check_tests_pass
 """
 
@@ -29,6 +30,7 @@ from text_tool_checks import (
 # symbol checks
 from symbol_checks import (
     _parse_module_symbols,
+    check_plan_symbols_per_module,
     check_symbols_covered_by_modules,
 )
 
@@ -58,6 +60,7 @@ __all__ = [
     "check_tool_called",
     # symbol checks
     "_parse_module_symbols",
+    "check_plan_symbols_per_module",
     "check_symbols_covered_by_modules",
     "check_tests_pass",
     # phase engine

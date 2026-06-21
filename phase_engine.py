@@ -36,7 +36,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
         },
         "Ekstraher": {
             "type": "all_of",
-            "description": "FORM\u00c5L: Opret nye modulfiler med kode fra den originale fil. Kr\u00e6ver: alle planlagte *.py-moduler oprettet + alle symboler fordelt.",
+            "description": "FORM\u00c5L: Opret nye modulfiler med kode fra den originale fil. Kr\u00e6ver: alle planlagte *.py-moduler oprettet + alle symboler fordelt + hvert modul har sine planlagte symboler.",
             "description_key": "phase_check.refactor.ekstraher",
             "checks": [
                 {
@@ -49,6 +49,12 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                 {
                     "type": "symbols_covered",
                     "source_file": "{source_file}",
+                    "plan_path": "refactor_plan.md",
+                    "ext": ".py",
+                    "exclude_patterns": [r"^__[A-Za-z0-9_]+__$"],
+                },
+                {
+                    "type": "plan_symbols_per_module",
                     "plan_path": "refactor_plan.md",
                     "ext": ".py",
                     "exclude_patterns": [r"^__[A-Za-z0-9_]+__$"],

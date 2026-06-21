@@ -225,6 +225,74 @@ def check_symbols_covered_by_modules(spec: dict[str, Any], base_dir: str | None 
     return False, f"symbols_covered: {' | '.join(parts)}"
 
 
+def check_plan_symbols_per_module(spec: dict[str, Any], base_dir: str | None = None) -> tuple[bool, str]:
+    """Return ``(passed, message)`` for a plan_symbols_per_module check.
+
+    Parses the refactor plan to get the planned symbols for each module,
+    then verifies each module file exists AND contains **all** of its
+    planned symbols. A symbol is considered present if its name appears
+    among the module's top-level definitions (AST-parsed).
+
+    This is the strictest Ekstraher check: it guarantees correct
+    placement, not just that symbols exist somewhere.
+
+    Spec keys:
+      - ``plan_path`` (default ``refactor_plan.md``) — path to plan
+      - ``ext`` (default ``.py``) — module file extension
+      - ``exclude_patterns`` (default dunder regex) — symbol names to ignore
+    """
+    base = base_dir or os.environ.get('AGENT_WORKDIR') or os.getcwd()
+    plan_rel = spec.get("plan_path", "refactor_plan.md")
+    plan_path = plan_rel if os.path.isabs(plan_rel) else os.path.join(base, plan_rel)
+    if not os.path.exists(plan_path):
+        return False, f"plan_symbols_per_module: plan {plan_path} findes ikke"
+    try:
+        with open(plan_path, encoding="utf-8") as f:
+            plan_content = f.read()
+    except OSError as e:
+        return False, f"plan_symbols_per_module: kunne ikke læse {plan_path}: {e}"
+    planning = _parse_plan_symbol_mapping(plan_content)
+    if not planning:
+        return True, "plan_symbols_per_module: planen indeholder ingen symbol-mappings (springer over)"
+
+    exclude_patterns = spec.get("exclude_patterns")
+    if exclude_patterns is None:
+        exclude_patterns = [r"^__[A-Za-z0-9_]+__$"]
+    exclude_res = [re.compile(p) for p in exclude_patterns]
+
+    missing_modules: list[str] = []
+    missing_symbols_by_module: dict[str, list[str]] = {}
+
+    for mod, planned_names in planning.items():
+        mod_path = mod if os.path.isabs(mod) else os.path.join(base, mod)
+        if not os.path.exists(mod_path):
+            missing_modules.append(mod)
+            missing_symbols_by_module[mod] = list(planned_names)
+            continue
+        syms = _parse_module_symbols(mod_path)
+        actual_names = {
+            s.get("name", "") for s in syms
+            if s.get("name", "") and not any(p.match(s.get("name", "")) for p in exclude_res)
+        }
+        missing = [n for n in planned_names if n not in actual_names]
+        if missing:
+            missing_symbols_by_module[mod] = missing
+
+    if not missing_modules and not missing_symbols_by_module:
+        sample = ", ".join(list(planning.keys())[:3])
+        return True, (
+            f"plan_symbols_per_module: alle {len(planning)} moduler har "
+            f"sine planlagte symboler (f.eks. {sample})"
+        )
+
+    parts: list[str] = []
+    if missing_modules:
+        parts.append(f"modul(er) mangler: {', '.join(missing_modules)}")
+    for mod, syms in sorted(missing_symbols_by_module.items()):
+        if syms:
+            parts.append(f"{mod} mangler: {', '.join(syms[:5])}"
+                         f"{' (+%d flere)' % (len(syms) - 5) if len(syms) > 5 else ''}")
+    return False, f"plan_symbols_per_module: {' | '.join(parts)}"
 
 
 # Phase name aliases for multi-language support.
@@ -323,6 +391,8 @@ def check_all_of(
             r = _check_tp(sub, agent=agent, tool_name=tool_name, called_tools=called_tools)
         elif sub_type == "symbols_covered":
             r = check_symbols_covered_by_modules(sub, base_dir=base_dir)
+        elif sub_type == "plan_symbols_per_module":
+            r = check_plan_symbols_per_module(sub, base_dir=base_dir)
         elif sub_type == "text_contains":
             r = check_text_contains(sub, full_response=full_response)
         else:

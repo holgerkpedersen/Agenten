@@ -3398,13 +3398,28 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
                     _planned_syms = _ekstraher_sym_map.get(mod, [])
                     if _planned_syms:
                         _src_f = _src or "source_file"
-                        _chunk_size = 8
-                        _chunks = [_planned_syms[i:i+_chunk_size] for i in range(0, len(_planned_syms), _chunk_size)]
+                        # Chunk symbols into batches of max 15 symbols or ~500 chars.
+                        # Each chunk contains COMPLETE symbols — never cut mid-symbol.
+                        _chunks: list[list[str]] = []
+                        _current: list[str] = []
+                        _current_chars = 0
+                        for _sym in _planned_syms:
+                            _sym_len = len(_sym) + 2  # ", " separator
+                            _would_exceed_count = len(_current) >= 15
+                            _would_exceed_chars = _current and _current_chars + _sym_len > 500
+                            if _would_exceed_count or _would_exceed_chars:
+                                _chunks.append(_current)
+                                _current = []
+                                _current_chars = 0
+                            _current.append(_sym)
+                            _current_chars += _sym_len
+                        if _current:
+                            _chunks.append(_current)
                         _batch_parts = []
-                        for chunk in _chunks:
-                            _sym_str = ", ".join(chunk)
+                        for _chunk in _chunks:
+                            _sym_str = ", ".join(_chunk)
                             _batch_parts.append(f"batch_extract_symbols(source='{_src_f}', symbols='{_sym_str}', target='{mod}')")
-                        _gen_text = " → ".join(_batch_parts)
+                        _gen_text = " -> ".join(_batch_parts)
                         # Tjek om ALLE planlagte symboler findes i modulet
                         # (ikke bare om filen eksisterer — kan være stale fra tidl. session)
                         if _exists:
