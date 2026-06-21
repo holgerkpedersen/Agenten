@@ -2369,6 +2369,13 @@ app.add_url_rule('/api/skillflow/apply', 'skillflow_apply', skillflow_apply, met
 app.add_url_rule('/api/skillflow/status', 'skillflow_status', skillflow_status, methods=['GET'])
 
 
+@app.errorhandler(500)
+def _log_500(e):
+    import traceback
+    config.log.error("500: %s", traceback.format_exc())
+    return jsonify({"success": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Agenten API Server')
