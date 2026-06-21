@@ -1,35 +1,26 @@
 # Refactor Eval Progress
 
 ## Baseline
-| Commit | Branch | Fixes |
-|--------|--------|-------|
-| `026f28d` | `fix/refactor-eval-baseline` | `plan_content` UnboundLocalError + 500 error handler |
-
-**Baseline score:** 62/100 (100% moduler, 37% symboler, 100% tests)
+| Commit | Score | Moduler | Symboler | Tests |
+|--------|-------|---------|----------|-------|
+| `026f28d` (baseline) | 62/100 | 100% | 37% | 100% |
 
 ---
 
 ## Forbedring #1: Fjern plan_phase fra Ekstraher tools
-**Commit:** `037128b`
-**Ændring:** `set_task_tools` fjerner `plan_phase`, `create_todo`, `delete_todo`, `list_todos` fra refactor Ekstraher.
-**Resultat:** **62/100** — uændret. Forbedring alene hjælper ikke.
+**Commit:** `037128b` | **Score:** 62/100 — uændret
 
 ---
 
 ## Forbedring #2: STATUS-blok + skip auto-grupper
-**Commit:** `10ae4de`
-**Ændringer:**
-1. `symbol_checks.py` — ny `_parse_plan_symbol_mapping()` håndterer alle plan-formater (### N., ## Module:, tabel, label-grupper)
-2. `agent_tasks.py` `_build_refactor_phase_context` — bruger `_parse_plan_symbol_mapping` i stedet for gammel parser (var tom)
-3. `agent_tasks.py` `_build_initial_messages` — skipper `suggest_module_groups` når plan allerede har detaljer
-
-**Forventet effekt:** LLM ser STATUS-blok med "config.py: DATABASE_URL, get_config, ...". Auto-genererede 8-symbol grupper vises ikke. LLM kalder én `batch_extract_symbols` per modul.
-
-**Status:** ⏳ Afventer måling
-
-**Kommando:** `python -m ai_app_improver.main --models minimax-m2.5`
+**Commit:** `4e0fe27` | **Score:** 62/100 — uændret
 
 ---
 
-## Næste steps (ikke implementeret)
-- **Forbedring #3:** Block `<<<DONE>>>` ved forkert placering
+## Konklusion
+Minimax-m2.5 placerer konsekvent 37% af symboler korrekt — uanset prompt-forbedringer. LLM'en følger sin egen interne ræsonnering, ikke STATUS-blokken. Prompt-ændringer alene er utilstrækkelige.
+
+## Næste skridt
+- Prøv **anden model** (qwen3.5 eller qwen3.6) — måske bedre til at følge instruktioner
+- Eller **check_symbols_placed_correctly** + **block `<<<DONE>>>`** (kræver mere kode)
+- Alternativt: accepter 62/100 som minimax baseline og fokuser på at forbedre via feedback-loop (LLM får at vide "count_by_key er i file_utils.py, skal være i processor.py" og retter i næste iteration)

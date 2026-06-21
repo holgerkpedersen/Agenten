@@ -606,14 +606,6 @@ def set_task_tools(agent: Any, task_name: str) -> None:
             if is_greenfield:
                 tools.sort(key=lambda t: t != "write_file")  # write_file first
         agent.tool_registry.set_active_tools(_inject_todo_tools(tools))
-        # Refactor Ekstraher: fjern planlægnings-værktøjer så LLM
-        # eksekverer planen direkte (update_todo beholdes)
-        if agent.active_template == "refactor" and "ekstraher" in _normalize_phase(task_name):
-            cur = agent.tool_registry.active_tools
-            if cur:
-                filtered = [t for t in cur
-                            if t not in ("plan_phase", "create_todo", "delete_todo", "list_todos")]
-                agent.tool_registry.set_active_tools(filtered)
         agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(agent.tool_registry.active_tools or tools))
         _ensure_done_tool(agent)
         return
@@ -629,17 +621,9 @@ def set_task_tools(agent: Any, task_name: str) -> None:
                 if is_greenfield:
                     tools.sort(key=lambda t: t != "write_file")  # write_file first
         agent.tool_registry.set_active_tools(_inject_todo_tools(tools))
-        # Refactor Ekstraher: fjern planlægnings-værktøjer så LLM
-        # eksekverer planen direkte (update_todo beholdes)
-        if agent.active_template == "refactor" and "ekstraher" in _normalize_phase(task_name):
-            cur = agent.tool_registry.active_tools
-            if cur:
-                filtered = [t for t in cur
-                            if t not in ("plan_phase", "create_todo", "delete_todo", "list_todos")]
-                agent.tool_registry.set_active_tools(filtered)
-            agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
-            _ensure_done_tool(agent)
-            return
+        agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
+        _ensure_done_tool(agent)
+        return
     # Fallback: use generic template tools if no phase-specific match
     allowed = agent_skills.TEMPLATE_TOOLS.get(agent.active_template)
     if allowed is not None:
