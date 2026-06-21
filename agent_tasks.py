@@ -2341,6 +2341,29 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
     else:
         task_node.status = "done"
 
+    # Analyse & Plan phase output for refactor: require output files
+    if task_node.status == "done" and getattr(agent, "active_template", "") == "refactor":
+        phase = _normalize_phase(task_node.name).lower()
+        _wd = os.environ.get("AGENT_WORKDIR", "")
+        if phase == "analyse":
+            _analyse_path = os.path.join(_wd, "refactor_analyse.md") if _wd else "refactor_analyse.md"
+            if not os.path.exists(_analyse_path):
+                task_node.status = "failed"
+                full_response = (
+                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Analyse-fasen afsluttede "
+                    f"UDEN at skrive `refactor_analyse.md`. Kald write_file() for at "
+                    f"gemme din analyse før du afslutter."
+                )
+        if phase == "plan":
+            _plan_path = os.path.join(_wd, "refactor_plan.md") if _wd else "refactor_plan.md"
+            if not os.path.exists(_plan_path):
+                task_node.status = "failed"
+                full_response = (
+                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Plan-fasen afsluttede "
+                    f"UDEN at skrive `refactor_plan.md`. Kald write_file() for at "
+                    f"gemme din plan før du afslutter."
+                )
+
     # For refactor Ekstraher: verify that symbols were actually removed from source,
     # not just that extract_symbol/batch_extract_symbols was called once.
     template = getattr(agent, "active_template", "")
