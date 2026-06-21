@@ -605,7 +605,13 @@ def set_task_tools(agent: Any, task_name: str) -> None:
             is_greenfield = _is_greenfield()
             if is_greenfield:
                 tools.sort(key=lambda t: t != "write_file")  # write_file first
-        agent.tool_registry.set_active_tools(_inject_todo_tools(tools))
+        tools = _inject_todo_tools(tools)
+        if _refactor_ekstraher:
+            # Fjern plan_phase/create_todo så LLM ikke laver egne
+            # position-baserede grupperinger — auto-populated todos
+            # fra _auto_populate_llm_todos har konkrete batch-kald.
+            tools = [t for t in tools if t not in ("plan_phase", "create_todo")]
+        agent.tool_registry.set_active_tools(tools)
         agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(agent.tool_registry.active_tools or tools))
         _ensure_done_tool(agent)
         return
@@ -620,14 +626,20 @@ def set_task_tools(agent: Any, task_name: str) -> None:
                 is_greenfield = _is_greenfield()
                 if is_greenfield:
                     tools.sort(key=lambda t: t != "write_file")  # write_file first
-        agent.tool_registry.set_active_tools(_inject_todo_tools(tools))
-        agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
-        _ensure_done_tool(agent)
-        return
+            tools = _inject_todo_tools(tools)
+            if _refactor_ekstraher:
+                tools = [t for t in tools if t not in ("plan_phase", "create_todo")]
+            agent.tool_registry.set_active_tools(tools)
+            agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
+            _ensure_done_tool(agent)
+            return
     # Fallback: use generic template tools if no phase-specific match
     allowed = agent_skills.TEMPLATE_TOOLS.get(agent.active_template)
     if allowed is not None:
-        agent.tool_registry.set_active_tools(_inject_todo_tools(list(allowed)))
+        tools = _inject_todo_tools(list(allowed))
+        if _refactor_ekstraher:
+            tools = [t for t in tools if t not in ("plan_phase", "create_todo")]
+        agent.tool_registry.set_active_tools(tools)
     _ensure_done_tool(agent)
 
 
@@ -3312,12 +3324,27 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
             _tgt_mods = [m for m in _all_mods if _src not in m] if _src else _all_mods
             if not _tgt_mods:
                 _tgt_mods = _all_mods
+            # Hent symbol-mapping fra planen én gang per fase (ikke per modul)
+            _ekstraher_sym_map = {}
+            if phase == "ekstraher":
+                try:
+                    with open(plan_path, encoding="utf-8") as _pf:
+                        import symbol_checks as _sc2
+                        _ekstraher_sym_map = _sc2._parse_plan_symbol_mapping(_pf.read())
+                except Exception:
+                    pass
             for mod in _tgt_mods:
                 _exists = _os.path.exists(mod)
                 _todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
                 if phase == "ekstraher":
                     _actual = _count_symbols_in_file(mod) if _exists else 0
-                    _text = f"[{_tgt_mods.index(mod)+1}/{len(_tgt_mods)}] Flyt symboler til {mod} med batch_extract_symbols"
+                    _gen_text = ""
+                    _planned_syms = _ekstraher_sym_map.get(mod, [])
+                    if _planned_syms:
+                        _sym_str = ", ".join(_planned_syms)
+                        _src_f = _src or "source_file"
+                        _gen_text = f"batch_extract_symbols(source='{_src_f}', symbols='{_sym_str}', target='{mod}')"
+                    _text = f"[{_tgt_mods.index(mod)+1}/{len(_tgt_mods)}] {_gen_text or 'Flyt symboler til ' + mod + ' med batch_extract_symbols'}"
                     if _exists and _actual > 0:
                         _text += f" ({_actual} symbols)"
                 elif phase == "plan":
@@ -3331,8 +3358,10 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
             _total_done = all(_os.path.exists(m) for m in _tgt_mods)
             agent._llm_todos.append({"id": "lt_total", "text": _total_text, "done": _total_done, "parent_id": None, "phase": phase})
             events.append({"type": "llm_todo_add", "id": "lt_total", "text": _total_text, "parent_id": None})
-            # Don't set _llm_has_planned — auto-populated todos are a template,
-            # LLM should still call plan_phase to create its OWN detailed plan.
+            # Ekstraher: auto-populated todos har konkrete batch_extract_symbols
+            # kald fra planen — LLM behøver IKKE kalde plan_phase/create_todo.
+            if phase == "ekstraher" and _ekstraher_sym_map:
+                agent._llm_has_planned = True
             return events
 
     # ── For other phases: leave LLM's plan empty — LLM creates its own ──
