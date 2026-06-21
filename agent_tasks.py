@@ -3354,9 +3354,14 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
                     _gen_text = ""
                     _planned_syms = _ekstraher_sym_map.get(mod, [])
                     if _planned_syms:
-                        _sym_str = ", ".join(_planned_syms)
                         _src_f = _src or "source_file"
-                        _gen_text = f"batch_extract_symbols(source='{_src_f}', symbols='{_sym_str}', target='{mod}')"
+                        _chunk_size = 8
+                        _chunks = [_planned_syms[i:i+_chunk_size] for i in range(0, len(_planned_syms), _chunk_size)]
+                        _batch_parts = []
+                        for chunk in _chunks:
+                            _sym_str = ", ".join(chunk)
+                            _batch_parts.append(f"batch_extract_symbols(source='{_src_f}', symbols='{_sym_str}', target='{mod}')")
+                        _gen_text = " → ".join(_batch_parts)
                         # Tjek om ALLE planlagte symboler findes i modulet
                         # (ikke bare om filen eksisterer — kan være stale fra tidl. session)
                         if _exists:
