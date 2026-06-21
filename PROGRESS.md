@@ -1,33 +1,53 @@
 # Refactor Eval Progress
 
-## Endelige resultater (commit `bfb0a06`)
+## Resultater
 
-| Model | Score | Moduler | Symbol-acc | Tests | Tid |
-|-------|-------|---------|-----------|-------|-----|
-| minimax-m2.5 | 62/100 | 100% | 37% | 100% | 24min |
-| qwen3.5-122b-a10b | 82/100 | 100% | 68% | 100% | 15min |
-| **qwen3.6-27b-mtp** 🏆 | **92.7/100** | **100%** | **88%** | **100%** | 27min |
+| Commit | qwen3.6-27b-mtp | qwen3.5-122b | minimax-m2.5 | Note |
+|--------|-----------------|--------------|--------------|------|
+| `bfb0a06` (baseline) | 92.7/100 | 82/100 | 62/100 | STATUS-blok + skip auto-grupper |
+| `1ce7f08` (fixes #3+#4) | 97.1/100 | — | — | variable detection + concrete batch todos |
+| `e103be4` (fix #4b) | afventer | — | — | symbol-completeness check |
 
-## Ny commit: `ef851e2` — fixes #3 + #4
+## Fixes implementeret
 
-### Fix #3: AI App Improver — detect variables in `parse_top_level_symbols`
-- `ast.Assign`/`ast.AnnAssign` detection added
-- Fixes false "missing symbol" for top-level config variables
-- Commit: AIAppImprover `2ffd4e5`
+| # | Commit Agenten | Commit AIAppImprover | Beskrivelse |
+|---|---------------|---------------------|-------------|
+| 1 | — | `2ffd4e5` | `parse_top_level_symbols` detekterer `ast.Assign`/`ast.AnnAssign` variable |
+| 2 | `ef851e2` | — | Auto-inject konkrete `batch_extract_symbols()` kald som todos fra plan |
+| 3 | `ef851e2` | — | Fjern `plan_phase`/`create_todo` fra Ekstraher tools |
+| 4 | `e103be4` | — | Symbol-completeness check: `_done = True` kun hvis ALLE planlagte symboler findes i filen |
+| 5 | — | `67ceb8e` | Robust `reset_testrefac`: `git restore` + `git clean -fd` + retry ved PermissionError |
 
-### Fix #4: Agenten — auto-inject batch calls + remove plan_phase from Ekstraher
-1. `_auto_populate_llm_todos` injects concrete `batch_extract_symbols()` calls with exact symbols from plan (via `_parse_plan_symbol_mapping`)
-2. `plan_phase` + `create_todo` removed from Ekstraher active tools
-3. `_llm_has_planned = True` when plan mapped → budget nudge won't suggest plan_phase
-4. Fixed latent `UnboundLocalError` in keyword-match path
-- Commit: Agenten `ef851e2` on branch `fix/refactor-eval-baseline`
+## Dybdeanalyse: Hvorfor modellerne fejler
 
-## Expected improvement
-- qwen3.6 should go from 92.7 → ~98/100 (5 config variables now detected)
-- qwen3.5/minimax should improve by following concrete todos instead of position-based groupings
+### Qwen3.6-27b-mtp (97.1/100) — 2 manglende funktioner
+`config_to_dict` og `get_allowed_extensions` mangler i config.py fordi:
+1. `config.py` eksisterede fra tidligere session (stale) — `reset_testrefac` ryddede ikke op
+2. Auto-populated todo markeret som `"done": True` pga. fil-eksistens
+3. LLM'en sprang config-ekstraktion over → kun 8/10 symboler flyttet
 
-## Next: Run evaluation
+**Fix #4b** (`e103be4`) løser dette ved at tjekke symbol-completeness, ikke bare fil-eksistens.
+
+### Minimax-m2.5 (62/100) — 37% symbol-accuracy
+batch_extract kald:
+```
+user_handler.py: get_allowed_extensions, config_to_dict, User, create_user... (config-funktioner blandet med user!)
+processor.py:    get_active_users, bulk_create_users, parse_csv, filter_records... (user-funktioner blandet med processor!)
+```
+Grupperer efter **position i kildefilen** i stedet for semantisk kategori.
+
+### Qwen3.5-122b (82/100) — 68% symbol-accuracy
+Samme position-baserede gruppering som minimax, men via `plan_phase`:
+```
+Step 2: User, create_user, find_user... → user_handler.py ✅
+Step 3: get_active_users, bulk_create_users, parse_csv, filter_records... → processor.py ❌
+```
+De 4 user-funktioner endte i processor.py fordi de stod tæt på processor-funktionerne i kildefilen.
+
+## Næste: Kør evaluering
 ```bash
 cd C:\Dev\AIAppImprover
 python -m ai_app_improver.main --models qwen3.6-27b-mtp
 ```
+
+Forventet: ~100/100 (alle 41 symboler korrekt placeret, variabler detekteret, stale filer ryddet korrekt).
