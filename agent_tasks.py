@@ -1296,6 +1296,18 @@ def _count_symbols_in_file(filepath: str) -> int:
     return 0
 
 
+def _get_symbol_names_in_file(filepath: str) -> set[str]:
+    """Get set of top-level symbol names in a Python file."""
+    try:
+        import agent_files as _af
+        result = _af.list_symbols(filepath)
+        if isinstance(result, dict) and result.get("success"):
+            return {s["name"] for s in result.get("symbols", [])}
+    except Exception:
+        pass
+    return set()
+
+
 def _detect_module_deps(module_path: str, all_modules: list[str]) -> list[str]:
     """Detect which planned modules a module depends on via imports."""
     if not os.path.exists(module_path):
@@ -3335,6 +3347,7 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
                     pass
             for mod in _tgt_mods:
                 _exists = _os.path.exists(mod)
+                _done = _exists
                 _todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
                 if phase == "ekstraher":
                     _actual = _count_symbols_in_file(mod) if _exists else 0
@@ -3344,6 +3357,11 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
                         _sym_str = ", ".join(_planned_syms)
                         _src_f = _src or "source_file"
                         _gen_text = f"batch_extract_symbols(source='{_src_f}', symbols='{_sym_str}', target='{mod}')"
+                        # Tjek om ALLE planlagte symboler findes i modulet
+                        # (ikke bare om filen eksisterer — kan være stale fra tidl. session)
+                        if _exists:
+                            _actual_names = _get_symbol_names_in_file(mod)
+                            _done = all(s in _actual_names for s in _planned_syms)
                     _text = f"[{_tgt_mods.index(mod)+1}/{len(_tgt_mods)}] {_gen_text or 'Flyt symboler til ' + mod + ' med batch_extract_symbols'}"
                     if _exists and _actual > 0:
                         _text += f" ({_actual} symbols)"
@@ -3351,11 +3369,18 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
                     _text = f"Planlæg indhold af {mod}"
                 else:
                     _text = f"Opdatér referencer i {mod}"
-                agent._llm_todos.append({"id": _todo_id, "text": _text, "done": _exists, "parent_id": None, "phase": phase})
+                agent._llm_todos.append({"id": _todo_id, "text": _text, "done": _done, "parent_id": None, "phase": phase})
                 events.append({"type": "llm_todo_add", "id": _todo_id, "text": _text, "parent_id": None})
             _n = len(_tgt_mods)
             _total_text = f"Verificér at alle {_n} moduler er korrekt oprettet" if _n != 1 else "Verificér at modulet er korrekt oprettet"
-            _total_done = all(_os.path.exists(m) for m in _tgt_mods)
+            _total_done = False
+            if phase == "ekstraher" and _ekstraher_sym_map:
+                _total_done = all(
+                    _os.path.exists(m) and all(s in _get_symbol_names_in_file(m) for s in _ekstraher_sym_map.get(m, []))
+                    for m in _tgt_mods
+                )
+            else:
+                _total_done = all(_os.path.exists(m) for m in _tgt_mods)
             agent._llm_todos.append({"id": "lt_total", "text": _total_text, "done": _total_done, "parent_id": None, "phase": phase})
             events.append({"type": "llm_todo_add", "id": "lt_total", "text": _total_text, "parent_id": None})
             # Ekstraher: auto-populated todos har konkrete batch_extract_symbols
