@@ -16,6 +16,7 @@ from agent_phase_checks import (
     check_files_from_plan,
     check_min_text_length,
     check_phase_done,
+    check_plan_symbols_covered,
     check_symbols_covered_by_modules,
     check_tests_pass,
     check_tool_called,
@@ -257,9 +258,16 @@ class TestTemplatePhaseChecksConfig(unittest.TestCase):
     def test_refactor_plan_check(self):
         cfg = TEMPLATE_PHASE_CHECKS.get("refactor", {}).get("Plan")
         self.assertIsNotNone(cfg)
-        self.assertEqual(cfg["type"], "files_from_plan")
-        self.assertEqual(cfg["plan_path"], "refactor_plan.md")
-        self.assertEqual(cfg["min_files"], 1)
+        self.assertEqual(cfg["type"], "all_of")
+        sub_types = [c.get("type") for c in cfg.get("checks", [])]
+        self.assertIn("files_from_plan", sub_types)
+        self.assertIn("plan_symbols_covered", sub_types)
+        files_spec = next(c for c in cfg["checks"] if c["type"] == "files_from_plan")
+        self.assertEqual(files_spec["plan_path"], "refactor_plan.md")
+        self.assertEqual(files_spec["min_files"], 1)
+        plan_spec = next(c for c in cfg["checks"] if c["type"] == "plan_symbols_covered")
+        self.assertEqual(plan_spec["source_file"], "{source_file}")
+        self.assertEqual(plan_spec["plan_path"], "refactor_plan.md")
 
     def test_refactor_ekstraher_check(self):
         cfg = TEMPLATE_PHASE_CHECKS.get("refactor", {}).get("Ekstraher")
@@ -746,6 +754,130 @@ class TestSymbolsCoveredByModules(unittest.TestCase):
             )
             self.assertFalse(ok)
             self.assertIn("index", msg)
+
+
+class TestCheckPlanSymbolsCovered(unittest.TestCase):
+    """Verify check_plan_symbols_covered — Plan phase gate."""
+
+    def _setup(self, tmp, source_content="", plan_content="", source_name="refac_test.py"):
+        if source_content:
+            open(os.path.join(tmp, source_name), "w", encoding="utf-8").write(source_content)
+        if plan_content:
+            open(os.path.join(tmp, "refactor_plan.md"), "w", encoding="utf-8").write(plan_content)
+
+    def test_all_symbols_covered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                source_content="def read_file():\n    pass\ndef write_file():\n    pass\ndef copy_file():\n    pass\n",
+                plan_content="### file_utils.py\n- read_file\n- write_file\n- copy_file\n",
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md"},
+                base_dir=tmp,
+            )
+            self.assertTrue(ok, msg)
+            self.assertIn("alle", msg)
+
+    def test_missing_symbols(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                source_content="def read_file():\n    pass\ndef write_file():\n    pass\ndef copy_file():\n    pass\n",
+                plan_content="### file_utils.py\n- read_file\n- write_file\n",  # copy_file missing
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md"},
+                base_dir=tmp,
+            )
+            self.assertFalse(ok)
+            self.assertIn("copy_file", msg)
+
+    def test_empty_plan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                source_content="def read_file():\n    pass\n",
+                plan_content="# Refactor Plan\n\nNo modules listed yet.\n",
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md"},
+                base_dir=tmp,
+            )
+            self.assertFalse(ok)
+            self.assertIn("ingen symbol-mappings", msg)
+
+    def test_dunders_excluded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                source_content="__all__ = ['read_file']\ndef read_file():\n    pass\n",
+                plan_content="### file_utils.py\n- read_file\n",
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md"},
+                base_dir=tmp,
+            )
+            self.assertTrue(ok, msg)
+
+    def test_missing_source_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                plan_content="### file_utils.py\n- read_file\n",
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md"},
+                base_dir=tmp,
+            )
+            self.assertFalse(ok)
+            self.assertIn("findes ikke", msg)
+
+    def test_missing_plan_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                source_content="def read_file():\n    pass\n",
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md"},
+                base_dir=tmp,
+            )
+            self.assertFalse(ok)
+            self.assertIn("findes ikke", msg)
+
+    def test_no_exclude_patterns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                source_content="VERSION = '1.0'\nALLOWED = ['read']\ndef read():\n    pass\n",
+                plan_content="### file_utils.py\n- VERSION\n- ALLOWED\n- read\n",
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md",
+                 "exclude_patterns": []},
+                base_dir=tmp,
+            )
+            self.assertTrue(ok, msg)
+
+    def test_multiple_modules_in_plan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                source_content="def read_file():\n    pass\ndef write_file():\n    pass\ndef process():\n    pass\ndef handle():\n    pass\n",
+                plan_content="### file_utils.py\n- read_file\n- write_file\n### processor.py\n- process\n- handle\n",
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md"},
+                base_dir=tmp,
+            )
+            self.assertTrue(ok, msg)
+
+    def test_ignore_unlisted_bypass(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._setup(tmp,
+                source_content="def read_file():\n    pass\n",
+                plan_content="# Empty plan\n",
+            )
+            ok, msg = check_plan_symbols_covered(
+                {"source_file": "refac_test.py", "plan_path": "refactor_plan.md",
+                 "ignore_unlisted": True},
+                base_dir=tmp,
+            )
+            self.assertTrue(ok)
+            self.assertIn("ignoreret", msg)
 
 
 class TestAllOf(unittest.TestCase):

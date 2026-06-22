@@ -155,14 +155,18 @@ class TestReadLocationRejectsNonPython(unittest.TestCase):
 
 
 class TestPlanPhaseCheckIsFilesFromPlan(unittest.TestCase):
-    """Verify Plan phase uses files_from_plan, not file_exists."""
+    """Verify Plan phase uses all_of with files_from_plan + plan_symbols_covered."""
 
-    def test_plan_uses_files_from_plan_with_min_5(self):
+    def test_plan_uses_all_of_with_files_and_symbols(self):
         from agent_phase_checks import TEMPLATE_PHASE_CHECKS
         plan_spec = TEMPLATE_PHASE_CHECKS["refactor"]["Plan"]
-        self.assertEqual(plan_spec["type"], "files_from_plan")
-        self.assertEqual(plan_spec["plan_path"], "refactor_plan.md")
-        self.assertEqual(plan_spec["min_files"], 1)
+        self.assertEqual(plan_spec["type"], "all_of")
+        subs = plan_spec.get("checks", [])
+        self.assertEqual(len(subs), 2)
+        files_spec = next(c for c in subs if c["type"] == "files_from_plan")
+        self.assertEqual(files_spec["plan_path"], "refactor_plan.md")
+        self.assertEqual(files_spec["min_files"], 1)
+        self.assertTrue(any(c["type"] == "plan_symbols_covered" for c in subs))
 
 
 if __name__ == "__main__":

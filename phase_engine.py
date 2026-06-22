@@ -26,13 +26,24 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
             ],
         },
         "Plan": {
-            "type": "files_from_plan",
-            "plan_path": "refactor_plan.md",
-            "ext": ".py",
-            "min_files": 1,
-            "source_file": "{source_file}",
-            "description": "FORMÅL: Beslut modulopdeling og skriv plan. Kræver: refactor_plan.md med mindst 1 *.py-modul.",
+            "type": "all_of",
+            "description": "FORM\u00c5L: Beslut modulopdeling og skriv plan. Kr\u00e6ver: refactor_plan.md med moduler + ALLE kildens symboler n\u00e6vnt i planen.",
             "description_key": "phase_check.refactor.plan",
+            "checks": [
+                {
+                    "type": "files_from_plan",
+                    "plan_path": "refactor_plan.md",
+                    "ext": ".py",
+                    "min_files": 1,
+                    "source_file": "{source_file}",
+                },
+                {
+                    "type": "plan_symbols_covered",
+                    "source_file": "{source_file}",
+                    "plan_path": "refactor_plan.md",
+                    "exclude_patterns": [r"^__[A-Za-z0-9_]+__$"],
+                },
+            ],
         },
         "Ekstraher": {
             "type": "all_of",

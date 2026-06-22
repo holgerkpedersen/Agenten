@@ -295,6 +295,79 @@ def check_plan_symbols_per_module(spec: dict[str, Any], base_dir: str | None = N
     return False, f"plan_symbols_per_module: {' | '.join(parts)}"
 
 
+def check_plan_symbols_covered(spec: dict[str, Any], base_dir: str | None = None) -> tuple[bool, str]:
+    """Return ``(passed, message)`` for a plan_symbols_covered check.
+
+    Verifies that EVERY top-level symbol from the source file is mentioned
+    in the refactor plan — i.e. the plan is comprehensive and no symbol
+    was forgotten. Unlike ``symbols_covered`` (Ekstraher) which checks
+    modules on disk, this checks the plan CONTENT itself.
+
+    Spec keys:
+      - ``source_file`` (required) — original .py file
+      - ``plan_path`` (default ``refactor_plan.md``) — plan to validate
+      - ``ext`` (default ``.py``) — module file extension
+      - ``exclude_patterns`` (default dunder regex) — symbol names to skip
+      - ``ignore_unlisted`` (default False) — if True, symbols not found in
+        the plan are silently ignored rather than failing the check
+    """
+    source_rel = spec.get("source_file", "")
+    if not source_rel:
+        return False, "plan_symbols_covered: source_file mangler"
+    base = base_dir or os.environ.get('AGENT_WORKDIR') or os.getcwd()
+    source_path = source_rel if os.path.isabs(source_rel) else os.path.join(base, source_rel)
+    if not os.path.exists(source_path):
+        return False, f"plan_symbols_covered: kildefil {source_path} findes ikke"
+    plan_rel = spec.get("plan_path", "refactor_plan.md")
+    plan_path = plan_rel if os.path.isabs(plan_rel) else os.path.join(base, plan_rel)
+    if not os.path.exists(plan_path):
+        return False, f"plan_symbols_covered: plan {plan_path} findes ikke"
+    try:
+        with open(plan_path, encoding="utf-8") as f:
+            plan_content = f.read()
+    except OSError as e:
+        return False, f"plan_symbols_covered: kunne ikke læse {plan_path}: {e}"
+
+    exclude_patterns = spec.get("exclude_patterns")
+    if exclude_patterns is None:
+        exclude_patterns = [r"^__[A-Za-z0-9_]+__$"]
+    exclude_res = [re.compile(p) for p in exclude_patterns]
+
+    source_symbols = _parse_module_symbols(source_path)
+    source_names: set[str] = {
+        s.get("name", "") for s in source_symbols
+        if s.get("name", "") and not any(p.match(s.get("name", "")) for p in exclude_res)
+    }
+    if not source_names:
+        return True, "plan_symbols_covered: ingen symbols at spore i kildefilen"
+
+    planning = _parse_plan_symbol_mapping(plan_content)
+    # Flatten all planned symbols from all modules into one set
+    plan_symbols: set[str] = set()
+    for syms in planning.values():
+        plan_symbols.update(syms)
+
+    if not plan_symbols:
+        ignore_unlisted = bool(spec.get("ignore_unlisted", False))
+        if ignore_unlisted:
+            return True, "plan_symbols_covered: plan indeholder ingen symbol-mappings (ignoreret)"
+        return False, "plan_symbols_covered: planen indeholder ingen symbol-mappings"
+
+    missing = sorted(source_names - plan_symbols)
+    if not missing:
+        return True, (
+            f"plan_symbols_covered: alle {len(source_names)} kildesymboler "
+            f"er nævnt i planen ({len(plan_symbols)} planlagte)"
+        )
+
+    sample = ", ".join(missing[:8])
+    more = f" (+{len(missing) - 8} flere)" if len(missing) > 8 else ""
+    return False, (
+        f"plan_symbols_covered: {len(missing)} af {len(source_names)} kildesymboler "
+        f"mangler i planen: {sample}{more}"
+    )
+
+
 # Phase name aliases for multi-language support.
 # Maps canonical (Danish) phase key → list of alias phase names in other languages.
 # Used by both backend check_phase_done() and the frontend /api/phase-checks endpoint.
@@ -393,6 +466,8 @@ def check_all_of(
             r = check_symbols_covered_by_modules(sub, base_dir=base_dir)
         elif sub_type == "plan_symbols_per_module":
             r = check_plan_symbols_per_module(sub, base_dir=base_dir)
+        elif sub_type == "plan_symbols_covered":
+            r = check_plan_symbols_covered(sub, base_dir=base_dir)
         elif sub_type == "text_contains":
             r = check_text_contains(sub, full_response=full_response)
         else:
