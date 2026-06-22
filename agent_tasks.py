@@ -17,6 +17,8 @@ import agent_autoresearch
 import config
 from typing import Any, Generator
 from llm_wrapper import LMStudioWrapper
+from config import get_logger
+log = get_logger(__name__)
 
 
 def _use_native_tools(agent: Any | None = None) -> bool:
@@ -1713,8 +1715,13 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
         inner = result.get("result", {})
         if isinstance(inner, dict) and inner.get("succeeded", 0):
             target = os.path.basename(inner.get("target", "?"))
+            source = os.path.basename(inner.get("source", "?"))
             succeeded = inner.get("succeeded", 0)
+            failed = inner.get("failed", 0)
+            total = inner.get("total", 0)
             symbols_in_batch = [r.get("symbol", "") for r in inner.get("results", []) if r.get("success")]
+            log.info("batch_extract_symbols RESULT: %s → %s (%d/%d succeeded, %d failed): %s",
+                     source, target, succeeded, total, failed, ', '.join(symbols_in_batch))
             progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
             _add_user_msg(messages, progress_msg)
 
@@ -1728,6 +1735,8 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
                     f"findes i {source_name}: {deps_str}. Ekstraher disse symboler "
                     f"først eller tilføj imports for at undgå NameError.]"
                 )
+                log.warning("batch_extract_symbols: missing deps in %s from %s: %s",
+                            target, source_name, deps_str)
                 _add_user_msg(messages, warning)
 
     checkpoint_msg = agent_git.verify_pr_step(agent, parsed["tool"], result, task_node.name, original_prompt)
@@ -4308,8 +4317,13 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     inner = result.get("result", {})
                     if isinstance(inner, dict) and inner.get("succeeded", 0):
                         target = os.path.basename(inner.get("target", "?"))
+                        source = os.path.basename(inner.get("source", "?"))
                         succeeded = inner.get("succeeded", 0)
+                        failed = inner.get("failed", 0)
+                        total = inner.get("total", 0)
                         symbols_in_batch = [r.get("symbol", "") for r in inner.get("results", []) if r.get("success")]
+                        log.info("batch_extract_symbols RESULT (native): %s → %s (%d/%d succeeded, %d failed): %s",
+                                 source, target, succeeded, total, failed, ', '.join(symbols_in_batch))
                         progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
                         messages.append({"role": "user", "content": progress_msg})
 

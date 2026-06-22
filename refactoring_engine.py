@@ -19,6 +19,9 @@ import time as _time
 from typing import Any
 from collections import defaultdict
 
+from config import get_logger
+log = get_logger(__name__)
+
 
 def _atomic_replace(src: str, dst: str, max_retries: int = 8) -> None:
     """Replace dst with src atomically, retrying on Windows file locks."""
@@ -732,6 +735,7 @@ class RefactoringEngine:
 
     def _write(self, path: str, content: str) -> None:
         path = self._resolve(path)
+        log.debug("_write: %s (%d bytes)", path, len(content))
         tmppath = path + '.tmp'
         with open(tmppath, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -754,12 +758,15 @@ class RefactoringEngine:
         """
         source = self._abs(source)
         target = self._resolve(target)
+        log.info("extract_symbol start: source=%s target=%s symbol=%s",
+                 os.path.basename(source), os.path.basename(target), symbol_name)
 
         content, lines = self._read(source)
 
         try:
             tree = ast.parse(content)
         except SyntaxError as e:
+            log.warning("extract_symbol: syntax error in source %s: %s", source, e)
             raise RefactoringError(
                 f"Syntax error in source: {e}",
                 category=RefactoringError.SYNTAX,
@@ -769,6 +776,7 @@ class RefactoringEngine:
 
         node = AstAnalyzer.find_node(tree, symbol_name)
         if node is None:
+            log.warning("extract_symbol: symbol '%s' not found in %s", symbol_name, source)
             raise RefactoringError(
                 f"Symbol '{symbol_name}' not found in {os.path.basename(source)}",
                 category=RefactoringError.SYMBOL_NOT_FOUND,
@@ -779,6 +787,9 @@ class RefactoringEngine:
         start_line, end_line = AstAnalyzer.get_symbol_lines(lines, node)
         symbol_code = '\n'.join(lines[start_line:end_line])
         symbol_type = AstAnalyzer.get_symbol_type(node)
+        log.debug("extract_symbol: source_lines=%d-%d, type=%s, code=%s",
+                  start_line + 1, end_line, symbol_type,
+                  symbol_code.strip()[:200])
 
         visitor = ImportVisitor()
         visitor.visit(node)
@@ -798,6 +809,8 @@ class RefactoringEngine:
         for imp in needed_imports:
             _imp_mod = _extract_module_from_import(imp)
             if _imp_mod and _has_back_import(_imp_mod, target):
+                log.warning("extract_symbol: circular import detected: %s imports from %s",
+                            _imp_mod, _tgt_module)
                 raise RefactoringError(
                     f"Cirkulær import: '{_imp_mod}' importerer allerede fra '{_tgt_module}'. "
                     f"Symbol '{symbol_name}' kan ikke flyttes til {os.path.basename(target)} "
@@ -812,6 +825,8 @@ class RefactoringEngine:
         if os.path.exists(target):
             with open(target, 'r', encoding='utf-8') as f:
                 existing = f.read().strip()
+            log.debug("extract_symbol: target %s exists (%d bytes), existing imports parsed",
+                      os.path.basename(target), len(existing))
         else:
             existing = ''
 
@@ -866,6 +881,7 @@ class RefactoringEngine:
             try:
                 ast.parse(target_content)
             except SyntaxError as e:
+                log.warning("extract_symbol: target syntax error after extraction: %s", e)
                 raise RefactoringError(
                     f"Target file would be syntactically invalid after extraction: {e}",
                     category=RefactoringError.TARGET_SYNTAX,
@@ -873,7 +889,25 @@ class RefactoringEngine:
                     details={"line": e.lineno, "msg": e.msg, "symbol": symbol_name}
                 )
 
+        # Kildeadvalidering: sammenlind ekstraheret kode med kilde
+        _src_check = ast.parse(content)
+        _src_node = AstAnalyzer.find_node(_src_check, symbol_name)
+        if _src_node:
+            _src_code = '\n'.join(lines[_src_node.lineno - 1:_src_node.end_lineno])
+            if _src_code.strip() != symbol_code.strip():
+                log.warning(
+                    "extract_symbol: KILDEAFVIKLING for '%s' — target (%s...) "
+                    "adskiller sig fra kilde (%s...)",
+                    symbol_name,
+                    symbol_code.strip()[:120],
+                    _src_code.strip()[:120],
+                )
+
         self._write(target, target_content)
+
+        log.info("extract_symbol OK: %s → %s (%d imports, %d lines, preview=%.80s)",
+                 symbol_name, os.path.basename(target), len(new_imports),
+                 end_line - start_line, symbol_code.strip()[:80])
 
         return {
             'success': True,
@@ -902,6 +936,7 @@ class RefactoringEngine:
         try:
             tree = ast.parse(content)
         except SyntaxError as e:
+            log.warning("remove_symbol: syntax error in %s: %s", source, e)
             raise RefactoringError(
                 f"Syntax error in source: {e}",
                 category=RefactoringError.SYNTAX,
@@ -913,6 +948,8 @@ class RefactoringEngine:
         if node is None:
             # Symbol not found — likely already extracted in a prior phase.
             # Return soft success instead of raising, so the LLM can continue.
+            log.debug("remove_symbol: %s not found in %s (already removed?)",
+                      symbol_name, os.path.basename(source))
             return {
                 'success': True,
                 'symbol': symbol_name,
@@ -927,10 +964,15 @@ class RefactoringEngine:
         try:
             CodeModifier.remove_lines(source, start_line, end_line)
         except RefactoringError as e:
+            log.warning("remove_symbol: remove_lines FAILED for %s: %s — restoring snapshot",
+                        symbol_name, e)
             snapshot.restore()
             raise
 
         remaining = self._list_symbols(source)
+        log.info("remove_symbol OK: %s removed from %s (lines %d-%d, %d symbols remain)",
+                 symbol_name, os.path.basename(source), start_line + 1, end_line,
+                 len(remaining))
 
         return {
             'success': True,
@@ -952,8 +994,10 @@ class RefactoringEngine:
         try:
             added = CodeModifier.insert_import(source, import_stmt)
         except RefactoringError as e:
+            log.warning("add_import: FAILED %s in %s: %s", import_stmt, source, e)
             raise
 
+        log.debug("add_import: %s in %s (added=%s)", import_stmt, os.path.basename(source), added)
         return {
             'success': True,
             'import_added': added,
@@ -978,8 +1022,10 @@ class RefactoringEngine:
             content, lines = self._read(source)
             ast.parse(content)
         except SyntaxError as e:
+            log.warning("verify_refactor: SYNTAX ERROR in %s: %s", source, e)
             return {'success': False, 'error': f"Syntax error: {e}"}
         except Exception as e:
+            log.warning("verify_refactor: FAILED to read/parse %s: %s", source, e)
             return {'success': False, 'error': f"Failed to read/parse: {e}"}
 
         symbols = self._list_symbols(source)
@@ -997,6 +1043,9 @@ class RefactoringEngine:
                 source_content, _ = self._read(source_for_deps)
                 local_deps = _find_unresolved_local_deps(source_content, content)
                 if local_deps:
+                    log.warning("verify_refactor: unresolved deps in %s from %s: %s",
+                                os.path.basename(source), os.path.basename(source_for_deps),
+                                ', '.join(local_deps))
                     result['warning'] = (
                         f"Filen refererer symboler der kun er defineret i "
                         f"{os.path.basename(source_for_deps)}: "
@@ -1009,6 +1058,8 @@ class RefactoringEngine:
             except (OSError, RefactoringError, SyntaxError):
                 pass
 
+        log.debug("verify_refactor: %s OK (%d lines, %d symbols)",
+                  os.path.basename(source), len(lines), len(symbols))
         return result
 
     def batch_extract_symbols(self, source: str, symbols: list[str] | str, target: str) -> dict[str, Any]:
@@ -1023,6 +1074,9 @@ class RefactoringEngine:
         hallucination: ``'["sym1", "sym2"]'``).
         """
         symbols = _parse_symbols_list(symbols)
+        log.info("batch_extract_symbols start: %d symbols %s → %s: %s",
+                 len(symbols), os.path.basename(source), os.path.basename(target),
+                 ', '.join(symbols))
         results = []
         for i, sym in enumerate(symbols):
             if i > 0:
@@ -1030,6 +1084,7 @@ class RefactoringEngine:
                 time.sleep(0.1)
             # Tjek om symbolet allerede er ekstraheret i en tidligere session
             if _is_already_extracted(source, sym):
+                log.debug("batch_extract_symbols: %s already extracted (skipped)", sym)
                 results.append({
                     "success": True,
                     "symbol": sym,
@@ -1043,6 +1098,8 @@ class RefactoringEngine:
                     _mark_extracted(source, sym)
                 results.append(r)
             except RefactoringError as e:
+                log.warning("batch_extract_symbols: %s FAILED: %s (category=%s)",
+                            sym, e, e.category)
                 results.append({
                     "success": False,
                     "symbol": sym,
@@ -1060,13 +1117,30 @@ class RefactoringEngine:
         except (OSError, RefactoringError):
             pass
 
+        _succeeded = sum(1 for r in results if r.get("success"))
+        _failed = sum(1 for r in results if not r.get("success"))
+        _skipped = sum(1 for r in results if r.get("already_extracted"))
+
+        if missing_deps:
+            log.warning("batch_extract_symbols: missing deps in target: %s",
+                        ', '.join(missing_deps))
+
+        log.info("batch_extract_symbols done: %s → %s (%d/%d succeeded, %d failed, %d skipped, deps=%d)",
+                 os.path.basename(source), os.path.basename(target),
+                 _succeeded, len(symbols), _failed, _skipped, len(missing_deps))
+        for r in results:
+            status = "OK" if r.get("success") else "FAIL"
+            extra = " (already_extracted)" if r.get("already_extracted") else ""
+            err = f" — {r['error']}" if r.get("error") else ""
+            log.debug("  %s %s%s%s", status, r["symbol"], extra, err)
+
         return {
             "success": True,
             "source": source,
             "target": target,
             "total": len(symbols),
-            "succeeded": sum(1 for r in results if r.get("success")),
-            "failed": sum(1 for r in results if not r.get("success")),
+            "succeeded": _succeeded,
+            "failed": _failed,
             "results": results,
             "missing_dependencies": missing_deps,
         }
@@ -1093,6 +1167,7 @@ class RefactoringEngine:
         target_snapshot = FileSnapshot.create(target) if target_exists else None
 
         def _rollback(error_step: str) -> dict[str, Any]:
+            log.warning("move_symbol: ROLLBACK after %s failure for %s", error_step, symbol_name)
             source_snapshot.restore()
             if target_snapshot:
                 target_snapshot.restore()
@@ -1102,10 +1177,14 @@ class RefactoringEngine:
                 except OSError:
                     pass
 
+        _t0 = _time.monotonic()
+
         # Step 1: Extract
         try:
             extract_result = self.extract_symbol(source, symbol_name, target)
+            _t_extract = _time.monotonic() - _t0
         except RefactoringError as e:
+            log.warning("move_symbol: extract FAILED for %s: %s", symbol_name, e)
             return {
                 'success': False,
                 'error': f"Extract failed: {e}",
@@ -1114,9 +1193,12 @@ class RefactoringEngine:
             }
 
         # Step 2: Remove
+        _t1 = _time.monotonic()
         try:
             remove_result = self.remove_symbol(source, symbol_name)
+            _t_remove = _time.monotonic() - _t1
         except RefactoringError as e:
+            log.warning("move_symbol: remove FAILED for %s: %s — rolling back", symbol_name, e)
             _rollback('remove')
             return {
                 'success': False,
@@ -1126,9 +1208,12 @@ class RefactoringEngine:
             }
 
         # Step 3: Add import
+        _t2 = _time.monotonic()
         try:
             import_result = self.add_import(source, target_module, short_name)
+            _t_import = _time.monotonic() - _t2
         except RefactoringError as e:
+            log.warning("move_symbol: import FAILED for %s: %s — rolling back", symbol_name, e)
             _rollback('import')
             return {
                 'success': False,
@@ -1136,6 +1221,11 @@ class RefactoringEngine:
                 'step': 'import',
                 'category': e.category,
             }
+
+        _t_total = _time.monotonic() - _t0
+        log.info("move_symbol OK: %s %s→%s (extract=%.3fs, remove=%.3fs, import=%.3fs, total=%.3fs)",
+                 symbol_name, os.path.basename(source), os.path.basename(target),
+                 _t_extract, _t_remove, _t_import, _t_total)
 
         return {
             'success': True,
