@@ -31,6 +31,16 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
         if m:
             current_mod = m.group(1)
             mapping.setdefault(current_mod, [])
+            # Check for inline symbols on the same line
+            sym_inline = re.search(r'\*{0,2}[Ss]ymbol(er|s)?\s*\(\d+\):\*{0,2}\s*(.+)', line)
+            if sym_inline:
+                for part in sym_inline.group(2).split(','):
+                    part = part.strip()
+                    sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                    if sym_m:
+                        name = sym_m.group(1)
+                        if name and not name.startswith('__') and name not in mapping[current_mod]:
+                            mapping[current_mod].append(name)
             continue
 
         # Format 1b: ## Modul N: filename.py (Danish heading with optional number)
@@ -38,6 +48,16 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
         if m:
             current_mod = m.group(1)
             mapping.setdefault(current_mod, [])
+            # Check for inline symbols on the same line
+            sym_inline = re.search(r'\*{0,2}[Ss]ymbol(er|s)?\s*\(\d+\):\*{0,2}\s*(.+)', line)
+            if sym_inline:
+                for part in sym_inline.group(2).split(','):
+                    part = part.strip()
+                    sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                    if sym_m:
+                        name = sym_m.group(1)
+                        if name and not name.startswith('__') and name not in mapping[current_mod]:
+                            mapping[current_mod].append(name)
             continue
 
         # Format 1c: **Symboler (N):** sym1, sym2,... or **Symbols (N):** sym1, sym2,...
@@ -59,6 +79,16 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
         if m:
             current_mod = m.group(1)
             mapping.setdefault(current_mod, [])
+            # Check for inline symbols on the same line
+            sym_inline = re.search(r'\*{0,2}[Ss]ymbol(er|s)?\s*\(\d+\):\*{0,2}\s*(.+)', line)
+            if sym_inline:
+                for part in sym_inline.group(2).split(','):
+                    part = part.strip()
+                    sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                    if sym_m:
+                        name = sym_m.group(1)
+                        if name and not name.startswith('__') and name not in mapping[current_mod]:
+                            mapping[current_mod].append(name)
             continue
 
         # Format 3: markdown table
