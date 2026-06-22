@@ -1593,6 +1593,31 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
             _cached = agent._list_symbols_cache[_ls_file]
             agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=parsed['tool']), f"(cached) cached result")
             return {"tool": parsed["tool"], "args": parsed.get("args", {}), "result": _cached, **({"checkpoint_msg": ""} if False else {})}
+    # Plan-deviation check: block batch_extract_symbols if symbols go to wrong module
+    if parsed["tool"] == "batch_extract_symbols" and isinstance(parsed.get("args"), dict):
+        _planned = getattr(agent, '_planned_symbols_per_target', None)
+        if _planned:
+            _target = os.path.basename(parsed["args"].get("target", ""))
+            _symbols_raw = parsed["args"].get("symbols", "")
+            _called_syms = set(s.strip() for s in _symbols_raw.split(",") if s.strip())
+            # Find which module each symbol is PLANNED for
+            _wrong = []
+            for _sym in _called_syms:
+                for _mod, _plan_syms in _planned.items():
+                    if _sym in _plan_syms and os.path.basename(_mod) != _target:
+                        _wrong.append((_sym, os.path.basename(_mod)))
+                        break
+            if _wrong:
+                _wrong_str = ", ".join(f"{s} → {m}" for s, m in _wrong[:5])
+                _deviation_msg = (
+                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: "
+                    f"Plan-deviation: {_wrong_str}\n"
+                    f"Du sender symboler til {_target} men planen siger de hører til et andet modul. "
+                    f"Ret batch kaldet til at bruge det korrekte target."
+                )
+                _add_user_msg(messages, _deviation_msg)
+                return {"tool": parsed["tool"], "args": parsed["args"],
+                        "result": {"success": False, "error": "Plan deviation blocked"}}
     result = agent.tool_registry.execute(parsed["tool"], parsed["args"])
     if parsed["tool"] == "list_symbols" and isinstance(result, dict) and result.get("success"):
         _f = (parsed.get("args") or {}).get("filepath", "")
@@ -4086,6 +4111,32 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                         yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                         continue
+                # Plan-deviation check: block batch_extract_symbols if symbols go to wrong module
+                if tool_name == "batch_extract_symbols" and isinstance(args_val, dict):
+                    _planned = getattr(agent, '_planned_symbols_per_target', None)
+                    if _planned:
+                        _target = os.path.basename(args_val.get("target", ""))
+                        _symbols_raw = args_val.get("symbols", "")
+                        _called_syms = set(s.strip() for s in _symbols_raw.split(",") if s.strip())
+                        _wrong = []
+                        for _sym in _called_syms:
+                            for _mod, _plan_syms in _planned.items():
+                                if _sym in _plan_syms and os.path.basename(_mod) != _target:
+                                    _wrong.append((_sym, os.path.basename(_mod)))
+                                    break
+                        if _wrong:
+                            _wrong_str = ", ".join(f"{s} → {m}" for s, m in _wrong[:5])
+                            _deviation_msg = (
+                                f"[SYSTEM: Plan-deviation blokeret: {_wrong_str}. "
+                                f"Disse symboler hører til et andet modul ifølge planen. "
+                                f"Ret dit batch_extract_symbols kald til at bruge det korrekte target-modul.]"
+                            )
+                            messages.append({"role": "user", "content": _deviation_msg})
+                            yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                            yield {"type": "tool_result", "tool": tool_name, "args": args_val,
+                                   "result": {"success": False, "error": "Plan deviation blocked"}}
+                            agent._log("SYSTEM", "Plan-deviation blocked", f"{_wrong_str} → {_target}")
+                            continue
                 result = agent.tool_registry.execute(tool_name, args_val)
                 if tool_name == "list_symbols" and isinstance(args_val, dict) and isinstance(result, dict) and result.get("success"):
                     agent._list_symbols_cache[args_val["filepath"]] = result
