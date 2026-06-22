@@ -4006,11 +4006,20 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                                 _add_user_msg(messages,
                                     f"[SYSTEM: {_current_target} er allerede fuldført. "
                                     f"Automatisk omdirigeret til {_next_mod}.]")
-                                # Fall through to execute with new args
+                                # Execute directly — can't fall through due to `continue` below
                                 args_val = _new_args
-                                tool_key = tool_name + str(args_val)
-                                dup_count = 0
-                                called_tools[tool_key] = 1
+                                result = agent.tool_registry.execute(tool_name, args_val)
+                                result_str = json.dumps(result, ensure_ascii=False)
+                                agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str[:500])
+                                messages.append({"role": "tool", "tool_call_id": "", "content": result_str})
+                                yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                                yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
+                                if tool_name in ("extract_symbol", "batch_extract_symbols") and isinstance(args_val, dict):
+                                    _src_cache = args_val.get("source", "")
+                                    if _src_cache in agent._list_symbols_cache:
+                                        del agent._list_symbols_cache[_src_cache]
+                                consecutive_dedups = 0
+                                continue
                             else:
                                 dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
                                 _add_user_msg(messages, dup_err)
