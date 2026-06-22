@@ -100,6 +100,71 @@ _BUILTINS_TYPING: frozenset[str] = frozenset({
 })
 
 
+def _list_top_level_symbol_names(content: str) -> set[str]:
+    """Return set of all top-level function/class/variable names in content."""
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return set()
+    names: set[str] = set()
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    names.add(t.id)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.add(node.target.id)
+    return names
+
+
+def _find_unresolved_local_deps(source_content: str, target_content: str) -> list[str]:
+    """Find names used in target_content that are local symbols in source_content.
+
+    These are names that a target file references but that are only defined
+    as top-level symbols in the source file (not builtins, not imported,
+    not defined in the target itself). This detects the case where extracting
+    a function like ``create_user() -> User`` leaves ``User`` undefined in
+    the target because ``User`` is a class in the source — not an import.
+    """
+    try:
+        source_tree = ast.parse(source_content)
+    except SyntaxError:
+        return []
+    try:
+        target_tree = ast.parse(target_content)
+    except SyntaxError:
+        return []
+
+    source_symbols = _list_top_level_symbol_names(source_content)
+
+    # Collect names defined/imported in target
+    target_defined = _list_top_level_symbol_names(target_content)
+    target_imported: set[str] = set()
+    for node in ast.walk(target_tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            target_imported |= AstAnalyzer.names_from_import_node(node)
+
+    all_known = target_defined | target_imported | _BUILTINS | _BUILTINS_TYPING
+
+    # Collect ALL Name nodes in target (except imports and definitions)
+    used_in_target: set[str] = set()
+    for node in ast.walk(target_tree):
+        if isinstance(node, ast.Name):
+            name = node.id
+            # Skip names that are being defined (target of assignment, function def, etc.)
+            # We only care about references, not definitions
+            if name not in all_known and name not in source_symbols:
+                continue
+            # Check if this is a reference (not a definition context)
+            if name not in target_defined:
+                used_in_target.add(name)
+
+    unresolved = sorted(used_in_target & source_symbols)
+    return [u for u in unresolved if u not in all_known]
+
+
 def _split_imports_from_code(content: str) -> tuple[str, str]:
     """Split file content into (imports_block, code_block).
 
@@ -719,6 +784,12 @@ class RefactoringEngine:
         visitor.visit(node)
         used_names = visitor.names
 
+        # Find lokale symbol-afhængigheder: navne brugt af symbolet som er
+        # top-level symboler i source-filen (f.eks. en klasse der refereres
+        # i type hints). Disse skal også ekstraheres for at target virker.
+        _source_symbols = _list_top_level_symbol_names(content)
+        missing_deps = sorted(used_names & _source_symbols - {symbol_name})
+
         needed_imports = ImportResolver.filter_for_symbol(content, lines, used_names)
 
         # Tjek for circular imports: hvis nogen af de nødvendige imports
@@ -815,6 +886,7 @@ class RefactoringEngine:
             'imports_added': len(new_imports),
             'imports_deduped': len(needed_imports) - len(new_imports),
             'used_names': sorted(used_names),
+            'missing_dependencies': missing_deps,
         }
 
     def remove_symbol(self, source: str, symbol_name: str) -> dict[str, Any]:
@@ -889,8 +961,14 @@ class RefactoringEngine:
             'import_line': import_stmt,
         }
 
-    def verify_refactor(self, source: str) -> dict[str, Any]:
+    def verify_refactor(self, source: str, source_for_deps: str | None = None) -> dict[str, Any]:
         """Verify a source file is syntactically valid Python.
+
+        When ``source_for_deps`` is provided (the original source file from
+        which symbols were extracted), also checks the target file for
+        unresolved name references that are only defined in the source.
+        This catches ``NameError`` scenarios (e.g. a function using a class
+        that was left behind in the source file).
 
         Returns dict with success, lines, symbols.
         """
@@ -906,12 +984,32 @@ class RefactoringEngine:
 
         symbols = self._list_symbols(source)
 
-        return {
+        result: dict[str, Any] = {
             'success': True,
             'source': source,
             'lines': len(lines),
             'symbols': symbols,
         }
+
+        # Cross-file dependency check
+        if source_for_deps:
+            try:
+                source_content, _ = self._read(source_for_deps)
+                local_deps = _find_unresolved_local_deps(source_content, content)
+                if local_deps:
+                    result['warning'] = (
+                        f"Filen refererer symboler der kun er defineret i "
+                        f"{os.path.basename(source_for_deps)}: "
+                        f"{', '.join(local_deps)}. "
+                        f"Ekstraher disse symboler eller tilføj imports for at "
+                        f"undgå NameError ved import."
+                    )
+                    result['missing_dependencies'] = local_deps
+                    result['source_for_deps'] = source_for_deps
+            except (OSError, RefactoringError, SyntaxError):
+                pass
+
+        return result
 
     def batch_extract_symbols(self, source: str, symbols: list[str] | str, target: str) -> dict[str, Any]:
         """Extract multiple symbols to a target module in a single call.
@@ -951,6 +1049,17 @@ class RefactoringEngine:
                     "error": str(e),
                     "category": e.category,
                 })
+        # Post-check: find navne i target der kun er defineret i source
+        # (f.eks. en klasse der bruges i type hints men ikke blev ekstraheret)
+        missing_deps: list[str] = []
+        try:
+            with open(self._resolve(target), 'r', encoding='utf-8') as _tf:
+                _target_content = _tf.read().replace('\r\n', '\n').replace('\r', '\n')
+            _source_content, _ = self._read(source)
+            missing_deps = _find_unresolved_local_deps(_source_content, _target_content)
+        except (OSError, RefactoringError):
+            pass
+
         return {
             "success": True,
             "source": source,
@@ -959,6 +1068,7 @@ class RefactoringEngine:
             "succeeded": sum(1 for r in results if r.get("success")),
             "failed": sum(1 for r in results if not r.get("success")),
             "results": results,
+            "missing_dependencies": missing_deps,
         }
 
     def move_symbol(self, source: str, symbol_name: str, target: str) -> dict[str, Any]:

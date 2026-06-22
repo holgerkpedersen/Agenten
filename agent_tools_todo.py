@@ -6,6 +6,7 @@ during a phase. Todos appear in the frontend alongside the auto-generated
 """
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any
 
@@ -20,6 +21,62 @@ def _ensure_llm_todos(agent: Any) -> list[dict]:
     if not hasattr(agent, '_llm_todos') or agent._llm_todos is None:
         agent._llm_todos = []
     return agent._llm_todos
+
+
+def _extract_planned_symbols_from_steps(steps: str) -> dict[str, list[str]]:
+    """Extract target→[symbols] mapping from plan_phase steps text.
+
+    Parses lines like::
+
+        batch_extract_symbols(source='...', symbols='sym1, sym2', target='mod.py')
+        batch_extract_symbols(source='...', symbols='sym1, sym2', target='mod.py') → verify_refactor
+
+    Returns dict mapping target filename → list of planned symbol names.
+    """
+    mapping: dict[str, list[str]] = {}
+
+    # Match batch_extract_symbols or extract_symbol calls with symbols= and target=
+    for line in steps.split('\n'):
+        line = line.strip()
+        # Extract target
+        tm = re.search(r"target\s*=\s*['\"]([^'\"]+)['\"]", line)
+        if not tm:
+            continue
+        target = tm.group(1)
+
+        # Extract symbols — handles: 'a, b', ['a', 'b'], "a, b"
+        sm = re.search(r"symbols\s*=\s*(.+)", line)
+        if not sm:
+            continue
+
+        symbols_str = sm.group(1).strip()
+        symbols: list[str] = []
+
+        # JSON/Python list format: ['a', 'b'] or ["a", "b"]
+        if symbols_str.startswith('['):
+            try:
+                import ast as _ast
+                # Find the matching closing bracket
+                _end = symbols_str.find(']')
+                if _end > 0:
+                    parsed = _ast.literal_eval(symbols_str[:_end+1])
+                    if isinstance(parsed, (list, tuple)):
+                        symbols = [str(s).strip() for s in parsed if str(s).strip()]
+            except (ValueError, SyntaxError):
+                pass
+
+        # Quoted comma-separated: 'a, b' or "a, b"
+        if not symbols:
+            # Match content inside quotes (single or double)
+            _qm = re.match(r"""['\"]([^'\"]+)['\"]""", symbols_str)
+            if _qm:
+                raw = _qm.group(1)
+                symbols = [s.strip() for s in raw.split(',') if s.strip()]
+
+        if symbols:
+            mapping[target] = symbols
+
+    return mapping
 
 
 def _emit(agent: Any, event_type: str, data: dict) -> None:
@@ -51,12 +108,36 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
     todos = _ensure_llm_todos(agent)
     # Clear any previous plan — start fresh every time (handles retries)
     if agent._llm_todos:
-        agent._llm_todos = []
-        _emit(agent, "llm_todo_clear", {})
+        if steps and steps.strip():
+            # Store planned symbols per target for post-call validation
+            agent._planned_symbols_per_target = _extract_planned_symbols_from_steps(steps)
+            lines = [s.strip() for s in steps.strip().split("\n") if s.strip()]
+            for line in lines:
+                # Skip if duplicate text already exists
+                if any(t.get("text","").strip() == line for t in agent._llm_todos):
+                    continue
+                todo_id = "lt_" + uuid.uuid4().hex[:8]
+                agent._llm_todos.append({
+                    "id": todo_id, "text": line, "done": False,
+                    "parent_id": None, "phase": phase_name,
+                })
+                _emit(agent, "llm_todo_add", {"id": todo_id, "text": line, "parent_id": None})
+        agent._llm_has_planned = True
+        return {
+            "success": True,
+            "todos": list(agent._llm_todos),
+            "count": len(agent._llm_todos),
+        }
+
+    # Clear previous LLM todos
+    agent._llm_todos = []
+    _emit(agent, "llm_todo_clear", {})
     agent._llm_has_planned = True
 
     # If LLM provided explicit steps, use them; otherwise create a generic plan
     if steps and steps.strip():
+        # Store planned symbols per target for post-call validation
+        agent._planned_symbols_per_target = _extract_planned_symbols_from_steps(steps)
         lines = [s.strip() for s in steps.strip().split("\n") if s.strip()]
         for line in lines:
             line = _sanitize_refactor_path(line)

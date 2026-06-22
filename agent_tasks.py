@@ -132,6 +132,26 @@ def _save_llm_log_file(agent: Any, task_name: str, iteration: int, content: str)
     return filepath
 
 
+def _resolve_refactor_plan_path(agent, plan_file="refactor_plan.md"):
+    """Resolve refactor plan path against AGENT_WORKDIR.
+    
+    Tries workdir-relative first, then falls back to agent._refactor_plan_path.
+    Returns the correct absolute path or empty string if not found.
+    """
+    wd_resolve = os.environ.get('AGENT_WORKDIR', '')
+    if wd_resolve:
+        refac_plan_path = os.path.join(wd_resolve, plan_file)
+    else:
+        refac_plan_path = plan_file
+    if not os.path.exists(refac_plan_path):
+        refac_plan_path = getattr(agent, '_refactor_plan_path', '')
+        if not refac_plan_path and plan_file:
+            refac_plan_path = plan_file
+        if refac_plan_path and not os.path.isabs(refac_plan_path) and wd_resolve:
+            refac_plan_path = os.path.join(wd_resolve, refac_plan_path)
+    return refac_plan_path if (refac_plan_path and os.path.exists(refac_plan_path)) else ""
+
+
 def _check_import_placement(filepath: str) -> str | None:
     """Check if any import statements are inside functions/classes.
     Returns a warning message if found, None otherwise."""
@@ -283,8 +303,8 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
     Reads refactor_plan.md + AST of source/target modules so the LLM
     sees EXACTLY which symbols need extraction/cleanup.
     """
-    plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
-    if not os.path.exists(plan_path):
+    plan_path = _resolve_refactor_plan_path(agent, "refactor_plan.md")
+    if not plan_path or not os.path.exists(plan_path):
         return ""
 
     modules = agent_phase_checks._parse_refactor_plan_modules(plan_path)
@@ -306,17 +326,8 @@ def _build_refactor_phase_context(agent: Any, source_file: str = "api_server.py"
                        for s in src_result["symbols"]
                        if s.get("type") in ("function", "class", "async_function")}
 
-    per_module: dict[str, list[str]] = {}
-    current_mod = None
-    for line in plan_text.splitlines():
-        m = re.match(r'^##\s*Module:\s*(\S+)', line)
-        if m:
-            current_mod = m.group(1)
-            continue
-        if current_mod and line.strip().startswith('- '):
-            sym = line.strip()[2:].strip()
-            if sym and not sym.startswith('#'):
-                per_module.setdefault(current_mod, []).append(sym)
+    from symbol_checks import _parse_plan_symbol_mapping
+    per_module = _parse_plan_symbol_mapping(plan_text)
 
     parts: list[str] = []
     parts.append(f"\n\n## STATUS: Symboler i {source_file} vs plan")
@@ -632,8 +643,14 @@ def set_task_tools(agent: Any, task_name: str) -> None:
             is_greenfield = _is_greenfield()
             if is_greenfield:
                 tools.sort(key=lambda t: t != "write_file")  # write_file first
-        agent.tool_registry.set_active_tools(_inject_todo_tools(tools))
-        agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
+        tools = _inject_todo_tools(tools)
+        if _refactor_ekstraher:
+            # Fjern plan_phase/create_todo så LLM ikke laver egne
+            # position-baserede grupperinger — auto-populated todos
+            # fra _auto_populate_llm_todos har konkrete batch-kald.
+            tools = [t for t in tools if t not in ("plan_phase", "create_todo")]
+        agent.tool_registry.set_active_tools(tools)
+        agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(agent.tool_registry.active_tools or tools))
         _ensure_done_tool(agent)
         return
     for keyword, tools_kv in template_tools.items():
@@ -647,14 +664,20 @@ def set_task_tools(agent: Any, task_name: str) -> None:
                 is_greenfield = _is_greenfield()
                 if is_greenfield:
                     tools.sort(key=lambda t: t != "write_file")  # write_file first
-            agent.tool_registry.set_active_tools(_inject_todo_tools(tools))
+            tools = _inject_todo_tools(tools)
+            if _refactor_ekstraher:
+                tools = [t for t in tools if t not in ("plan_phase", "create_todo")]
+            agent.tool_registry.set_active_tools(tools)
             agent._log("TOOL", f"Aktive tools for '{task_name[:40]}'", ', '.join(tools))
             _ensure_done_tool(agent)
             return
     # Fallback: use generic template tools if no phase-specific match
     allowed = agent_skills.TEMPLATE_TOOLS.get(agent.active_template)
     if allowed is not None:
-        agent.tool_registry.set_active_tools(_inject_todo_tools(list(allowed)))
+        tools = _inject_todo_tools(list(allowed))
+        if _refactor_ekstraher:
+            tools = [t for t in tools if t not in ("plan_phase", "create_todo")]
+        agent.tool_registry.set_active_tools(tools)
     _ensure_done_tool(agent)
 
 
@@ -909,43 +932,53 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             except Exception as _e:
                 agent._log("DEBUG", f"Failed to auto-load refactor context: {_e}", "")
 
-    # For refactor Ekstraher phase: auto-suggest module groups from dependency graph
-    # so the LLM can start extracting immediately without re-grouping.
+    # For refactor Ekstraher phase: auto-suggest module groups from dependency graph.
+    # Only when the plan doesn't already have detailed per-module symbol lists.
     _group_block = ""
     if agent.active_template == "refactor" and task_node.name.lower() == "ekstraher":
-        try:
-            from refactoring_engine import RefactoringEngine
-            # Determine source file from prompt
-            _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
-            _source_file = _src_match.group(1) if _src_match else "api_server.py"
-            agent._source_file = _source_file
-            _engine = RefactoringEngine()
-            _gr = _engine.suggest_module_groups(source=_source_file, max_group_size=8)
-            if _gr.get("success") and _gr.get("groups"):
-                # Filter groups to only include symbols that actually exist in the file
-                # (suggest_module_groups may include already-extracted symbols from imports)
-                import agent_files as _af
-                _existing = set()
-                _ls = _af.list_symbols(filepath=_source_file)
-                if _ls.get("success"):
-                    _existing = {s["name"] for s in _ls.get("symbols", [])}
-                if _existing:
-                    for _g in _gr["groups"]:
-                        _g["symbols"] = [s for s in _g.get("symbols", []) if s in _existing]
-                    _gr["groups"] = [_g for _g in _gr["groups"] if _g.get("symbols")]
+        _plan_path = getattr(agent, '_refactor_plan_path', '') or "refactor_plan.md"
+        _plan_has_details = False
+        if os.path.exists(_plan_path):
+            from symbol_checks import _parse_plan_symbol_mapping as _spm
+            try:
+                with open(_plan_path, encoding="utf-8") as _pf:
+                    _plan_has_details = bool(_spm(_pf.read()))
+            except Exception:
+                pass
+        if not _plan_has_details:
+            try:
+                from refactoring_engine import RefactoringEngine
+                # Determine source file from prompt
+                _src_match = re.search(r"([a-zA-Z_][\w.]+\.py)", original_prompt or "")
+                _source_file = _src_match.group(1) if _src_match else "api_server.py"
+                agent._source_file = _source_file
+                _engine = RefactoringEngine()
+                _gr = _engine.suggest_module_groups(source=_source_file, max_group_size=8)
+                if _gr.get("success") and _gr.get("groups"):
+                    # Filter groups to only include symbols that actually exist in the file
+                    # (suggest_module_groups may include already-extracted symbols from imports)
+                    import agent_files as _af
+                    _existing = set()
+                    _ls = _af.list_symbols(filepath=_source_file)
+                    if _ls.get("success"):
+                        _existing = {s["name"] for s in _ls.get("symbols", [])}
+                    if _existing:
+                        for _g in _gr["groups"]:
+                            _g["symbols"] = [s for s in _g.get("symbols", []) if s in _existing]
+                        _gr["groups"] = [_g for _g in _gr["groups"] if _g.get("symbols")]
 
-                _lines = ["\n## Foresl\u00e5ede modulopdelinger (fra afh\u00e6ngighedsgraf)"]
-                for i, g in enumerate(_gr["groups"], 1):
-                    _syms = g.get("symbols", [])
-                    if isinstance(_syms, (list, tuple)):
-                        _sym_list = ", ".join(str(s) for s in _syms[:12])
-                        if len(_syms) > 12:
-                            _sym_list += f" ... (+{len(_syms)-12})"
-                        _lines.append(f"\n  Gruppe {i} ({len(_syms)} symboler): {_sym_list}")
-                _group_block = "\n".join(_lines)
-                agent._log("DEBUG", f"Auto-generated {len(_gr['groups'])} module groups for {_source_file}", "")
-        except Exception as _e:
-            agent._log("DEBUG", f"Could not suggest module groups: {_e}", "")
+                    _lines = ["\n## Foresl\u00e5ede modulopdelinger (fra afh\u00e6ngighedsgraf)"]
+                    for i, g in enumerate(_gr["groups"], 1):
+                        _syms = g.get("symbols", [])
+                        if isinstance(_syms, (list, tuple)):
+                            _sym_list = ", ".join(str(s) for s in _syms[:12])
+                            if len(_syms) > 12:
+                                _sym_list += f" ... (+{len(_syms)-12})"
+                            _lines.append(f"\n  Gruppe {i} ({len(_syms)} symboler): {_sym_list}")
+                    _group_block = "\n".join(_lines)
+                    agent._log("DEBUG", f"Auto-generated {len(_gr['groups'])} module groups for {_source_file}", "")
+            except Exception as _e:
+                agent._log("DEBUG", f"Could not suggest module groups: {_e}", "")
 
     # For refactor phases: inject full list_symbols output so model never needs to call it
     _symbols_block = ""
@@ -1301,6 +1334,18 @@ def _count_symbols_in_file(filepath: str) -> int:
     return 0
 
 
+def _get_symbol_names_in_file(filepath: str) -> set[str]:
+    """Get set of top-level symbol names in a Python file."""
+    try:
+        import agent_files as _af
+        result = _af.list_symbols(filepath)
+        if isinstance(result, dict) and result.get("success"):
+            return {s["name"] for s in result.get("symbols", [])}
+    except Exception:
+        pass
+    return set()
+
+
 def _detect_module_deps(module_path: str, all_modules: list[str]) -> list[str]:
     """Detect which planned modules a module depends on via imports."""
     if not os.path.exists(module_path):
@@ -1576,6 +1621,18 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
             symbols_in_batch = [r.get("symbol", "") for r in inner.get("results", []) if r.get("success")]
             progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
             _add_user_msg(messages, progress_msg)
+
+            # Check for missing dependencies after batch_extract_symbols
+            missing_deps = inner.get("missing_dependencies", []) if isinstance(inner, dict) else []
+            if missing_deps:
+                deps_str = ', '.join(missing_deps)
+                source_name = os.path.basename(inner.get("source", "?"))
+                warning = (
+                    f"[SYSTEM: ⚠️ ADVARSEL — {target} refererer symboler der kun "
+                    f"findes i {source_name}: {deps_str}. Ekstraher disse symboler "
+                    f"først eller tilføj imports for at undgå NameError.]"
+                )
+                _add_user_msg(messages, warning)
 
     checkpoint_msg = agent_git.verify_pr_step(agent, parsed["tool"], result, task_node.name, original_prompt)
     if checkpoint_msg:
@@ -2302,6 +2359,29 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
     else:
         task_node.status = "done"
 
+    # Analyse & Plan phase output for refactor: require output files
+    if task_node.status == "done" and getattr(agent, "active_template", "") == "refactor":
+        phase = _normalize_phase(task_node.name).lower()
+        _wd = os.environ.get("AGENT_WORKDIR", "")
+        if phase == "analyse":
+            _analyse_path = os.path.join(_wd, "refactor_analyse.md") if _wd else "refactor_analyse.md"
+            if not os.path.exists(_analyse_path):
+                task_node.status = "failed"
+                full_response = (
+                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Analyse-fasen afsluttede "
+                    f"UDEN at skrive `refactor_analyse.md`. Kald write_file() for at "
+                    f"gemme din analyse før du afslutter."
+                )
+        if phase == "plan":
+            _plan_path = os.path.join(_wd, "refactor_plan.md") if _wd else "refactor_plan.md"
+            if not os.path.exists(_plan_path):
+                task_node.status = "failed"
+                full_response = (
+                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Plan-fasen afsluttede "
+                    f"UDEN at skrive `refactor_plan.md`. Kald write_file() for at "
+                    f"gemme din plan før du afslutter."
+                )
+
     # For refactor Ekstraher: verify that symbols were actually removed from source,
     # not just that extract_symbol/batch_extract_symbols was called once.
     template = getattr(agent, "active_template", "")
@@ -2897,6 +2977,7 @@ def _check_refactor_progress(agent: Any | None = None, prompt: str = "") -> str:
     import os as _os
     import re as _re
     parts = []
+    plan_content = ""
 
     _src = _resolve_source_file(agent, prompt) if agent else "api_server.py"
 
@@ -3030,6 +3111,8 @@ _TODO_TOOL_MAP: list[tuple[str, Any | None, str]] = [
 
 def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: list[dict] | None) -> list[str]:
     """Match a tool call against todo text and return matching todo IDs."""
+    # Reset cross-call flag — only set True if THIS call has a deviation
+    agent._batch_had_deviation = False
     if not todo_list:
         return []
     ids = []
@@ -3065,7 +3148,39 @@ def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: 
         if tool_name in ("extract_symbol", "batch_extract_symbols"):
             target = args_val.get("target", "")
             if target and (target in ttext or os.path.basename(target) in ttext):
-                ids.append(tid)
+                # Check planned symbols vs called symbols
+                _planned = getattr(agent, '_planned_symbols_per_target', {})
+                if _planned and target in _planned and tool_name == "batch_extract_symbols":
+                    _planned_syms = set(_planned[target])
+                    _called = args_val.get("symbols", "")
+                    if isinstance(_called, str):
+                        _called_syms = set(s.strip() for s in _called.replace("'", "").replace('"', '').split(',') if s.strip())
+                    elif isinstance(_called, (list, tuple)):
+                        _called_syms = set(str(s).strip() for s in _called if str(s).strip())
+                    else:
+                        _called_syms = set()
+                    _missing = _planned_syms - _called_syms
+                    if _missing:
+                        # Don't mark the todo as done — LLM hasn't covered all planned symbols
+                        agent._log("ADVARSEL",
+                            f"Planafvigelse for {target}: mangler {len(_missing)} plannede symboler",
+                            f"Kaldte: {sorted(_called_syms)}\nMangler: {sorted(_missing)}")
+                        # Store warning for handle_tool_call to inject
+                        if not hasattr(agent, '_plan_warnings'):
+                            agent._plan_warnings = []
+                        agent._plan_warnings.append({
+                            "target": target,
+                            "missing": sorted(_missing),
+                            "called": sorted(_called_syms),
+                            "planned": sorted(_planned_syms),
+                            "deviation": True,
+                        })
+                        # Also set persistent flag so batch_extract_symbols section can detect it
+                        agent._batch_had_deviation = True
+                    else:
+                        ids.append(tid)
+                else:
+                    ids.append(tid)
 
         # list_symbols -> matches "List alle symboler" or "list_symbols"
         if tool_name == "list_symbols" and ("list_symbols" in ttext.lower() or "list alle symboler" in ttext.lower()):
@@ -3283,7 +3398,7 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
 
     # ── Refactor-template: file-based todos from refactor_plan.md ──
     if template == 'refactor' and phase in ('plan', 'ekstraher', 'opdatering', 'opdatér', 'opdater'):
-        plan_path = getattr(agent, '_refactor_plan_path', '') or 'refactor_plan.md'
+        plan_path = _resolve_refactor_plan_path(agent, 'refactor_plan.md')
         if not _os.path.isabs(plan_path):
             _wd = _os.environ.get('AGENT_WORKDIR', '')
             if _wd:
@@ -3300,27 +3415,77 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
             _tgt_mods = [m for m in _all_mods if _src not in m] if _src else _all_mods
             if not _tgt_mods:
                 _tgt_mods = _all_mods
+            # Hent symbol-mapping fra planen én gang per fase (ikke per modul)
+            _ekstraher_sym_map = {}
+            if phase == "ekstraher":
+                try:
+                    with open(plan_path, encoding="utf-8") as _pf:
+                        import symbol_checks as _sc2
+                        _ekstraher_sym_map = _sc2._parse_plan_symbol_mapping(_pf.read())
+                except Exception:
+                    pass
             for mod in _tgt_mods:
                 _exists = _os.path.exists(mod)
+                _done = _exists
                 _todo_id = "lt_" + _re.sub(r'[^a-zA-Z0-9]', '', mod.replace('.py', ''))[:12]
                 if phase == "ekstraher":
                     _actual = _count_symbols_in_file(mod) if _exists else 0
-                    _text = f"[{_tgt_mods.index(mod)+1}/{len(_tgt_mods)}] Flyt symboler til {mod} med batch_extract_symbols"
+                    _gen_text = ""
+                    _planned_syms = _ekstraher_sym_map.get(mod, [])
+                    if _planned_syms:
+                        _src_f = _src or "source_file"
+                        # Chunk symbols into batches of max 15 symbols or ~500 chars.
+                        # Each chunk contains COMPLETE symbols — never cut mid-symbol.
+                        _chunks: list[list[str]] = []
+                        _current: list[str] = []
+                        _current_chars = 0
+                        for _sym in _planned_syms:
+                            _sym_len = len(_sym) + 2  # ", " separator
+                            _would_exceed_count = len(_current) >= 15
+                            _would_exceed_chars = _current and _current_chars + _sym_len > 500
+                            if _would_exceed_count or _would_exceed_chars:
+                                _chunks.append(_current)
+                                _current = []
+                                _current_chars = 0
+                            _current.append(_sym)
+                            _current_chars += _sym_len
+                        if _current:
+                            _chunks.append(_current)
+                        _batch_parts = []
+                        for _chunk in _chunks:
+                            _sym_str = ", ".join(_chunk)
+                            _batch_parts.append(f"batch_extract_symbols(source='{_src_f}', symbols='{_sym_str}', target='{mod}')")
+                        _gen_text = " -> ".join(_batch_parts)
+                        # Tjek om ALLE planlagte symboler findes i modulet
+                        # (ikke bare om filen eksisterer — kan være stale fra tidl. session)
+                        if _exists:
+                            _actual_names = _get_symbol_names_in_file(mod)
+                            _done = all(s in _actual_names for s in _planned_syms)
+                    _text = f"[{_tgt_mods.index(mod)+1}/{len(_tgt_mods)}] {_gen_text or 'Flyt symboler til ' + mod + ' med batch_extract_symbols'}"
                     if _exists and _actual > 0:
                         _text += f" ({_actual} symbols)"
                 elif phase == "plan":
                     _text = f"Planlæg indhold af {mod}"
                 else:
                     _text = f"Opdatér referencer i {mod}"
-                agent._llm_todos.append({"id": _todo_id, "text": _text, "done": _exists, "parent_id": None, "phase": phase})
+                agent._llm_todos.append({"id": _todo_id, "text": _text, "done": _done, "parent_id": None, "phase": phase})
                 events.append({"type": "llm_todo_add", "id": _todo_id, "text": _text, "parent_id": None})
             _n = len(_tgt_mods)
             _total_text = f"Verificér at alle {_n} moduler er korrekt oprettet" if _n != 1 else "Verificér at modulet er korrekt oprettet"
-            _total_done = all(_os.path.exists(m) for m in _tgt_mods)
+            _total_done = False
+            if phase == "ekstraher" and _ekstraher_sym_map:
+                _total_done = all(
+                    _os.path.exists(m) and all(s in _get_symbol_names_in_file(m) for s in _ekstraher_sym_map.get(m, []))
+                    for m in _tgt_mods
+                )
+            else:
+                _total_done = all(_os.path.exists(m) for m in _tgt_mods)
             agent._llm_todos.append({"id": "lt_total", "text": _total_text, "done": _total_done, "parent_id": None, "phase": phase})
             events.append({"type": "llm_todo_add", "id": "lt_total", "text": _total_text, "parent_id": None})
-            # Don't set _llm_has_planned — auto-populated todos are a template,
-            # LLM should still call plan_phase to create its OWN detailed plan.
+            # Ekstraher: auto-populated todos har konkrete batch_extract_symbols
+            # kald fra planen — LLM behøver IKKE kalde plan_phase/create_todo.
+            if phase == "ekstraher" and _ekstraher_sym_map:
+                agent._llm_has_planned = True
             return events
 
     # ── For other phases: leave LLM's plan empty — LLM creates its own ──
@@ -3382,6 +3547,45 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
         except Exception as _exc:
             import traceback
             agent._log("DEBUG", f"Fast phase-check exception: {_exc}", traceback.format_exc()[-300:])
+
+    # Prerequisite check: Plan requires refactor_analyse.md from Analyse
+    if agent.active_template == "refactor" and _normalize_phase(task_node.name) == "plan":
+        _analyse_path = "refactor_analyse.md"
+        _wd_check = os.environ.get('AGENT_WORKDIR', '')
+        if _wd_check:
+            _analyse_path_abs = os.path.join(_wd_check, _analyse_path)
+        else:
+            _analyse_path_abs = _analyse_path
+        if not os.path.exists(_analyse_path_abs):
+            _msg = (f"Analyse-fasen har ikke produceret `refactor_analyse.md`. "
+                    f"Plan kan ikke køre uden analysen. Genstart refactor-processen.")
+            agent._log("ERROR", "Plan prerequisite missing", _msg)
+            task_node.status = "failed"
+            yield {"type": "complete", "message": _msg[:200]}
+            return
+
+    # Prerequisite check: Ekstraher requires refactor_plan.md from Plan
+    if agent.active_template == "refactor" and _normalize_phase(task_node.name) == "ekstraher":
+        _wd_check = os.environ.get('AGENT_WORKDIR', '')
+        if _wd_check:
+            _plan_path = os.path.join(_wd_check, "refactor_plan.md")
+        else:
+            _plan_path = "refactor_plan.md"
+        _check_ok = os.path.exists(_plan_path)
+        if not _check_ok:
+            # Fallback: check _refactor_plan_path (may point to session-scoped dir)
+            _alt = getattr(agent, '_refactor_plan_path', '')
+            if _alt and os.path.isabs(_alt):
+                _check_ok = os.path.exists(_alt)
+            elif _alt and _wd_check:
+                _check_ok = os.path.exists(os.path.join(_wd_check, _alt))
+        if not _check_ok:
+            _msg = (f"Plan-fasen har ikke produceret `refactor_plan.md`. "
+                    f"Ekstraher kan ikke køre uden planen. Genstart refactor-processen.")
+            agent._log("ERROR", "Ekstraher prerequisite missing", _msg)
+            task_node.status = "failed"
+            yield {"type": "complete", "message": _msg[:200]}
+            return
 
     # If resuming from pause, use saved messages directly
     if saved_messages:
@@ -3921,6 +4125,21 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 if _llm:
                     for tids in _match_tool_to_todos(tool_name, args_val, agent, _llm):
                         yield {"type": "llm_todo_update", "id": tids, "done": True, "text": None}
+                # Inject plan deviation warnings BEFORE auto-advance (så LLM ser dem)
+                _plan_warnings = getattr(agent, '_plan_warnings', None)
+                if _plan_warnings:
+                    for _pw in _plan_warnings:
+                        _missing_str = ', '.join(_pw["missing"])
+                        _target = _pw["target"]
+                        warning_msg = (
+                            f"[SYSTEM: ⚠️ PLANAFVIGELSE — du planlagde at ekstrahere "
+                            f"{len(_pw['planned'])} symboler til {_target}, men kaldte kun "
+                            f"{len(_pw['called'])}. Mangler: {_missing_str}. "
+                            f"Kald batch_extract_symbols IGEN for at ekstrahere de resterende "
+                            f"symboler, eller opdater din plan med plan_phase().]"
+                        )
+                        messages.append({"role": "user", "content": warning_msg})
+                    agent._plan_warnings = []
                 # Auto-advance check (EFTER todo matching så todos opdateres før break)
                 msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=full_response)
                 if msg:
@@ -3942,6 +4161,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         symbols_in_batch = [r.get("symbol", "") for r in inner.get("results", []) if r.get("success")]
                         progress_msg = f"[SYSTEM: ✅ {succeeded} symboler flyttet til {target}: {', '.join(symbols_in_batch)}]"
                         messages.append({"role": "user", "content": progress_msg})
+
+                        # Check if this call had a plan deviation (warning already injected above)
+                        _has_missing = getattr(agent, '_batch_had_deviation', False)
+
                         # Opdater todo-tekst med symbol-fremskridt
                         _todo_text = "{} færdig".format(target)
                         _actual = _count_symbols_in_file(inner.get("target", ""))
@@ -3954,7 +4177,9 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                                 _pm = _re3.search(r'(\d+)\s*symbols', _tt)
                                 if _pm:
                                     _todo_text = "{} færdig — {}/{} symbols".format(target, _actual, _pm.group(1))
-                                yield {"type": "todo_update", "id": _tid, "done": True, "text": _todo_text}
+                                # Only mark as done if no plan deviation
+                                if not _has_missing:
+                                    yield {"type": "todo_update", "id": _tid, "done": True, "text": _todo_text}
                                 break
 
                 if tool_name == "extract_symbol" and result.get("success"):
@@ -3973,7 +4198,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         yield {"type": "llm_todo_update", "id": lid, "done": True, "text": None}
 
                 messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
-                total_calls = sum(called_tools.values())
+                # Count only real-work tools toward the limit, not planning tools
+                _planning_tools = {"plan_phase", "create_todo", "update_todo", "delete_todo", "list_todos"}
+                total_calls = sum(v for k, v in called_tools.items()
+                                  if k.split("{")[0] not in _planning_tools)
                 if total_calls >= _get_max_tool_calls(task_node.name):
                     full_response = t(K.LOG_AUTO_DONE, agent.lang).format(count=total_calls)
                     break
