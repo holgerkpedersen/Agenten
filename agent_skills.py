@@ -25,7 +25,7 @@ def _load_section_instructions() -> dict[str, dict[str, str]]:
     result = {}
     all_templates = set(_HARDCODED_INSTRUCTIONS_DATA.keys())
     for fname in os.listdir(_INSTRUCTIONS_DIR):
-        if not fname.endswith(".json"):
+        if not fname.endswith(".json") or fname.startswith("_"):
             continue
         key = fname[:-5]
         all_templates.add(key)
@@ -99,63 +99,9 @@ TEMPLATE_TOOLS = {
 # Different templates need different budgets: refactor Ekstraher needs 15+
 # to create 7 modules, but a simple bugfix Analyse only needs 4.
 # Falls back to MAX_TASK_ITERATIONS from config if not specified.
-TEMPLATE_PHASE_ITERATION_LIMITS = {
-    "kodeanalyse": {
-        "Form\u00e5l": 8,
-        "Imports og afh\u00e6ngigheder": 8,
-        "Arkitektur": 8,
-        "Kodekvalitet": 8,
-        "Sikkerhed": 8,
-    },
-    "programmering": {
-        "Kravanalyse": 8,
-        "Arkitekturdesign": 10,
-        "Implementeringsplan": 8,
-        "Sikkerhedsanalyse": 8,
-        "Uddyb/refinements": 15,
-        "Kodeimplementering": 20,
-    },
-    "refactor": {
-        "Analyse": 12,   # plan_phase + list_symbols + read_location(1-2) + analyze_dependencies + write refactor_analyse.md + done
-        "Plan": 8,       # Read + write refactor_plan.md (auto-advances)
-        "Ekstraher": 20, # extract_symbol does all the work in 1 call per symbol; 34+ symbols in plan
-        "Opdat\u00e9r": 20,  # ~5-8 remove_symbol + add_import + verify_refactor per module
-        "Test": 8,       # run_tests + 2-3 fix loops
-    },
-    "bugfix": {
-        "Analyse": 6,
-        "Test (Red)": 6,
-        "Implementering": 12,
-        "Verifikation (Green)": 8,
-        "Opdatering": 4,
-    },
-    "selvforbedring": {
-        "Analyser": 6,
-        "Diagnostic\u00e9r": 6,
-        "Ret": 12,
-        "Verific\u00e9r": 8,
-        "Commit": 4,
-    },
-    "testgenerering": {
-        "Analyse": 6,
-        "Test (Red)": 8,
-        "Implementering": 10,
-        "Verifikation (Green)": 8,
-    },
-    "issue_handler": {
-        "L\u00e6s": 4,
-        "Afklar": 8,
-        "Fix": 12,
-        "Luk Issue": 4,
-    },
-    "selvforbedring": {
-        "Analyser": 6,
-        "Diagnostic\u00e9r": 6,
-        "Ret": 15,
-        "Verific\u00e9r": 8,
-        "Commit": 4,
-    },
-}
+# Per-template, per-phase iteration limits — see config.py for defaults.
+# Override by editing instructions/iteration_limits.json.
+from config import TEMPLATE_PHASE_ITERATION_LIMITS
 
 # Per-template, per-phase model overrides. Phases not listed keep the
 # current session model. Useful when write-capable models (minimax-m2.5)

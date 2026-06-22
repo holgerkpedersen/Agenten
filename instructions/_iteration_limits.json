@@ -1,0 +1,7 @@
+{
+  "_comment": "Override per-template per-phase iteration limits. Template keys match templates (refactor, bugfix, etc.). Phase keys are case-insensitive. Limits below 1 are ignored. Missing templates/phases use defaults from config.py.",
+  "refactor": {
+    "Ekstraher": 20,
+    "Opdatér": 20
+  }
+}

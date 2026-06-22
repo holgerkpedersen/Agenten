@@ -93,6 +93,104 @@ MAX_TASK_ITERATIONS = 6       # max LLM conversation turns per task
 MAX_PR_TASK_ITERATIONS = 10   # max turns for PR/git workflow tasks
 NATIVE_TOOLS = True  # Use OpenAI native function calling when available
 
+# Per-template, per-phase iteration limits (LLM conversation turns).
+# Different templates need different budgets: refactor Ekstraher needs 15+
+# to create 7 modules, but a simple bugfix Analyse only needs 4.
+# Override via instructions/iteration_limits.json (template.phase → limit).
+# Falls back to MAX_TASK_ITERATIONS if not specified for a phase.
+TEMPLATE_PHASE_ITERATION_LIMITS: dict[str, dict[str, int]] = {
+    "kodeanalyse": {
+        "Form\u00e5l": 8,
+        "Imports og afh\u00e6ngigheder": 8,
+        "Arkitektur": 8,
+        "Kodekvalitet": 8,
+        "Sikkerhed": 8,
+    },
+    "programmering": {
+        "Kravanalyse": 8,
+        "Arkitekturdesign": 10,
+        "Implementeringsplan": 8,
+        "Sikkerhedsanalyse": 8,
+        "Uddyb/refinements": 15,
+        "Kodeimplementering": 20,
+    },
+    "refactor": {
+        "Analyse": 12,
+        "Plan": 8,
+        "Ekstraher": 20,
+        "Opdat\u00e9r": 20,
+        "Test": 8,
+    },
+    "bugfix": {
+        "Analyse": 6,
+        "Test (Red)": 6,
+        "Implementering": 12,
+        "Verifikation (Green)": 8,
+        "Opdatering": 4,
+    },
+    "selvforbedring": {
+        "Analyser": 6,
+        "Diagnostic\u00e9r": 6,
+        "Ret": 15,
+        "Verific\u00e9r": 8,
+        "Commit": 4,
+    },
+    "testgenerering": {
+        "Analyse": 6,
+        "Test (Red)": 8,
+        "Implementering": 10,
+        "Verifikation (Green)": 8,
+    },
+    "issue_handler": {
+        "L\u00e6s": 4,
+        "Afklar": 8,
+        "Fix": 12,
+        "Luk Issue": 4,
+    },
+}
+
+
+def _load_iteration_limit_overrides() -> None:
+    """Merge overrides from instructions/iteration_limits.json into TEMPLATE_PHASE_ITERATION_LIMITS.
+
+    File format: {"template": {"Phase": 25, ...}, ...}
+    Unknown templates/phases are silently ignored (no crash on malformed JSON).
+    """
+    import json as _json
+    _override_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "instructions", "_iteration_limits.json"
+    )
+    try:
+        with open(_override_path, encoding="utf-8") as _f:
+            _overrides = _json.load(_f)
+    except (OSError, _json.JSONDecodeError):
+        return  # no override file or malformed — keep defaults
+    if not isinstance(_overrides, dict):
+        return
+    for _template, _phases in _overrides.items():
+        if _template not in TEMPLATE_PHASE_ITERATION_LIMITS:
+            continue
+        if not isinstance(_phases, dict):
+            continue
+        for _phase, _limit in _phases.items():
+            if not isinstance(_limit, int) or _limit < 1:
+                continue
+            # Case-insensitive phase lookup in the defaults
+            _canonical = None
+            for _key in TEMPLATE_PHASE_ITERATION_LIMITS[_template]:
+                if _key.lower() == _phase.lower():
+                    _canonical = _key
+                    break
+            if _canonical:
+                TEMPLATE_PHASE_ITERATION_LIMITS[_template][_canonical] = _limit
+            else:
+                # New phase key — add it
+                TEMPLATE_PHASE_ITERATION_LIMITS[_template][_phase] = _limit
+
+
+# Load overrides at import time (runs once)
+_load_iteration_limit_overrides()
+
 # Message size limits (chars) — prevents "too much context" errors to LM Studio
 MAX_MESSAGE_CHARS = 60000  # hard cap on total message body sent per LLM call (raised from 20000 to preserve full conversation history)
 
