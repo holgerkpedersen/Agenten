@@ -3486,6 +3486,9 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
             # kald fra planen — LLM behøver IKKE kalde plan_phase/create_todo.
             if phase == "ekstraher" and _ekstraher_sym_map:
                 agent._llm_has_planned = True
+                # Store plan mapping so deviation detection can compare
+                # batch_extract_symbols calls against planned symbols per module
+                agent._planned_symbols_per_target = dict(_ekstraher_sym_map)
             return events
 
     # ── For other phases: leave LLM's plan empty — LLM creates its own ──
@@ -4132,11 +4135,13 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         _missing_str = ', '.join(_pw["missing"])
                         _target = _pw["target"]
                         warning_msg = (
-                            f"[SYSTEM: ⚠️ PLANAFVIGELSE — du planlagde at ekstrahere "
-                            f"{len(_pw['planned'])} symboler til {_target}, men kaldte kun "
-                            f"{len(_pw['called'])}. Mangler: {_missing_str}. "
-                            f"Kald batch_extract_symbols IGEN for at ekstrahere de resterende "
-                            f"symboler, eller opdater din plan med plan_phase().]"
+                            f"[SYSTEM: \u26a0\ufe0f UFULDST\u00c6NDIGT MODUL \u2014 du var planlagt at ekstrahere "
+                            f"{_pw['planned']} symboler til {_target}, men kaldte kun "
+                            f"{_pw['called']}. Mangler: {_missing_str}. "
+                            f"\u26d4 G\u00c5 IKKE videre til n\u00e6ste modul. "
+                            f"Kald batch_extract_symbols IGEN med de manglende symboler: "
+                            f"batch_extract_symbols(source='refac_test.py', symbols='{_missing_str}', target='{_target}'). "
+                            f"\u26d4 Oprethold IKKE en ny plan \u2014 f\u00e6rdigg\u00f8r dette modul f\u00f8rst.]"
                         )
                         messages.append({"role": "user", "content": warning_msg})
                     agent._plan_warnings = []
