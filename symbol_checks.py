@@ -13,7 +13,8 @@ import os
 def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
     """Parse refactor plan into {module_filename: [symbol_names]}.
 
-    Handles: ## Module:, ### N. filename.py, | **file.py** | table, and
+    Handles: ## Module:, ### N. filename.py, | **file.py** | table,
+    ## Modul N: file.py (Danish), **Symboler (N):** inline lists, and
     label-grouped bullets (- Variabler: sym1, sym2).
     """
     mapping: dict[str, list[str]] = {}
@@ -30,6 +31,27 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
         if m:
             current_mod = m.group(1)
             mapping.setdefault(current_mod, [])
+            continue
+
+        # Format 1b: ## Modul N: filename.py (Danish heading with optional number)
+        m = re.match(r'^#{2,6}\s+[Mm]odul[er]*\s*\d*:?\s*([\w./-]+\.\w+)', line)
+        if m:
+            current_mod = m.group(1)
+            mapping.setdefault(current_mod, [])
+            continue
+
+        # Format 1c: **Symboler (N):** sym1, sym2,... or **Symbols (N):** sym1, sym2,...
+        # Inline symbol listing after a module heading
+        m = re.match(r'^\*{1,2}[Ss]ymbol(er|s)?\s*\(\d+\):\*{0,2}\s*(.+)', line)
+        if m and current_mod:
+            syms_text = m.group(2)
+            for part in syms_text.split(','):
+                part = part.strip()
+                sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                if sym_m:
+                    name = sym_m.group(1)
+                    if name and not name.startswith('__') and name not in mapping[current_mod]:
+                        mapping[current_mod].append(name)
             continue
 
         # Format 2: ### N. filename.py
