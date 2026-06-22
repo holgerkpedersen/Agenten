@@ -20,19 +20,21 @@ python api_server.py   # 打开 http://localhost:5000
 agent_core.py         # Agent 外观：初始化、工具注册、分解、执行、委托方法
 agent_tasks.py        # 任务执行：solve_task_stream, solve_task, handle_tool_call
 agent_tree.py         # 树操作：parse, create_fallback_tree, record_outcome, evolve_if_needed
-agent_files.py        # 文件/块操作：读/写/分块、文件夹扫描（.env 已排除）
-agent_skills.py       # 技能匹配、模板常量（TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS）
+agent_files.py        # 文件/块操作：读/写/分块、文件夹扫描（.env 已排除）、locate_code (AST)
+agent_skills.py       # 技能匹配、模板常量（TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS, TEMPLATE_PHASE_ITERATION_LIMITS）
 agent_autoresearch.py # 自动研究：分类失败、构建建议修复、创建CORE-issue、重试
 agent_phase_checks.py # 确定性阶段检查：file_exists, files_from_plan, tool_called, tests_pass
 agent_wta.py          # 加权工具仲裁：rank_tool_calls, 拉普拉斯评分, 序列分析
 agent_issues.py       # Issue工具：read_issue, update_issue_status, create_issue, 文件大小检测
 agent_git.py          # Git/PR工作流：is_pr_workflow, extract_branch_name, verify_pr_step
+symbol_checks.py      # 计划解析器：_parse_plan_symbol_mapping, 符号完整性验证
+refactoring_engine.py # 重构：extract_symbol, batch_extract_symbols, move_symbol, verify_refactor（带结构化日志）
 api_server.py         # Flask API：SSE流、会话、图片上传、版本、issues端点
 llm_wrapper.py        # LM Studio HTTP客户端（聊天 + 流 + 视觉/图像编码）
 tools.py              # Tool/ToolRegistry — 工具框架（parse_response, build_system_prompt）
 task_tree.py          # TaskTree / TaskNode 数据结构
 config.py             # 中心常量（CHUNK_SIZE, timeout, max_tokens）
-git_ops.py            # Git + 文件操作（write_file, edit_file，带验证）
+git_ops.py            # Git + 文件操作（write_file, edit_file, add_method, add_function，带验证）
 github_wrapper.py     # GitHub API：仓库、issues、PRs
 session_manager.py    # 会话持久化（JSON），线程锁
 web_searcher.py       # DuckDuckGo 网页抓取
@@ -49,8 +51,8 @@ AGENTS.md             # 知识库 — 错误、修复、调试工作流
 BRUGERVEJLEDNING.md   # 用户指南（丹麦语）
 static/index.html     # 浏览器UI：拖拽/调整面板、模板下拉、图片预览、issues查看器
 core_analytics.py    # 工具/测试结果追踪、热点、摘要
-instructions/        # 按模板的章节指令（JSON，12个模板）
-tests/                # 739 项测试（pytest）
+instructions/        # 按模板的章节指令（JSON，13个模板）
+tests/                # 808 项测试（pytest）
 sessions/             # JSON 会话持久化（保存/加载/删除）
 skills/               # 带 frontmatter 的 markdown 技能文件
 ```
@@ -78,7 +80,7 @@ skills/               # 带 frontmatter 的 markdown 技能文件
 
 ## 🔧 工具
 
-Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作（35 个工具）：
+Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作（40+ 个工具）：
 
 | 工具 | 操作 |
 |------|------|
@@ -89,10 +91,21 @@ Agent 可以通过 `<<<TOOL>>>` 标记执行系统操作（35 个工具）：
 | `list_todos` | 显示Agent的成功标准和LLM的行动计划 |
 | `list_chunks` | 列出所有已加载的文件 |
 | `read_chunk` | 读取大文件的一个块 |
-| `locate` | 通过AST查找PYTHON函数/类/变量的当前行 — 非工具名称 |
+| `list_symbols` | 通过AST列出Python文件中的所有符号（函数、类、变量） |
+| `locate` | 通过AST查找函数/类/变量的当前行 |
 | `write_file` | 创建新文件（拒绝覆盖现有 .py — 使用 edit_file） |
 | `edit_file` | 在现有文件中搜索替换（带语法检查） |
 | `list_files` | 列出目录中的文件（支持模式过滤和最大深度） |
+| `delete_file` | 删除文件 |
+| `extract_symbol` | 将单个符号（函数/类/变量）从源文件移动到模块 |
+| `batch_extract_symbols` | 一次性将多个符号移动到模块 |
+| `remove_symbol` | 从源文件移除符号 |
+| `add_method` | 向现有类添加方法（基于AST） |
+| `add_function` | 向文件添加函数（基于AST） |
+| `add_import` | 向文件添加导入语句 |
+| `verify_refactor` | 验证重构后的语法和依赖关系 |
+| `analyze_dependencies` | 分析模块间的依赖关系 |
+| `suggest_module_groups` | 基于符号分析建议模块分组 |
 | `create_issue` | 创建新 issue |
 | `create_refactor_issue` | 为大文件创建重构 issue |
 | `read_issue` | 读取 issue |
@@ -239,7 +252,10 @@ Flask API (api_server.py)
 - **会话持久化修复**：`current_session_id` 在测试文件间的泄漏已修复，`_save_session_data` 的防抖移除（总是在 SSE 结束时保存），树序列化现在包含 `result` 字段
 - **阶段检查和自动推进**：阶段的确定性成功标准。系统在所有模块存在或计划写入后自动完成。
 - **重构模板迭代限制**：更高的预算 (15-12 次迭代) 以处理大的重构工作量。
-- **384 项测试**：覆盖所有模块的 pytest 测试套件
+- **计划偏差检测**：如果符号根据计划被发送到错误的模块，则阻止 batch_extract_symbols。
+- **结构化日志**：extract_symbol、batch_extract_symbols、move_symbol 记录 INFO/WARNING，包含时间戳和源验证。
+- **计划解析器**：_parse_plan_symbol_mapping 正确处理单行计划和丹麦语标题。
+- **808 项测试**：覆盖所有模块的 pytest 测试套件
 
 ## 📋 要求
 

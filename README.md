@@ -20,19 +20,21 @@ python api_server.py   # Åbn http://localhost:5000
 agent_core.py         # Agent-facade: init, tool-registrering, decompose, execute, tynde delegat-metoder
 agent_tasks.py        # Opgaveudførelse: solve_task_stream, solve_task, handle_tool_call
 agent_tree.py         # Træoperationer: parse, create_fallback_tree, record_outcome, evolve_if_needed
-agent_files.py        # Fil/chunk operationer: read/write/chunk, folder-scanning (.env ekskluderet)
+agent_files.py        # Fil/chunk operationer: read/write/chunk, folder-scanning (.env ekskluderet), locate_code (AST)
 agent_skills.py       # Skills-matching, skabelon-konstanter (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS, TEMPLATE_PHASE_ITERATION_LIMITS)
 agent_autoresearch.py # Auto-research: klassificér fejl, byg proposed_fix, opret CORE-issues, genforsøg
 agent_phase_checks.py # Deterministiske fase-checks: file_exists, files_from_plan, tool_called, tests_pass
 agent_wta.py          # Weighted Tool Arbitration: rank_tool_calls, Laplace scoring, sekvensanalyse
 agent_issues.py       # Issue-værktøjer: read_issue, update_issue_status, create_issue, oversize-detektion
 agent_git.py          # Git/PR workflow: is_pr_workflow, extract_branch_name, verify_pr_step
+symbol_checks.py      # Plan-parser: _parse_plan_symbol_mapping, symbol completeness checks
+refactoring_engine.py # Refactoring: extract_symbol, batch_extract_symbols, move_symbol, verify_refactor (med struktureret logging)
 api_server.py         # Flask API: SSE streaming, sessions, billed-upload, version, issues endpoint
 llm_wrapper.py        # LM Studio HTTP wrapper (chat + streaming + vision/image encoding)
 tools.py              # Tool/ToolRegistry — værktøjs-ramme (parse_response, build_system_prompt)
 task_tree.py          # TaskTree / TaskNode datastruktur
 config.py             # Centrale konstanter (CHUNK_SIZE, timeout, max_tokens)
-git_ops.py            # Git + fil operationer (write_file, edit_file med validering)
+git_ops.py            # Git + fil operationer (write_file, edit_file, add_method, add_function med validering)
 github_wrapper.py     # GitHub API: repos, issues, PRs
 session_manager.py    # Session persistence (JSON), threading lock
 web_searcher.py       # DuckDuckGo web scraping
@@ -49,8 +51,8 @@ AGENTS.md             # Knowledge base — bugs, fixes, debugging workflow
 BRUGERVEJLEDNING.md   # Brugervejledning
 static/index.html     # Browser-UI med drag/resize paneler, template dropdown, billed-preview, issues viewer
 core_analytics.py     # Tool/test outcome tracking, hotspots, summaries
-instructions/         # Sektionsinstruktioner pr. template (JSON, 12 templates)
-tests/                # 739 tests (pytest)
+instructions/         # Sektionsinstruktioner pr. template (JSON, 13 templates)
+tests/                # 808 tests (pytest)
 sessions/             # Sessioner i JSON-format (gem/indlæs/slet)
 skills/               # Skills i markdown med frontmatter
 ```
@@ -78,7 +80,7 @@ Vælg skabelon i dropdown før nedbrydning — LLM får fastlagte sektioner:
 
 ## 🔧 Værktøjer
 
-Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (35 værktøjer):
+Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (40+ værktøjer):
 
 | Værktøj | Handling |
 |---------|----------|
@@ -89,10 +91,21 @@ Agenten kan udføre systemoperationer via `<<<TOOL>>>` markører (35 værktøjer
 | `list_todos` | Vis både Agentens succeskriterier og LLM's handlingsplan |
 | `list_chunks` | List alle indlæste filer |
 | `read_chunk` | Læs en chunk af en stor fil |
-| `locate` | Find aktuel linje for PYTHON funktion/klasse/variabel via AST — IKKE værktøjsnavn (tool) |
+| `list_symbols` | List alle symboler (funktioner, klasser, variabler) i en Python-fil via AST |
+| `locate` | Find aktuel linje for en funktion/klasse/variabel via AST |
 | `write_file` | Opret NY fil (afviser eksisterende .py filer — brug edit_file) |
 | `edit_file` | Search-and-replace i eksisterende filer (med syntax-tjek) |
 | `list_files` | List filer i en mappe (med filter på filtype og max dybde) |
+| `delete_file` | Slet en fil |
+| `extract_symbol` | Flyt ét symbol (funktion/klasse/variabel) fra kildefil til modul |
+| `batch_extract_symbols` | Flyt flere symboler til et modul i ét kald |
+| `remove_symbol` | Fjern et symbol fra en kildefil |
+| `add_method` | Tilføj en metode til en eksisterende klasse (AST-baseret) |
+| `add_function` | Tilføj en funktion til en fil (AST-baseret) |
+| `add_import` | Tilføj en import-statement til en fil |
+| `verify_refactor` | Verificér syntaks og afhængigheder efter refactoring |
+| `analyze_dependencies` | Analysér afhængigheder mellem moduler |
+| `suggest_module_groups` | Foreslå modulopdeling baseret på symbolanalyse |
 | `create_issue` | Opret nyt issue |
 | `create_refactor_issue` | Opret refactor-issue ved oversize filer |
 | `read_issue` | Læs issue (include_hints=false default — problem-only) |
@@ -239,7 +252,10 @@ Flask API (api_server.py)
 - **Session persistence fix**: `current_session_id` læk mellem test-filer fikset, `_save_session_data` debounce fjernet (altid gem ved SSE afslutning), tree serialisering inkluderer nu `result` felt
 - **Phase checks & auto-advance**: Deterministiske succeskriterier for faser. Systemet auto-afslutter når alle moduler findes eller planen er skrevet.
 - **Refactor template iteration limits**: Højere budget (15-12 iterationer) til at håndtere store refaktor arbejdsbelastninger.
-- **739 tests**: pytest suite med test af alle moduler (alle passerer på 11s)
+- **Plan-deviation detection**: Blokkerer batch_extract_symbols hvis symboler sendes til forkerte moduler ifølge planen.
+- **Struktureret logging**: extract_symbol, batch_extract_symbols, move_symbol logger INFO/WARNING med timing og kildeadvalidering.
+- **Plan-parser**: _parse_plan_symbol_mapping håndterer single-line plans og danske overskrifter korrekt.
+- **808 tests**: pytest suite med test af alle moduler (alle passerer på 11s)
 - **agents.md**: Knowledge base opdateret med entries 34-57+ (LLM-todos, AGENT_WORKDIR, refactor_analyse, m.fl.)
 - **Cache-Control: no-cache**: Static routes undgår browser-caching af index.html
 

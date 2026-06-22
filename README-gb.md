@@ -20,19 +20,21 @@ python api_server.py   # Open http://localhost:5000
 agent_core.py         # Agent facade: init, tool registration, decompose, execute, thin delegates
 agent_tasks.py        # Task execution: solve_task_stream, solve_task, handle_tool_call
 agent_tree.py         # Tree operations: parse, create_fallback_tree, record_outcome, evolve_if_needed
-agent_files.py        # File/chunk operations: read/write/chunk, folder scanning (.env excluded)
-agent_skills.py       # Skill matching, template constants (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS)
+agent_files.py        # File/chunk operations: read/write/chunk, folder scanning (.env excluded), locate_code (AST)
+agent_skills.py       # Skill matching, template constants (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS, TEMPLATE_PHASE_ITERATION_LIMITS)
 agent_autoresearch.py # Auto-research: classify failures, build proposed_fix, create CORE-issues, retry
 agent_phase_checks.py # Deterministic phase checks: file_exists, files_from_plan, tool_called, tests_pass
 agent_wta.py          # Weighted Tool Arbitration: rank_tool_calls, Laplace scoring, sequence analysis
 agent_issues.py       # Issue tools: read_issue, update_issue_status, create_issue, oversize detection
 agent_git.py          # Git/PR workflow: is_pr_workflow, extract_branch_name, verify_pr_step
+symbol_checks.py      # Plan parser: _parse_plan_symbol_mapping, symbol completeness checks
+refactoring_engine.py # Refactoring: extract_symbol, batch_extract_symbols, move_symbol, verify_refactor (with structured logging)
 api_server.py         # Flask API: SSE streaming, sessions, image upload, version, issues endpoint
 llm_wrapper.py        # LM Studio HTTP wrapper (chat + streaming + vision/image encoding)
 tools.py              # Tool/ToolRegistry — tool framework (parse_response, build_system_prompt)
 task_tree.py          # TaskTree / TaskNode data structures
 config.py             # Central constants (CHUNK_SIZE, timeout, max_tokens)
-git_ops.py            # Git + file operations (write_file, edit_file with validation)
+git_ops.py            # Git + file operations (write_file, edit_file, add_method, add_function with validation)
 github_wrapper.py     # GitHub API: repos, issues, PRs
 session_manager.py    # Session persistence (JSON), threading lock
 web_searcher.py       # DuckDuckGo web scraping
@@ -49,8 +51,8 @@ AGENTS.md             # Knowledge base — bugs, fixes, debugging workflow
 BRUGERVEJLEDNING.md   # User guide (Danish)
 static/index.html     # Browser UI with drag/resize panels, template dropdown, image preview, issues viewer
 core_analytics.py    # Tool/test outcome tracking, hotspots, summaries
-instructions/        # Section instructions per template (JSON, 12 templates)
-tests/                # 739 tests (pytest, all pass in 11s)
+instructions/        # Section instructions per template (JSON, 13 templates)
+tests/                # 808 tests (pytest, all pass in 11s)
 sessions/             # JSON session persistence (save/load/delete)
 skills/               # Skills in markdown with frontmatter
 ```
@@ -78,7 +80,7 @@ Select a template from the dropdown before decomposition — the LLM receives fi
 
 ## 🔧 Tools
 
-The agent can perform system operations via `<<<TOOL>>>` markers (35 tools):
+The agent can perform system operations via `<<<TOOL>>>` markers (40+ tools):
 
 | Tool | Action |
 |------|--------|
@@ -89,10 +91,21 @@ The agent can perform system operations via `<<<TOOL>>>` markers (35 tools):
 | `list_todos` | Show both Agent's success criteria and LLM's action plan |
 | `list_chunks` | List all loaded files |
 | `read_chunk` | Read a chunk of a large file |
-| `locate` | Find current line of PYTHON function/class/variable via AST — NOT tool name |
+| `list_symbols` | List all symbols (functions, classes, variables) in a Python file via AST |
+| `locate` | Find current line of a function/class/variable via AST |
 | `write_file` | Create NEW file (rejects existing .py files — use edit_file) |
 | `edit_file` | Search-and-replace in existing files (with syntax check) |
 | `list_files` | List files in a directory (with file type filter and max depth) |
+| `delete_file` | Delete a file |
+| `extract_symbol` | Move a single symbol (function/class/variable) from source to module |
+| `batch_extract_symbols` | Move multiple symbols to a module in one call |
+| `remove_symbol` | Remove a symbol from a source file |
+| `add_method` | Add a method to an existing class (AST-based) |
+| `add_function` | Add a function to a file (AST-based) |
+| `add_import` | Add an import statement to a file |
+| `verify_refactor` | Verify syntax and dependencies after refactoring |
+| `analyze_dependencies` | Analyze dependencies between modules |
+| `suggest_module_groups` | Suggest module grouping based on symbol analysis |
 | `create_issue` | Create new issue |
 | `create_refactor_issue` | Create refactor issue for oversized files |
 | `read_issue` | Read issue (include_hints=false default — problem-only) |
@@ -239,7 +252,10 @@ Flask API (api_server.py)
 - **Session persistence fix**: `current_session_id` leak between test files fixed, `_save_session_data` debounce removed (always saves at SSE end), tree serialization now includes `result` field
 - **Phase checks & auto-advance**: Deterministic success criteria for phases. System auto-completes when all modules exist or plan is written.
 - **Refactor template iteration limits**: Higher budget (15-12 iterations) to handle large refactor workloads.
-- **739 tests**: pytest suite covering all modules (all pass in 11s)
+- **Plan-deviation detection**: Blocks batch_extract_symbols if symbols are sent to wrong modules per plan.
+- **Structured logging**: extract_symbol, batch_extract_symbols, move_symbol log INFO/WARNING with timing and source validation.
+- **Plan parser**: _parse_plan_symbol_mapping handles single-line plans and Danish headings correctly.
+- **808 tests**: pytest suite covering all modules (all pass in 11s)
 - **AGENTS.md**: Knowledge base updated with entries 34-57+ (LLM todos, AGENT_WORKDIR, refactor_analyse, etc.)
 - **Cache-Control: no-cache**: Static routes avoid browser caching of index.html
 

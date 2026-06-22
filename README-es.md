@@ -20,19 +20,21 @@ python api_server.py   # Abre http://localhost:5000
 agent_core.py         # Fachada del agente: init, registro de herramientas, decompose, execute, delegados
 agent_tasks.py        # Ejecución de tareas: solve_task_stream, solve_task, handle_tool_call
 agent_tree.py         # Operaciones de árbol: parse, create_fallback_tree, record_outcome, evolve_if_needed
-agent_files.py        # Operaciones de archivos: lectura/escritura/chunk, escaneo de carpetas (.env excluido)
-agent_skills.py       # Coincidencia de habilidades, constantes de plantillas (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS)
+agent_files.py        # Operaciones de archivos: lectura/escritura/chunk, escaneo de carpetas (.env excluido), locate_code (AST)
+agent_skills.py       # Coincidencia de habilidades, constantes de plantillas (TEMPLATE_TOOLS, TEMPLATE_TASK_TOOLS, TEMPLATE_PHASE_ITERATION_LIMITS)
 agent_autoresearch.py # Investigación automática: clasificar fallos, construir solución propuesta, crear issues CORE, reintentar
 agent_phase_checks.py # Comprobaciones deterministas de fase: file_exists, files_from_plan, tool_called, tests_pass
 agent_wta.py          # Arbitraje ponderado de herramientas: rank_tool_calls, puntuación Laplace, análisis de secuencias
 agent_issues.py       # Herramientas de issues: read_issue, update_issue_status, create_issue, detección de tamaño
 agent_git.py          # Flujo de trabajo Git/PR: is_pr_workflow, extract_branch_name, verify_pr_step
+symbol_checks.py      # Analizador de planes: _parse_plan_symbol_mapping, verificación de completitud de símbolos
+refactoring_engine.py # Refactorización: extract_symbol, batch_extract_symbols, move_symbol, verify_refactor (con registro estructurado)
 api_server.py         # API Flask: streaming SSE, sesiones, carga de imágenes, versión, endpoint de issues
 llm_wrapper.py        # Cliente HTTP de LM Studio (chat + streaming + visión/codificación de imágenes)
 tools.py              # Tool/ToolRegistry — marco de herramientas (parse_response, build_system_prompt)
 task_tree.py          # Estructuras de datos TaskTree / TaskNode
 config.py             # Constantes centrales (CHUNK_SIZE, timeout, max_tokens)
-git_ops.py            # Operaciones Git + archivos (write_file, edit_file con validación)
+git_ops.py            # Operaciones Git + archivos (write_file, edit_file, add_method, add_function con validación)
 github_wrapper.py     # API de GitHub: repos, issues, PRs
 session_manager.py    # Persistencia de sesiones (JSON), bloqueo de hilos
 web_searcher.py       # Web scraping de DuckDuckGo
@@ -49,8 +51,8 @@ AGENTS.md             # Base de conocimiento — errores, correcciones, flujo de
 BRUGERVEJLEDNING.md   # Guía de usuario (danés)
 static/index.html     # UI de navegador con paneles de arrastre/redimensión, selector de plantillas, vista previa de imágenes, visor de issues
 core_analytics.py    # Seguimiento de resultados de herramientas/pruebas, puntos clave, resúmenes
-instructions/        # Instrucciones de sección por plantilla (JSON, 12 plantillas)
-tests/                # 739 pruebas (pytest)
+instructions/        # Instrucciones de sección por plantilla (JSON, 13 plantillas)
+tests/                # 808 pruebas (pytest)
 sessions/             # Persistencia de sesiones JSON (guardar/cargar/eliminar)
 skills/               # Habilidades en markdown con frontmatter
 ```
@@ -78,7 +80,7 @@ Selecciona una plantilla en el menú desplegable antes de la descomposición —
 
 ## 🔧 Herramientas
 
-El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>` (35 herramientas):
+El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>` (40+ herramientas):
 
 | Herramienta | Acción |
 |-------------|--------|
@@ -89,10 +91,21 @@ El agente puede realizar operaciones del sistema mediante marcadores `<<<TOOL>>>
 | `list_todos` | Mostrar criterios de éxito del Agent y plan de acción del LLM |
 | `list_chunks` | Lista todos los archivos cargados |
 | `read_chunk` | Lee un fragmento de un archivo grande |
-| `locate` | Encuentra la línea actual de función/clase/variable PYTHON vía AST — NO es nombre de herramienta |
+| `list_symbols` | Lista todos los símbolos (funciones, clases, variables) en un archivo Python via AST |
+| `locate` | Encuentra la línea actual de una función/clase/variable via AST |
 | `write_file` | Crea un NUEVO archivo (rechaza sobrescribir .py existente — usa edit_file) |
 | `edit_file` | Búsqueda y reemplazo en archivos existentes (con verificación de sintaxis) |
 | `list_files` | Lista archivos en un directorio (con filtro de patrón y profundidad máxima) |
+| `delete_file` | Elimina un archivo |
+| `extract_symbol` | Mueve un símbolo (función/clase/variable) de fuente a módulo |
+| `batch_extract_symbols` | Mueve múltiples símbolos a un módulo en una sola llamada |
+| `remove_symbol` | Elimina un símbolo de un archivo fuente |
+| `add_method` | Añade un método a una clase existente (basado en AST) |
+| `add_function` | Añade una función a un archivo (basado en AST) |
+| `add_import` | Añade una declaración de importación a un archivo |
+| `verify_refactor` | Verifica sintaxis y dependencias después de la refactorización |
+| `analyze_dependencies` | Analiza dependencias entre módulos |
+| `suggest_module_groups` | Sugiere agrupación de módulos basada en análisis de símbolos |
 | `create_issue` | Crea un nuevo issue |
 | `create_refactor_issue` | Crea issue de refactorización para archivos grandes |
 | `read_issue` | Lee un issue |
@@ -239,7 +252,10 @@ API Flask (api_server.py)
 - **Corrección persistencia de sesiones**: Fuga de `current_session_id` entre archivos de prueba corregida, debounce en `_save_session_data` eliminado (siempre guarda al final SSE), serialización de árbol ahora incluye el campo `result`
 - **Checks de fases y autoavance**: Criterios de éxito determinísticos para las fases. El sistema se completa automáticamente cuando todos los módulos existen o la planificación está escrita.
 - **Límites de iteraciones para plantilla Refactor**: Presupuesto más alto (15-12 iteraciones) para manejar grandes cargas de trabajo de refactorización.
-- **739 pruebas**: Suite pytest que cubre todos los módulos
+- **Detección de desviación del plan**: Bloquea batch_extract_symbols si los símbolos se envían a módulos incorrectos según el plan.
+- **Registro estructurado**: extract_symbol, batch_extract_symbols, move_symbol registran INFO/WARNING con validación de temporización y origen.
+- **Analizador de planes**: _parse_plan_symbol_mapping maneja planes de una sola línea y encabezados danés correctamente.
+- **808 pruebas**: Suite pytest que cubre todos los módulos
 
 ## 📋 Requisitos
 
