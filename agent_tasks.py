@@ -1562,8 +1562,47 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     dup_count = called_tools.get(tool_key, 0)
     called_tools[tool_key] = dup_count + 1
     if dup_count >= 1:
-        # For batch_extract_symbols/extract_symbol: show module progress
-        if parsed['tool'] in ("batch_extract_symbols", "extract_symbol"):
+        # For batch_extract_symbols: auto-redirect to next incomplete module
+        if parsed['tool'] == "batch_extract_symbols":
+            _planned = getattr(agent, '_planned_symbols_per_target', None)
+            if _planned and isinstance(parsed.get('args'), dict):
+                _current_target = os.path.basename(parsed['args'].get("target", ""))
+                _next = None
+                for _mod, _syms in _planned.items():
+                    _mod_base = os.path.basename(_mod)
+                    if _mod_base == _current_target:
+                        continue
+                    if _syms:
+                        _exists = os.path.exists(_mod)
+                        if _exists:
+                            _actual = _get_symbol_names_in_file(_mod)
+                            _missing = [s for s in _syms if s not in _actual]
+                            if _missing:
+                                _next = (_mod_base, _missing)
+                                break
+                        else:
+                            _next = (_mod_base, list(_syms))
+                            break
+                if _next:
+                    _next_mod, _next_syms = _next
+                    _src = parsed['args'].get("source", "")
+                    parsed['args'] = {"source": _src, "symbols": ", ".join(_next_syms), "target": _next_mod}
+                    agent._log("SYSTEM", "Auto-redirect batch_extract_symbols",
+                               f"{_current_target} (done) → {_next_mod} ({len(_next_syms)} symbols)")
+                    _add_user_msg(messages,
+                        f"[SYSTEM: {_current_target} er allerede fuldført. "
+                        f"Automatisk omdirigeret til {_next_mod}.]")
+                    # Reset dup tracking for new args and fall through to execute
+                    tool_key = parsed['tool'] + str(parsed['args'])
+                    dup_count = 0
+                    called_tools[tool_key] = 1
+                else:
+                    _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
+                    return None
+            else:
+                _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
+                return None
+        elif parsed['tool'] == "extract_symbol":
             _progress = _build_module_progress_msg(agent)
             if _progress:
                 _target = (parsed.get('args') or {}).get('target', '?')
@@ -1574,8 +1613,11 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
                     f"Gå videre til næste modul med batch_extract_symbols."
                 ))
                 return None
-        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
-        return None
+            _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
+            return None
+        else:
+            _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
+            return None
     if parsed["tool"] in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
         _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_ISSUE_RESOLVED, agent.lang)}")
         return None
@@ -3933,9 +3975,55 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     called_tools[tool_key] = dup_count + 1
                 if tool_name not in ("run_tests", "list_symbols") and dup_count >= 1:
                     consecutive_dedups += 1
-                    # For batch_extract_symbols/extract_symbol: show module progress
-                    # so the LLM knows which modules are done and what to do next
-                    if tool_name in ("batch_extract_symbols", "extract_symbol"):
+                    # For batch_extract_symbols: auto-redirect to next incomplete module
+                    # instead of just showing a message (LLMs like minimax ignore text and loop)
+                    if tool_name == "batch_extract_symbols":
+                        _planned = getattr(agent, '_planned_symbols_per_target', None)
+                        if _planned and isinstance(args_val, dict):
+                            _current_target = os.path.basename(args_val.get("target", ""))
+                            _next = None
+                            for _mod, _syms in _planned.items():
+                                _mod_base = os.path.basename(_mod)
+                                if _mod_base == _current_target:
+                                    continue
+                                if _syms:
+                                    _exists = os.path.exists(_mod)
+                                    if _exists:
+                                        _actual = _get_symbol_names_in_file(_mod)
+                                        _missing = [s for s in _syms if s not in _actual]
+                                        if _missing:
+                                            _next = (_mod_base, _missing)
+                                            break
+                                    else:
+                                        _next = (_mod_base, list(_syms))
+                                        break
+                            if _next:
+                                _next_mod, _next_syms = _next
+                                _src = args_val.get("source", "")
+                                _new_args = {"source": _src, "symbols": ", ".join(_next_syms), "target": _next_mod}
+                                agent._log("SYSTEM", "Auto-redirect batch_extract_symbols",
+                                           f"{_current_target} (done) → {_next_mod} ({len(_next_syms)} symbols)")
+                                _add_user_msg(messages,
+                                    f"[SYSTEM: {_current_target} er allerede fuldført. "
+                                    f"Automatisk omdirigeret til {_next_mod}.]")
+                                # Fall through to execute with new args
+                                args_val = _new_args
+                                tool_key = tool_name + str(args_val)
+                                dup_count = 0
+                                called_tools[tool_key] = 1
+                            else:
+                                dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
+                                _add_user_msg(messages, dup_err)
+                                yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                                yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": {"success": False, "error": "All modules complete or no next module found"}}
+                                continue
+                        else:
+                            dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
+                            _add_user_msg(messages, dup_err)
+                            yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                            yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": {"success": False, "error": "Duplicate call blocked"}}
+                            continue
+                    elif tool_name == "extract_symbol":
                         _progress = _build_module_progress_msg(agent)
                         if _progress:
                             dup_err = (
@@ -3946,12 +4034,16 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                             )
                         else:
                             dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
+                        _add_user_msg(messages, dup_err)
+                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": {"success": False, "error": "Duplicate call blocked"}}
+                        continue
                     else:
                         dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
-                    _add_user_msg(messages, dup_err)
-                    messages.append({"role": "user", "content": dup_err})
-                    yield {"type": "tool_call", "tool": tool_name, "args": args_val}
-                    yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": {"success": False, "error": "Duplicate call blocked"}}
+                        _add_user_msg(messages, dup_err)
+                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": {"success": False, "error": "Duplicate call blocked"}}
+                        continue
                     if tool_name in READ_ONLY_TOOLS and getattr(agent, '_read_escape_sent', False):
                         agent._read_block_hits += 1
                     if consecutive_dedups >= 3:
