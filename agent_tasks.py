@@ -434,6 +434,9 @@ def _validate_done_output(agent: Any, result_text: str | dict, task_name: str, t
     bugfix_templates = {"bugfix", "refactor", "testgenerering", "issue_handler"}
     if template not in bugfix_templates:
         return None
+    # Refactor Analyse/Plan are code analysis, not bug triage — no issue-id/bug keywords needed
+    if template == "refactor" and any(k in phase for k in ["analyse", "plan"]):
+        return None
     rt = result_text.lower()
     if any(k in phase for k in ["analyse", "læs", "afklar"]):
         has_issue_id = bool(re.search(r'(BUG|SEC|TST|ARC|PRF|MNT|REFAC)-\d+', result_text))
@@ -1346,6 +1349,62 @@ def _get_symbol_names_in_file(filepath: str) -> set[str]:
     return set()
 
 
+def _build_module_progress_msg(agent: Any) -> str:
+    """Build a progress summary for Ekstraher phase: completed vs pending modules.
+
+    Returns a multi-line string like:
+        ✅ config.py: 10/10 symboler
+        ⏳ file_utils.py: 0/11 symboler — næste: batch_extract_symbols(...)
+        ⏳ processor.py: 0/10 symboler
+        ⏳ user_handler.py: 0/10 symboler
+
+    Returns empty string if no plan data is available.
+    """
+    planned = getattr(agent, '_planned_symbols_per_target', None)
+    if not planned:
+        return ""
+    lines = []
+    next_batch = None
+    for mod, planned_syms in planned.items():
+        if not planned_syms:
+            continue
+        mod_basename = os.path.basename(mod)
+        exists = os.path.exists(mod)
+        if exists:
+            actual = _get_symbol_names_in_file(mod)
+            done_count = len(actual & set(planned_syms))
+            total = len(planned_syms)
+            if done_count >= total:
+                lines.append(f"  ✅ {mod_basename}: {total}/{total} symboler")
+            else:
+                missing = [s for s in planned_syms if s not in actual]
+                lines.append(f"  ⏳ {mod_basename}: {done_count}/{total} symboler — mangler: {', '.join(missing[:5])}")
+                if next_batch is None:
+                    _src = getattr(agent, '_source_file', '') or ''
+                    if not _src:
+                        import re as _re_src
+                        _m = _re_src.search(r"([a-zA-Z_][\w.]+\.py)", getattr(agent, 'original_prompt', '') or '')
+                        if _m:
+                            _src = _m.group(1)
+                    next_batch = f"batch_extract_symbols(source='{_src}', symbols='{', '.join(missing)}', target='{mod_basename}')"
+        else:
+            lines.append(f"  ⏳ {mod_basename}: 0/{len(planned_syms)} symboler — endnu ikke oprettet")
+            if next_batch is None:
+                _src = getattr(agent, '_source_file', '') or ''
+                if not _src:
+                    import re as _re_src
+                    _m = _re_src.search(r"([a-zA-Z_][\w.]+\.py)", getattr(agent, 'original_prompt', '') or '')
+                    if _m:
+                        _src = _m.group(1)
+                next_batch = f"batch_extract_symbols(source='{_src}', symbols='{', '.join(planned_syms)}', target='{mod_basename}')"
+    if not lines:
+        return ""
+    result = "\n".join(lines)
+    if next_batch:
+        result += f"\n\n📝 Næste skridt: {next_batch}"
+    return result
+
+
 def _detect_module_deps(module_path: str, all_modules: list[str]) -> list[str]:
     """Detect which planned modules a module depends on via imports."""
     if not os.path.exists(module_path):
@@ -1501,6 +1560,18 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     dup_count = called_tools.get(tool_key, 0)
     called_tools[tool_key] = dup_count + 1
     if dup_count >= 1:
+        # For batch_extract_symbols/extract_symbol: show module progress
+        if parsed['tool'] in ("batch_extract_symbols", "extract_symbol"):
+            _progress = _build_module_progress_msg(agent)
+            if _progress:
+                _target = (parsed.get('args') or {}).get('target', '?')
+                _add_user_msg(messages, (
+                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: "
+                    f"Du har allerede dette resultat for {_target}.\n\n"
+                    f"📊 Fremgang:\n{_progress}\n\n"
+                    f"Gå videre til næste modul med batch_extract_symbols."
+                ))
+                return None
         _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
         return None
     if parsed["tool"] in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
@@ -3828,7 +3899,21 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     called_tools[tool_key] = dup_count + 1
                 if tool_name not in ("run_tests", "list_symbols") and dup_count >= 1:
                     consecutive_dedups += 1
-                    dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
+                    # For batch_extract_symbols/extract_symbol: show module progress
+                    # so the LLM knows which modules are done and what to do next
+                    if tool_name in ("batch_extract_symbols", "extract_symbol"):
+                        _progress = _build_module_progress_msg(agent)
+                        if _progress:
+                            dup_err = (
+                                f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: "
+                                f"Du har allerede dette resultat for {args_val.get('target', '?')}.\n\n"
+                                f"📊 Fremgang:\n{_progress}\n\n"
+                                f"Gå videre til næste modul med batch_extract_symbols."
+                            )
+                        else:
+                            dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
+                    else:
+                        dup_err = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}"
                     _add_user_msg(messages, dup_err)
                     messages.append({"role": "user", "content": dup_err})
                     yield {"type": "tool_call", "tool": tool_name, "args": args_val}
@@ -3843,14 +3928,24 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                             # Prune active_tools to WRITE_TOOLS only — LLM cannot read anymore
                             agent.tool_registry.active_tools = write_tools
                             tools_param = agent.tool_registry.get_openai_tools_for_active() if _use_native_tools(agent) else []
-                            reminder = (
-                                f"[SYSTEM: Du er i en l\u00f8kke med identiske resultater. "
-                                f"KUN skrivev\u00e6rkt\u00f8jer er tilg\u00e6ngelige nu: "
-                                f"{', '.join(write_tools)}. "
-                                f"Respond ONLY with a tool call.]"
-                            )
+                            # For batch_extract_symbols: show concrete next step
+                            _progress = _build_module_progress_msg(agent)
+                            if _progress:
+                                reminder = (
+                                    f"[SYSTEM: Du er i en løkke med identiske resultater. "
+                                    f"STOP med at kalde batch_extract_symbols for det samme modul.\n\n"
+                                    f"📊 Fremgang:\n{_progress}\n\n"
+                                    f"Gå videre til næste modul nu.]"
+                                )
+                            else:
+                                reminder = (
+                                    f"[SYSTEM: Du er i en løkke med identiske resultater. "
+                                    f"KUN skriveværktøjer er tilgængelige nu: "
+                                    f"{', '.join(write_tools)}. "
+                                    f"Respond ONLY with a tool call.]"
+                                )
                             messages.append({"role": "system", "content": reminder})
-                            agent._log("SYSTEM", "Dedup-loop escape", f"pruned to {write_tools}")
+                            agent._log("SYSTEM", "Dedup-loop escape", f"pruned to {write_tools}, progress={bool(_progress)}")
                             consecutive_dedups = 0
                     continue
                 consecutive_dedups = 0
