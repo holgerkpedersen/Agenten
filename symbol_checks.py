@@ -20,7 +20,11 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
     mapping: dict[str, list[str]] = {}
     current_mod: str | None = None
 
-    for line in plan_content.splitlines():
+    # Normalize: insert newline before ## headings that appear mid-line
+    # (handles single-line plans like "... Symboler (10): ... ## Module: file.py ...")
+    _normalized = re.sub(r'(?<=\S)\s+(?=##\s)', '\n', plan_content)
+
+    for line in _normalized.splitlines():
         # Reset on non-module headings
         heading_m = re.match(r'^#{2,6}\s+\S', line)
         if heading_m and '.py' not in line:
