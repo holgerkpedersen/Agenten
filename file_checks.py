@@ -114,8 +114,13 @@ def _extract_modules_from_plan(plan_content: str, ext: str = ".py", allow_nested
         rf"^\s*#{1,6}\s+[\d\.\)]*\s*([\w./-]+{ext_pattern})\b",
         re.MULTILINE,
     )
+    # Also match "## Module: file.py" (colon-separated heading)
+    module_heading_pat = re.compile(
+        rf"^\s*#{1,6}\s+[Mm]odul[er]*\s*\d*:?\s*([\w./-]+{ext_pattern})\b",
+        re.MULTILINE,
+    )
     inline_pat = re.compile(rf"\b([\w./-]+{ext_pattern})\b")
-    for pat in (heading_pat, inline_pat):
+    for pat in (heading_pat, module_heading_pat, inline_pat):
         for m in pat.finditer(plan_content):
             name = m.group(1).strip()
             if not name:
