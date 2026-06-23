@@ -3744,6 +3744,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
     consecutive_reads = 0
     consecutive_failures = 0
     consecutive_same_tool = 0
+    consecutive_text_only = 0
     last_tool_name = ""
     last_name_arg = ""
     READ_ONLY_TOOLS = {"read_location", "read_chunk", "list_chunks", "list_files", "list_symbols", "locate", "read_issue"}
@@ -4612,7 +4613,13 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
         _add_user_msg(messages, t(K.TOOL_NO_RESULT, agent.lang))
         messages = _truncate_messages(messages, agent.max_conversation_chars, agent)
         full_response = response
-        if i >= 3 and not called_tools:
+        # Break if 3+ consecutive text-only responses (no tool calls in this iteration)
+        if parsed["type"] == "text":
+            consecutive_text_only += 1
+        else:
+            consecutive_text_only = 0
+        if i >= 3 and consecutive_text_only >= 3:
+            agent._log("SYSTEM", "Text-only loop escape", f"{consecutive_text_only} consecutive text-only responses")
             break
 
     yield from _finalize_task_stream(agent, task_node, full_response, text_fallback, called_tools, _report_logs, original_prompt, messages)
