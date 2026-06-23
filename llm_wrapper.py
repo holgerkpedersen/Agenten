@@ -12,6 +12,9 @@ from config import get_logger
 from typing import Any, Generator
 log = get_logger(__name__)
 
+# Models whose Jinja chat template requires system messages at position 0
+SYSTEM_FIRST_KEYWORDS = ["qwen", "nemotron", "glm"]
+
 
 class LMStudioWrapper:
     """lmstudio wrapper."""
@@ -220,6 +223,17 @@ class LMStudioWrapper:
                 compressed.append({**m, "content": compressed_content})
             else:
                 compressed.append(m)
+
+        # Ensure system messages are at the beginning for models that require it
+        model_lower = (self.model or "").lower()
+        needs_system_first = any(kw in model_lower for kw in SYSTEM_FIRST_KEYWORDS)
+        if needs_system_first and len(compressed) > 1:
+            sys_msgs = [m for m in compressed if m.get("role") == "system"]
+            other_msgs = [m for m in compressed if m.get("role") != "system"]
+            if sys_msgs and compressed[0].get("role") != "system":
+                log.info("Moving %d system message(s) to beginning for model %s", len(sys_msgs), self.model)
+                compressed = sys_msgs + other_msgs
+
         return compressed
 
     def generate(self, prompt: str | None = None, messages: list[dict] | None = None, temperature: float = 0.7, max_tokens: int | None = None, use_cache: bool = True, images: list | None = None) -> str:
