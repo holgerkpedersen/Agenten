@@ -3695,6 +3695,35 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
             yield {"type": "complete", "message": _msg[:200]}
             return
 
+    # Prerequisite check: Opdatér requires Ekstraher to have run (at least one module created)
+    if agent.active_template == "refactor" and _normalize_phase(task_node.name) == "opdatér":
+        _wd_check = os.environ.get('AGENT_WORKDIR', '')
+        _refactor_plan_path = getattr(agent, '_refactor_plan_path', '')
+        _plan_path = _refactor_plan_path or "refactor_plan.md"
+        if _wd_check and not os.path.isabs(_plan_path):
+            _plan_path = os.path.join(_wd_check, _plan_path)
+        if os.path.exists(_plan_path):
+            try:
+                with open(_plan_path, 'r', encoding='utf-8') as f:
+                    _plan_content = f.read()
+                _modules = re.findall(r'##\s+Module:\s+(\S+\.py)', _plan_content)
+                if _modules:
+                    _any_exists = False
+                    for _mod in _modules:
+                        _mod_path = os.path.join(_wd_check or '.', _mod) if _wd_check else _mod
+                        if os.path.exists(_mod_path):
+                            _any_exists = True
+                            break
+                    if not _any_exists:
+                        _msg = (f"Ekstraher har ikke oprettet nogen modulfiler endnu. "
+                                f"Opdatér kan ikke køre uden moduler. Kør Ekstraher først.")
+                        agent._log("ERROR", "Opdatér prerequisite missing", _msg)
+                        task_node.status = "failed"
+                        yield {"type": "complete", "message": _msg[:200]}
+                        return
+            except Exception:
+                pass
+
     # If resuming from pause, use saved messages directly
     if saved_messages:
         messages = list(saved_messages)
