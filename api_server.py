@@ -2391,6 +2391,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Agenten API Server')
     parser.add_argument('--workdir', '-w', type=str, default='',
                         help='Arbejdsmappe for filoperationer (f.eks. stien til projektet agenten skal arbejde på)')
+    parser.add_argument('--port', '-p', type=int, default=5000,
+                        help='Port til API-serveren (default: 5000)')
     args = parser.parse_args()
     if args.workdir:
         workdir_abs = os.path.abspath(args.workdir)
@@ -2408,7 +2410,7 @@ if __name__ == "__main__":
     log.info("=" * 50)
     log.info("Dansk Agent API starter...")
     log.info("Startet: %s", started)
-    log.info("http://localhost:5000")
+    log.info("http://localhost:%s", args.port)
     log.info("Static mappe: %s", STATIC_DIR)
     log.info("api_server=%s | agent_core=%s | llm=%s", BUILD_INFO['api_server.py'], BUILD_INFO['agent_core.py'], BUILD_INFO['llm_wrapper.py'])
     log.info("Sessions gemmes i: %s", _sessions_dir)
@@ -2417,4 +2419,4 @@ if __name__ == "__main__":
         log.info("Målprojekt: %s", workdir_abs)
     log.info("=" * 50)
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    app.run(debug=debug, use_reloader=False, port=5000, threaded=True)
+    app.run(debug=debug, use_reloader=False, port=args.port, threaded=True)
