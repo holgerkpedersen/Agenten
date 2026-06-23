@@ -893,10 +893,20 @@ def execute_without_stream() -> Any:
         with execution_status_lock:
             execution_status["results"] = results
             execution_status["running"] = False
+        # Save session after execution so tree status is persisted
+        try:
+            _save_session_data(current_session_id, agent, "da")
+        except Exception:
+            pass
         return jsonify({"success": True, "results": results, "total_tasks": total_tasks})
     except Exception as e:
         with execution_status_lock:
             execution_status["running"] = False
+        # Save session even on failure so partial progress is captured
+        try:
+            _save_session_data(current_session_id, agent, "da")
+        except Exception:
+            pass
         return jsonify({"success": False, "error": str(e)}), 500
 
 def _ensure_model_loaded(model_key: str | None) -> None:
