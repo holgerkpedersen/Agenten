@@ -3672,12 +3672,13 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
             yield {"type": "complete", "message": _msg[:200]}
             return
         # Auto-load refactor_analyse.md into file_chunks so Plan can read it
-        if "refactor_analyse.md" not in agent.file_chunks:
+        _chunk_key = "file_refactor_analyse.md"
+        if _chunk_key not in agent.file_chunks:
             try:
                 with open(_analyse_path_abs, 'r', encoding='utf-8') as _f:
                     _content = _f.read()
-                agent.file_chunks["refactor_analyse.md"] = agent_files.chunk_text(_content)
-                agent._log("INFO", "Auto-loaded refactor_analyse.md", f"{len(_content)} chars, {len(agent.file_chunks['refactor_analyse.md'])} chunks")
+                agent.file_chunks[_chunk_key] = agent_files.chunk_text(_content)
+                agent._log("INFO", "Auto-loaded refactor_analyse.md", f"{len(_content)} chars, {len(agent.file_chunks[_chunk_key])} chunks")
             except Exception as _exc:
                 agent._log("WARNING", f"Could not auto-load refactor_analyse.md: {_exc}", "")
 
@@ -3704,13 +3705,14 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
             yield {"type": "complete", "message": _msg[:200]}
             return
         # Auto-load refactor_plan.md into file_chunks so Ekstraher can read it
-        if "refactor_plan.md" not in agent.file_chunks:
+        _chunk_key = "file_refactor_plan.md"
+        if _chunk_key not in agent.file_chunks:
             _plan_abs = _alt if (_alt and os.path.isabs(_alt)) else (_plan_path if os.path.isabs(_plan_path) else os.path.join(_wd_check or '.', _plan_path))
             try:
                 with open(_plan_abs, 'r', encoding='utf-8') as _f:
                     _content = _f.read()
-                agent.file_chunks["refactor_plan.md"] = agent_files.chunk_text(_content)
-                agent._log("INFO", "Auto-loaded refactor_plan.md", f"{len(_content)} chars, {len(agent.file_chunks['refactor_plan.md'])} chunks")
+                agent.file_chunks[_chunk_key] = agent_files.chunk_text(_content)
+                agent._log("INFO", "Auto-loaded refactor_plan.md", f"{len(_content)} chars, {len(agent.file_chunks[_chunk_key])} chunks")
             except Exception as _exc:
                 agent._log("WARNING", f"Could not auto-load refactor_plan.md: {_exc}", "")
 
