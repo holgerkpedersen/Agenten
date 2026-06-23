@@ -3952,15 +3952,14 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     consecutive_same_tool = 0
                     last_tool_name = tool_name
 
-                # run_tests/list_symbols: skip dedup tracking
-                # run_tests is a side-effect tool, list_symbols manages its own cache
-                if tool_name in ("run_tests", "list_symbols"):
+                # run_tests: skip dedup tracking (side-effect tool, called multiple times legitimately)
+                if tool_name in ("run_tests",):
                     pass
                 else:
                     tool_key = tool_name + str(args_val)
                     dup_count = called_tools.get(tool_key, 0)
                     called_tools[tool_key] = dup_count + 1
-                if tool_name not in ("run_tests", "list_symbols") and dup_count >= 1:
+                if tool_name not in ("run_tests",) and dup_count >= 1:
                     consecutive_dedups += 1
                     # For batch_extract_symbols/extract_symbol: show module progress
                     # so the LLM knows which modules are done and what to do next
