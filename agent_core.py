@@ -696,9 +696,20 @@ class Agent:
             self._log("INFO", t(K.LOG_TREE_EXECUTION, self.lang), "")
             node = self.task_tree.root
         results = {}
+        cascade_skip = False
         for child in node.children:
-            child_results = self.execute_tree(child)
-            results[child.name] = child_results
+            if cascade_skip:
+                child.status = "skipped"
+                results[child.name] = {"status": "skipped", "message": "Forrige fase fejlede"}
+                self._log("INFO", f"Springer over {child.name}: Plan-fasen fejlede")
+            else:
+                child_results = self.execute_tree(child)
+                results[child.name] = child_results
+                if not cascade_skip and self.active_template == "refactor":
+                    phase = child.name.lower()
+                    if phase == "plan" and child.status == "failed":
+                        cascade_skip = True
+                        self._log("WARNING", "Plan-fasen fejlede — resterende faser (Ekstraher, Opdatér, Test) springes over")
         results[node.name] = self.solve_task(node, self.original_prompt)
         return results
 

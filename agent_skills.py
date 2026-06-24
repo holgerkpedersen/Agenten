@@ -158,10 +158,10 @@ TEMPLATE_TASK_TOOLS = {
     },
     "refactor": {
         "analyse": ["read_issue", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_refactor_issue", "analyze_dependencies", "write_file"],
-        "plan": ["read_issue", "update_issue_status", "write_file", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "analyze_dependencies", "suggest_module_groups"],
+        "plan": ["plan_phase", "create_todo", "update_todo", "list_todos", "delete_todo", "read_issue", "update_issue_status", "write_file", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "analyze_dependencies", "suggest_module_groups"],
         "ekstraher": ["list_symbols", "read_location", "locate", "write_file", "extract_symbol", "batch_extract_symbols", "verify_refactor", "add_method", "add_function", "list_chunks", "read_chunk"],
         "opdat\u00e9r": ["list_symbols", "read_location", "locate", "edit_file", "update_issue_status", "write_file", "remove_symbol", "add_import", "add_method", "add_function", "delete_file", "verify_refactor"],
-        "test": ["run_tests", "edit_file", "update_issue_status", "verify_refactor"],
+        "test": ["plan_phase", "create_todo", "update_todo", "list_todos", "delete_todo", "run_tests", "edit_file", "update_issue_status", "verify_refactor"],
     },
     "testgenerering": {
         "analyse": ["list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "run_tests", "create_issue", "create_refactor_issue"],

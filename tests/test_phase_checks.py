@@ -32,6 +32,9 @@ class FakeAgent:
         self._tests_failed = tests_failed
         self.messages = messages or []
 
+    def _log(self, level: str, message: str, log_file: str | None = None) -> None:
+        pass
+
 
 class FakeTask:
     def __init__(self, name: str) -> None:

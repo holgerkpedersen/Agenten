@@ -12,9 +12,6 @@ from config import get_logger
 from typing import Any, Generator
 log = get_logger(__name__)
 
-# Models whose Jinja chat template requires system messages at position 0
-SYSTEM_FIRST_KEYWORDS = ["qwen", "nemotron", "glm"]
-
 
 class LMStudioWrapper:
     """lmstudio wrapper."""
@@ -205,7 +202,7 @@ class LMStudioWrapper:
 
     def _compress_messages(self, messages: list[dict]) -> list[dict]:
         """compress messages.
-        
+
         Args:
             messages:"""
         compressed = []
@@ -223,22 +220,115 @@ class LMStudioWrapper:
                 compressed.append({**m, "content": compressed_content})
             else:
                 compressed.append(m)
-
-        # Ensure system messages are at the beginning for models that require it
-        model_lower = (self.model or "").lower()
-        needs_system_first = any(kw in model_lower for kw in SYSTEM_FIRST_KEYWORDS)
-        if needs_system_first and len(compressed) > 1:
-            sys_msgs = [m for m in compressed if m.get("role") == "system"]
-            other_msgs = [m for m in compressed if m.get("role") != "system"]
-            if sys_msgs and compressed[0].get("role") != "system":
-                log.info("Moving %d system message(s) to beginning for model %s", len(sys_msgs), self.model)
-                compressed = sys_msgs + other_msgs
-
         return compressed
+
+    def _merge_system_messages(self, messages: list[dict]) -> list[dict]:
+        """Merge consecutive system messages into a single one at position 0.
+
+        Some Jinja templates (qwen, nemotron) only accept ONE system message.
+        Multiple system messages cause 'System message must be at the beginning'
+        errors even when they ARE at position 0.
+        """
+        sys_msgs = [m for m in messages if m.get("role") == "system"]
+        other_msgs = [m for m in messages if m.get("role") != "system"]
+        if len(sys_msgs) <= 1:
+            return messages
+        merged_parts = []
+        for m in sys_msgs:
+            c = m.get("content", "")
+            if isinstance(c, str):
+                merged_parts.append(c)
+            elif isinstance(c, list):
+                for part in c:
+                    if part.get("type") == "text":
+                        merged_parts.append(part.get("text", ""))
+            else:
+                merged_parts.append(str(c))
+        merged = "\n\n".join(p for p in merged_parts if p.strip())
+        log.info("Merged %d system messages into one (%d chars)", len(sys_msgs), len(merged))
+        return [{"role": "system", "content": merged}] + other_msgs
+
+    def _ensure_system_first(self, messages: list[dict]) -> list[dict]:
+        """Ensure ALL system messages are at position 0. Unconditional — all models."""
+        if len(messages) <= 1:
+            return messages
+        sys_msgs = [m for m in messages if m.get("role") == "system"]
+        other_msgs = [m for m in messages if m.get("role") != "system"]
+        if not sys_msgs:
+            return messages
+        # Check if already correct: first N messages are all system
+        already_correct = all(m.get("role") == "system" for m in messages[:len(sys_msgs)])
+        if already_correct:
+            return messages
+        log.info("Moving %d system message(s) to beginning", len(sys_msgs))
+        return sys_msgs + other_msgs
+
+    def _prepare_body(
+        self,
+        msgs: list[dict],
+        temperature: float,
+        max_tokens: int,
+        stream: bool,
+        tools: list | None = None,
+    ) -> dict | None:
+        """Single chokepoint for ALL request construction.
+
+        Handles: compression, system message merging, system-first reorder,
+        truncation, validation, body construction.
+
+        Args:
+            msgs: Pre-built message list from _to_messages().
+            temperature:
+            max_tokens:
+            stream:
+            tools:
+        """
+        compressed = self._compress_messages(msgs)
+        compressed = self._ensure_system_first(compressed)
+
+        # Merge system messages for models whose Jinja templates require
+        # exactly one system message at the beginning (qwen, nemotron, glm).
+        # After _ensure_system_first, all system messages are at position 0,
+        # but qwen rejects having multiple system messages even in sequence.
+        if any(kw in self.model.lower() for kw in ("qwen", "nemotron", "glm")):
+            compressed = self._merge_system_messages(compressed)
+
+        if len(compressed) > 3:
+            compressed = self._truncate_messages(compressed)
+
+        # Validate: system message must be at position 0
+        if compressed and compressed[0].get("role") != "system":
+            log.error("CRITICAL: First message role=%s, expected 'system'. "
+                      "Messages: %s", compressed[0].get("role"),
+                      [m.get("role") for m in compressed[:5]])
+
+        # Log message order for debugging
+        log.info("Request to %s: %d messages, stream=%s, tools=%s",
+                 self.model, len(compressed), stream,
+                 len(tools) if tools else 0)
+        for mi, mm in enumerate(compressed):
+            role = mm.get("role", "?")
+            c = mm.get("content", "")
+            clen = len(c) if isinstance(c, str) else len(str(c))
+            log.info("  msg[%d] role=%s len=%d", mi, role, clen)
+
+        body: dict[str, Any] = {
+            "model": self.model,
+            "messages": compressed,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if stream:
+            body["stream"] = True
+        if tools:
+            body["tools"] = tools
+        if self.on_request:
+            self.on_request(body)
+        return body
 
     def generate(self, prompt: str | None = None, messages: list[dict] | None = None, temperature: float = 0.7, max_tokens: int | None = None, use_cache: bool = True, images: list | None = None) -> str:
         """generate.
-        
+
         Args:
             prompt:
             messages:
@@ -257,19 +347,8 @@ class LMStudioWrapper:
                     self._cache_access[cache_key] = time.time()
                     return self.cache[cache_key]
 
-        compressed = self._compress_messages(msgs)
-        log.info(f"Sending to LLM (chat, timeout: {self.timeout}s)")
-        if len(compressed) > 3:
-            compressed = self._truncate_messages(compressed)
-
-        body = {
-            "model": self.model,
-            "messages": compressed,
-            "temperature": temperature,
-            "max_tokens": max_tokens
-        }
-        if self.on_request:
-            self.on_request(body)
+        body = self._prepare_body(msgs, temperature, max_tokens, stream=False)
+        log.info("Sending to LLM (chat, timeout: %ss)", self.timeout)
         try:
             response = requests.post(
                 f"{self.base_url}/chat/completions",
@@ -339,7 +418,7 @@ class LMStudioWrapper:
 
     def generate_stream(self, prompt: str | None = None, messages: list[dict] | None = None, temperature: float = 0.7, max_tokens: int | None = None, images: list | None = None, tools: list | None = None) -> Generator[str, None, None]:
         """generate stream.
-        
+
         Args:
             prompt:
             messages:
@@ -347,18 +426,18 @@ class LMStudioWrapper:
             max_tokens:
             images:
             tools:
-        
+
         Yields:
             ..."""
         if max_tokens is None:
             max_tokens = config.MAX_TOKENS
         msgs = self._to_messages(prompt, messages, images)
-        compressed = self._compress_messages(msgs)
+        body = self._prepare_body(msgs, temperature, max_tokens, stream=True, tools=tools)
         self._pending_tool_calls.clear()
         self._pending_reasoning = None
         if images:
             log.info("Sending %s images with model %s", len(images), self.model)
-            for i, m in enumerate(compressed):
+            for i, m in enumerate(body["messages"]):
                 c = m.get("content","")
                 if isinstance(c, list):
                     for j, part in enumerate(c):
@@ -368,21 +447,7 @@ class LMStudioWrapper:
                             log.debug("  msg[%s] content[%s] type=%s url_len=%s url_start=%s...", i, j, t, len(url), url[:50])
                 elif isinstance(c, str):
                     log.info("  msg[%s] type=text len=%s", i, len(c))
-        log.info("Streaming chat request to LLM")
-        if len(compressed) > 3:
-            compressed = self._truncate_messages(compressed)
         stream_timeout = self._stream_timeout
-        body = {
-            "model": self.model,
-            "messages": compressed,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "stream": True
-        }
-        if tools:
-            body["tools"] = tools
-        if self.on_request:
-            self.on_request(body)
         try:
             workdir = os.environ.get('AGENT_WORKDIR') or os.getcwd()
             req_dir = os.path.join(workdir, "logs", "llm_requests")

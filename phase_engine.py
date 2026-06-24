@@ -400,11 +400,11 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
                 _plan_path = _plan_candidate
         if not _plan_path:
             _wd = os.environ.get('AGENT_WORKDIR', '')
-            if _wd:
+            if _wd and not base_dir:
                 _plan_candidate = os.path.join(_wd, "refactor_plan.md")
                 if os.path.exists(_plan_candidate):
                     _plan_path = _plan_candidate
-        if not _plan_path and os.path.exists("refactor_plan.md"):
+        if not _plan_path and not base_dir and os.path.exists("refactor_plan.md"):
             _plan_path = "refactor_plan.md"
         _target = None
         if _plan_path:
@@ -456,9 +456,11 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
             if os.path.exists(_cand):
                 _plan_src = _cand
         if not _plan_src:
-            _wd = os.environ.get('AGENT_WORKDIR', '')
-            _plan_src = os.path.join(_wd, "refactor_plan.md") if _wd else "refactor_plan.md"
-        if os.path.exists(_plan_src):
+            # Only fall back if no explicit base_dir was given
+            if not base_dir:
+                _wd = os.environ.get('AGENT_WORKDIR', '')
+                _plan_src = os.path.join(_wd, "refactor_plan.md") if _wd else "refactor_plan.md"
+        if _plan_src and os.path.exists(_plan_src):
             try:
                 from file_checks import _parse_refactor_plan_modules
                 _mods = _parse_refactor_plan_modules(_plan_src)
