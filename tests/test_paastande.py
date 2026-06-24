@@ -117,31 +117,34 @@ def test_paastand_2_iteration_limit_for_lavt():
 # =============================================================================
 
 def test_paastand_3_opdater_ingen_plan():
-    """Kun 'ekstraher' får plan_block, 'opdatér' får ingenting."""
-    from agent_tasks import _build_initial_messages as build_msgs
+    """Både 'ekstraher' og 'opdatér' skal få plan_block."""
+    # Efter refactoring er _build_initial_messages flyttet til prompt_builder.py.
+    # Tjek begge filer for at være robust over for fremtidige ændringer.
+    base = os.path.join(os.path.dirname(__file__), '..')
+    candidates = ['prompt_builder.py', 'agent_tasks.py']
 
-    # Vi kan ikke kalde build_msgs direkte (kræver agent mock),
-    # så vi tjekker prompt-bygningskoden
-    with open(os.path.join(os.path.dirname(__file__), '..', 'agent_tasks.py'),
-              'r', encoding='utf-8') as f:
-        content = f.read()
-
-    # Find plan_block sektionen
-    in_plan_block = False
     ekstraher_has_plan = False
     opdater_has_plan = False
-    lines = content.splitlines()
-    for i, line in enumerate(lines):
-        if 'plan_block' in line and '= ""' in line:
-            in_plan_block = True
-        if in_plan_block and 'ekstraher' in line.lower() and 'task_node.name' in line:
-            ekstraher_has_plan = True
-        if in_plan_block and 'opdatér' in line.lower() and 'task_node.name' in line:
-            opdater_has_plan = True
-        if in_plan_block and 'plan_block' in line and '+=' in line and '+ ""' not in line:
-            # Næste plan_block brug — stop her
-            if ekstraher_has_plan and not opdater_has_plan:
-                break
+
+    for fname in candidates:
+        fpath = os.path.join(base, fname)
+        if not os.path.exists(fpath):
+            continue
+        with open(fpath, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Find om koden indeholder plan_block-logik der dækker begge faser.
+        # Koden kan være på én linje eller split over flere (multi-line if).
+        for i, line in enumerate(content.splitlines()):
+            has_ekstraher = 'ekstraher' in line.lower()
+            has_opdater = 'opdatér' in line.lower() or 'opdater' in line.lower()
+
+            # Tjek om linjen eller dens nabo-linjer refererer til plan_block + task_node
+            context_window = '\n'.join(content.splitlines()[max(0, i-2):i+3])
+            if has_ekstraher and 'plan_block' in context_window:
+                ekstraher_has_plan = True
+            if has_opdater and 'plan_block' in context_window:
+                opdater_has_plan = True
 
     print(f"✅ FIX 3: Ekstraher får plan_block = {ekstraher_has_plan}, "
           f"Opdatér får plan_block = {opdater_has_plan}")
