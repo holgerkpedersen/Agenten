@@ -3971,7 +3971,15 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     elif phase_lower == "ekstraher":
                         budget_msg += "\n\nRækkefølge: 1) list_symbols 2) extract_symbol (gentag) 3) add_function/add_method kun hvis nødvendigt 4) verify_refactor"
                 # If LLM hasn't called plan_phase yet, nudge it (from iteration 0)
-                if not getattr(agent, '_llm_has_planned', False):
+                # Skip for Analyse/Plan in refactor template — these phases have a single
+                # file deliverable (refactor_analyse.md / refactor_plan.md) and plan_phase
+                # distracts the LLM from calling write_file
+                _phase_lower = _normalize_phase(task_node.name).lower() if hasattr(task_node, 'name') else ''
+                _skip_plan_nudge = (
+                    getattr(agent, 'active_template', '') == 'refactor'
+                    and _phase_lower in ('analyse', 'plan')
+                )
+                if not getattr(agent, '_llm_has_planned', False) and not _skip_plan_nudge:
                     _has_auto_template = bool(getattr(agent, '_llm_todos', None))
                     if _has_auto_template:
                         # Has auto-populated template todos — nudge to detail them
@@ -3987,7 +3995,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                             messages.append({"role": "system", "content": msg})
                             budget_msg += "\n\n⛔ " + msg
                 # Also nudge to update_todo if LLM isn't marking progress
-                elif i >= 1:
+                elif i >= 1 and not _skip_plan_nudge:
                     _any_updated = any(t.get("done") for t in (getattr(agent, '_llm_todos') or []))
                     if not _any_updated:
                         _has_auto = bool(getattr(agent, '_llm_todos', None))
@@ -4003,7 +4011,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     if _awd:
                         _apath = os.path.join(_awd, _apath)
                     if not os.path.exists(_apath) and i >= 1:
-                        budget_msg += "\n\n📝 **SIDSTE HANDLING: Skriv analysen til `refactor_analyse.md` med write_file()** — før du kan afslutte."
+                        _wmsg = "⛔ Du SKAL kalde write_file(path='refactor_analyse.md', content='...') nu. Det er din eneste opgave i denne fase. Kald IKKE plan_phase, list_symbols eller read_location igen."
+                        messages.append({"role": "system", "content": _wmsg})
+                        budget_msg += "\n\n" + _wmsg
                 # For Plan: remind to write refactor_plan.md if not done yet
                 if getattr(agent, 'active_template', '') == 'refactor' and _normalize_phase(task_node.name).lower() == "plan":
                     _ppath = "refactor_plan.md"
@@ -4011,7 +4021,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     if _pwd:
                         _ppath = os.path.join(_pwd, _ppath)
                     if not os.path.exists(_ppath) and i >= 1:
-                        budget_msg += "\n\n📝 **SIDSTE HANDLING: Skriv planen til `refactor_plan.md` med write_file()** — du har allerede læst analysen. Brug write_file med den fulde plan."
+                        _wmsg = "⛔ Du SKAL kalde write_file(path='refactor_plan.md', content='...') nu. Det er din eneste opgave i denne fase. Kald IKKE plan_phase, list_symbols eller read_location igen."
+                        messages.append({"role": "system", "content": _wmsg})
+                        budget_msg += "\n\n" + _wmsg
                 messages.append({"role": "user", "content": budget_msg})
                 yield {"type": "budget", "iteration": i + 1, "max": max_iterations, "remaining": remaining}
             _save_llm_prompt_file(agent, task_node.name, i, messages)
