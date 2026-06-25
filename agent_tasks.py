@@ -1643,7 +1643,9 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     tool_key = parsed['tool'] + str(parsed.get('args', {}))
     dup_count = called_tools.get(tool_key, 0)
     called_tools[tool_key] = dup_count + 1
-    if dup_count >= 1:
+    # verify_refactor results change as symbols are extracted — don't dedup-block
+    _DEDUP_EXEMPT = {"verify_refactor"}
+    if dup_count >= 1 and parsed['tool'] not in _DEDUP_EXEMPT:
         # For batch_extract_symbols/extract_symbol: show module progress
         if parsed['tool'] in ("batch_extract_symbols", "extract_symbol"):
             _progress = _build_module_progress_msg(agent)
@@ -1661,6 +1663,21 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     if parsed["tool"] in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
         _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_ISSUE_RESOLVED, agent.lang)}")
         return None
+
+    # Block docs/ writes during Ekstraher — they waste iterations on status reports
+    if parsed["tool"] == "write_file" and isinstance(parsed.get("args"), dict):
+        _wf_path = (parsed.get("args") or {}).get("path", "")
+        _phase_lower = _normalize_phase(task_node.name).lower() if hasattr(task_node, 'name') else ''
+        if getattr(agent, 'active_template', '') == 'refactor' and _phase_lower == "ekstraher":
+            _wf_norm = _wf_path.replace("\\", "/").lower()
+            if _wf_norm.startswith("docs/") or "/docs/" in _wf_norm or _wf_norm.endswith(".md") and not _wf_norm.endswith("refactor_plan.md"):
+                _add_user_msg(messages, (
+                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: "
+                    f"Skriv IKKE dokumentation eller statusrapporter i Ekstraher-fasen. "
+                    f"Brug batch_extract_symbols til at oprette manglende .py moduler. "
+                    f"Tjek 'Mangler' listen i din budget-besked."
+                ))
+                return None
 
     # In test phases, force write_file as the first tool call — block reads before write
     if "test" in _normalize_phase(task_node.name):
@@ -1708,6 +1725,11 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
         if _f:
             agent._list_symbols_cache[_f] = result
     if parsed["tool"] in ("extract_symbol", "batch_extract_symbols") and isinstance(parsed.get("args"), dict):
+        _src = parsed["args"].get("source", "")
+        if _src in getattr(agent, '_list_symbols_cache', {}):
+            del agent._list_symbols_cache[_src]
+    # verify_refactor: clear source symbol cache so next list_symbols sees updated file
+    if parsed["tool"] == "verify_refactor" and isinstance(parsed.get("args"), dict):
         _src = parsed["args"].get("source", "")
         if _src in getattr(agent, '_list_symbols_cache', {}):
             del agent._list_symbols_cache[_src]
@@ -3206,13 +3228,38 @@ def _check_refactor_progress(agent: Any | None = None, prompt: str = "") -> str:
         modules = _re.findall(r'`([a-zA-Z_][\w.]+\.py)`', plan_content)
         if modules:
             modules = sorted(set(modules))
-            existing = [m for m in modules if _os.path.exists(m)]
-            remaining = [m for m in modules if m not in existing]
+            # Parse symbol mapping to verify each module has its planned symbols
+            try:
+                import symbol_checks as _sc
+                sym_map = _sc._parse_plan_symbol_mapping(plan_content)
+            except Exception:
+                sym_map = {}
+            existing_complete = []
+            existing_partial = []
+            remaining = []
+            for m in modules:
+                if not _os.path.exists(m):
+                    remaining.append(m)
+                else:
+                    planned_syms = sym_map.get(m, [])
+                    if planned_syms:
+                        actual_syms = set(_get_symbol_names_in_file(m))
+                        missing_in_mod = [s for s in planned_syms if s not in actual_syms]
+                        if missing_in_mod:
+                            existing_partial.append("{} (mangler {}/{}: {})".format(
+                                m, len(missing_in_mod), len(planned_syms),
+                                ', '.join(missing_in_mod[:5])))
+                        else:
+                            existing_complete.append(m)
+                    else:
+                        existing_complete.append(m)
             total = len(modules)
-            if existing:
-                parts.append("Allerede oprettet ({}/{}): {}".format(len(existing), total, ', '.join(existing)))
+            if existing_complete:
+                parts.append("Komplet ({}/{}): {}".format(len(existing_complete), total, ', '.join(existing_complete)))
+            if existing_partial:
+                parts.append("Ufuldstændig ({}/{}): {}".format(len(existing_partial), total, ', '.join(existing_partial)))
             if remaining:
-                parts.append("Mangler ({}/{}): {}".format(len(remaining), total, ', '.join(remaining)))
+                parts.append("⚠️ MANGLER ({}/{}): {}".format(len(remaining), total, ', '.join(remaining)))
 
     # Always count symbols in source file (fallback when no plan exists)
     try:
@@ -4120,7 +4167,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                     tool_key = tool_name + str(args_val)
                     dup_count = called_tools.get(tool_key, 0)
                     called_tools[tool_key] = dup_count + 1
-                if tool_name not in ("run_tests",) and dup_count >= 1:
+                if tool_name not in ("run_tests", "verify_refactor") and dup_count >= 1:
                     consecutive_dedups += 1
                     # For batch_extract_symbols/extract_symbol: show module progress
                     # so the LLM knows which modules are done and what to do next
@@ -4347,6 +4394,24 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                         continue
                 # Plan-deviation check: block batch_extract_symbols if symbols go to wrong module
+                # Block docs/ writes during Ekstraher — they waste iterations on status reports
+                if tool_name == "write_file" and isinstance(args_val, dict):
+                    _wf_path = args_val.get("path", "")
+                    _phase_lower = _normalize_phase(task_node.name).lower() if hasattr(task_node, 'name') else ''
+                    if getattr(agent, 'active_template', '') == 'refactor' and _phase_lower == "ekstraher":
+                        _wf_norm = _wf_path.replace("\\", "/").lower()
+                        if _wf_norm.startswith("docs/") or "/docs/" in _wf_norm or (_wf_norm.endswith(".md") and not _wf_norm.endswith("refactor_plan.md")):
+                            _block_msg = (
+                                "[SYSTEM: Skriv IKKE dokumentation eller statusrapporter i Ekstraher-fasen. "
+                                "Brug batch_extract_symbols til at oprette manglende .py moduler. "
+                                "Tjek 'Mangler' listen i din budget-besked.]"
+                            )
+                            messages.append({"role": "user", "content": _block_msg})
+                            yield {"type": "tool_call", "tool": tool_name, "args": args_val}
+                            yield {"type": "tool_result", "tool": tool_name, "args": args_val,
+                                   "result": {"success": False, "error": "docs writes blocked in Ekstraher"}}
+                            agent._log("SYSTEM", "docs write blocked in Ekstraher", _wf_path)
+                            continue
                 if tool_name == "batch_extract_symbols" and isinstance(args_val, dict):
                     _planned = getattr(agent, '_planned_symbols_per_target', None)
                     if _planned:
