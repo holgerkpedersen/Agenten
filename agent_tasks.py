@@ -2578,6 +2578,7 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                 if sym_result.get("success"):
                     remaining = len(sym_result.get("symbols", []))
                     if remaining >= 50:
+                        _path = "ekstraher_remaining"
                         task_node.status = "failed"
                         full_response = t(K.LOG_EXTRACT_INCOMPLETE, agent.lang).format(
                             remaining=remaining
@@ -2587,14 +2588,19 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
 
         # Per-module symbol validation: check that ALL planned symbols exist
         # in their target modules, not just that the source was emptied.
+        # NOTE: Only run for ekstraher phases — during Analyse/Plan modules
+        # don't exist yet, so validation would falsely fail.
         if task_node.status in ("done",):
-            try:
-                validation_msg = _validate_ekstraher_symbols(agent)
-                if validation_msg:
-                    task_node.status = "failed"
-                    full_response = validation_msg
-            except Exception:
-                pass
+            phase = _normalize_phase(task_node.name).lower()
+            if "ekstraher" in phase:
+                try:
+                    validation_msg = _validate_ekstraher_symbols(agent)
+                    if validation_msg:
+                        _path = "ekstraher_validation"
+                        task_node.status = "failed"
+                        full_response = validation_msg
+                except Exception:
+                    pass
 
     # For refactor Analyse: verify that refactor_analyse.md was actually written.
     # Prevents phases from being marked "done" when the model ran out of iterations
