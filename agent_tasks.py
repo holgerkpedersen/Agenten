@@ -509,8 +509,13 @@ def _validate_done_completion(
         )
 
     # Block done() in Analyse/Plan if LLM hasn't created its own plan
+    # Skip for refactor template — these phases deliver a .md file, not a plan
     _phase_check = _normalize_phase(task_node.name).lower()
-    if _phase_check in ("analyse", "plan") and not getattr(agent, '_llm_has_planned', False):
+    _skip_plan_required = (
+        getattr(agent, 'active_template', '') == 'refactor'
+        and _phase_check in ('analyse', 'plan')
+    )
+    if _phase_check in ("analyse", "plan") and not getattr(agent, '_llm_has_planned', False) and not _skip_plan_required:
         return (
             f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: Du kan ikke afslutte {task_node.name} "
             f"før du har oprettet din egen opgaveplan. Kald **plan_phase(fasenavn, mål)** "
