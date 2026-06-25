@@ -3480,15 +3480,25 @@ def _reconcile_llm_todos(agent: Any) -> list[str]:
                 ids.append(tid)
             continue
 
-        # Check if file mentioned in text exists
-        m = _re.search(r'([a-zA-Z_][\w./-]+\.py)', text)
-        if m:
-            fpath = m.group(1)
-            if _os.path.exists(fpath) and _os.path.getsize(fpath) > 0:
-                _actual = _count_symbols_in_file(fpath)
-                ids.append(tid)
-                # Also update text with symbol count
-                todo["text"] = f"Flyt symboler til {fpath} med batch_extract_symbols ({_actual} symbols)"
+        # For batch_extract_symbols calls, extract the TARGET module file
+        # (e.g. task_config.py from target='task_config.py') rather than
+        # the source file (agent_tasks.py from source='agent_tasks.py').
+        # The first .py match in the raw text is always the source file,
+        # which would cause ALL todos to point at the source file.
+        if "batch_extract_symbols" in text:
+            tm = _re.search(r"target=['\"]([^'\"]+\.py)['\"]", text)
+            fpath = tm.group(1) if tm else None
+        else:
+            fpath = None
+        if not fpath:
+            m = _re.search(r'([a-zA-Z_][\w./-]+\.py)', text)
+            if m:
+                fpath = m.group(1)
+        if fpath and _os.path.exists(fpath) and _os.path.getsize(fpath) > 0:
+            _actual = _count_symbols_in_file(fpath)
+            ids.append(tid)
+            # Also update text with symbol count
+            todo["text"] = f"Flyt symboler til {fpath} med batch_extract_symbols ({_actual} symbols)"
     return ids
 
 
