@@ -3268,7 +3268,7 @@ def _check_refactor_progress(agent: Any | None = None, prompt: str = "") -> str:
         if isinstance(result, dict) and result.get("success"):
             symbols = result.get("symbols", [])
             count = len(symbols) if isinstance(symbols, list) else 0
-            parts.append("{}: {} symbols tilbage (mål: ≤50)".format(_src, count))
+            parts.append("{}: {} symbols tilbage (mål: ≤50) og ingen flyttede funktioner tilbage i originalfilen".format(_src, count))
     except Exception:
         pass
 

@@ -23,6 +23,7 @@ from agent_tasks import _normalize_phase
 from config import get_logger, log
 import agent_issues
 import agent_autoresearch
+from refactoring_engine import clear_extracted_registry
 
 config.setup_logging()
 
@@ -470,6 +471,7 @@ def create_session() -> Any:
     current_session_id = session_id
     with agent.images_lock:
         agent.images = []  # clear images from previous session
+    clear_extracted_registry()  # nulstil extraction-register til ny session
     return jsonify({"success": True, "session_id": session_id, "session": session_data})
 
 @app.route("/api/sessions/load/<session_id>", methods=["GET"])

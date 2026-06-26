@@ -199,32 +199,33 @@ def _split_imports_from_code(content: str) -> tuple[str, str]:
 
 
 # Globalt register over allerede ekstraherede symboler pr. source-fil.
-# Nøgle: absolut sti til source-filen + hash af source-indhold.
+# Nøgle: absolut sti til source-filen.
 # Værdi: sæt af symbolnavne der allerede er flyttet til en target.
-# Nulstilles når source-filen ændres (ny mtime/hash).
+# Nulstilles eksplicit vha. clear_extracted_registry() ved sessionsstart.
 _extracted_registry: dict[str, set[str]] = {}
-_registry_source_hashes: dict[str, str] = {}
 
 
 def _registry_key(source: str) -> str:
-    """Generer en nøgle for registret: absolut sti + hash af source.
+    """Generer en nøgle for registret: absolut sti til source-filen.
 
-    Hashet sikrer at registret nulstilles når source-filen revertes
-    (f.eks. mellem sessioner) så symboler kan ekstraheres igen.
+    Tidligere brugte denne funktion et hash til at detektere source-reverts,
+    men det ødelagde registret efter hver extraction (fordi filen ændrer
+    sig når et symbol fjernes). Nu bruges kun absolut sti som nøgle.
     """
-    abspath = os.path.abspath(source)
-    try:
-        with open(abspath, 'rb') as f:
-            content = f.read()
-        h = hashlib.sha256(content).hexdigest()[:16]
-        old_h = _registry_source_hashes.get(abspath)
-        if old_h and old_h != h:
-            # Filen har ændret sig (revert/ny version) — nulstil registret
-            _extracted_registry.pop(abspath, None)
-        _registry_source_hashes[abspath] = h
-        return abspath
-    except (OSError, IOError):
-        return abspath
+    return os.path.abspath(source)
+
+
+def clear_extracted_registry(source: str | None = None) -> None:
+    """Nulstil registret for én eller alle source-filer.
+
+    Args:
+        source: Hvis angivet, nulstilles kun for denne fil.
+                Hvis None, nulstilles hele registret.
+    """
+    if source:
+        _extracted_registry.pop(os.path.abspath(source), None)
+    else:
+        _extracted_registry.clear()
 
 
 def _mark_extracted(source: str, symbol: str) -> None:
@@ -1145,12 +1146,30 @@ class RefactoringEngine:
             "missing_dependencies": missing_deps,
         }
 
+    @staticmethod
+    def _symbol_exists_in_target(target: str, symbol_name: str) -> bool:
+        """Tjek om et symbol allerede findes i target-filen via AST.
+
+        Forhindrer duplikatextractioner na r batch_extract_symbols kaldes
+        flere gange for samme symbol (f.eks. efter session-reset).
+        """
+        if not os.path.exists(target):
+            return False
+        try:
+            with open(target, 'r', encoding='utf-8') as f:
+                content = f.read()
+            tree = ast.parse(content)
+            return AstAnalyzer.find_node(tree, symbol_name) is not None
+        except (SyntaxError, OSError):
+            return False
+
     def move_symbol(self, source: str, symbol_name: str, target: str) -> dict[str, Any]:
         """Full move: extract + remove + add_import.
 
         Template Method pattern: defines the skeleton of a move operation.
         Steps:
-        1. Extract symbol to target (imports + code)
+        0. Check if symbol already exists in target (idempotent guard)
+        1. Extract symbol to target (imports + code) — skip if already exists
         2. Remove symbol from source
         3. Add import in source pointing to target module
         4. Verify source syntax
@@ -1179,18 +1198,32 @@ class RefactoringEngine:
 
         _t0 = _time.monotonic()
 
-        # Step 1: Extract
-        try:
-            extract_result = self.extract_symbol(source, symbol_name, target)
-            _t_extract = _time.monotonic() - _t0
-        except RefactoringError as e:
-            log.warning("move_symbol: extract FAILED for %s: %s", symbol_name, e)
-            return {
-                'success': False,
-                'error': f"Extract failed: {e}",
-                'step': 'extract',
-                'category': e.category,
+        # Step 0: Idempotent guard — check if symbol already exists in target
+        symbol_already_in_target = self._symbol_exists_in_target(target, symbol_name)
+
+        if symbol_already_in_target:
+            log.debug("move_symbol: %s already exists in %s — skipping extract",
+                      symbol_name, os.path.basename(target))
+            extract_result = {
+                "success": True,
+                "symbol": symbol_name,
+                "already_exists": True,
+                "note": f"Symbol '{symbol_name}' fandtes allerede i target — extract sprunget over",
             }
+            _t_extract = _time.monotonic() - _t0
+        else:
+            # Step 1: Extract
+            try:
+                extract_result = self.extract_symbol(source, symbol_name, target)
+                _t_extract = _time.monotonic() - _t0
+            except RefactoringError as e:
+                log.warning("move_symbol: extract FAILED for %s: %s", symbol_name, e)
+                return {
+                    'success': False,
+                    'error': f"Extract failed: {e}",
+                    'step': 'extract',
+                    'category': e.category,
+                }
 
         # Step 2: Remove
         _t1 = _time.monotonic()
@@ -1223,15 +1256,16 @@ class RefactoringEngine:
             }
 
         _t_total = _time.monotonic() - _t0
-        log.info("move_symbol OK: %s %s→%s (extract=%.3fs, remove=%.3fs, import=%.3fs, total=%.3fs)",
+        log.info("move_symbol OK: %s %s→%s (already_in_target=%s, extract=%.3fs, remove=%.3fs, import=%.3fs, total=%.3fs)",
                  symbol_name, os.path.basename(source), os.path.basename(target),
-                 _t_extract, _t_remove, _t_import, _t_total)
+                 symbol_already_in_target, _t_extract, _t_remove, _t_import, _t_total)
 
         return {
             'success': True,
             'symbol': symbol_name,
             'source': source,
             'target': target,
+            'already_in_target': symbol_already_in_target,
             'steps': {
                 'extract': extract_result,
                 'remove': remove_result,
