@@ -599,6 +599,23 @@ Opdaterede eksisterende tests i `tests/test_phase_checks.py` (3 tests: `test_pla
 
 **Files:** `agent_phase_checks.py:67-110` (2 nye helpers), `agent_tasks.py:80-130` (rewritten check), `agent_tasks.py:635-655` (early-abort logik), `agent_tasks.py:915-924, 1006-1024` (dedup tracking), `i18n.py:179` (ny KEY), `lang/{da,en,es,zh}.json:215` (ny key), `tests/test_session_175d41a5_phase2.py` (ny, 22 tests), `tests/test_session_175d41a5_fixes.py:65-105` (2 opdaterede tests)
 
+### 60. `_extracted_registry` hash-clearing makes `_is_already_extracted` always return False
+
+**Symptom:** `batch_extract_symbols` creates duplicate symbol definitions in target files when called more than once for the same source. Symbols remain in the source file even though `move_symbol` reports success.
+
+**Root cause (refactoring_engine.py:209-227):** `_registry_key()` used file SHA-256 hash to detect source-file reverts. Every `remove_symbol` call modifies the source file, changing its hash. The next `_registry_key()` call sees a new hash and **clears the entire registry** for that file. This means:
+1. `_is_already_extracted()` always returns False after the first extraction
+2. `batch_extract_symbols` re-extracts all symbols on every call → duplicates in target
+
+**Fix (3 parts):**
+1. **Remove hash-clearing from `_registry_key()`** — now just returns `os.path.abspath(source)`. Registry persists during the session without self-invalidation.
+2. **Add `_symbol_exists_in_target()` check in `move_symbol()`** — before extracting, checks via AST if the symbol already exists in the target file. If it does, skips the extract step (preventing duplicates) but still runs `remove_symbol` and `add_import`. Makes `batch_extract_symbols` fully idempotent.
+3. **Clear registry at session start** — `create_session()` in `api_server.py` calls `clear_extracted_registry()` to prevent stale entries from previous sessions.
+
+Also removed unused `_registry_source_hashes` global dict. Added public `clear_extracted_registry(source=None)` function.
+
+**Files:** `refactoring_engine.py:201-240,1149-1310`, `api_server.py:25,473`
+
 ## Model Knowledge
 
 See `skills/vision_models.md` for full vision model compatibility matrix.  
