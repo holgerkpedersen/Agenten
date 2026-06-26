@@ -155,6 +155,49 @@ class TestClassifyFailure:
         assert ftype != "incomplete"
 
 
+class TestCheckIssueFixApplied:
+    def test_incomplete_fix_not_applied(self):
+        """Real agent_tasks.py mangler dynamic budget — check returnerer False."""
+        from agent_autoresearch import _check_issue_fix_applied, FAILURE_INCOMPLETE
+        result = _check_issue_fix_applied(
+            FAILURE_INCOMPLETE, {"modules_planned": 3}, "refactor", "Ekstraher")
+        assert result is False
+
+    def test_incomplete_fix_applied(self):
+        """Mock agent_tasks.py med dynamic budget — check returnerer True."""
+        from agent_autoresearch import _check_issue_fix_applied, FAILURE_INCOMPLETE
+        from unittest.mock import mock_open, patch
+        import os
+        mock_source = (
+            "def _get_max_iterations(agent, task_name):\n"
+            "    if template == 'refactor' and task_lower == 'ekstraher':\n"
+            "        from file_checks import _parse_refactor_plan_modules\n"
+            "        pp = os.path.join(wd, 'refactor_plan.md')\n"
+            "        if os.path.exists(pp):\n"
+            "            mods = _parse_refactor_plan_modules(pp)\n"
+            "            if mods:\n"
+            "                return max(20, 2 + len(mods) * 2 + 5)\n"
+            "    return 6\n"
+        )
+        original_exists = os.path.exists
+        def _mock_exists(path):
+            if "agent_tasks.py" in str(path):
+                return True
+            return original_exists(path)
+        with patch("builtins.open", mock_open(read_data=mock_source)):
+            with patch("os.path.exists", _mock_exists):
+                result = _check_issue_fix_applied(
+                    FAILURE_INCOMPLETE, {}, "refactor", "Ekstraher")
+                assert result is True
+
+    def test_incomplete_fix_other_failure(self):
+        """Non-INCOMPLETE failure returnerer altid False."""
+        from agent_autoresearch import _check_issue_fix_applied, FAILURE_MISSING_TOOL
+        result = _check_issue_fix_applied(
+            FAILURE_MISSING_TOOL, {}, "refactor", "Ekstraher")
+        assert result is False
+
+
 class TestFindDuplicateIssue:
     def test_exact_match_same_template(self):
         from agent_autoresearch import _find_duplicate_issue
@@ -307,6 +350,91 @@ class TestTriggerIfNeeded:
                    "ufuldstændig" in call_args.get("title", "").lower()
             assert "modul_c.py" in call_args.get("description", "")
             assert call_args["type"] == "self"
+
+    def test_trigger_auto_resolves_when_fix_applied(self, tmp_path, monkeypatch):
+        """When duplicate findes og fix_applied=True → auto-resolve eksisterende issue."""
+        from agent_autoresearch import trigger_if_needed
+        import os
+        agent = MagicMock()
+        agent.active_template = "refactor"
+        agent.autoresearch_enabled = True
+        agent._session_id = "test-autoresolve-001"
+        agent._tool_log = []
+        agent._autoresearch_depth = 0
+        agent.tool_registry.active_tools = ["batch_extract_symbols", "verify_refactor"]
+        task_node = MagicMock()
+        task_node.name = "Ekstraher"
+        task_node.status = "failed"
+        monkeypatch.chdir(tmp_path)
+        plan = tmp_path / "refactor_plan.md"
+        plan.write_text(
+            "## Module: modul_a.py\n**Symboler (2):** sym1, sym2\n\n"
+            "## Module: modul_b.py\n**Symboler (2):** sym3, sym4\n\n"
+            "## Module: modul_c.py\n**Symboler (1):** sym5\n",
+            encoding="utf-8"
+        )
+        (tmp_path / "modul_a.py").write_text("def sym1(): pass\n")
+        (tmp_path / "modul_b.py").write_text("def sym3(): pass\n")
+        called_tools = {"batch_extract_symbols{}": 2}
+        with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
+             patch("agent_autoresearch._check_issue_fix_applied", return_value=True), \
+             patch("agent_issues._load_issues") as mock_load, \
+             patch("agent_issues.update_issue_status") as mock_update:
+            mock_load.return_value = {
+                "issues": [
+                    {"id": "CORE-101", "status": "open",
+                     "title": "Ufuldstændig ekstrahering i refactor/Ekstraher",
+                     "description": "**Template:** refactor\n**Fase:** Ekstraher"},
+                ]
+            }
+            result = trigger_if_needed(
+                agent, task_node, called_tools, "2/3 moduler færdige", [])
+            assert result is None  # No new issue created
+            mock_update.assert_called_once()
+            call_args = mock_update.call_args
+            assert call_args[0][1] == "CORE-101"
+            assert call_args[0][2] == "resolved"
+            assert "implementeret" in call_args[0][3]
+
+    def test_trigger_skips_when_fix_not_applied(self, tmp_path, monkeypatch):
+        """When duplicate findes og fix_applied=False → skip (ingen ny issue, ingen resolve)."""
+        from agent_autoresearch import trigger_if_needed
+        agent = MagicMock()
+        agent.active_template = "refactor"
+        agent.autoresearch_enabled = True
+        agent._session_id = "test-skip-001"
+        agent._tool_log = []
+        agent._autoresearch_depth = 0
+        agent.tool_registry.active_tools = ["batch_extract_symbols", "verify_refactor"]
+        task_node = MagicMock()
+        task_node.name = "Ekstraher"
+        task_node.status = "failed"
+        monkeypatch.chdir(tmp_path)
+        plan = tmp_path / "refactor_plan.md"
+        plan.write_text(
+            "## Module: modul_a.py\n**Symboler (2):** sym1, sym2\n\n"
+            "## Module: modul_b.py\n**Symboler (2):** sym3, sym4\n\n"
+            "## Module: modul_c.py\n**Symboler (1):** sym5\n",
+            encoding="utf-8"
+        )
+        (tmp_path / "modul_a.py").write_text("def sym1(): pass\n")
+        (tmp_path / "modul_b.py").write_text("def sym3(): pass\n")
+        called_tools = {"batch_extract_symbols{}": 2}
+        with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
+             patch("agent_autoresearch._check_issue_fix_applied", return_value=False), \
+             patch("agent_issues._load_issues") as mock_load, \
+             patch("agent_issues.update_issue_status") as mock_update:
+            mock_load.return_value = {
+                "issues": [
+                    {"id": "CORE-101", "status": "open",
+                     "title": "Ufuldstændig ekstrahering i refactor/Ekstraher",
+                     "description": "**Template:** refactor\n**Fase:** Ekstraher"},
+                ]
+            }
+            result = trigger_if_needed(
+                agent, task_node, called_tools, "2/3 moduler færdige", [])
+            assert result is None  # Duplicate → skippet
+            mock_update.assert_not_called()  # Ingen resolve
 
 
 class TestEventQueue:

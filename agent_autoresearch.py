@@ -293,6 +293,8 @@ def _find_duplicate_issue(failure_type: str, template: str,
                 "read_loop": ["laese-loop", "l\u00e6se-loop", "laeser gentagne",
                               "l\u00e6ser gentagne"],
                 "short_output": ["kort output", "for kort"],
+                "incomplete": ["ufuldst\u00e6ndig", "manglende moduler",
+                               "ikke alle moduler"],
                 "unknown": ["uforklaret"],
             }
             da_matches = da_labels.get(failure_type, [])
@@ -319,6 +321,39 @@ def _find_duplicate_issue(failure_type: str, template: str,
             return issue.get("id")
 
     return None
+
+
+def _check_issue_fix_applied(failure_type: str, evidence: dict,
+                             template: str, phase: str) -> bool:
+    """Return True if the fix for this failure type is already in the codebase,
+    meaning the existing CORE issue can be auto-resolved.
+
+    Checks the current code state programmatically. Only supports failure
+    types where a deterministic code-check is possible.
+    """
+    if failure_type == FAILURE_INCOMPLETE:
+        # Check if _get_max_iterations already has dynamic budget logic
+        # for refactor Ekstraher.
+        try:
+            import ast as _ast
+            _tasks_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "agent_tasks.py")
+            if not os.path.exists(_tasks_path):
+                return False
+            with open(_tasks_path, encoding="utf-8") as _f:
+                _tree = _ast.parse(_f.read())
+            for _node in _ast.walk(_tree):
+                if isinstance(_node, _ast.FunctionDef) and _node.name == "_get_max_iterations":
+                    _src = _ast.unparse(_node)
+                    # Dynamic budget: checks refactor plan and parses modules
+                    if "_parse_refactor_plan_modules" in _src and "refactor_plan.md" in _src:
+                        return True
+            return False
+        except Exception:
+            return False
+
+    # For unknown failure types, assume fix NOT applied (conservative)
+    return False
 
 
 def _check_filters(agent: Any, issue: dict | None = None,
@@ -418,13 +453,22 @@ def trigger_if_needed(agent: Any, task_node: Any,
 
     # Dedup
     try:
-        from agent_issues import _load_issues
+        from agent_issues import _load_issues, update_issue_status
         data = _load_issues()
         dup_id = _find_duplicate_issue(
             failure_type, template, phase, evidence, data.get("issues", []))
         if dup_id:
-            agent._log("AUTOR", f"Auto-research: dublet — {dup_id}",
-                       f"{failure_type} i {template}/{phase}")
+            # Check if the existing issue's fix is ALREADY applied
+            if _check_issue_fix_applied(failure_type, evidence, template, phase):
+                update_issue_status(
+                    agent, dup_id, "resolved",
+                    f"Auto-resolved: fix allerede implementeret i koden "
+                    f"(verificeret via {failure_type} check)")
+                agent._log("AUTOR", f"Auto-resolved {dup_id} — fix allerede implementeret",
+                           f"{failure_type} i {template}/{phase}")
+            else:
+                agent._log("AUTOR", f"Auto-research: dublet — {dup_id}",
+                           f"{failure_type} i {template}/{phase}")
             return None
     except Exception as exc:
         agent._log("AUTOR", "Auto-research: dedup fejlede", str(exc))
