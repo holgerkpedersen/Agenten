@@ -30,6 +30,7 @@ FAILURE_TOOL_FAILED       = "tool_failed"
 FAILURE_READ_LOOP         = "read_loop"
 FAILURE_SHORT_OUTPUT      = "short_output"
 FAILURE_PHASE_CHECK       = "phase_check"
+FAILURE_INCOMPLETE        = "incomplete"
 FAILURE_UNKNOWN           = "unknown"
 
 # ── Research log dir ───────────────────────────────────────────
@@ -228,6 +229,30 @@ def classify_failure(task_node: Any, called_tools: dict,
             "response_length": len(full_response),
             "response_preview": full_response[:100],
         }
+
+    # 5. INCOMPLETE — budget exhausted before all planned work completed
+    _phase_name = getattr(task_node, "name", "") or ""
+    _active_tmpl = getattr(agent, "active_template", "") or ""
+    _phase_v = _phase_name.lower()
+    if _active_tmpl == "refactor" and _phase_v in ("ekstraher", "opdatér"):
+        try:
+            import os as _os
+            _wd = _os.environ.get('AGENT_WORKDIR', '') or _os.getcwd()
+            _plan_path = _os.path.join(_wd, "refactor_plan.md")
+            if _os.path.exists(_plan_path):
+                from file_checks import _parse_refactor_plan_modules
+                mods = _parse_refactor_plan_modules(_plan_path)
+                if mods:
+                    created = [m for m in mods if _os.path.exists(m)]
+                    if len(created) < len(mods):
+                        return FAILURE_INCOMPLETE, {
+                            "modules_planned": len(mods),
+                            "modules_created": len(created),
+                            "missing_modules": sorted(set(mods) - set(created)),
+                            "all_modules": mods,
+                        }
+        except Exception:
+            pass
 
     return FAILURE_UNKNOWN, {
         "called_tools": list(called_names) if called_tools else [],
@@ -496,6 +521,11 @@ def _build_issue_title(failure_type: str, evidence: dict,
     elif failure_type == FAILURE_SHORT_OUTPUT:
         return (f"Kort output i {template}/{phase} "
                 f"— {evidence.get('response_length', 0)} tegn, ingen tools")
+    elif failure_type == FAILURE_INCOMPLETE:
+        p = evidence.get("modules_planned", "?")
+        c = evidence.get("modules_created", "?")
+        return (f"Ufuldstændig ekstrahering i {template}/{phase} "
+                f"— {c}/{p} moduler oprettet")
     else:
         return f"Uforklaret fejl i {template}/{phase}"
 
@@ -545,6 +575,26 @@ def _build_issue_description(failure_type: str, evidence: dict,
         lines.append("### Analyse")
         lines.append("LLM'en mangler kontekst til at skrive. "
                      "Overvej at øge iteration budget eller give en tom skabelon.")
+    elif failure_type == FAILURE_INCOMPLETE:
+        p = evidence.get("modules_planned", "?")
+        c = evidence.get("modules_created", "?")
+        missing = evidence.get("missing_modules", [])
+        lines.append("### Hvad skete der?")
+        lines.append(f"Fasen løb tør for iterationer før alt planlagt arbejde "
+                     f"var færdigt ({c}/{p} moduler oprettet).")
+        lines.append(f"Manglende moduler: {', '.join(missing)}")
+        lines.append("")
+        lines.append("### Analyse")
+        lines.append("LLM'en kaldte værktøjer korrekt, men iteration budgettet "
+                     "var for lavt til at fuldføre alle moduler. "
+                     "Budgettet skal beregnes dynamisk baseret på antal moduler "
+                     "i refactor_plan.md i stedet for at være fast.")
+        lines.append("")
+        lines.append("### Forventet næste skridt")
+        lines.append("1. Læs _get_max_iterations() i agent_tasks.py\n"
+                     "2. Beregn dynamisk budget: max(20, 2 + antal_moduler * 2 + 5)\n"
+                     "3. Tilføj system-besked når todos auto-opdateres\n"
+                     "4. Opdater instructions/refactor.json — fjern 'Brug update_todo'")
     else:
         lines.append("### Hvad skete der?")
         lines.append(f"Kaldte værktøjer: {evidence.get('called_tools', [])}")
@@ -569,6 +619,11 @@ def _build_issue_impact(failure_type: str, evidence: dict,
     elif failure_type == FAILURE_READ_LOOP:
         return (f"LLM'en læser uden at skrive i {template}/{phase}, "
                 f"hvilket spilder iterationer og fører til timeout.")
+    elif failure_type == FAILURE_INCOMPLETE:
+        c = evidence.get("modules_created", 0)
+        p = evidence.get("modules_planned", 0)
+        return (f"Kun {c}/{p} moduler blev oprettet i {template}/{phase}. "
+                f"Fasen kan ikke fuldføres før ALLE planlagte moduler findes.")
     else:
         return f"Fasen {phase} i {template} fejler af uforklarede årsager."
 
@@ -665,6 +720,47 @@ def _build_issue_fix(failure_type: str, evidence: dict,
             f"Løsning: Øg iteration budget for {template}/{phase} "
             f"i TEMPLATE_PHASE_ITERATION_LIMITS, eller tilføj "
             f"\"DIN FØRSTE handling SKAL være edit_file\" i instructions/{template}.json."
+        )
+
+    elif failure_type == FAILURE_INCOMPLETE:
+        p = evidence.get("modules_planned", 0)
+        c = evidence.get("modules_created", 0)
+        missing = evidence.get("missing_modules", [])
+        _current_budget = 20
+        try:
+            from config import TEMPLATE_PHASE_ITERATION_LIMITS
+            _current_budget = TEMPLATE_PHASE_ITERATION_LIMITS.get("refactor", {}).get("Ekstraher", 20)
+        except Exception:
+            pass
+        guess_budget = max(_current_budget, 2 + p * 2 + 5)
+        return (
+            f"Fasen \"{phase}\" i \"{template}\" løb tør for iterationer "
+            f"før ALLE planlagte moduler var oprettet ({c}/{p}).\n"
+            f"Manglende moduler: {', '.join(missing)}\n\n"
+            f"Tre forbedringer er nødvendige:\n\n"
+            f"=== 1. Dynamisk iteration budget (agent_tasks.py) ===\n"
+            f"I funktionen _get_max_iterations() tilføj et tjek for "
+            f"refactor/Ekstraher der beregner budgettet dynamisk:\n\n"
+            f"  if template == \"refactor\" and task_lower == \"ekstraher\":\n"
+            f"      import os\n"
+            f"      from file_checks import _parse_refactor_plan_modules\n"
+            f"      wd = os.environ.get('AGENT_WORKDIR', '') or os.getcwd()\n"
+            f"      pp = os.path.join(wd, 'refactor_plan.md')\n"
+            f"      if os.path.exists(pp):\n"
+            f"          mods = _parse_refactor_plan_modules(pp)\n"
+            f"          if mods:\n"
+            f"              return max({_current_budget}, 2 + len(mods) * 2 + 5)\n\n"
+            f"Anslået budget for denne fase: {guess_budget} iterationer "
+            f"(nuværende: {_current_budget} for refactor Ekstraher).\n\n"
+            f"=== 2. System-besked ved auto-todo opdatering (agent_tasks.py) ===\n"
+            f"I solve_task_stream(), efter _reconcile_llm_todos(), tilføj:\n\n"
+            f"  if _auto_done_ids:\n"
+            f"      messages.append({{'role': 'user', 'content':\n"
+            f"          f'[SYSTEM: ✅ TODO auto-opdateret: {{\", \".join(_auto_done_ids)}}]'}})\n\n"
+            f"=== 3. Fjern 'Brug update_todo' fra instruktion "
+            f"(instructions/refactor.json) ===\n"
+            f"Erstat '📋 Brug **update_todo** for at markere hvert modul færdigt.'\n"
+            f"med: '✅ TODO\\'er opdateres automatisk — spring update_todo over.'"
         )
 
     elif failure_type == FAILURE_SHORT_OUTPUT:

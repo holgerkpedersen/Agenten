@@ -101,6 +101,59 @@ class TestClassifyFailure:
         ftype, _ = classify_failure(mock_task_node, {}, [], "hej", mock_agent_readonly)
         assert ftype == "short_output"
 
+    def test_incomplete_ekstraher(self, tmp_path, monkeypatch):
+        from agent_autoresearch import classify_failure
+        agent = MagicMock()
+        agent.active_template = "refactor"
+        agent.tool_registry.active_tools = ["batch_extract_symbols", "verify_refactor"]
+        task_node = MagicMock()
+        task_node.name = "Ekstraher"
+        monkeypatch.chdir(tmp_path)
+        plan = tmp_path / "refactor_plan.md"
+        plan.write_text(
+            "## Module: modul_a.py\n**Symboler (2):** sym1, sym2\n\n"
+            "## Module: modul_b.py\n**Symboler (2):** sym3, sym4\n\n"
+            "## Module: modul_c.py\n**Symboler (1):** sym5\n",
+            encoding="utf-8"
+        )
+        # Only create 2 of 3 modules
+        (tmp_path / "modul_a.py").write_text("def sym1(): pass\ndef sym2(): pass\n")
+        (tmp_path / "modul_b.py").write_text("def sym3(): pass\ndef sym4(): pass\n")
+        called_tools = {"batch_extract_symbols{'source':'x','target':'modul_b.py'}": 1}
+        ftype, evidence = classify_failure(
+            task_node, called_tools, [], "lavet 2/3 moduler", agent)
+        assert ftype == "incomplete"
+        assert evidence.get("modules_planned") == 3
+        assert evidence.get("modules_created") == 2
+        assert "modul_c.py" in evidence.get("missing_modules", [])
+
+    def test_incomplete_not_refactor(self, mock_agent, mock_task_node):
+        from agent_autoresearch import classify_failure
+        called_tools = {"read_issue{}": 1}
+        ftype, _ = classify_failure(
+            mock_task_node, called_tools, [], "tekst", mock_agent)
+        assert ftype == "missing_tool"  # not incomplete — agent is issue_handler
+
+    def test_incomplete_all_modules_done(self, tmp_path, monkeypatch):
+        from agent_autoresearch import classify_failure
+        agent = MagicMock()
+        agent.active_template = "refactor"
+        agent.tool_registry.active_tools = ["batch_extract_symbols", "verify_refactor"]
+        task_node = MagicMock()
+        task_node.name = "Ekstraher"
+        monkeypatch.chdir(tmp_path)
+        plan = tmp_path / "refactor_plan.md"
+        plan.write_text(
+            "## Module: modul_a.py\n**Symboler (2):** sym1, sym2\n",
+            encoding="utf-8"
+        )
+        (tmp_path / "modul_a.py").write_text("def sym1(): pass\n")
+        called_tools = {"batch_extract_symbols{}": 1}
+        ftype, _ = classify_failure(
+            task_node, called_tools, [], "alt færdigt", agent)
+        # All modules exist → not incomplete, falls through to unknown
+        assert ftype != "incomplete"
+
 
 class TestFindDuplicateIssue:
     def test_exact_match_same_template(self):
@@ -216,6 +269,44 @@ class TestTriggerIfNeeded:
             result = trigger_if_needed(mock_agent, mock_task_node,
                                        {"read_issue{}": 1}, "", [])
             assert result == "CORE-999", f"Expected issue_id, got {result}"
+
+    def test_trigger_incomplete_creates_core_issue(self, tmp_path, monkeypatch):
+        """Integration test: refactor Ekstraher med 2/3 moduler → CORE-issue."""
+        from agent_autoresearch import trigger_if_needed
+        agent = MagicMock()
+        agent.active_template = "refactor"
+        agent.autoresearch_enabled = True
+        agent._session_id = "test-incomplete-001"
+        agent._tool_log = []
+        agent.tool_registry.active_tools = ["batch_extract_symbols", "verify_refactor"]
+        agent._autoresearch_depth = 0
+        task_node = MagicMock()
+        task_node.name = "Ekstraher"
+        task_node.status = "failed"
+        monkeypatch.chdir(tmp_path)
+        plan = tmp_path / "refactor_plan.md"
+        plan.write_text(
+            "## Module: modul_a.py\n**Symboler (2):** sym1, sym2\n\n"
+            "## Module: modul_b.py\n**Symboler (2):** sym3, sym4\n\n"
+            "## Module: modul_c.py\n**Symboler (1):** sym5\n",
+            encoding="utf-8"
+        )
+        (tmp_path / "modul_a.py").write_text("def sym1(): pass\n")
+        (tmp_path / "modul_b.py").write_text("def sym3(): pass\n")
+        called_tools = {"batch_extract_symbols{}": 2}
+        with patch("agent_autoresearch._rate_limit_ok", return_value=True), \
+             patch("agent_issues._load_issues") as mock_load, \
+             patch("agent_issues.create_issue") as mock_create:
+            mock_load.return_value = {"issues": [], "meta": {"total": 0}}
+            mock_create.return_value = {"success": True, "issue": {"id": "CORE-050"}}
+            result = trigger_if_needed(agent, task_node, called_tools, "2/3 moduler færdige", [])
+            assert result == "CORE-050"
+            mock_create.assert_called_once()
+            call_args = mock_create.call_args[1]
+            assert "incomplete" in call_args.get("title", "").lower() or \
+                   "ufuldstændig" in call_args.get("title", "").lower()
+            assert "modul_c.py" in call_args.get("description", "")
+            assert call_args["type"] == "self"
 
 
 class TestEventQueue:
