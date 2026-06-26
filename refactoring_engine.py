@@ -15,6 +15,7 @@ import ast
 import json
 import os
 import hashlib
+import textwrap
 import time as _time
 from typing import Any
 from collections import defaultdict
@@ -786,7 +787,7 @@ class RefactoringEngine:
             )
 
         start_line, end_line = AstAnalyzer.get_symbol_lines(lines, node)
-        symbol_code = '\n'.join(lines[start_line:end_line])
+        symbol_code = textwrap.dedent('\n'.join(lines[start_line:end_line]))
         symbol_type = AstAnalyzer.get_symbol_type(node)
         log.debug("extract_symbol: source_lines=%d-%d, type=%s, code=%s",
                   start_line + 1, end_line, symbol_type,
