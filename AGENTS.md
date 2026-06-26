@@ -604,6 +604,34 @@ Opdaterede eksisterende tests i `tests/test_phase_checks.py` (3 tests: `test_pla
 See `skills/vision_models.md` for full vision model compatibility matrix.  
 Key takeaway: Gemma requires raw_b64 + images-before-text. Qwen/GPT use data_url.
 
+### 5. Autoresearch: FAILURE_INCOMPLETE + auto-resolve af CORE-issues
+
+**`agent_autoresearch.py`: `FAILURE_INCOMPLETE`** — ny failure-type for når
+en refactor Ekstraher/Opdatér fase løber tør for iterationer før alle
+moduler er oprettet.
+
+**Detektion** i `classify_failure()`:
+- Tjekker `active_template == "refactor"` og fase `ekstraher`/`opdatér`
+- Parser `refactor_plan.md` for moduler via `_parse_refactor_plan_modules()`
+- Sammenligner med hvad der findes på disk
+- Returnerer `FAILURE_INCOMPLETE` med `modules_planned`, `modules_created`,
+  `missing_modules`, `all_modules` i evidence
+
+**Fix-proposal** i `_build_issue_fix()` inkluderer:
+- Dynamisk iteration budget i `_get_max_iterations()`: `max(current_budget, 2 + num_modules * 2 + 5)`
+- System-besked når todos auto-opdateres
+- Fjern 'Brug update_todo' fra `instructions/refactor.json`
+
+**Auto-resolve af CORE-issues**: `_check_issue_fix_applied()` verificerer
+programmatisk om et issues fix allerede er implementeret:
+- `FAILURE_INCOMPLETE`: AST-scan af `agent_tasks.py` efter `_get_max_iterations`
+  med `_parse_refactor_plan_modules` + `refactor_plan.md` i koden
+- Hvis fix er implementeret → `update_issue_status(issue, "resolved")`
+- Hvis fix ikke er implementeret → ignorer duplicate (ingen ny research)
+
+**`da_labels` i `_find_duplicate_issue()`**: `incomplete` genkendes på
+danske keywords ("ufuldstændig", "manglende moduler", "ikke alle moduler").
+
 ### 5. Commit ALTID før test
 
 **Regel:** `git add` + `git commit` ALLE ændringer **før** du beder brugeren om at starte serveren eller teste. Serveren auto-stasher uncommitted ændringer ved fejl — de går tabt. Sig aldrig "prøv nu" med ucommittede ændringer.
