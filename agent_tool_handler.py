@@ -196,6 +196,9 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
                     agent._hints_available.add(iid)
                 if issue_data.get("_hints_read"):
                     agent._hints_requested.add(iid)
+                if issue_data.get("status") == "resolved":
+                    agent.issue_resolved = True
+                    log.info("Issue %s already resolved — marking agent.issue_resolved=True", iid)
 
     # Inject compact progress summary after batch_extract_symbols
     if parsed["tool"] == "batch_extract_symbols" and result.get("success"):
