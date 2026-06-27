@@ -1442,7 +1442,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
     for child in node.children:
         if _check_client(agent):
             return
-        if getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') not in ('refactor', 'programmering'):
+        if getattr(agent, 'issue_resolved', False):
             skip_msg = "Skipped — issue was already resolved in an earlier phase"
             for remaining in node.children[node.children.index(child):]:
                 remaining.status = "skipped"
