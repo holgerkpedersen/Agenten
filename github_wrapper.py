@@ -3,6 +3,8 @@
 import os
 import json
 import requests
+
+_NETWORK_ERROR = "GitHub API netværksfejl"
 from dotenv import load_dotenv
 from typing import Any
 
@@ -51,7 +53,7 @@ class GithubAPI:
 
         resp = self._request("GET", f"{self.api}/user", headers=self.headers)
         if resp is None:
-            return {"success": False, "error": "GitHub API netværksfejl"}
+            return {"success": False, "error": _NETWORK_ERROR}
         if resp.status_code == 200:
             user = self._safe_json(resp)
             return {"success": True, "login": user.get("login"), "email": user.get("email")}
@@ -71,7 +73,7 @@ class GithubAPI:
         data = {"name": name, "description": description, "private": private, "auto_init": False}
         resp = self._request("POST", f"{self.api}/user/repos", headers=self.headers, json=data)
         if resp is None:
-            return {"success": False, "error": "GitHub API netværksfejl"}
+            return {"success": False, "error": _NETWORK_ERROR}
         if resp.status_code == 201:
             repo = self._safe_json(resp)
             return {
@@ -91,7 +93,7 @@ class GithubAPI:
 
         resp = self._request("GET", f"{self.api}/user/repos?per_page=50&sort=updated", headers=self.headers)
         if resp is None:
-            return {"success": False, "error": "GitHub API netværksfejl"}
+            return {"success": False, "error": _NETWORK_ERROR}
         if resp.status_code == 200:
             repos = self._safe_json(resp)
             return {"success": True, "repos": [{"name": r["name"], "url": r["html_url"], "private": r["private"]} for r in repos]}
@@ -112,7 +114,7 @@ class GithubAPI:
         data = {"title": title, "body": body}
         resp = self._request("POST", f"{self.api}/repos/{owner}/{repo}/issues", headers=self.headers, json=data)
         if resp is None:
-            return {"success": False, "error": "GitHub API netværksfejl"}
+            return {"success": False, "error": _NETWORK_ERROR}
         if resp.status_code == 201:
             issue = self._safe_json(resp)
             return {"success": True, "url": issue.get("html_url"), "number": issue.get("number")}
@@ -134,7 +136,7 @@ class GithubAPI:
         data = {"title": title, "head": head, "base": base}
         resp = self._request("POST", f"{self.api}/repos/{owner}/{repo}/pulls", headers=self.headers, json=data)
         if resp is None:
-            return {"success": False, "error": "GitHub API netværksfejl"}
+            return {"success": False, "error": _NETWORK_ERROR}
         if resp.status_code == 201:
             pr = self._safe_json(resp)
             return {"success": True, "url": pr.get("html_url"), "number": pr.get("number")}

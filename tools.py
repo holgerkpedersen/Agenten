@@ -12,6 +12,8 @@ from config import get_logger
 from refactoring_engine import RefactoringError
 log = get_logger(__name__)
 
+_HALLUCINATED_NAMES = frozenset({"navn", "name", "nombre", "名称"})
+
 
 def _strip_llm_tags(text: str) -> str:
     """Strip thought tags and channel markers from LLM output.
@@ -200,7 +202,7 @@ class ToolRegistry:
             if data is None:
                 return {"type": "error", "message": t(K.TOOL_INVALID_JSON, self.lang)}
             tool_name = data.get("tool", "")
-            if tool_name.lower() in ("navn", "name", "nombre", "名称"):
+            if tool_name.lower() in _HALLUCINATED_NAMES:
                 names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
                 return {"type": "error", "message": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=', '.join(names))}
             args = data.get("args", {})
@@ -219,7 +221,7 @@ class ToolRegistry:
          data, err = _parse_json_robust(raw)
          if data is not None and isinstance(data, dict):
           tool_name = data.get("tool", "")
-          if tool_name.lower() not in ("navn", "name", "nombre", "\u540d\u79f0"):
+          if tool_name.lower() not in _HALLUCINATED_NAMES:
            return {"type": "tool", "tool": tool_name, "args": data.get("args", {})}
         if done_match:
             try:
@@ -239,7 +241,7 @@ class ToolRegistry:
         Args:
             tool_name:
             args:"""
-        if tool_name.lower() in ("navn", "name", "nombre", "\u540d\u79f0"):
+        if tool_name.lower() in _HALLUCINATED_NAMES:
             names = list(self.tools.keys()) if self.active_tools is None else self.active_tools
             tools_hint = ', '.join(names)
             return {"success": False, "error": t(K.TOOL_HALLUCINATED, self.lang).format(tool=tool_name, tools=tools_hint)}

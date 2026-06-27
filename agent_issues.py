@@ -118,12 +118,17 @@ def _save_issues(data: dict[str, Any]) -> None:
         _json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def _get_issues(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Get issues list from data dict (DRY replacement for data.get('issues', []))."""
+    return data.get("issues", [])
+
+
 def _next_refac_id(data: dict[str, Any]) -> str:
     """next refac id.
     
     Args:
         data:"""
-    existing = [i["id"] for i in data.get("issues", []) if i["id"].startswith("REFAC-")]
+    existing = [i["id"] for i in _get_issues(data) if i["id"].startswith("REFAC-")]
     nums = [int(i.split("-")[1]) for i in existing if i.split("-")[1].isdigit()]
     return f"REFAC-{max(nums) + 1:03d}" if nums else "REFAC-001"
 
@@ -149,7 +154,7 @@ def _next_issue_id(data: dict[str, Any], issue_type: str) -> str:
         data:
         issue_type:"""
     prefix = ISSUE_TYPE_PREFIXES.get(issue_type, "BUG")
-    existing = [i["id"] for i in data.get("issues", []) if i["id"].startswith(f"{prefix}-")]
+    existing = [i["id"] for i in _get_issues(data) if i["id"].startswith(f"{prefix}-")]
     nums = [int(i.split("-")[1]) for i in existing if i.split("-")[1].isdigit()]
     return f"{prefix}-{max(nums) + 1:03d}" if nums else f"{prefix}-001"
 
@@ -182,7 +187,7 @@ def read_issue(issue_id: str, include_hints: bool = False) -> dict[str, Any]:
         include_hints:"""
     data = _load_issues()
     # Search in regular issues first
-    for issue in data.get("issues", []):
+    for issue in _get_issues(data):
         if issue.get("id", "").lower() == issue_id.lower():
             result = {"success": True, "issue": dict(issue)}
             result["issue"].setdefault("acceptance_criteria", "")
@@ -205,7 +210,7 @@ def read_issue(issue_id: str, include_hints: bool = False) -> dict[str, Any]:
             risk_data.setdefault("impact", "")
             risk_data.setdefault("proposed_fix", risk_data.get("action", ""))
             return {"success": True, "issue": risk_data, "from_risk": True}
-    available = [i["id"] for i in data.get("issues", [])] + [r["id"] for r in data.get("active_risks", [])]
+    available = [i["id"] for i in _get_issues(data)] + [r["id"] for r in data.get("active_risks", [])]
     return {"success": False, "error": f"Issue '{issue_id}' not found. Available: {available}"}
 
 
@@ -226,7 +231,7 @@ def _resolve_referenced_issues(agent: Any, data: dict[str, Any], issue: dict[str
     refs.discard(issue.get("id", ""))
     results = []
     for ref in refs:
-        for ref_issue in data.get("issues", []):
+        for ref_issue in _get_issues(data):
             if ref_issue.get("id", "").upper() == ref.upper() and ref_issue.get("status") in ("open", "in_progress"):
                 note = f"Lukket automatisk da {issue['id']} blev resolved: {resolution_note[:100]}"
                 results.append((ref, note))
@@ -245,14 +250,14 @@ def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note:
     data = _load_issues()
     now = time.strftime("%Y-%m-%dT%H:%M:%S")
     # Search in regular issues first
-    for issue in data.get("issues", []):
+    for issue in _get_issues(data):
         if issue.get("id", "").lower() == issue_id.lower():
             issue["status"] = status
             issue["updated_at"] = now
             if resolution_note:
                 issue["resolution_note"] = resolution_note
             for ref_id, ref_note in _resolve_referenced_issues(agent, data, issue, status, resolution_note):
-                for ref_issue in data.get("issues", []):
+                for ref_issue in _get_issues(data):
                     if ref_issue.get("id", "").upper() == ref_id.upper():
                         ref_issue["status"] = "resolved"
                         ref_issue["resolution_note"] = ref_note
@@ -292,7 +297,7 @@ def create_refactor_issue(agent: Any, filepath: str, line_count: int, related_is
         line_count:
         related_issues:"""
     data = _load_issues()
-    existing = [i for i in data.get("issues", []) if i.get("location", "").startswith(filepath) and i.get("type") == "refactor"]
+    existing = [i for i in _get_issues(data) if i.get("location", "").startswith(filepath) and i.get("type") == "refactor"]
     if existing:
         agent._log("INFO", f"REFAC-issue findes allerede for {filepath}", existing[0]["id"])
         return {"success": True, "issue": existing[0], "existing": True}
@@ -372,7 +377,7 @@ def create_issue(agent: Any, title: str, type: str = "bug", severity: str = "med
 
     title_lower = title.lower()
     title_keywords = {w for w in title_lower.split() if len(w) > 3}
-    for i in data.get("issues", []):
+    for i in _get_issues(data):
         if i.get("title") == title:
             agent._log("INFO", f"Issue findes allerede", i["id"])
             return {"success": True, "issue": i, "existing": True}
