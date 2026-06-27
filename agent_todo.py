@@ -56,7 +56,9 @@ def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: 
                         _called_syms = set(str(s).strip() for s in _called if str(s).strip())
                     else:
                         _called_syms = set()
-                    _missing = _planned_syms - _called_syms
+                    _in_file = _get_symbol_names_in_file(target) if target else set()
+                    _known = _called_syms | _in_file
+                    _missing = _planned_syms - _known
                     if _missing:
                         # Don't mark the todo as done — LLM hasn't covered all planned symbols
                         agent._log("ADVARSEL",
