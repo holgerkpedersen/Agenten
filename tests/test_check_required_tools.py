@@ -30,7 +30,8 @@ class FakeAgent:
         self._tool_log = []
 
 
-from agent_tasks import _check_required_tools, _get_max_iterations  # noqa: E402
+from agent_tool_handler import _check_required_tools  # noqa: E402
+from agent_tasks import _get_max_iterations  # noqa: E402
 import config  # noqa: E402
 
 

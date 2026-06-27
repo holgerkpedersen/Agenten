@@ -180,3 +180,144 @@ def check_files_from_plan(spec: dict[str, Any], base_dir: str | None = None) -> 
         f"files_from_plan: mangler {len(missing)} af {len(modules)} moduler: "
         f"{', '.join(missing)}"
     )
+
+
+def fix_cross_module_imports(agent):
+    import ast as _ast
+
+    plan_path = getattr(agent, '_refactor_plan_path', '') or os.path.join(
+        os.environ.get('AGENT_WORKDIR') or os.getcwd(), 'refactor_plan.md')
+    if not os.path.exists(plan_path):
+        return []
+
+    base = os.path.dirname(plan_path) or os.getcwd()
+    modules = _parse_refactor_plan_modules(plan_path)
+    if not modules:
+        return []
+
+    mod_files = {m: p for m in modules if m.endswith('.py')
+                 and os.path.exists(p := os.path.join(base, m))}
+    if not mod_files:
+        return []
+
+    mod_info = {}
+    for name, path in mod_files.items():
+        try:
+            with open(path, encoding='utf-8') as f:
+                content = f.read()
+            tree = _ast.parse(content)
+        except Exception:
+            continue
+        defs, imports, names, calls = set(), set(), set(), {}
+        for node in _ast.walk(tree):
+            if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef)):
+                defs.add(node.name)
+            elif isinstance(node, _ast.Import):
+                imports.update(a.asname or a.name for a in node.names)
+            elif isinstance(node, _ast.ImportFrom):
+                imports.update(a.asname or a.name for a in node.names if a.name)
+            elif isinstance(node, _ast.Name) and isinstance(node.ctx, _ast.Load):
+                names.add(node.id)
+        for node in _ast.walk(tree):
+            if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                fc = set()
+                for sub in _ast.walk(node):
+                    if isinstance(sub, _ast.Call) and isinstance(sub.func, _ast.Name):
+                        fc.add(sub.func.id)
+                calls[node.name] = fc
+        mod_info[name] = dict(defs=defs, imports=imports, names=names - defs - imports,
+                              calls=calls, tree=tree, path=path, content=content)
+
+    def _scan_defs(filepath):
+        """Scan a .py file for top-level function/class/constant definitions."""
+        import os as _os
+        full = _os.path.join(_os.path.dirname(__file__), filepath)
+        defs = {}
+        try:
+            with open(full, encoding='utf-8') as f:
+                tree = _ast.parse(f.read())
+            for node in _ast.walk(tree):
+                if isinstance(node, (_ast.FunctionDef, _ast.AsyncFunctionDef)):
+                    defs[node.name] = node.lineno
+            for node in _ast.walk(tree):
+                if isinstance(node, _ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, _ast.Name) and target.id.isupper():
+                            defs[target.id] = node.lineno
+        except Exception:
+            pass
+        return defs, filepath
+
+    at_defs = {}
+    at_sources = {'agent_tasks.py': {}, 'agent_utils.py': {}}
+    for src in at_sources:
+        defs, fname = _scan_defs(src)
+        at_sources[src] = defs
+        at_defs.update(defs)
+
+    from config import get_logger
+    _log = get_logger(__name__)
+    fixes = []
+
+    for name, info in mod_info.items():
+        unresolved = info['names'].copy()
+        for other, oi in mod_info.items():
+            if other == name or other == 'agent_tasks.py':
+                continue
+            missing = unresolved & oi['defs']
+            if not missing:
+                continue
+            other_stem = other.replace('.py', '')
+            imp = f"from {other_stem} import {', '.join(sorted(missing))}"
+            with open(info['path'], encoding='utf-8') as f:
+                lines = f.read().split('\n')
+            last_idx = -1
+            for i, l in enumerate(lines):
+                stripped = l.strip()
+                if stripped.startswith(('import ', 'from ')):
+                    last_idx = i
+                elif stripped.startswith(('def ', 'class ', '@')):
+                    break
+            lines.insert(last_idx + 1, imp)
+            with open(info['path'], 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines))
+            fixes.append(f"{name}: {imp}")
+
+    source_module_for_sym = {}
+    for src, defs in at_sources.items():
+        for sym in defs:
+            source_module_for_sym[sym] = src.replace('.py', '')
+
+    for name, info in mod_info.items():
+        for func, fcalls in info['calls'].items():
+            needed = fcalls & at_defs.keys() - info['defs'] - info['imports']
+            if not needed:
+                continue
+            func_node = next((n for n in _ast.walk(info['tree'])
+                              if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))
+                              and n.name == func), None)
+            if not func_node:
+                continue
+            body_line = func_node.lineno
+            for stmt in func_node.body:
+                if not isinstance(stmt, _ast.Expr):
+                    body_line = stmt.lineno
+                    break
+            by_src = {}
+            for sym in needed:
+                src = source_module_for_sym.get(sym, 'agent_tasks')
+                by_src.setdefault(src, []).append(sym)
+            with open(info['path'], encoding='utf-8') as f:
+                lines = f.read().split('\n')
+            for src, syms in sorted(by_src.items()):
+                imp = f"    from {src} import {', '.join(sorted(syms))}"
+                if any(imp.strip() == l.strip() for l in lines):
+                    continue
+                lines.insert(body_line - 1, imp)
+                fixes.append(f"{name}.{func}(): lazy {imp.strip()}")
+            with open(info['path'], 'w', encoding='utf-8') as f:
+                f.write('\n'.join(lines))
+
+    if fixes:
+        _log.info("Auto-fixed cross-module imports: %s", '; '.join(fixes))
+    return fixes

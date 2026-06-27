@@ -124,7 +124,7 @@ class TestCheckRequiredToolsRefactorEarlyAbort(unittest.TestCase):
         return agent
 
     def test_refactor_ekstraher_no_write_at_iter3_fails(self):
-        from agent_tasks import _check_required_tools
+        from agent_tool_handler import _check_required_tools
         agent = self._make_agent(iteration=3)
         called = {"read_location": 1}
         result = _check_required_tools(agent, called, "Ekstraher")
@@ -132,14 +132,14 @@ class TestCheckRequiredToolsRefactorEarlyAbort(unittest.TestCase):
         self.assertIn("write_file", result)
 
     def test_refactor_opdater_no_write_at_iter3_fails(self):
-        from agent_tasks import _check_required_tools
+        from agent_tool_handler import _check_required_tools
         agent = self._make_agent(iteration=3)
         called = {"read_location": 1}
         result = _check_required_tools(agent, called, "Opdat\u00e9r")
         self.assertIsNotNone(result)
 
     def test_refactor_with_write_call_passes(self):
-        from agent_tasks import _check_required_tools
+        from agent_tool_handler import _check_required_tools
         agent = self._make_agent(iteration=5)
         called = {"read_location": 1, "write_file{}": 1}
         result = _check_required_tools(agent, called, "Ekstraher")
@@ -147,7 +147,7 @@ class TestCheckRequiredToolsRefactorEarlyAbort(unittest.TestCase):
             self.assertNotIn("FEJL: Du har ikke kaldt", result)
 
     def test_non_refactor_template_unaffected(self):
-        from agent_tasks import _check_required_tools
+        from agent_tool_handler import _check_required_tools
         agent = self._make_agent(template="issue_handler", iteration=10)
         called = {"read_issue": 1}
         result = _check_required_tools(agent, called, "Analyse")
@@ -156,7 +156,7 @@ class TestCheckRequiredToolsRefactorEarlyAbort(unittest.TestCase):
 
     def test_refactor_low_iteration_passes(self):
         """Før iteration 3 skal Fix C ikke abortere."""
-        from agent_tasks import _check_required_tools
+        from agent_tool_handler import _check_required_tools
         agent = self._make_agent(iteration=2)
         called = {"read_location": 1}
         result = _check_required_tools(agent, called, "Ekstraher")

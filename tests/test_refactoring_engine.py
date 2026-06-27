@@ -711,3 +711,65 @@ class TestDependencyGraphMethods:
         d = tree.body[0].decorator_list[0]
         name = AstAnalyzer.decorator_name(d)
         assert name == "staticmethod"
+
+
+class TestExtractDedent:
+    """Extracted symbols should always be dedented to module level (0 indent)."""
+
+    SOURCE_WITH_NESTED = '''"""Module with nested function."""
+import os
+
+def outer():
+    """I do stuff."""
+    x = 1
+
+    def inner():
+        """I am nested — 4-space indented."""
+        return 42
+
+    return inner()
+'''
+
+    def test_extract_nested_function_is_dedented(self, engine, tmp_path):
+        src = tmp_path / "nested_source.py"
+        src.write_text(self.SOURCE_WITH_NESTED, encoding="utf-8")
+        tgt = tmp_path / "target.py"
+
+        result = engine.extract_symbol(str(src), "inner", str(tgt))
+        assert result["success"]
+
+        target_code = tgt.read_text(encoding="utf-8")
+        assert "def inner():" in target_code, (
+            f"inner() should be at module level, got:\n{target_code}"
+        )
+        # Verify the def line has NO leading whitespace
+        for line in target_code.splitlines():
+            if line.strip().startswith("def inner():"):
+                assert line == "def inner():", (
+                    f"inner() should NOT be indented (0 spaces). "
+                    f"Found: {repr(line)}"
+                )
+                break
+        else:
+            pytest.fail("def inner(): not found in target")
+
+    def test_extract_top_level_function_unchanged(self, engine, tmp_path):
+        src = tmp_path / "flat_source.py"
+        src.write_text('''"""Flat module."""
+def top():
+    return 1
+''', encoding="utf-8")
+        tgt2 = tmp_path / "target2.py"
+
+        result = engine.extract_symbol(str(src), "top", str(tgt2))
+        assert result["success"]
+
+        target_code = tgt2.read_text(encoding="utf-8")
+        for line in target_code.splitlines():
+            if line.strip().startswith("def top():"):
+                assert line == "def top():", (
+                    f"top() should remain at 0 indent. Found: {repr(line)}"
+                )
+                break
+        else:
+            pytest.fail("def top(): not found in target")
