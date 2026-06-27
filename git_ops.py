@@ -654,7 +654,8 @@ def edit_file(path: str, old_text: str = "", new_text: str = "", expected_hash: 
                         parts.append(content[pos:next_newline + 1])
                         pos = next_newline + 1
                     exact_old = ''.join(parts)
-                new_content = content.replace(exact_old, new_text, 1)
+                new_text_normalized = _normalize_indentation(new_text, exact_old)
+                new_content = content.replace(exact_old, new_text_normalized, 1)
             elif "." in symbol:
                 class_name = symbol.rsplit(".", 1)[0]
                 class_loc = locate_code(filepath=path, name=class_name)
