@@ -784,3 +784,53 @@ danske keywords ("ufuldstændig", "manglende moduler", "ikke alle moduler").
 **Fix:** Removed `if symbol:` condition — `_normalize_indentation` now runs for ALL `.py` edits when `ast.parse` fails, regardless of whether `old_text` or `symbol` was used.
 
 **Files:** `git_ops.py:710-742`
+
+### 58. Nested function extraction: 3 runtime-crashes fixed (`refactoring_engine.py`)
+
+**Symptom:** `batch_extract_symbols` succeeded (9/9) but stateful closure `execute_with_progress`
+would crash at runtime with `NameError`.
+
+**Root cause 3 separate bugs:**
+
+**(A) `get_captured_variables` missing for/with/except/comprehension targets (`refactoring_engine.py:538-549`):**
+Only checked `ast.Assign`/`ast.AnnAssign`/`ast.NamedExpr` for local variable definitions.
+For-loop variables (`for child in ...`), with-as variables (`with x as y`), exception variables
+(`except Exception as e`), and comprehension generators were NOT recognized as local → falsely
+appeared as "captured" → `__init__` got extra parameters that don't exist in the call site's scope.
+**Fix:** Added `ast.For.target`, `ast.AsyncFor.target`, `ast.AugAssign.target`, `ast.With.items[i].optional_vars`,
+`ast.AsyncWith.items[i].optional_vars`, `ast.ExceptHandler.name`, `ast.ListComp`/`ast.SetComp`/`ast.GeneratorExp`/
+`ast.DictComp` generators' `.target` to `local_names`.
+**Nuance:** `ast.AugAssign` must exclude nonlocal names (`completed += 1` with `nonlocal completed` is
+NOT creating a local, it's rebinding the enclosing scope). Added `nonlocal_names` pre-scan.
+**Python 3.9+:** `ast.With` uses `items` (list of `withitem`), not direct `optional_vars`.
+
+**(B) `read_captures` not replaced with `self.` in `__call__` body (`refactoring_engine.py:1376-1378`):**
+Only `nonlocal` vars were replaced (`self._`). Read-captured vars (e.g. `total_tasks`) were stored in
+`__init__` but the `__call__` body referenced them bare → `NameError`.
+**Fix:** In the body-building loop, after nonlocal replacement, also replace each `read_capture` with
+`self.{v}`.
+
+**(C) Recursive calls not updated to `self()` (`refactoring_engine.py:1430-1435`):**
+The call-site scanner skipped lines inside the function body (`if start_line <= ref_lineno < end_line:
+continue`). Recursive calls like `execute_with_progress(child)` were never updated → `NameError`
+in target module after extraction.
+**Fix:** In the body-building loop, replace `{symbol_name}(` with `self(` before the capture replacements.
+
+**Verification:** All 9 nested functions in `api_server.py` extracted successfully (1 stateful → class).
+Generated `__call__` body is self-contained: recursive calls use `self()`, captured vars use `self.`,
+nonlocal vars use `self._`.
+
+**Files:** `refactoring_engine.py:538-586` (Fix A), `refactoring_engine.py:1375-1379` (Fix B+C)
+
+### 59. `ast.With` in Python 3.9+ has `items` attribute
+
+**Symptom:** `AttributeError: 'With' object has no attribute 'optional_vars'` when running
+AST analysis on Python 3.12.
+
+**Root cause:** Python 3.9 changed `ast.With` from direct attributes (`context_expr`, `optional_vars`)
+to `items: list[withitem]` where each `withitem` has `context_expr` and `optional_vars`.
+Same for `ast.AsyncWith`.
+
+**Fix:** Use `for item in child.items:` before accessing `item.optional_vars`.
+
+**Files:** `refactoring_engine.py:565-569`
