@@ -536,6 +536,12 @@ class AstAnalyzer:
             param_names.add(a.arg)
 
         local_names: set[str] = set()
+        # Collect nonlocal names first — AugAssign targets with nonlocal
+        # are rebinding enclosing scope, not creating local vars.
+        nonlocal_names: set[str] = set()
+        for child in ast.walk(node):
+            if isinstance(child, ast.Nonlocal):
+                nonlocal_names.update(child.names)
         for child in ast.walk(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 local_names.add(child.name)
@@ -547,6 +553,42 @@ class AstAnalyzer:
                 local_names.add(child.target.id)
             if isinstance(child, ast.NamedExpr) and isinstance(child.target, ast.Name):
                 local_names.add(child.target.id)
+            if isinstance(child, ast.AugAssign) and isinstance(child.target, ast.Name) and child.target.id not in nonlocal_names:
+                local_names.add(child.target.id)
+            if isinstance(child, (ast.For, ast.AsyncFor)):
+                if isinstance(child.target, ast.Name):
+                    local_names.add(child.target.id)
+                elif isinstance(child.target, ast.Tuple):
+                    for elt in child.target.elts:
+                        if isinstance(elt, ast.Name):
+                            local_names.add(elt.id)
+            if isinstance(child, (ast.With, ast.AsyncWith)):
+                for item in child.items:
+                    if item.optional_vars is not None:
+                        if isinstance(item.optional_vars, ast.Name):
+                            local_names.add(item.optional_vars.id)
+                        elif isinstance(item.optional_vars, ast.Tuple):
+                            for elt in item.optional_vars.elts:
+                                if isinstance(elt, ast.Name):
+                                    local_names.add(elt.id)
+            if isinstance(child, ast.ExceptHandler) and child.name is not None:
+                local_names.add(child.name)
+            if isinstance(child, (ast.ListComp, ast.SetComp, ast.GeneratorExp)):
+                for gen in child.generators:
+                    if isinstance(gen.target, ast.Name):
+                        local_names.add(gen.target.id)
+                    elif isinstance(gen.target, ast.Tuple):
+                        for elt in gen.target.elts:
+                            if isinstance(elt, ast.Name):
+                                local_names.add(elt.id)
+            if isinstance(child, ast.DictComp):
+                for gen in child.generators:
+                    if isinstance(gen.target, ast.Name):
+                        local_names.add(gen.target.id)
+                    elif isinstance(gen.target, ast.Tuple):
+                        for elt in gen.target.elts:
+                            if isinstance(elt, ast.Name):
+                                local_names.add(elt.id)
 
         # Collect all Name loads in the function body
         refs: set[str] = set()
@@ -1373,9 +1415,16 @@ class RefactoringEngine:
                 extra_nesting = 0
             body_indent = '        ' + '    ' * (extra_nesting // 4)
             modified = orig_line.strip()
+            # Fix C: recursive call → self() in __call__
+            modified = modified.replace(f"{symbol_name}(", "self(")
+            # Fix B: nonlocal vars → self._
             for nv in sorted(nonlocal_vars, key=len, reverse=True):
                 if nv in modified and not modified.startswith('#'):
                     modified = modified.replace(nv, f"self._{nv}")
+            # Fix B: read_captures → self.{v}
+            for rc in sorted(read_captures, key=len, reverse=True):
+                if rc in modified and not modified.startswith('#'):
+                    modified = modified.replace(rc, f"self.{rc}")
             call_body_lines.append(f"{body_indent}{modified}")
 
         # Find original params for __call__
