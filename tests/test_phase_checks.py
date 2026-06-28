@@ -204,17 +204,16 @@ class TestCheckPhaseDone(unittest.TestCase):
             ok, _ = check_phase_done(agent, task, None, base_dir=tmp)
             self.assertFalse(ok)
 
-    def test_plan_phase_fails_when_too_few_modules(self):
-        """Plan must list at least 1 .py module."""
+    def test_plan_phase_fails_when_symbols_not_covered(self):
+        """Plan passes file_exists but fails plan_symbols_covered without source."""
         with tempfile.TemporaryDirectory() as tmp:
-            # Only 0 modules listed — should fail with min_files=1
-            plan_content = "# Plan\nNo modules here.\n"
+            plan_content = "# Plan\n### 1. routes.py\n"
             open(os.path.join(tmp, "refactor_plan.md"), "w", encoding="utf-8").write(plan_content)
             agent = FakeAgent(template="refactor")
             task = FakeTask("Plan")
             ok, msg = check_phase_done(agent, task, None, base_dir=tmp)
             self.assertFalse(ok, msg)
-            self.assertIn("mindst 1", msg)
+            self.assertIn("symbols_covered", msg.lower())
 
     def test_case_insensitive_phase_match(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -263,11 +262,10 @@ class TestTemplatePhaseChecksConfig(unittest.TestCase):
         self.assertIsNotNone(cfg)
         self.assertEqual(cfg["type"], "all_of")
         sub_types = [c.get("type") for c in cfg.get("checks", [])]
-        self.assertIn("files_from_plan", sub_types)
+        self.assertIn("file_exists", sub_types)
         self.assertIn("plan_symbols_covered", sub_types)
-        files_spec = next(c for c in cfg["checks"] if c["type"] == "files_from_plan")
-        self.assertEqual(files_spec["plan_path"], "refactor_plan.md")
-        self.assertEqual(files_spec["min_files"], 1)
+        file_spec = next(c for c in cfg["checks"] if c["type"] == "file_exists")
+        self.assertIn("refactor_plan.md", file_spec.get("paths", []))
         plan_spec = next(c for c in cfg["checks"] if c["type"] == "plan_symbols_covered")
         self.assertEqual(plan_spec["source_file"], "{source_file}")
         self.assertEqual(plan_spec["plan_path"], "refactor_plan.md")

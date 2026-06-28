@@ -199,9 +199,7 @@ class TestAPIPhaseChecks:
         assert plan_check["spec"]["type"] == "all_of"
         subs = plan_check["spec"].get("checks", [])
         assert len(subs) == 2
-        files_spec = next(c for c in subs if c["type"] == "files_from_plan")
-        assert files_spec["plan_path"] == "refactor_plan.md"
-        assert files_spec["min_files"] == 1
+        assert any(c["type"] == "file_exists" for c in subs)
         assert any(c["type"] == "plan_symbols_covered" for c in subs)
         assert "refactor_plan.md" in plan_check["description"]
         assert "FORMÅL" in plan_check["description"]

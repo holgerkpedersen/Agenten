@@ -169,6 +169,73 @@ def _find_unresolved_local_deps(source_content: str, target_content: str) -> lis
     return [u for u in unresolved if u not in all_known]
 
 
+def _detect_import_cycle_risk(
+    source_content: str,
+    source_path: str,
+    target_path: str,
+    symbol_code: str,
+) -> list[str]:
+    """Detect if extracted symbol code references names from source that would
+    create a circular import if imported into target.
+
+    A circular import risk exists when:
+    1. The extracted code references names defined at module level in source
+       (not imports, not builtins, not defined in the symbol itself)
+    2. The source file already imports from the target module
+
+    Returns list of risky name references (names that need importing from
+    source into target, but source already imports from target → cycle).
+    """
+    if not os.path.exists(target_path):
+        return []
+
+    try:
+        source_tree = ast.parse(source_content)
+    except SyntaxError:
+        return []
+    try:
+        symbol_tree = ast.parse(textwrap.dedent(symbol_code))
+    except SyntaxError:
+        return []
+
+    # Names defined locally in the symbol itself
+    local_names: set[str] = set()
+    for node in ast.walk(symbol_tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            local_names.add(node.name)
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            local_names.add(node.id)
+        if isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    local_names.add(t.id)
+
+    source_symbols = _list_top_level_symbol_names(source_content)
+
+    # Names referenced in the symbol (Load) that are defined in source
+    referenced_from_source: set[str] = set()
+    for node in ast.walk(symbol_tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            if node.id in source_symbols and node.id not in local_names:
+                referenced_from_source.add(node.id)
+
+    if not referenced_from_source:
+        return []
+
+    # Check if source already imports from target → would create a cycle
+    target_module_name = os.path.splitext(os.path.basename(target_path))[0]
+    for node in ast.walk(source_tree):
+        if isinstance(node, ast.ImportFrom):
+            if node.module and (node.module == target_module_name or node.module.split('.')[0] == target_module_name):
+                return sorted(referenced_from_source)
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == target_module_name or alias.name.split('.')[0] == target_module_name:
+                    return sorted(referenced_from_source)
+
+    return []
+
+
 def _split_imports_from_code(content: str) -> tuple[str, str]:
     """Split file content into (imports_block, code_block).
 
@@ -214,6 +281,25 @@ def _registry_key(source: str) -> str:
     sig når et symbol fjernes). Nu bruges kun absolut sti som nøgle.
     """
     return os.path.abspath(source)
+
+
+def _is_nested_function(tree: ast.AST, node: ast.AST) -> bool:
+    """Check if a FunctionDef/AsyncFunctionDef is nested inside another function.
+
+    Returns True if the node is a function defined INSIDE another function
+    (not a class method, not module-level). Uses AST parent-walking by
+    scanning all FunctionDef/AsyncFunctionDef bodies for the node reference.
+    """
+    if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return False
+    for candidate in ast.walk(tree):
+        if candidate is tree or candidate is node:
+            continue
+        if isinstance(candidate, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for child in ast.iter_child_nodes(candidate):
+                if child is node:
+                    return True
+    return False
 
 
 def clear_extracted_registry(source: str | None = None) -> None:
@@ -304,6 +390,8 @@ class RefactoringError(Exception):
     REMOVAL_FAILED = "removal_failed"
     TARGET_SYNTAX = "target_syntax"
     CIRCULAR_IMPORT = "circular_import"
+    SYMBOL_NESTED = "symbol_nested"
+    SYMBOL_NESTED_STATEFUL = "symbol_nested_stateful"
 
     def __init__(self, message: str, category: str = "unknown",
                  filepath: str = "", snapshot: Any = None,
@@ -424,6 +512,56 @@ class AstAnalyzer:
                 if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == func_name:
                     return node
         return None
+
+    @staticmethod
+    def get_captured_variables(tree: ast.AST, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+        """Find names captured from enclosing scope by a nested function.
+
+        Scans the function body for all Name references, then filters out:
+        - Parameters of the function itself
+        - Names defined locally inside the function (inner defs/assigns)
+        - Builtins and imports
+        - 'self', 'cls', 'super'
+
+        Returns sorted list of captured variable names.
+        """
+        param_names: set[str] = {a.arg for a in node.args.args}
+        if node.args.vararg:
+            param_names.add(node.args.vararg.arg)
+        if node.args.kwarg:
+            param_names.add(node.args.kwarg.arg)
+        for a in node.args.kwonlyargs:
+            param_names.add(a.arg)
+        for a in node.args.posonlyargs:
+            param_names.add(a.arg)
+
+        local_names: set[str] = set()
+        for child in ast.walk(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                local_names.add(child.name)
+            if isinstance(child, ast.Assign):
+                for t in child.targets:
+                    if isinstance(t, ast.Name):
+                        local_names.add(t.id)
+            if isinstance(child, ast.AnnAssign) and isinstance(child.target, ast.Name):
+                local_names.add(child.target.id)
+            if isinstance(child, ast.NamedExpr) and isinstance(child.target, ast.Name):
+                local_names.add(child.target.id)
+
+        # Collect all Name loads in the function body
+        refs: set[str] = set()
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load):
+                refs.add(child.id)
+
+        # Collect imports visible in the source file
+        import_names: set[str] = set()
+        for child in ast.iter_child_nodes(tree):
+            if isinstance(child, (ast.Import, ast.ImportFrom)):
+                import_names |= AstAnalyzer.names_from_import_node(child)
+
+        captured = refs - param_names - local_names - _BUILTINS - _BUILTINS_TYPING - import_names
+        return sorted(captured)
 
     @staticmethod
     def get_symbol_lines(lines: list[str], node: ast.AST) -> tuple[int, int]:
@@ -786,6 +924,47 @@ class RefactoringEngine:
                 details={"symbol": symbol_name}
             )
 
+        # Check if symbol is a nested function (closure) — requires special handling
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and _is_nested_function(tree, node):
+            captured = AstAnalyzer.get_captured_variables(tree, node)
+            has_nonlocal = any(
+                isinstance(n, ast.Nonlocal) for n in ast.walk(node)
+            )
+            log.warning("extract_symbol: %s is nested (captures=%s, nonlocal=%s)",
+                        symbol_name, captured, has_nonlocal)
+            if has_nonlocal:
+                try:
+                    return self._convert_stateful_closure(source, symbol_name, target, tree, node, lines)
+                except RefactoringError:
+                    log.warning("extract_symbol: stateful conversion failed for %s, raising NESTED_STATEFUL",
+                                symbol_name)
+                    raise RefactoringError(
+                        f"Symbol '{symbol_name}' er en stateful nested funktion "
+                        f"(nonlocal). Forsøg på automatisk konvertering slog fejl.",
+                        category=RefactoringError.SYMBOL_NESTED_STATEFUL,
+                        filepath=source,
+                        details={"symbol": symbol_name, "captured": captured}
+                    )
+            if not captured:
+                # No captured variables — can extract as-is (just dedented)
+                # Fall through to normal extraction below
+                log.info("extract_symbol: %s is nested but has no captures — extracting as-is",
+                         symbol_name)
+                pass
+            else:
+                # Simple captures — convert to top-level with explicit params
+                try:
+                    return self._convert_nested_to_top_level(source, symbol_name, target, tree, node, lines)
+                except RefactoringError:
+                    raise
+                except Exception as e:
+                    raise RefactoringError(
+                        f"Nested function '{symbol_name}' kunne ikke konverteres: {e}",
+                        category=RefactoringError.SYMBOL_NESTED,
+                        filepath=source,
+                        details={"symbol": symbol_name, "captured": captured, "error": str(e)}
+                    )
+
         start_line, end_line = AstAnalyzer.get_symbol_lines(lines, node)
         symbol_code = textwrap.dedent('\n'.join(lines[start_line:end_line]))
         symbol_type = AstAnalyzer.get_symbol_type(node)
@@ -923,6 +1102,374 @@ class RefactoringEngine:
             'imports_deduped': len(needed_imports) - len(new_imports),
             'used_names': sorted(used_names),
             'missing_dependencies': missing_deps,
+        }
+
+    def _convert_nested_to_top_level(
+        self,
+        source: str,
+        symbol_name: str,
+        target: str,
+        tree: ast.AST,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+        lines: list[str],
+    ) -> dict[str, Any]:
+        """Convert a nested function to a top-level function in target.
+
+        Handles:
+        - Simple captures (variables from enclosing scope) → adds as parameters
+        - Direct call sites → appends captured args
+        - Callback pass sites → wraps with functools.partial
+
+        Does NOT handle stateful closures (with nonlocal).
+        """
+        target = self._resolve(target)
+        captured = AstAnalyzer.get_captured_variables(tree, node)
+        start_line, end_line = AstAnalyzer.get_symbol_lines(lines, node)
+        symbol_lines = list(lines[start_line:end_line])
+        log.info("_convert_nested_to_top_level: %s captures=%s", symbol_name, captured)
+
+        # 1. Build new signature with captured vars at the end
+        def_line_idx = node.lineno - 1 - start_line  # offset from start to def line
+        old_sig_line = symbol_lines[def_line_idx] if 0 <= def_line_idx < len(symbol_lines) else lines[node.lineno - 1]
+        if captured:
+            new_params_str = ', '.join(captured)
+            if '(' in old_sig_line and ')' in old_sig_line:
+                paren_idx = old_sig_line.rindex(')')
+                before = old_sig_line[:paren_idx]
+                after = old_sig_line[paren_idx:]
+                if before.rstrip().endswith('('):
+                    # def func( → def func(captured1, captured2)
+                    new_sig_line = before + new_params_str + after
+                else:
+                    # def func(a, b) → def func(a, b, captured1, captured2)
+                    new_sig_line = before + ', ' + new_params_str + after
+            else:
+                new_sig_line = old_sig_line
+            symbol_lines[def_line_idx] = new_sig_line
+        # else: no captured → keep original signature
+
+        # 2. Get symbol code with modified signature
+        symbol_code = textwrap.dedent('\n'.join(symbol_lines))
+
+        # 3. Resolve and write target
+        visitor = ImportVisitor()
+        visitor.visit(node)
+        used_names = visitor.names | set(captured)
+        content = '\n'.join(lines)
+        needed_imports = ImportResolver.filter_for_symbol(content, lines, used_names)
+        os.makedirs(os.path.dirname(target) or '.', exist_ok=True)
+        existing_target = ''
+        if os.path.exists(target):
+            existing_target = open(target, 'r', encoding='utf-8').read().strip()
+        existing_imports: set[str] = set()
+        if existing_target:
+            try:
+                for imp_node in ast.walk(ast.parse(existing_target)):
+                    if isinstance(imp_node, (ast.Import, ast.ImportFrom)):
+                        seg = ast.get_source_segment(existing_target, imp_node)
+                        if seg:
+                            existing_imports.add(seg.strip())
+            except SyntaxError:
+                pass
+        new_imports = [i for i in needed_imports if i not in existing_imports]
+        target_imports_block = '\n'.join(new_imports)
+        target_parts = [p for p in [target_imports_block, symbol_code] if p.strip()]
+        target_content = '\n\n'.join(target_parts) + '\n'
+        try:
+            ast.parse(target_content)
+        except SyntaxError as e:
+            raise RefactoringError(
+                f"Target syntax error after nested conversion: {e}",
+                category=RefactoringError.TARGET_SYNTAX,
+                filepath=target,
+                details={"symbol": symbol_name, "captured": captured, "error": str(e)}
+            )
+        self._write(target, target_content)
+        log.info("_convert_nested_to_top_level: wrote %s to %s (%d bytes)",
+                 symbol_name, os.path.basename(target), len(target_content))
+
+        # 4. Update source in-memory
+        source_path = self._abs(source)
+        source_content = '\n'.join(lines)
+        source_tree = ast.parse(source_content)
+
+        # Find references to the symbol outside its own definition
+        # Collect all (line, col_offset) of Name nodes with this id
+        source_lines = list(lines)
+        ref_locations: set[int] = set()  # line numbers (0-based)
+        for ref_node in ast.walk(source_tree):
+            if not isinstance(ref_node, ast.Name) or ref_node.id != symbol_name:
+                continue
+            ref_lineno = ref_node.lineno - 1
+            if start_line <= ref_lineno < end_line:
+                continue
+            # Determine if direct call or callback pass
+            # Check if parent node is a Call where this Name is the function
+            is_call = False
+            for p_node in ast.walk(source_tree):
+                if isinstance(p_node, ast.Call):
+                    if isinstance(p_node.func, ast.Name) and p_node.func.id == symbol_name:
+                        if p_node.func.lineno - 1 == ref_lineno:
+                            is_call = True
+                            break
+            ref_locations.add(ref_lineno)
+
+            if captured:
+                if is_call:
+                    # Direct call: append captured args to existing call
+                    # Find the full Call expression's line range
+                    call_line = source_lines[ref_lineno]
+                    close_paren = call_line.rfind(')')
+                    if close_paren >= 0 and '(' in call_line:
+                        append = ', ' + ', '.join(captured)
+                        source_lines[ref_lineno] = call_line[:close_paren] + append + call_line[close_paren:]
+                    else:
+                        # Multi-line call — append to call via wrapping as partial
+                        source_lines[ref_lineno] = source_lines[ref_lineno].replace(
+                            f'{symbol_name}(', f'functools.partial({symbol_name}, ', 1
+                        )
+                        # Fix: we changed the semantics — partial with all args
+                else:
+                    # Callback pass: wrap with partial
+                    captured_kwargs = ', '.join(f'{v}={v}' for v in captured)
+                    old_ref = symbol_name
+                    new_ref = f"functools.partial({symbol_name}, {captured_kwargs})"
+                    source_lines[ref_lineno] = source_lines[ref_lineno].replace(old_ref, new_ref, 1)
+
+        # Handle non-call references (like `return _merge_session`)
+        # These are the same as "callback pass" — already handled above by the else branch
+
+        # Write updated source (with updated references but still containing the function)
+        source_path = self._abs(source)
+        updated_source = '\n'.join(source_lines)
+        with open(source_path + '.tmp', 'w', encoding='utf-8') as f:
+            f.write(updated_source)
+        _atomic_replace(source_path + '.tmp', source_path)
+
+        # 5. Remove the original nested function lines
+        try:
+            new_source = CodeModifier.remove_lines(source, start_line, end_line)
+        except RefactoringError as e:
+            log.warning("_convert_nested_to_top_level: remove_lines FAILED: %s", e)
+            raise RefactoringError(
+                f"Kunne ikke fjerne nested function '{symbol_name}' efter konvertering: {e}",
+                category=RefactoringError.REMOVAL_FAILED,
+                filepath=source,
+                details={"symbol": symbol_name, "captured": captured}
+            )
+
+        # 6. Add import in source
+        target_module = os.path.splitext(os.path.basename(target))[0]
+        try:
+            CodeModifier.insert_import(source, f"from {target_module} import {symbol_name}")
+        except RefactoringError as e:
+            log.warning("_convert_nested_to_top_level: insert_import FAILED: %s", e)
+            raise
+
+        # 7. Add functools import if partial wrappers were used
+        used_partial = any('functools.partial' in l for l in source_lines)
+        if used_partial:
+            try:
+                CodeModifier.insert_import(source, "import functools")
+            except RefactoringError:
+                pass
+
+        log.info("_convert_nested_to_top_level OK: %s → %s (captured=%s, refs=%d)",
+                 symbol_name, os.path.basename(target), captured, len(ref_locations))
+        return {
+            "success": True,
+            "symbol": symbol_name,
+            "source": source,
+            "target": target,
+            "converted": True,
+            "captured_vars": captured,
+            "references_updated": len(ref_locations),
+        }
+
+    def _convert_stateful_closure(
+        self,
+        source: str,
+        symbol_name: str,
+        target: str,
+        tree: ast.AST,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+        lines: list[str],
+    ) -> dict[str, Any]:
+        """Convert a stateful nested closure to a class-based wrapper in target.
+
+        Handles closures with `nonlocal` declarations by creating a class
+        with `__call__` in the target module.
+
+        For example:
+            def outer():
+                completed = 0
+                def inner(node):
+                    nonlocal completed
+                    completed += 1
+                    ...
+            →
+            class InnerWrapper:
+                def __init__(self):
+                    self._completed = 0
+                def __call__(self, node):
+                    self._completed += 1
+                    ...
+        """
+        target = self._resolve(target)
+        captured = AstAnalyzer.get_captured_variables(tree, node)
+        # Find nonlocal variables
+        nonlocal_vars: set[str] = set()
+        for child in ast.walk(node):
+            if isinstance(child, ast.Nonlocal):
+                nonlocal_vars.update(child.names)
+        # Captured variables minus nonlocal = just-read captures
+        read_captures = [v for v in captured if v not in nonlocal_vars]
+        log.info("_convert_stateful_closure: %s nonlocal=%s read_captures=%s",
+                 symbol_name, sorted(nonlocal_vars), read_captures)
+
+        start_line, end_line = AstAnalyzer.get_symbol_lines(lines, node)
+        symbol_lines = list(lines[start_line:end_line])
+        def_line_idx = node.lineno - 1 - start_line
+
+        # Build the class wrapper
+        class_name = symbol_name[0].upper() + symbol_name[1:] + "Wrapper" if symbol_name[0].islower() else symbol_name + "Wrapper"
+
+        # Build __init__
+        init_kwargs = ', '.join(read_captures)
+        class_code = f"class {class_name}:\n"
+        if read_captures or nonlocal_vars:
+            class_code += f"    def __init__(self{', ' + init_kwargs if init_kwargs else ''}):\n"
+            for v in read_captures:
+                class_code += f"        self.{v} = {v}\n"
+            for v in sorted(nonlocal_vars):
+                class_code += f"        self._{v} = 0\n"
+        else:
+            class_code += "    def __init__(self):\n"
+            class_code += "        pass\n"
+
+        # Build __call__ from the original code
+        dedent_level = len(symbol_lines[def_line_idx]) - len(symbol_lines[def_line_idx].lstrip())
+        call_body_lines = []
+        for idx, orig_line in enumerate(symbol_lines):
+            if idx == def_line_idx:
+                continue  # skip the def line
+            stripped = orig_line.strip()
+            if not stripped:
+                call_body_lines.append('')
+                continue
+            if stripped.startswith('nonlocal '):
+                call_body_lines.append("        # converted nonlocal")
+                continue
+            # Determine indentation: body is at 8 spaces (4 class + 4 method)
+            # plus any extra nesting beyond the direct function body
+            orig_indent = len(orig_line) - len(orig_line.lstrip())
+            extra_nesting = orig_indent - dedent_level - 4
+            if extra_nesting < 0:
+                extra_nesting = 0
+            body_indent = '        ' + '    ' * (extra_nesting // 4)
+            modified = orig_line.strip()
+            for nv in sorted(nonlocal_vars, key=len, reverse=True):
+                if nv in modified and not modified.startswith('#'):
+                    modified = modified.replace(nv, f"self._{nv}")
+            call_body_lines.append(f"{body_indent}{modified}")
+
+        # Find original params for __call__
+        orig_params_list = [a.arg for a in node.args.args]
+        orig_params = ', '.join(orig_params_list)
+        call_sig = f"def __call__(self{', ' + orig_params if orig_params else ''}):"
+
+        class_code += f"    {call_sig}\n"
+        class_code += '\n'.join(call_body_lines) + '\n'
+
+        # Write target
+        os.makedirs(os.path.dirname(target) or '.', exist_ok=True)
+        visitor = ImportVisitor()
+        visitor.visit(node)
+        used_names = visitor.names | set(captured)
+        content = '\n'.join(lines)
+        needed_imports = ImportResolver.filter_for_symbol(content, lines, used_names)
+        existing_target = ''
+        if os.path.exists(target):
+            existing_target = open(target, 'r', encoding='utf-8').read().strip()
+        existing_imports: set[str] = set()
+        if existing_target:
+            try:
+                for imp_node in ast.walk(ast.parse(existing_target)):
+                    if isinstance(imp_node, (ast.Import, ast.ImportFrom)):
+                        seg = ast.get_source_segment(existing_target, imp_node)
+                        if seg:
+                            existing_imports.add(seg.strip())
+            except SyntaxError:
+                pass
+        new_imports = [i for i in needed_imports if i not in existing_imports]
+        imports_block = '\n'.join(new_imports)
+        target_parts = [p for p in [imports_block, class_code] if p.strip()]
+        target_content = '\n\n'.join(target_parts) + '\n'
+        try:
+            ast.parse(target_content)
+        except SyntaxError as e:
+            raise RefactoringError(
+                f"Target syntax error after stateful conversion: {e}",
+                category=RefactoringError.TARGET_SYNTAX,
+                filepath=target,
+                details={"symbol": symbol_name, "error": str(e)}
+            )
+        self._write(target, target_content)
+
+        # Remove the original nested function and update the call site
+        source_path = self._abs(source)
+        source_lines = list(lines)
+
+        # Find reference to the function in parent scope and replace with instance creation
+        source_tree = ast.parse('\n'.join(source_lines))
+        ref_line_nos: set[int] = set()
+        for ref_node in ast.walk(source_tree):
+            if isinstance(ref_node, ast.Name) and ref_node.id == symbol_name:
+                ref_lineno = ref_node.lineno - 1
+                if not (start_line <= ref_lineno < end_line):
+                    ref_line_nos.add(ref_lineno)
+
+        init_kwargs = ', '.join(f'{v}={v}' for v in read_captures)
+        init_call = f"{class_name}({init_kwargs})" if init_kwargs else f"{class_name}()"
+        for ref_line in ref_line_nos:
+            source_lines[ref_line] = source_lines[ref_line].replace(symbol_name, init_call, 1)
+
+        # Write updated source
+        updated_source = '\n'.join(source_lines)
+        with open(source_path + '.tmp', 'w', encoding='utf-8') as f:
+            f.write(updated_source)
+        _atomic_replace(source_path + '.tmp', source_path)
+
+        # Remove original function
+        try:
+            CodeModifier.remove_lines(source, start_line, end_line)
+        except RefactoringError as e:
+            raise RefactoringError(
+                f"Kunne ikke fjerne stateful closure '{symbol_name}': {e}",
+                category=RefactoringError.REMOVAL_FAILED,
+                filepath=source,
+                details={"symbol": symbol_name}
+            )
+
+        # Add import
+        target_module = os.path.splitext(os.path.basename(target))[0]
+        try:
+            CodeModifier.insert_import(source, f"from {target_module} import {class_name}")
+        except RefactoringError:
+            pass
+
+        log.info("_convert_stateful_closure OK: %s → %s.%s (nonlocal=%s, refs=%d)",
+                 symbol_name, os.path.basename(target), class_name,
+                 sorted(nonlocal_vars), len(ref_line_nos))
+        return {
+            "success": True,
+            "symbol": symbol_name,
+            "source": source,
+            "target": target,
+            "converted": True,
+            "class_name": class_name,
+            "nonlocal_vars": sorted(nonlocal_vars),
+            "references_updated": len(ref_line_nos),
         }
 
     def remove_symbol(self, source: str, symbol_name: str) -> dict[str, Any]:
@@ -1064,6 +1611,51 @@ class RefactoringEngine:
                   os.path.basename(source), len(lines), len(symbols))
         return result
 
+    @staticmethod
+    def _verify_importable(target: str) -> dict[str, Any]:
+        """Verify that target module can be imported without circular errors.
+
+        Tries to import the target module using importlib. If the module
+        has unresolved circular imports (e.g. it imports from the source
+        file while the source also imports from it), this will raise
+        ImportError.
+
+        Returns {"success": True} or {"success": False, "error": "..."}.
+        The module is removed from sys.modules afterward to avoid side
+        effects.
+        """
+        import importlib
+        import sys as _sys
+
+        target_path = target
+        if not os.path.isabs(target_path):
+            wd = os.environ.get("AGENT_WORKDIR", "")
+            target_path = os.path.normpath(os.path.join(wd, target_path)) if wd else os.path.abspath(target_path)
+
+        if not os.path.exists(target_path):
+            return {"success": False, "error": f"Target file not found: {target_path}"}
+
+        module_name = os.path.splitext(os.path.basename(target_path))[0]
+        target_dir = os.path.dirname(target_path)
+        added = False
+
+        if target_dir not in _sys.path:
+            _sys.path.insert(0, target_dir)
+            added = True
+
+        try:
+            importlib.import_module(module_name)
+            return {"success": True}
+        except ImportError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            return {"success": False, "error": f"{type(e).__name__}: {e}"}
+        finally:
+            if module_name in _sys.modules:
+                del _sys.modules[module_name]
+            if added and target_dir in _sys.path:
+                _sys.path.remove(target_dir)
+
     def batch_extract_symbols(self, source: str, symbols: list[str] | str, target: str) -> dict[str, Any]:
         """Extract multiple symbols to a target module in a single call.
 
@@ -1080,6 +1672,29 @@ class RefactoringEngine:
                  len(symbols), os.path.basename(source), os.path.basename(target),
                  ', '.join(symbols))
         results = []
+
+        # Pre-extraction check: import cycle risk analysis
+        import_cycle_risks: dict[str, list[str]] = {}
+        try:
+            source_content_cycle, source_lines_cycle = self._read(source)
+            source_tree_cycle = ast.parse(source_content_cycle)
+            for sym in symbols:
+                node = AstAnalyzer.find_node(source_tree_cycle, sym)
+                if node is not None:
+                    _sl, _el = AstAnalyzer.get_symbol_lines(source_lines_cycle, node)
+                    sym_code = '\n'.join(source_lines_cycle[_sl:_el])
+                    risks = _detect_import_cycle_risk(
+                        source_content_cycle, source, target, sym_code
+                    )
+                    if risks:
+                        import_cycle_risks[sym] = risks
+        except Exception as e:
+            log.debug("import cycle risk check error: %s", e)
+
+        if import_cycle_risks:
+            log.warning("batch_extract_symbols: import cycle risk detected: %s",
+                        import_cycle_risks)
+
         for i, sym in enumerate(symbols):
             if i > 0:
                 import time
@@ -1136,7 +1751,19 @@ class RefactoringEngine:
             err = f" — {r['error']}" if r.get("error") else ""
             log.debug("  %s %s%s%s", status, r["symbol"], extra, err)
 
-        return {
+        # Post-extraction check: is target actually importable?
+        import_check: dict[str, Any] = {"success": True}
+        if _succeeded > 0:
+            try:
+                import_check = self._verify_importable(target)
+                if not import_check["success"]:
+                    log.warning("batch_extract_symbols: target NOT importable: %s",
+                                import_check.get("error", ""))
+            except Exception as e:
+                log.warning("batch_extract_symbols: import check crashed: %s", e)
+                import_check = {"success": False, "error": str(e)}
+
+        result = {
             "success": True,
             "source": source,
             "target": target,
@@ -1144,8 +1771,16 @@ class RefactoringEngine:
             "succeeded": _succeeded,
             "failed": _failed,
             "results": results,
+            "nested_converted": sum(1 for r in results if r.get("nested_function")),
+            "stateful_converted": sum(1 for r in results if r.get("stateful_closure")),
             "missing_dependencies": missing_deps,
+            "import_cycle_risks": import_cycle_risks,
+            "import_check": import_check,
         }
+
+        log.info("batch_extract_symbols done: succeeded=%d failed=%d import_ok=%s",
+                 _succeeded, _failed, import_check.get("success", "?"))
+        return result
 
     @staticmethod
     def _symbol_exists_in_target(target: str, symbol_name: str) -> bool:
@@ -1227,41 +1862,50 @@ class RefactoringEngine:
                 }
 
         # Step 2: Remove
-        _t1 = _time.monotonic()
-        try:
-            remove_result = self.remove_symbol(source, symbol_name)
-            _t_remove = _time.monotonic() - _t1
-        except RefactoringError as e:
-            log.warning("move_symbol: remove FAILED for %s: %s — rolling back", symbol_name, e)
-            _rollback('remove')
-            return {
-                'success': False,
-                'error': f"Remove failed: {e}",
-                'step': 'remove',
-                'category': e.category,
-            }
+        # For nested function conversions, the conversion already removed
+        # the original function and added the import — skip steps 2-3.
+        if extract_result.get("converted"):
+            log.info("move_symbol: %s was converted (nested) — skip remove & import", symbol_name)
+            remove_result = {"success": True, "skipped": True, "note": "conversion already removed source"}
+            import_result = {"success": True, "skipped": True, "note": "conversion already added import"}
+            _t_remove = 0.0
+            _t_import = 0.0
+        else:
+            _t1 = _time.monotonic()
+            try:
+                remove_result = self.remove_symbol(source, symbol_name)
+                _t_remove = _time.monotonic() - _t1
+            except RefactoringError as e:
+                log.warning("move_symbol: remove FAILED for %s: %s — rolling back", symbol_name, e)
+                _rollback('remove')
+                return {
+                    'success': False,
+                    'error': f"Remove failed: {e}",
+                    'step': 'remove',
+                    'category': e.category,
+                }
 
-        # Step 3: Add import
-        _t2 = _time.monotonic()
-        try:
-            import_result = self.add_import(source, target_module, short_name)
-            _t_import = _time.monotonic() - _t2
-        except RefactoringError as e:
-            log.warning("move_symbol: import FAILED for %s: %s — rolling back", symbol_name, e)
-            _rollback('import')
-            return {
-                'success': False,
-                'error': f"Import failed: {e}",
-                'step': 'import',
-                'category': e.category,
-            }
+            # Step 3: Add import
+            _t2 = _time.monotonic()
+            try:
+                import_result = self.add_import(source, target_module, short_name)
+                _t_import = _time.monotonic() - _t2
+            except RefactoringError as e:
+                log.warning("move_symbol: import FAILED for %s: %s — rolling back", symbol_name, e)
+                _rollback('import')
+                return {
+                    'success': False,
+                    'error': f"Import failed: {e}",
+                    'step': 'import',
+                    'category': e.category,
+                }
 
         _t_total = _time.monotonic() - _t0
         log.info("move_symbol OK: %s %s→%s (already_in_target=%s, extract=%.3fs, remove=%.3fs, import=%.3fs, total=%.3fs)",
                  symbol_name, os.path.basename(source), os.path.basename(target),
                  symbol_already_in_target, _t_extract, _t_remove, _t_import, _t_total)
 
-        return {
+        result = {
             'success': True,
             'symbol': symbol_name,
             'source': source,
@@ -1273,6 +1917,15 @@ class RefactoringEngine:
                 'import': import_result,
             },
         }
+        # Expose nested function info at top level for LLM visibility
+        if extract_result.get("converted"):
+            result["nested_function"] = True
+            result["captured_vars"] = extract_result.get("captured_vars", [])
+            result["references_updated"] = extract_result.get("references_updated", 0)
+        if extract_result.get("class_name"):
+            result["stateful_closure"] = True
+            result["class_name"] = extract_result.get("class_name")
+        return result
 
     def _list_symbols(self, path: str) -> list[dict[str, Any]]:
         """List all top-level symbols in a Python file."""

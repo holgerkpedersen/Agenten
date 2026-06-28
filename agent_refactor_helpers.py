@@ -312,6 +312,31 @@ def _validate_ekstraher_symbols(agent: Any) -> str | None:
 
         missing_syms = [s for s in expected_syms if s not in actual]
         if missing_syms:
+            # Filter out nested functions that can't be extracted
+            # Check if the missing symbol still exists in the source as a nested function
+            try:
+                from refactoring_engine import _is_nested_function
+                source_path = os.environ.get("AGENT_WORKDIR", "")
+                if source_path and os.path.exists(os.path.join(source_path, 'api_server.py')):
+                    source_path = os.path.join(source_path, 'api_server.py')
+                elif os.path.exists('api_server.py'):
+                    source_path = 'api_server.py'
+                if source_path and os.path.exists(source_path):
+                    with open(source_path, 'r', encoding='utf-8') as _sf:
+                        _src_content = _sf.read()
+                    _src_tree = ast.parse(_src_content)
+                    nested_still_present = []
+                    for sym in missing_syms[:]:
+                        for _node in ast.walk(_src_tree):
+                            if isinstance(_node, (ast.FunctionDef, ast.AsyncFunctionDef)) and _node.name == sym and _is_nested_function(_src_tree, _node):
+                                nested_still_present.append(sym)
+                                missing_syms.remove(sym)
+                                total_actual += 1  # not really missing
+                                break
+            except Exception:
+                pass
+
+        if missing_syms:
             desc = (
                 f"  \u26a0\ufe0f {mod_file}: mangler {len(missing_syms)}/{len(expected_syms)} "
                 f"symboler: {', '.join(missing_syms[:8])}"

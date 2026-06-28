@@ -773,3 +773,108 @@ def top():
                 break
         else:
             pytest.fail("def top(): not found in target")
+
+    SOURCE_WITH_CAPTURES = '''"""Module with captured var."""
+import os
+
+def outer():
+    prefix = "/var/log"
+    def log_msg(msg):
+        return prefix + msg
+    return log_msg("test")
+'''
+
+    def test_extract_nested_with_captures(self, engine, tmp_path):
+        """Nested function with captured vars → converted to top-level with extra params."""
+        src = tmp_path / "capture_source.py"
+        src.write_text(self.SOURCE_WITH_CAPTURES, encoding="utf-8")
+        tgt = tmp_path / "log_target.py"
+
+        result = engine.extract_symbol(str(src), "log_msg", str(tgt))
+        assert result["success"]
+        assert result.get("converted"), "Should have been converted"
+        assert result.get("captured_vars") == ["prefix"]
+
+        target_code = tgt.read_text(encoding="utf-8")
+        assert "def log_msg(msg, prefix):" in target_code, (
+            f"log_msg should have prefix param, got:\n{target_code}"
+        )
+
+        source_code = src.read_text(encoding="utf-8")
+        assert "from log_target import log_msg" in source_code, (
+            f"Source should import log_msg from target, got:\n{source_code}"
+        )
+        assert "def log_msg" not in source_code, (
+            "Nested def should be removed from source"
+        )
+
+    SOURCE_WITH_STATEFUL = '''"""Module with stateful closure."""
+import os
+
+def outer():
+    count = 0
+    def increment(amount):
+        nonlocal count
+        count += amount
+        return count
+    return increment(5)
+'''
+
+    def test_extract_stateful_closure(self, engine, tmp_path):
+        """Stateful closure with nonlocal → converted to class wrapper."""
+        src = tmp_path / "stateful_source.py"
+        src.write_text(self.SOURCE_WITH_STATEFUL, encoding="utf-8")
+        tgt = tmp_path / "counter.py"
+
+        result = engine.extract_symbol(str(src), "increment", str(tgt))
+        assert result["success"]
+        assert result.get("converted"), "Should have been converted"
+        assert "nonlocal_vars" in result
+        assert "count" in result.get("nonlocal_vars", [])
+
+        target_code = tgt.read_text(encoding="utf-8")
+        assert "class IncrementWrapper:" in target_code, (
+            f"Target should have class wrapper, got:\n{target_code}"
+        )
+        assert "__call__" in target_code, (
+            "Wrapper class should have __call__"
+        )
+        assert "self._count" in target_code, (
+            "Nonlocal var should be converted to self._count"
+        )
+
+        source_code = src.read_text(encoding="utf-8")
+        assert "from counter import IncrementWrapper" in source_code, (
+            f"Source should import wrapper class, got:\n{source_code}"
+        )
+        assert "def increment" not in source_code, (
+            "Nested def should be removed from source"
+        )
+
+    SOURCE_NO_CAPTURES = '''"""Module with nested but no captures."""
+def outer():
+    def helper():
+        return 1
+    return helper()
+'''
+
+    def test_extract_nested_no_captures(self, engine, tmp_path):
+        """Nested function with no captures → extracted as-is (no conversion needed)."""
+        src = tmp_path / "nocap_source.py"
+        src.write_text(self.SOURCE_NO_CAPTURES, encoding="utf-8")
+        tgt = tmp_path / "helper_target.py"
+
+        result = engine.extract_symbol(str(src), "helper", str(tgt))
+        assert result["success"]
+        assert not result.get("converted", False), (
+            "Should NOT be converted — no captures"
+        )
+
+        target_code = tgt.read_text(encoding="utf-8")
+        assert "def helper():" in target_code
+        for line in target_code.splitlines():
+            if line.strip().startswith("def helper():"):
+                assert line == "def helper():", (
+                    f"helper should be at 0 indent. Found: {repr(line)}"
+                )
+                break
