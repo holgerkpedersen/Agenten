@@ -834,3 +834,65 @@ Same for `ast.AsyncWith`.
 **Fix:** Use `for item in child.items:` before accessing `item.optional_vars`.
 
 **Files:** `refactoring_engine.py:565-569`
+
+### 60. `from session_manager import current_session_id` froze snapshots across modules — "Nedbryd en opgave først" after session load
+
+**Symptom:** User loads an existing session in the UI (tree is displayed), clicks "Stream" →
+immediate SSE error `Nedbryd en opgave først` ("Decompose a task first"). Meanwhile the tree IS
+in the session file — just not visible to `execute_stream()`.
+
+**Root cause (regression from refactoring):** After `api_server.py` was split into 27 modules,
+each module did `from session_manager import current_session_id, export_folder`.
+This imports the VALUE at import time (`None`). When `session_routes.py::load_session()` later
+ran `global current_session_id; current_session_id = session_id`, it only updated the binding
+in `session_routes.py`'s namespace — the 26 other modules kept their frozen `None` snapshot.
+So `stream_execution.py::execute_stream()` read `current_session_id = None`, skipped the
+session-restore branch, and `agent.task_tree` stayed `None` → "Decompose first" error.
+
+Same bug affects `export_folder` (set via `folder_manager.py::set_folder()`, read elsewhere).
+
+**Fix:** `current_session_id` and `export_folder` are now MUTABLE ATTRIBUTES on the singleton
+`session_manager` instance (set in `session_manager.py`:
+`session_manager.current_session_id = None; session_manager.export_folder = None`).
+All 27 importing modules no longer import these names — they read/write
+`session_manager.current_session_id` / `session_manager.export_folder`. Since the instance is a
+shared mutable object, writes propagate across modules immediately.
+
+Pattern rule for refactors: **never `from module import X` for a module-level mutable scalar
+that other modules rebind via `global X`**. Attach to a shared singleton instead.
+
+Updates touched: `session_manager.py`, `stream_execution.py`, `execution_core.py`,
+`execution_control.py`, `decomposition.py`, `session_routes.py`, `session_api.py` (dead code,
+also fixed for consistency), `folder_manager.py`, `routes.py`, `image_handler.py`,
+`layout_prompts.py`, `layout_routes.py`, `model_api.py`, `model_routes.py`, `phase_checks.py`,
+`phase_checks_routes.py`, `static_routes.py`, `api_server.py`, `autoresearch.py`,
+`autoresearch_routes.py`, `error_handling.py`, `issues_api.py`, `issue_routes.py`,
+`ui_routes.py`, `utility_routes.py`. Deleted dead `folder_handler.py`. Test fixtures in
+`tests/test_sse_streaming.py` and `tests/test_api.py` now reset
+`session_manager.current_session_id = None` and patch
+`stream_execution.session_manager.current_session_id` instead of the removed module symbol.
+
+**Files:** `session_manager.py:284-294` (singleton attributes), all 25 importer modules,
+`tests/test_sse_streaming.py:13-18,56,107`, `tests/test_api.py:13-18`
+
+### 61. `from api_server import X` inside a function re-executes `api_server.py` as a new module
+
+**Symptom:** First HTTP request after server start crashes with
+`AssertionError: The setup method 'after_request' can no longer be called on the application`
+originating from `CORS(app, ...)` inside `api_server.py`.
+
+**Root cause:** `api_server.py` is launched as `__main__`, so `sys.modules` stores it under
+`__main__`, NOT under `api_server`. Any function-level `from api_server import agent` in another
+module (e.g. `routes.py::upload_file`) cannot find `api_server` in `sys.modules`, so Python
+re-imports it as a fresh module — re-executing `CORS(app, ...)` after the first request has
+already been served → Flask raises.
+
+**Fix:** Replace every lazy `from api_server import X` with top-level imports from the actual
+source modules (`config`, `folder_manager`, `session_manager`, `stream_execution`,
+`decomposition`). Applied to `routes.py`, `execution_core.py`, `api_skillflow.py`.
+
+**Rule:** After refactoring `api_server.py`, NEVER leave `from api_server import X` inside a
+function body — the `__main__` aliasing makes it re-trigger module-level setup code. Import from
+the real source module instead.
+
+**Files:** `routes.py`, `execution_core.py`, `api_skillflow.py`

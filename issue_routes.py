@@ -4,7 +4,7 @@ from typing import Any, Generator
 import agent_issues
 import json
 import os
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 
 @app.route("/api/issues", methods=["GET"])
 def list_issues() -> Any:

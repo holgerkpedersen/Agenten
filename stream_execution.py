@@ -1,6 +1,6 @@
 """Stream-baseret execution, session save debounce og resume."""
 from typing import Any
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 import json
 import time
 from typing import Any, Generator
@@ -277,7 +277,7 @@ def execute_stream() -> Any:
 
     Yields:
         ..."""
-    global current_session_id
+    current_session_id = session_manager.current_session_id
     ui_lang = "da"
 
     # Create a session-scoped agent to avoid race conditions with concurrent SSE requests (ARC-007)
@@ -426,7 +426,7 @@ def execute_resume() -> Any:
     Returns SSE even on errors, so the frontend EventSource never fires onerror
     (which would hide the pause/resume buttons prematurely).
     """
-    global current_session_id
+    current_session_id = session_manager.current_session_id
     if not current_session_id:
         def _no_session():
             yield f"data: {json.dumps({'type': 'error', 'message': 'Ingen aktiv session'})}\n\n"

@@ -2,7 +2,7 @@
   "meta": {
     "generated": "2026-05-26",
     "source": "Code audit",
-    "total": 169,
+    "total": 172,
     "updated": "2026-06-14",
     "format": "C-A-S-E (Context, Action, Symptoms, Environment)",
     "total_risks": 6
@@ -1856,18 +1856,6 @@
       "resolution_note": "test.py does not exist in the repo (already removed or never committed)."
     },
     {
-      "id": "REFAC-004",
-      "title": "api_server.py er 1936 linjer — bryder Single Responsibility Principle",
-      "type": "refactor",
-      "severity": "medium",
-      "description": "api_server.py er 1384 linjer (grænse: 1000). En klasse på over 1000 linjer har typisk for mange ansvarsområder og bør opdeles efter SOLID-principperne.",
-      "location": "api_server.py",
-      "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
-      "proposed_fix": "Opdel api_server.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
-      "status": "open",
-      "related": []
-    },
-    {
       "id": "REFAC-016",
       "title": "agent_core.py er 1174 linjer — bryder Single Responsibility Principle",
       "type": "refactor",
@@ -2070,6 +2058,31 @@
       "created_at": "2026-06-15T21:30:00",
       "updated_at": "2026-06-15T21:30:00",
       "resolution_note": "Lukket automatisk: useIssueAsTask pre-fills but does not auto-submit"
+    },
+    {
+      "id": "REFAC-001",
+      "title": "api_server.py er 1521 linjer — bryder Single Responsibility Principle",
+      "type": "refactor",
+      "severity": "medium",
+      "description": "api_server.py var 1521 linjer. Opdelt i 18 moduler efter SOLID.",
+      "location": "api_server.py",
+      "impact": "Løst: api_server.py er nu 145 linjer med klar ansvarsfordeling.",
+      "proposed_fix": "Gennemført — se session 39a3b139 og commits 3c3809a, c082755.",
+      "status": "resolved",
+      "resolution_note": "Refactoring completed: api_server.py 1521→145 lines, 18 modules, 824 tests pass.",
+      "related": []
+    },
+    {
+      "id": "REFAC-024",
+      "title": "agent_stream.py er 2241 linjer — bryder Single Responsibility Principle",
+      "type": "refactor",
+      "severity": "medium",
+      "description": "agent_stream.py er 2241 linjer (grænse: 1000). En klasse på over 1000 linjer har typisk for mange ansvarsområder og bør opdeles efter SOLID-principperne.",
+      "location": "agent_stream.py",
+      "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
+      "proposed_fix": "Opdel agent_stream.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
+      "status": "open",
+      "related": []
     }
   ],
   "active_risks": [

@@ -12,8 +12,8 @@ from api_server import app as flask_app
 @pytest.fixture
 def client():
     flask_app.config["TESTING"] = True
-    import api_server
-    api_server.current_session_id = None
+    import session_manager
+    session_manager.current_session_id = None
     with flask_app.test_client() as c:
         yield c
 
@@ -53,7 +53,7 @@ class TestSSEWithSessionTree:
         child = TaskNode("sub task")
         tree.root.add_child(child)
 
-        with patch("stream_execution.current_session_id", "test-sse-session"), \
+        with patch("stream_execution.session_manager.current_session_id", "test-sse-session"), \
              patch("stream_execution.session_manager.load_session") as mock_load, \
              patch("api_server.agent") as mock_agent:
 
@@ -104,7 +104,7 @@ class TestSSEWithSessionTree:
 
         tree = TaskTree(root_name="test task")
 
-        with patch("stream_execution.current_session_id", "test-stop-session"), \
+        with patch("stream_execution.session_manager.current_session_id", "test-stop-session"), \
              patch("stream_execution.session_manager.load_session") as mock_load, \
              patch("api_server.agent") as mock_agent:
 

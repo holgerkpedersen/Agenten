@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from server_config import app
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
+from stream_execution import _save_session_data as _ssd
+from decomposition import TEMPLATE_GUIDANCE
 from typing import Any, Generator
 from lang import t, get_ui_translations
 from i18n import K
@@ -12,7 +14,7 @@ import os
 @app.route("/api/stop", methods=["POST"])
 def stop_execution() -> Any:
     """stop execution."""
-    global current_session_id
+    current_session_id = session_manager.current_session_id
 
     if current_session_id:
         with active_streams_lock:
@@ -28,7 +30,7 @@ def stop_execution() -> Any:
 @app.route("/api/execute-pause", methods=["POST"])
 def pause_execution() -> Any:
     """Pause execution — set pause flag so solve_task_stream saves messages."""
-    global current_session_id
+    current_session_id = session_manager.current_session_id
     if current_session_id:
         with active_streams_lock:
             sa = active_streams.get(current_session_id)
@@ -64,6 +66,7 @@ def reset_execution() -> Any:
 def execute_without_stream() -> Any:
     """execute without stream."""
     global execution_status
+    current_session_id = session_manager.current_session_id
     if agent.task_tree is None:
         return jsonify({"success": False, "error": t(K.ERR_DECOMPOSE_FIRST, agent.lang)}), 400
 
@@ -95,7 +98,6 @@ def execute_without_stream() -> Any:
             execution_status["running"] = False
         # Save session after execution so tree status is persisted
         try:
-            from api_server import _save_session_data as _ssd
             _ssd(current_session_id, agent, "da")
         except Exception:
             pass
@@ -107,7 +109,6 @@ def execute_without_stream() -> Any:
             execution_status["running"] = False
         # Save session even on failure so partial progress is captured
         try:
-            from api_server import _save_session_data as _ssd
             _ssd(current_session_id, agent, "da")
         except Exception:
             pass
@@ -148,8 +149,6 @@ def _validate_template_prompt(prompt: str, template: str) -> dict:
 
     Returns:
         dict"""
-    from api_server import TEMPLATE_GUIDANCE
-
     if not template:
         return {"warning": "", "suggestion": "", "suggested_template": "", "matches": 0, "total": 0}
 
@@ -220,11 +219,11 @@ def decompose() -> Any:
     if not prompt:
         return jsonify({"success": False, "error": t(K.ERR_NO_PROMPT, ui_lang)}), 400
 
-    global current_session_id
     if session_id:
-        current_session_id = session_id
-    elif not current_session_id:
-        current_session_id, _ = session_manager.create_session(prompt[:100])
+        session_manager.current_session_id = session_id
+    elif not session_manager.current_session_id:
+        session_manager.current_session_id, _ = session_manager.create_session(prompt[:100])
+    current_session_id = session_manager.current_session_id
 
     agent.show_thinking = show_thinking
     agent.lang = lang

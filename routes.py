@@ -4,6 +4,9 @@ import os
 from typing import Any
 from flask import request, jsonify, send_from_directory
 
+from config import BASE_DIR, STATIC_DIR
+from folder_manager import UPLOAD_DIR, sanitize_filename
+from session_manager import agent, session_manager
 from lang import t
 from i18n import K
 
@@ -11,7 +14,6 @@ from i18n import K
 
 def index() -> Any:
     """Serve index.html from static directory."""
-    from api_server import STATIC_DIR
     index_path = os.path.join(STATIC_DIR, 'index.html')
     if os.path.exists(index_path):
         return send_from_directory(STATIC_DIR, 'index.html')
@@ -30,7 +32,6 @@ def index() -> Any:
 
 def upload_file() -> Any:
     """Upload a file from the browser and save it with original name."""
-    from api_server import agent, UPLOAD_DIR, sanitize_filename
     if 'file' not in request.files:
         return jsonify({"success": False, "error": t(K.ERR_NO_FILE, agent.lang)}), 400
     file = request.files['file']
@@ -51,7 +52,6 @@ def upload_file() -> Any:
 
 def read_file() -> Any:
     """Read the content of a file."""
-    from api_server import agent, BASE_DIR
     from agent_files import _is_safe_path
     data = request.json
     filepath = data.get("filepath", "")
@@ -78,7 +78,6 @@ def read_file() -> Any:
 
 def view_file() -> Any:
     """View a file's content via POST request."""
-    from api_server import agent, BASE_DIR
     from agent_files import _is_safe_path
     data = request.json
     filepath = data.get("filepath", "")
@@ -105,7 +104,7 @@ def view_file() -> Any:
 
 def get_current_session() -> Any:
     """Get current session data."""
-    from api_server import agent, current_session_id, session_manager
+    current_session_id = session_manager.current_session_id
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
         return jsonify({"success": True, "session": session_data})

@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 from typing import Any, Generator
 from server_config import BASE_DIR, STATIC_DIR, app, _is_development_mode, _RateLimiter, rate_limiter, _rate_limit, active_streams, active_streams_lock, current_session_lock, _file_mtime, VERSION_FILES, BUILD_INFO
 import os

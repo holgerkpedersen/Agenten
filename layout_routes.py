@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from config import app
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 from typing import Any, Generator
 from lang import t, get_ui_translations
 from i18n import K
@@ -47,7 +47,7 @@ def get_session_prompts(session_id: str) -> Any:
 def get_context_for_prompt() -> Any:
     """get context for prompt."""
     data = request.json
-    session_id = data.get("session_id", current_session_id)
+    session_id = data.get("session_id", session_manager.current_session_id)
     prompt = data.get("prompt", "")
     if session_id and prompt:
         context = session_manager.get_knowledge_for_context(session_id, prompt)
@@ -59,7 +59,7 @@ def get_context_for_prompt() -> Any:
 def add_prompt_to_session() -> Any:
     """add prompt to session."""
     data = request.json
-    session_id = data.get("session_id", current_session_id)
+    session_id = data.get("session_id", session_manager.current_session_id)
     prompt = data.get("prompt", "")
     result = data.get("result", "")
     tree = data.get("tree")

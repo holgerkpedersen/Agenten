@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from config import app
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 from typing import Any, Generator
 from lang import t, get_ui_translations
 from i18n import K
@@ -10,7 +10,7 @@ from stream_execution import _save_session_data
 @app.route("/api/stop", methods=["POST"])
 def stop_execution() -> Any:
     """stop execution."""
-    global current_session_id
+    current_session_id = session_manager.current_session_id
 
     if current_session_id:
         with active_streams_lock:
@@ -26,7 +26,7 @@ def stop_execution() -> Any:
 @app.route("/api/execute-pause", methods=["POST"])
 def pause_execution() -> Any:
     """Pause execution — set pause flag so solve_task_stream saves messages."""
-    global current_session_id
+    current_session_id = session_manager.current_session_id
     if current_session_id:
         with active_streams_lock:
             sa = active_streams.get(current_session_id)
@@ -62,6 +62,7 @@ def reset_execution() -> Any:
 def execute_without_stream() -> Any:
     """execute without stream."""
     global execution_status
+    current_session_id = session_manager.current_session_id
     if agent.task_tree is None:
         return jsonify({"success": False, "error": t(K.ERR_DECOMPOSE_FIRST, agent.lang)}), 400
 

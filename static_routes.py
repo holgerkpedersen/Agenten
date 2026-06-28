@@ -6,7 +6,7 @@ from folder_manager import set_folder, folder_status, save_to_folder, list_folde
 from config import BASE_DIR, STATIC_DIR, app, _is_development_mode, _file_mtime, VERSION_FILES, BUILD_INFO
 from folder_manager import UPLOAD_DIR
 from middleware import _RateLimiter, rate_limiter, _rate_limit
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 import json
 
 # ============ STATIC ROUTES ============
@@ -29,7 +29,7 @@ def preview_export(filename: str) -> Any:
     Args:
         filename:"""
     import re
-    base = export_folder or os.path.join(BASE_DIR, "exports")
+    base = session_manager.export_folder or os.path.join(BASE_DIR, "exports")
     filepath = os.path.join(base, filename)
 
     # Security check: Path Traversal Prevention (SEC-013)

@@ -1,7 +1,7 @@
 from config import app, get_logger, log
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from folder_manager import UPLOAD_DIR, sanitize_filename
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 import os
 from typing import Any, Generator
 
@@ -51,7 +51,7 @@ def _normalize_images(images: list[dict]) -> list[dict]:
 @app.route("/api/image/upload", methods=["POST"])
 def image_upload() -> Any:
     """image upload."""
-    sid = current_session_id  # capture locally to avoid race (BUG-063)
+    sid = session_manager.current_session_id  # capture locally to avoid race (BUG-063)
     if 'image' not in request.files:
         return jsonify({"success": False, "error": "Ingen billedfil modtaget"}), 400
     f = request.files['image']

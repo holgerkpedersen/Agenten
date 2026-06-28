@@ -3,7 +3,7 @@ from server_config import app
 import os
 from typing import Any, Generator
 from lang import t, get_ui_translations
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 import model_manager
 import config
 from config import get_logger, log
@@ -110,12 +110,12 @@ def set_model() -> Any:
         agent.decompose_llm.set_model(model)
     else:
         agent.llm.set_model(model)
-    if current_session_id:
+    if session_manager.current_session_id:
         def _update_model(data: dict) -> dict:
             data["decompose_model"] = agent.decompose_llm.model
             data["execute_model"] = agent.llm.model
             return data
-        session_manager.update_session(current_session_id, _update_model)
+        session_manager.update_session(session_manager.current_session_id, _update_model)
     return jsonify({"success": True, "model": model, "type": dtype})
 
 

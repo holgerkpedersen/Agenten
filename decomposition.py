@@ -2,7 +2,7 @@ import model_manager
 import config
 from config import app, get_logger, log
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 import os
 from typing import Any, Generator
 from lang import t, get_ui_translations
@@ -190,11 +190,11 @@ def decompose() -> Any:
     if not prompt:
         return jsonify({"success": False, "error": t(K.ERR_NO_PROMPT, ui_lang)}), 400
 
-    global current_session_id
     if session_id:
-        current_session_id = session_id
-    elif not current_session_id:
-        current_session_id, _ = session_manager.create_session(prompt[:100])
+        session_manager.current_session_id = session_id
+    elif not session_manager.current_session_id:
+        session_manager.current_session_id, _ = session_manager.create_session(prompt[:100])
+    current_session_id = session_manager.current_session_id
 
     agent.show_thinking = show_thinking
     agent.lang = lang

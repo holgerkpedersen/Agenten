@@ -4,7 +4,7 @@ from i18n import K
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from agent_phase_checks import TEMPLATE_PHASE_CHECKS, check_phase_done
 from server_config import BASE_DIR, STATIC_DIR, app, _is_development_mode, _RateLimiter, rate_limiter, _rate_limit, active_streams, active_streams_lock, current_session_lock, _file_mtime, VERSION_FILES, BUILD_INFO
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 import agent_skills
 
 def _format_phase_check_description(phase_name: str, spec: dict[str, Any], lang: str = "da") -> str:
@@ -142,7 +142,7 @@ def update_task_status() -> Any:
     if not data:
         return jsonify({"success": False, "error": "Ingen JSON-body"}), 400
 
-    session_id = data.get("session_id") or current_session_id
+    session_id = data.get("session_id") or session_manager.current_session_id
     task_path = data.get("task_path", "")
     new_status = data.get("status", "done")
 

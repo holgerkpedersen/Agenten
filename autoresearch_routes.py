@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory, Response, stream
 from config import app
 from typing import Any, Generator
 import agent_autoresearch
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 
 @app.route("/api/autoresearch/events/<research_id>", methods=["GET"])
 def autoresearch_events(research_id: str) -> Any:

@@ -283,12 +283,15 @@ agent = Agent()
 
 session_manager = SessionManager(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sessions"))
 
-current_session_id = None
+# Shared mutable state — attached to the singleton session_manager instance so
+# all importing modules share ONE source of truth. (Using `from session_manager
+# import current_session_id` would freeze a snapshot at import time — see the
+# "current_session_id race" regression in AGENTS.md.)
+session_manager.current_session_id = None
+session_manager.export_folder = None
 
 execution_status = {"running": False, "progress": 0, "current_task": "", "log": []}
 
 execution_status_lock = threading.Lock()
-
-export_folder = None
 
 export_folder_lock = threading.Lock()

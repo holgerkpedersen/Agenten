@@ -1,7 +1,7 @@
 import os
 from config import app, BASE_DIR
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 from typing import Any, Generator
 from lang import t, get_ui_translations
 from i18n import K
@@ -14,7 +14,6 @@ UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 @app.route("/api/folder/set", methods=["POST"])
 def set_folder() -> Any:
     """set folder."""
-    global export_folder
     data = request.json
     folder = data.get("folder", "")
     if not folder:
@@ -27,14 +26,14 @@ def set_folder() -> Any:
         except Exception as e:
             return jsonify({"success": False, "error": t(K.ERR_CREATE_FOLDER, agent.lang).format(e=str(e))})
     with export_folder_lock:
-        export_folder = folder
-    return jsonify({"success": True, "folder": export_folder})
+        session_manager.export_folder = folder
+    return jsonify({"success": True, "folder": session_manager.export_folder})
 
 
 @app.route("/api/folder/status", methods=["GET"])
 def folder_status() -> Any:
     """folder status."""
-    global export_folder
+    export_folder = session_manager.export_folder
     if export_folder and os.path.exists(export_folder):
         return jsonify({"success": True, "folder": export_folder})
     return jsonify({"success": False, "error": t(K.ERR_NO_FOLDER, agent.lang), "folder": None})
@@ -43,11 +42,10 @@ def folder_status() -> Any:
 @app.route("/api/folder/save", methods=["POST"])
 def save_to_folder() -> Any:
     """save to folder."""
-    global export_folder
     data = request.json
     filename = data.get("filename", "export.md")
     content = data.get("content", "")
-    path = data.get("path") or export_folder
+    path = data.get("path") or session_manager.export_folder
 
     if not path:
         return jsonify({"success": False, "error": t(K.ERR_NO_FOLDER, agent.lang)}), 400
@@ -69,7 +67,7 @@ def save_to_folder() -> Any:
 def list_folder_contents() -> Any:
     """list folder contents."""
     data = request.json
-    folder_path = data.get("path", export_folder)
+    folder_path = data.get("path", session_manager.export_folder)
     if not folder_path or not os.path.exists(folder_path):
         return jsonify({"success": False, "error": t(K.ERR_FOLDER_NOT_FOUND, agent.lang)}), 400
     if not _is_safe_path(BASE_DIR, folder_path):

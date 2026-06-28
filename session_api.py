@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
-from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
+from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 import os
 from typing import Any, Generator
 from lang import t, get_ui_translations
@@ -60,8 +60,7 @@ def create_session() -> Any:
     data = request.json
     name = data.get("name", t(K.SESSION_DEFAULT_NAME, agent.lang).format(n=len(session_manager.list_sessions())+1))
     session_id, session_data = session_manager.create_session(name)
-    global current_session_id
-    current_session_id = session_id
+    session_manager.current_session_id = session_id
     with agent.images_lock:
         agent.images = []  # clear images from previous session
     clear_extracted_registry()  # nulstil extraction-register til ny session
@@ -74,12 +73,11 @@ def load_session(session_id: str) -> Any:
 
     Args:
         session_id:"""
-    global current_session_id
     agent.agent_log = []
     agent.execution_log = []
     session_data = session_manager.load_session(session_id)
     if session_data:
-        current_session_id = session_id
+        session_manager.current_session_id = session_id
         if session_data.get("tree"):
             from task_tree import TaskTree, TaskNode
             agent.task_tree = TaskTree(session_data.get("original_prompt", ""))
@@ -117,7 +115,7 @@ def load_session(session_id: str) -> Any:
 @app.route("/api/sessions/save", methods=["POST"])
 def save_current_session() -> Any:
     """save current session."""
-    global current_session_id
+    current_session_id = session_manager.current_session_id
     data = request.json
     session_id = data.get("session_id", current_session_id)
 
@@ -165,7 +163,7 @@ def save_current_session() -> Any:
         })
         return existing
     session_manager.update_session(session_id, _merge_session)
-    current_session_id = session_id
+    session_manager.current_session_id = session_id
     return jsonify({"success": True, "session_id": session_id})
 
 
@@ -188,12 +186,11 @@ def delete_session(session_id: str) -> Any:
 
     Args:
         session_id:"""
-    global current_session_id
     if not session_id:
         return jsonify({"success": False, "error": t(K.ERR_MISSING_SESSION, agent.lang)}), 400
     if session_manager.delete_session(session_id):
-        if current_session_id == session_id:
-            current_session_id = None
+        if session_manager.current_session_id == session_id:
+            session_manager.current_session_id = None
         return jsonify({"success": True, "deleted": session_id})
     return jsonify({"success": False, "error": t(K.ERR_SESSION_NOT_FOUND, agent.lang)}), 404
 
@@ -206,7 +203,7 @@ def clear_execution_state() -> Any:
     Called before undo to prevent stale execution data (todos, logs,
     task tree) from persisting after git stash pop + reload.
     """
-    global current_session_id
+    current_session_id = session_manager.current_session_id
     if not current_session_id:
         return jsonify({"success": False, "error": "Ingen aktiv session"}), 400
     session_data = session_manager.load_session(current_session_id) or {}

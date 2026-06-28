@@ -2,10 +2,10 @@ import json
 import os
 from typing import Any
 from flask import jsonify, request
+from config import BASE_DIR, _is_development_mode
 
 def skillflow_report() -> Any:
     """skillflow report."""
-    from api_server import BASE_DIR, _is_development_mode
     if not _is_development_mode():
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         expected_key = os.environ.get('AGENT_API_KEY', '')
@@ -140,7 +140,6 @@ def skillflow_apply() -> Any:
 def skillflow_status() -> Any:
     """skillflow status."""
     import json as _json
-    from api_server import BASE_DIR
     outcomes_path = os.path.join(BASE_DIR, ".agent_storage", "skill_outcomes.json")
     evolution_path = os.path.join(BASE_DIR, ".agent_storage", "evolution_actions.json")
     data = {"outcomes": [], "evolution": {}}
