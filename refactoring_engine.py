@@ -14,6 +14,7 @@ Design patterns used:
 import ast
 import json
 import os
+import re
 import hashlib
 import textwrap
 import time as _time
@@ -102,6 +103,197 @@ _BUILTINS_TYPING: frozenset[str] = frozenset({
     'TypeVar', 'Generic', 'Protocol', 'Union', 'Final', 'ClassVar',
     'Sequence', 'Iterable', 'Iterator', 'Generator',
 })
+
+# Static mapping of known framework symbols → their import paths.
+# batch_extract_symbols auto-adds these to target modules so extracted
+# functions actually compile without manual import fixing.
+_KNOWN_SYMBOL_IMPORTS: dict[str, str] = {
+    # Flask — bare symbols (typically from flask import X)
+    "Flask": "flask",
+    "request": "flask",
+    "jsonify": "flask",
+    "Response": "flask",
+    "send_from_directory": "flask",
+    "stream_with_context": "flask",
+    "url_for": "flask",
+    "redirect": "flask",
+    "abort": "flask",
+    "make_response": "flask",
+    "send_file": "flask",
+    "session": "flask",
+    "g": "flask",
+    "current_app": "flask",
+    "copy_current_request_context": "flask",
+    "has_request_context": "flask",
+    # Flask extension
+    "CORS": "flask_cors",
+    # Config
+    "app": "config",
+    "BASE_DIR": "config",
+    "STATIC_DIR": "config",
+    "VERSION_FILES": "config",
+    "BUILD_INFO": "config",
+    "get_logger": "config",
+    "log": "config",
+    "_is_development_mode": "config",
+    "_file_mtime": "config",
+    "active_streams": "config",
+    "active_streams_lock": "config",
+    "current_session_lock": "config",
+    # Session manager
+    "SessionManager": "session_manager",
+    "session_manager": "session_manager",
+    "agent": "session_manager",
+    "current_session_id": "session_manager",
+    "_guard_json_body": "session_manager",
+    "execution_status": "session_manager",
+    "execution_status_lock": "session_manager",
+    "export_folder": "session_manager",
+    "export_folder_lock": "session_manager",
+    # Agent core
+    "Agent": "agent_core",
+    # Framework modules
+    "TEMPLATE_PHASE_CHECKS": "agent_phase_checks",
+    "check_phase_done": "agent_phase_checks",
+    "clear_extracted_registry": "refactoring_engine",
+    "LMStudioWrapper": "llm_wrapper",
+    "K": "i18n",
+    "t": "lang",
+    "get_ui_translations": "lang",
+}
+
+# Reverse map: module → list of (symbol, alias) pairs for from X import Y
+_KNOWN_MODULE_SYMBOLS: dict[str, list[tuple[str, str | None]]] = {}
+for _sym, _mod in _KNOWN_SYMBOL_IMPORTS.items():
+    _KNOWN_MODULE_SYMBOLS.setdefault(_mod, []).append((_sym, None))
+
+
+def _auto_add_known_imports(target: str) -> list[str]:
+    """Scan a Python file for used-but-not-imported names and add known imports.
+
+    Checks each Name reference in the target file against
+    ``_KNOWN_SYMBOL_IMPORTS``. If an unimported name matches, adds the
+    corresponding ``from <module> import <name>`` at the top of the file.
+
+    Args:
+        target: Path to the target .py file.
+
+    Returns:
+        List of import strings that were added (empty if none needed).
+    """
+    if not os.path.exists(target):
+        return []
+    try:
+        with open(target, encoding="utf-8") as f:
+            content = f.read()
+    except (OSError, UnicodeDecodeError):
+        return []
+    try:
+        tree = ast.parse(content)
+    except SyntaxError:
+        return []
+
+    # Collect names already defined in the file
+    local_defs: set[str] = set()
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            local_defs.add(node.name)
+        elif isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    local_defs.add(t.id)
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name):
+                local_defs.add(node.target.id)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                imports.add(alias.asname or alias.name)
+            if isinstance(node, ast.ImportFrom) and node.module:
+                imports.update(alias.asname or alias.name for alias in node.names)
+
+    # Collect parameter names from all functions
+    param_names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for arg in node.args.args:
+                param_names.add(arg.arg)
+            if node.args.vararg:
+                param_names.add(node.args.vararg.arg)
+            if node.args.kwarg:
+                param_names.add(node.args.kwarg.arg)
+
+    # Collect all Name references (Load context only)
+    used: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            if node.id not in local_defs and node.id not in imports \
+               and node.id not in param_names and node.id not in _BUILTINS \
+               and node.id not in _BUILTINS_TYPING:
+                used.add(node.id)
+
+    # For remaining names, check if they're in KNOWN_SYMBOL_IMPORTS
+    needed_imports: dict[str, set[str]] = {}
+    for name in used:
+        mod = _KNOWN_SYMBOL_IMPORTS.get(name)
+        if mod:
+            needed_imports.setdefault(mod, set()).add(name)
+
+    if not needed_imports:
+        return []
+
+    # Read lines and insert imports after existing imports
+    lines = content.split("\n")
+    insert_pos = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith(("import ", "from ")):
+            insert_pos = i + 1
+        elif stripped.startswith(('"""', "'''", "#")) and insert_pos == 0:
+            # Docstring or comment at start — keep going
+            continue
+        elif stripped == "" and insert_pos == 0:
+            continue
+        elif insert_pos > 0:
+            break
+        else:
+            break
+
+    new_imports: list[str] = []
+    for mod in sorted(needed_imports):
+        symbols = sorted(needed_imports[mod])
+        # Check if these exact imports already exist
+        existing_imports_str = "\n".join(lines)
+        already_there = True
+        for sym in symbols:
+            pat = f"from {mod} import "
+            if pat in existing_imports_str:
+                # Already importing from this module
+                continue
+            already_there = False
+        if already_there:
+            # All symbols already imported — skip
+            continue
+        new_imports.append(f"from {mod} import {', '.join(symbols)}")
+
+    if not new_imports:
+        return []
+
+    # Insert after the last import line
+    for imp in new_imports:
+        lines.insert(insert_pos, imp)
+        insert_pos += 1
+
+    try:
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        log.info("_auto_add_known_imports: added %d imports to %s: %s",
+                 len(new_imports), os.path.basename(target), "; ".join(new_imports))
+    except OSError as e:
+        log.warning("_auto_add_known_imports: write failed: %s", e)
+        return []
+
+    return new_imports
 
 
 def _list_top_level_symbol_names(content: str) -> set[str]:
@@ -1792,13 +1984,18 @@ class RefactoringEngine:
         _failed = sum(1 for r in results if not r.get("success"))
         _skipped = sum(1 for r in results if r.get("already_extracted"))
 
+        # Auto-add known framework imports (app, BASE_DIR, request, etc.)
+        auto_added: list[str] = []
+        if _succeeded > 0:
+            auto_added = _auto_add_known_imports(target)
+
         if missing_deps:
             log.warning("batch_extract_symbols: missing deps in target: %s",
                         ', '.join(missing_deps))
 
-        log.info("batch_extract_symbols done: %s → %s (%d/%d succeeded, %d failed, %d skipped, deps=%d)",
+        log.info("batch_extract_symbols done: %s → %s (%d/%d succeeded, %d failed, %d skipped, deps=%d, auto_imports=%d)",
                  os.path.basename(source), os.path.basename(target),
-                 _succeeded, len(symbols), _failed, _skipped, len(missing_deps))
+                 _succeeded, len(symbols), _failed, _skipped, len(missing_deps), len(auto_added))
         for r in results:
             status = "OK" if r.get("success") else "FAIL"
             extra = " (already_extracted)" if r.get("already_extracted") else ""
@@ -1830,11 +2027,211 @@ class RefactoringEngine:
             "missing_dependencies": missing_deps,
             "import_cycle_risks": import_cycle_risks,
             "import_check": import_check,
+            "auto_added_imports": auto_added,
         }
 
         log.info("batch_extract_symbols done: succeeded=%d failed=%d import_ok=%s",
                  _succeeded, _failed, import_check.get("success", "?"))
         return result
+
+    def run_extraction_plan(
+        self,
+        source: str,
+        plan_path: str = "refactor_plan.md",
+    ) -> dict[str, Any]:
+        """Read ``refactor_plan.md`` and extract ALL planned symbols deterministically.
+
+        This is the core "one button" extraction tool — no LLM orchestration
+        needed. It parses the plan, runs ``batch_extract_symbols`` for each
+        module, and reports comprehensive results.
+
+        Args:
+            source: Path to the source file being refactored (e.g. ``api_server.py``).
+            plan_path: Path to the plan file (default ``refactor_plan.md``).
+
+        Returns:
+            Dict with keys:
+            - success (bool): True if ALL modules were fully extracted
+            - total_modules (int): Number of modules in the plan
+            - succeeded (int): Modules fully extracted
+            - failed (int): Modules with errors
+            - skipped (int): Modules that already existed with all symbols
+            - progress (list[dict]): Per-module results
+            - summary (str): Human-readable summary
+        """
+        # Resolve paths
+        base = os.environ.get("AGENT_WORKDIR", "")
+        if base:
+            plan_path = os.path.join(base, plan_path) if not os.path.isabs(plan_path) else plan_path
+            source = os.path.join(base, source) if not os.path.isabs(source) else source
+
+        if not os.path.exists(plan_path):
+            return {
+                "success": False,
+                "error": f"Plan file not found: {plan_path}",
+                "total_modules": 0,
+                "succeeded": 0,
+                "failed": 0,
+                "progress": [],
+                "summary": f"❌ Planfil {plan_path} findes ikke",
+            }
+
+        try:
+            with open(plan_path, encoding="utf-8") as f:
+                plan_content = f.read()
+        except (OSError, UnicodeDecodeError) as e:
+            return {
+                "success": False,
+                "error": f"Cannot read plan: {e}",
+                "total_modules": 0,
+                "succeeded": 0,
+                "failed": 0,
+                "progress": [],
+                "summary": f"❌ Kan ikke læse plan: {e}",
+            }
+
+        # Parse modules from plan — format:
+        # ## Module: config.py
+        # ... **Symboler (N):** sym1, sym2, sym3
+        module_pattern = re.compile(
+            r"^#{1,6}\s+[Mm]odule?:?\s*([\w./-]+\.py)\b",
+            re.MULTILINE,
+        )
+        symbols_pattern = re.compile(
+            r"\*\*Symboler\s*\(\d+\):\*\*\s*(.+)",
+        )
+
+        modules: list[dict[str, Any]] = []
+        for mod_match in module_pattern.finditer(plan_content):
+            mod_name = mod_match.group(1).strip()
+            # Find the Symboler line within the module section
+            start = mod_match.end()
+            # Find end of this module section (next ## heading or end of file)
+            next_heading = re.search(r"^#{1,6}\s+", plan_content[start:], re.MULTILINE)
+            end = start + next_heading.start() if next_heading else len(plan_content)
+            section = plan_content[start:end]
+            sym_match = symbols_pattern.search(section)
+            symbols: list[str] = []
+            if sym_match:
+                raw = sym_match.group(1).strip()
+                symbols = [s.strip() for s in raw.split(",") if s.strip()]
+            if not symbols:
+                symbols = []
+            modules.append({"name": mod_name, "symbols": symbols})
+
+        if not modules:
+            return {
+                "success": False,
+                "error": f"No modules found in {plan_path}",
+                "total_modules": 0,
+                "succeeded": 0,
+                "failed": 0,
+                "progress": [],
+                "summary": f"❌ Ingen moduler fundet i {plan_path}",
+            }
+
+        from file_checks import _parse_refactor_plan_modules
+        all_planned_modules = set(_parse_refactor_plan_modules(plan_path))
+
+        progress: list[dict[str, Any]] = []
+        succeeded_count = 0
+        failed_count = 0
+        skipped_count = 0
+
+        for mod in modules:
+            target = mod["name"]
+            symbols = mod["symbols"]
+            target_path = os.path.join(
+                os.path.dirname(plan_path) if not os.path.isabs(target) else "",
+                target
+            )
+            if not os.path.isabs(target_path):
+                target_path = os.path.join(os.getcwd(), target)
+
+            mod_result: dict[str, Any] = {
+                "module": target,
+                "symbols": symbols,
+                "status": "pending",
+            }
+
+            # Check if target already exists with all symbols
+            if os.path.exists(target_path):
+                existing_symbols = self._list_symbols(target_path)
+                planned_set = set(symbols)
+                missing = planned_set - set(existing_symbols)
+                if not missing and planned_set:
+                    mod_result["status"] = "skipped"
+                    mod_result["message"] = f"All {len(symbols)} symbols already in {target}"
+                    skipped_count += 1
+                    progress.append(mod_result)
+                    continue
+
+            if not symbols:
+                # Module is just a container (e.g. __init__.py) — skip
+                mod_result["status"] = "skipped"
+                mod_result["message"] = "No symbols to extract"
+                skipped_count += 1
+                progress.append(mod_result)
+                continue
+
+            # Run batch extraction
+            try:
+                result = self.batch_extract_symbols(
+                    source=source,
+                    symbols=symbols,
+                    target=target,
+                )
+                result_ok = result.get("success", False) and result.get("succeeded", 0) > 0
+                if result_ok:
+                    mod_result["status"] = "succeeded"
+                    mod_result["succeeded"] = result.get("succeeded", 0)
+                    mod_result["failed"] = result.get("failed", 0)
+                    mod_result["auto_added_imports"] = result.get("auto_added_imports", [])
+                    mod_result["import_check"] = result.get("import_check", {})
+                    succeeded_count += 1
+                else:
+                    mod_result["status"] = "failed"
+                    mod_result["error"] = result.get("results", [{}])[0].get("error", "Unknown error") if result.get("results") else "No results"
+                    failed_count += 1
+            except Exception as e:
+                mod_result["status"] = "failed"
+                mod_result["error"] = f"{type(e).__name__}: {e}"
+                failed_count += 1
+
+            progress.append(mod_result)
+
+        total = len(modules)
+        summary_parts = [
+            f"📊 Plan: {total} moduler, {succeeded_count} succes, {failed_count} fejl, {skipped_count} sprunget over"
+        ]
+        for m in progress:
+            if m["status"] == "succeeded":
+                sym_count = m.get("succeeded", 0)
+                imports = m.get("auto_added_imports", [])
+                imp_str = f" (+{len(imports)} imports)" if imports else ""
+                summary_parts.append(f"  ✅ {m['module']}: {sym_count}/{len(m['symbols'])} symboler{imp_str}")
+            elif m["status"] == "failed":
+                summary_parts.append(f"  ❌ {m['module']}: {m.get('error', '?')}")
+            else:
+                summary_parts.append(f"  ⏭️  {m['module']}: {m.get('message', '?')}")
+
+        all_ok = failed_count == 0
+        if all_ok:
+            summary_parts.append(f"\n✅ ALLE {total} moduler behandlet — ekstrahering fuldført!")
+        elif succeeded_count > 0:
+            summary_parts.append(f"\n⚠️ {failed_count} modul(er) fejlede — se detaljer ovenfor")
+        else:
+            summary_parts.append(f"\n❌ Alle {total} moduler fejlede!")
+
+        return {
+            "success": all_ok,
+            "total_modules": total,
+            "succeeded": succeeded_count,
+            "failed": failed_count,
+            "skipped": skipped_count,
+            "progress": progress,
+            "summary": "\n".join(summary_parts),
+        }
 
     @staticmethod
     def _symbol_exists_in_target(target: str, symbol_name: str) -> bool:

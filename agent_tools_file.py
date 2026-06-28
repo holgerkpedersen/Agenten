@@ -224,3 +224,12 @@ def register_file_tools(agent: Any) -> None:
             source=source, max_group_size=_safe_int(max_group_size, 5)
         )
     ))
+
+    agent.tool_registry.register(Tool(
+        "run_extraction_plan",
+        t(K.TOOL_RUN_EXTRACTION_PLAN, agent.lang),
+        ["source"],
+        lambda source, plan_path="refactor_plan.md": refactoring_engine.run_extraction_plan(
+            source=source, plan_path=plan_path,
+        )
+    ))

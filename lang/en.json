@@ -207,6 +207,7 @@
     "search_web": "Search the web via DuckDuckGo. Args: query (search string), num_results (optional — number of results, default 3).",
     "add_method": "Add a method to an existing class using AST. Requires: filepath, class_name, method_code (def line + body). Inserts at end of class.",
     "add_function": "Add a module-level function to a Python file using AST. Requires: filepath, function_code (def line + body). Optional: after_symbol (insert after given symbol).",
+    "run_extraction_plan": "Extract ALL symbols from refactor_plan.md in one deterministic call. Reads the plan, runs batch_extract_symbols for EACH module, auto-adds imports for framework symbols (app, request, BASE_DIR, etc.), verifies syntax. Requires: source (source file, e.g. api_server.py). Optional: plan_path (default: refactor_plan.md). USE THIS instead of manual batch_extract_symbols calls — the system handles everything automatically.",
     "batch_extract_symbols": "Move MULTIPLE symbols from one .py file to a NEW .py file in one call. Less token usage and fewer iterations than repeated extract_symbol calls. Requires: source, symbols (list e.g. ['sym1', 'sym2'] or comma-separated string), target.",
     "plan_phase": "Analyze the current phase and create a structured plan with todos. Use **steps** to specify concrete tool calls with parameters, e.g.: '1. batch_extract_symbols(source=X, symbols=[A,B], target=Y) 2. verify_refactor(source=X)'. Call this FIRST when starting a phase.",
     "create_todo": "Add a new todo item to your personal plan.",

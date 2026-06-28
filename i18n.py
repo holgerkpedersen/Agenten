@@ -110,6 +110,7 @@ class K(StrEnum):
     TOOL_VERIFY_REFACTOR                = "tools.verify_refactor"
     TOOL_ANALYZE_DEPENDENCIES           = "tools.analyze_dependencies"
     TOOL_SUGGEST_MODULE_GROUPS          = "tools.suggest_module_groups"
+    TOOL_RUN_EXTRACTION_PLAN            = "tools.run_extraction_plan"
     TOOL_RUN_TESTS                      = "tools.run_tests"
     TOOL_RUN_REFINEMENT                 = "tools.run_refinement"
     TOOL_READ_ISSUE                     = "tools.read_issue"
