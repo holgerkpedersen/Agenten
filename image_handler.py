@@ -1,10 +1,9 @@
-from config import get_logger, log
+from config import app, get_logger, log
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
-from server_config import app, UPLOAD_DIR, sanitize_filename
+from folder_manager import UPLOAD_DIR, sanitize_filename
 from session_manager import SessionManager, _guard_json_body, agent, session_manager, current_session_id, execution_status, execution_status_lock, export_folder, export_folder_lock
 import os
 from typing import Any, Generator
-from static_routes import index
 
 
 

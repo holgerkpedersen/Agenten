@@ -53,8 +53,8 @@ class TestSSEWithSessionTree:
         child = TaskNode("sub task")
         tree.root.add_child(child)
 
-        with patch("api_server.current_session_id", "test-sse-session"), \
-             patch("api_server.session_manager.load_session") as mock_load, \
+        with patch("stream_execution.current_session_id", "test-sse-session"), \
+             patch("stream_execution.session_manager.load_session") as mock_load, \
              patch("api_server.agent") as mock_agent:
 
             mock_load.return_value = {
@@ -104,8 +104,8 @@ class TestSSEWithSessionTree:
 
         tree = TaskTree(root_name="test task")
 
-        with patch("api_server.current_session_id", "test-stop-session"), \
-             patch("api_server.session_manager.load_session") as mock_load, \
+        with patch("stream_execution.current_session_id", "test-stop-session"), \
+             patch("stream_execution.session_manager.load_session") as mock_load, \
              patch("api_server.agent") as mock_agent:
 
             mock_load.return_value = {

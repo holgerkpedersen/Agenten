@@ -2,7 +2,10 @@
 import logging
 import os
 import sys
+import threading
 from typing import Any
+from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
+from datetime import datetime
 
 # Force UTF-8 on Windows consoles at import time
 for _stream in (sys.stdout, sys.stderr):
@@ -255,3 +258,40 @@ def config_to_dict() -> dict[str, Any]:
 
 
 log = get_logger(__name__)
+
+
+# ============ KONFIGURATION ============
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+STATIC_DIR = os.path.join(BASE_DIR, 'static')
+
+
+app = Flask(__name__, static_folder=STATIC_DIR, static_url_path='/static')
+
+
+VERSION_FILES = ["api_server.py", "agent_core.py", "llm_wrapper.py", "tools.py", "lang.py", "i18n.py"]
+
+
+# ============ VERSION ============
+def _file_mtime(path: str) -> str:
+    """file mtime.
+
+    Args:
+        path:"""
+    try: return datetime.fromtimestamp(os.path.getmtime(os.path.join(BASE_DIR, path))).strftime("%H:%M:%S")
+    except OSError: return "?"
+
+
+BUILD_INFO = {f: _file_mtime(f) for f in VERSION_FILES}
+
+
+# ============ SECURITY CONFIGURATION ============
+def _is_development_mode() -> bool:
+    """Check if server is running in development mode."""
+    return os.environ.get('DEV_MODE', 'true').lower() == 'true'
+
+
+# ============ SHARED GLOBAL STATE ============
+active_streams: dict = {}
+active_streams_lock = threading.Lock()
+current_session_lock = threading.Lock()

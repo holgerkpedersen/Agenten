@@ -121,7 +121,7 @@ def test_paastand_3_opdater_ingen_plan():
     # Efter refactoring er _build_initial_messages flyttet til prompt_builder.py.
     # Tjek begge filer for at være robust over for fremtidige ændringer.
     base = os.path.join(os.path.dirname(__file__), '..')
-    candidates = ['prompt_builder.py', 'agent_tasks.py']
+    candidates = ['prompt_builder.py', 'agent_tasks.py', 'agent_message_builder.py']
 
     ekstraher_has_plan = False
     opdater_has_plan = False
