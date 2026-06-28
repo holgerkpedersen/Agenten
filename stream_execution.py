@@ -8,6 +8,7 @@ from lang import t, get_ui_translations
 from i18n import K
 from agent_tasks import _normalize_phase
 from decomposition import _ensure_model_loaded, TEMPLATE_GUIDANCE, _validate_template_prompt, decompose, redecompose, _count_tasks, _check_client
+from refactoring_helpers import _count_source_symbols, _build_retry_lessons, _extract_retry_context
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from agent_core import Agent
 import agent_skills

@@ -13,7 +13,10 @@ from api_server import app as flask_app
 def client():
     flask_app.config["TESTING"] = True
     import session_manager
+    from api_server import agent
     session_manager.current_session_id = None
+    agent.task_tree = None
+    agent.original_prompt = ""
     with flask_app.test_client() as c:
         yield c
 
