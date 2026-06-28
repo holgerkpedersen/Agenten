@@ -1217,11 +1217,16 @@ class RefactoringEngine:
             if captured:
                 if is_call:
                     # Direct call: append captured args to existing call
-                    # Find the full Call expression's line range
                     call_line = source_lines[ref_lineno]
+                    open_paren = call_line.find('(')
                     close_paren = call_line.rfind(')')
-                    if close_paren >= 0 and '(' in call_line:
-                        append = ', ' + ', '.join(captured)
+                    if close_paren >= 0 and open_paren >= 0:
+                        args_section = call_line[open_paren + 1:close_paren]
+                        has_kwargs = '=' in args_section
+                        if has_kwargs:
+                            append = ', ' + ', '.join(f'{v}={v}' for v in captured)
+                        else:
+                            append = ', ' + ', '.join(captured)
                         source_lines[ref_lineno] = call_line[:close_paren] + append + call_line[close_paren:]
                     else:
                         # Multi-line call — append to call via wrapping as partial
@@ -1856,6 +1861,7 @@ class RefactoringEngine:
                 log.warning("move_symbol: extract FAILED for %s: %s", symbol_name, e)
                 return {
                     'success': False,
+                    'symbol': symbol_name,
                     'error': f"Extract failed: {e}",
                     'step': 'extract',
                     'category': e.category,
@@ -1880,6 +1886,7 @@ class RefactoringEngine:
                 _rollback('remove')
                 return {
                     'success': False,
+                    'symbol': symbol_name,
                     'error': f"Remove failed: {e}",
                     'step': 'remove',
                     'category': e.category,
@@ -1895,6 +1902,7 @@ class RefactoringEngine:
                 _rollback('import')
                 return {
                     'success': False,
+                    'symbol': symbol_name,
                     'error': f"Import failed: {e}",
                     'step': 'import',
                     'category': e.category,
