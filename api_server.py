@@ -126,6 +126,20 @@ if __name__ == "__main__":
 
     _sessions_dir = session_manager.storage_dir
     started = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # --- Cross-module import verifier (fanger Refactoring manglende-import fejl) ---
+    from verify_imports import verify_all_imports, log_import_issues
+    _import_issues = verify_all_imports(BASE_DIR)
+    if _import_issues:
+        log.warning("")
+        log_import_issues(_import_issues, log)
+        log.warning("[IMPORT-VERIFY] Manglende imports fundet! Filer kan fejle runtime.")
+        if not _is_development_mode():
+            log.error("[IMPORT-VERIFY] Server stopper fordi manglende imports ikke tolereres i production.")
+            raise SystemExit("Manglende cross-module imports — se log ovenfor.")
+    else:
+        log.info("[IMPORT-VERIFY] Alle cross-module imports er OK")
+
     log.info("=" * 50)
     log.info("Dansk Agent API starter...")
     log.info("Startet: %s", started)
