@@ -896,3 +896,32 @@ function body — the `__main__` aliasing makes it re-trigger module-level setup
 the real source module instead.
 
 **Files:** `routes.py`, `execution_core.py`, `api_skillflow.py`
+
+### 62. `verify_imports.py` — cross-module import scanner
+
+**Symptom:** After refactoring, `stream_execution.py` called `_count_source_symbols()` without
+importing it — `NameError` at runtime when the SSE endpoint first triggers. These bugs are silent
+until hit by a specific request flow.
+
+**Root cause:** No automated check that every called symbol in a module can be resolved from
+the module's imports or definitions. The refactoring engine moves symbols but doesn't update
+callers automatically.
+
+**Fix:** Created `verify_imports.py` — an AST-based scanner that runs at server startup:
+1. Builds a project-wide symbol map (all FunctionDef/ClassDef/Assign targets across all .py files)
+2. For each .py file, walks all `Call(Name(...))` nodes
+3. If the called name is a known project symbol defined in ANOTHER file but NOT imported or
+   defined in the calling file → flags it with file, line number, and source file
+4. Logs warnings; raises `SystemExit` in production mode
+
+Excludes: builtins, dunder names, `tests/`, `uploads/`, `sessions/`, `logs/`, `.agent_storage/`.
+
+Called from `api_server.py` startup before `app.run()`. Added to `VERSION_FILES` for the
+`/api/version` endpoint.
+
+**Tests:** `tests/test_verify_imports.py` (8 tests) — verifies: missing import detection,
+imported OK, local def OK, builtins OK, external imports OK, multi-missing, same-file def,
+and directory exclusion.
+
+**Files:** `verify_imports.py` (new), `api_server.py:131-141`, `config.py:273`,
+`tests/test_verify_imports.py` (new)
