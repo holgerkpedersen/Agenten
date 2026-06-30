@@ -413,6 +413,7 @@
         .status-running { background: var(--accent); color: white; }
         .status-done { background: var(--success); color: white; }
         .status-failed { background: #ef4444; color: white; }
+        .status-skipped { background: #f59e0b; color: white; }
         
         .loading {
             display: inline-block;
@@ -1522,8 +1523,8 @@ async function viewFile(path) {
 
 function renderTree(node, path = []) {
     if (!node) return '';
-    const statusClass = node.status === 'done' ? 'status-done' : (node.status === 'running' ? 'status-running' : (node.status === 'failed' ? 'status-failed' : 'status-pending'));
-    const statusText = node.status === 'done' ? '✓' : (node.status === 'running' ? '⏳' : (node.status === 'failed' ? '✗' : '○'));
+    const statusClass = node.status === 'done' ? 'status-done' : (node.status === 'running' ? 'status-running' : (node.status === 'failed' ? 'status-failed' : (node.status === 'skipped' ? 'status-skipped' : 'status-pending')));
+    const statusText = node.status === 'done' ? '✓' : (node.status === 'running' ? '⏳' : (node.status === 'failed' ? '✗' : (node.status === 'skipped' ? '⏭' : '○')));
     const pathStr = path.join('.');
     let html = `<div data-path="${pathStr}"><div class="tree-node-content">`;
 
