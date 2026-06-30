@@ -263,7 +263,7 @@ def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note:
                         ref_issue["resolution_note"] = ref_note
             _save_issues(data)
             agent._log("INFO", f"Issue {issue_id} \u2192 {status}", resolution_note[:200])
-            if status == "resolved":
+            if status in ("resolved", "rejected"):
                 agent.issue_resolved = True
                 # Opdater sessions der refererer til dette CORE-issue
                 try:
@@ -282,7 +282,7 @@ def update_issue_status(agent: Any, issue_id: str, status: str, resolution_note:
                 risk["resolution_note"] = resolution_note
             _save_issues(data)
             agent._log("INFO", f"Risk {issue_id} \u2192 {status}", resolution_note[:200])
-            if status == "resolved":
+            if status in ("resolved", "rejected"):
                 agent.issue_resolved = True
             return {"success": True, "issue": risk, "status": status}
     return {"success": False, "error": f"Issue '{issue_id}' not found."}

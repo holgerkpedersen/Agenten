@@ -2094,18 +2094,19 @@
       "updated_at": "2026-06-30T11:39:45"
     },
     {
-      "id": "BUG-103",
-      "title": "_extracted_registry er in-memory kun — tabt ved server-genstart",
-      "type": "bug",
-      "severity": "medium",
-      "description": "refactoring_engine.py:465 — _extracted_registry er en dict i hukommelsen. Ved genstart eller session-reload er registry tom, batch_extract_symbols prøver at gen-ekstrahere, remove_symbol fejler på allerede-fjernede symboler.",
-      "location": "refactoring_engine.py",
-      "impact": "Duplicate extractions og SYMBOL_NOT_FOUND fejl ved session-reload",
-      "proposed_fix": "Persister registry til session-filen eller brug _symbol_exists_in_target som primær check i stedet",
-      "acceptance_criteria": "",
-      "status": "open",
-      "created_at": "2026-06-30T11:39:45",
-      "updated_at": "2026-06-30T11:39:45"
+"id": "BUG-103",
+  "title": "_extracted_registry er in-memory kun — tabt ved server-genstart",
+  "type": "bug",
+  "severity": "medium",
+  "description": "refactoring_engine.py:465 — _extracted_registry er en dict i hukommelsen. Ved genstart eller session-reload er registry tom, batch_extract_symbols prøver at gen-ekstrahere, remove_symbol fejler på allerede-fjernede symboler.",
+  "location": "refactoring_engine.py",
+  "impact": "Duplicate extractions og SYMBOL_NOT_FOUND fejl ved session-reload",
+  "proposed_fix": "Persister registry til session-filen eller brug _symbol_exists_in_target som primær check i stedet",
+  "acceptance_criteria": "",
+  "status": "rejected",
+  "created_at": "2026-06-30T11:39:45",
+  "updated_at": "2026-06-30T22:10:36",
+  "resolution_note": "Påstanden afvist: Koden har allerede to lag beskyttelse mod problemet. (1) move_symbol() bruger _symbol_exists_in_target() som fil-baseret idempotent guard der overlever genstart — forhindrer duplikat-extraktion til target. (2) remove_symbol() returnerer soft success med 'already_removed': True når symbolet ikke findes i source, i stedet for at fejle. _extracted_registry er kun en optimering til at undgå unødige fil-læsninger inden for samme session — dens tab ved genstart forårsager ikke fejl eller duplikat-extraktioner."
     },
     {
       "id": "BUG-104",
