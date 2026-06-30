@@ -63,6 +63,7 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
                 return t(K.LOG_PHASE_COMPLETE, agent.lang)
             # Analyse phase resolved the issue — auto-complete
             if any(k in phase for k in ["analyse", "analysis"]):
+                agent.issue_resolved = True
                 return t(K.LOG_PHASE_COMPLETE, agent.lang)
 
     # Phase output verification — prevent auto-complete when no output was produced
