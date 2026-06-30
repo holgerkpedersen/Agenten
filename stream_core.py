@@ -327,7 +327,7 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                 if issue_id:
                     agent._log("INFO", f"Auto-resolving {issue_id} \u2014 bug already fixed per analysis", source_text[:200])
                     agent_issues.update_issue_status(agent, issue_id, "resolved",
-                        t(K.SYS_AUTO_RESOLVED, agent.lang, source=source_text[:200]))
+                        t(K.SYS_AUTO_RESOLVED, agent.lang).format(source=source_text[:200]))
                     agent._log("INFO", f"Auto-resolved {issue_id}", "Remaining phases will be skipped")
 
         if getattr(agent, '_needs_resolve_persist', False):
