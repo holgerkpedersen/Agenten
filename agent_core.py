@@ -701,7 +701,7 @@ class Agent:
             if cascade_skip:
                 child.status = "skipped"
                 results[child.name] = {"status": "skipped", "message": "Forrige fase fejlede"}
-                self._log("INFO", f"Springer over {child.name}: Plan-fasen fejlede")
+                self._log("INFO", f"Springer over {child.name}: Forrige fase fejlede eller issue allerede resolved")
             else:
                 child_results = self.execute_tree(child)
                 results[child.name] = child_results
@@ -710,6 +710,9 @@ class Agent:
                     if phase == "plan" and child.status == "failed":
                         cascade_skip = True
                         self._log("WARNING", "Plan-fasen fejlede — resterende faser (Ekstraher, Opdatér, Test) springes over")
+                if not cascade_skip and getattr(self, 'issue_resolved', False):
+                    cascade_skip = True
+                    self._log("INFO", "Issue allerede resolved — resterende faser springes over")
         results[node.name] = self.solve_task(node, self.original_prompt)
         return results
 
