@@ -357,7 +357,10 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
     # Deterministic phase check: if the template/phase has success criteria
     # defined in TEMPLATE_PHASE_CHECKS and they are NOT met, the phase
     # must be "failed" regardless of why the loop exited.
-    if task_node.status == "done":
+    # Skip this if the phase already auto-advanced via tool trigger
+    # (e.g. update_issue_status in Analyse phase) — the tool-level check
+    # is more specific and should not be overridden by a generic text-length check.
+    if task_node.status == "done" and not getattr(agent, '_phase_auto_advanced', False):
         _done_passed, _done_reason = agent_phase_checks.check_phase_done(
             agent, task_node, called_tools=called_tools,
             tool_name="", full_response=full_response,
@@ -478,6 +481,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
     agent._checkpoint_tools = set()
     agent._checkpoint_branch = ""
     agent._rubric_retried = False
+    agent._phase_auto_advanced = False
 
     # Quick phase-completion check: hvis deterministisk check allerede
     # passerer (filer findes, tests består osv.), skip LLM helt.
@@ -1418,6 +1422,7 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
             if msg:
                 agent._log("INFO", msg, "")
                 full_response = msg
+                agent._phase_auto_advanced = True
                 _pending_flush = getattr(agent, '_pending_sse_events', None)
                 if _pending_flush:
                     for evt in _pending_flush:

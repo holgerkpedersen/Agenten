@@ -61,6 +61,9 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
             # Bug already fixed — auto-complete implementering/fix phases
             if any(k in phase for k in ["implementering", "fix", "verifikation", "green"]):
                 return t(K.LOG_PHASE_COMPLETE, agent.lang)
+            # Analyse phase resolved the issue — auto-complete
+            if any(k in phase for k in ["analyse", "analysis"]):
+                return t(K.LOG_PHASE_COMPLETE, agent.lang)
 
     # Phase output verification — prevent auto-complete when no output was produced
     if tool_name in ("write_file",):

@@ -1,0 +1,26 @@
+Session: 9e18a725
+Entries: 193
+
+=== ALL entries mentioning BUG-105 ===
+  [#000] Starter nedbrydning
+     detail=BUG-105: run_extraction_plan mangler i TEMPLATE_TASK_TOOLS["ekstraher"] — LLM instrueres i at bruge  (skabelon: 🐛 Bugfix (TDD))
+
+  [#040] Resultat read_issue
+     detail={"success": false, "result": {"success": false, "error": "Issue 'REFAC-024' not found. Available: ['BUG-001', 'BUG-002', 'BUG-003', 'BUG-004', 'BUG-006', 'SEC-001', 'SEC-002', 'SEC-003', 'SEC-004', 'SEC-005', 'ARC-002', 'ARC-003', 'ARC-004', 'ARC-005', 'ARC-006', 'MNT-001', 'MNT-002', 'MNT-003', 'MN
+
+  [#080] Resultat read_issue
+     detail={"success": false, "result": {"success": false, "error": "Issue 'REFAC-024' not found. Available: ['BUG-001', 'BUG-002', 'BUG-003', 'BUG-004', 'BUG-006', 'SEC-001', 'SEC-002', 'SEC-003', 'SEC-004', 'SEC-005', 'ARC-002', 'ARC-003', 'ARC-004', 'ARC-005', 'ARC-006', 'MNT-001', 'MNT-002', 'MNT-003', 'MN
+
+  [#118] Resultat read_issue
+     detail={"success": false, "result": {"success": false, "error": "Issue 'REFAC-024' not found. Available: ['BUG-001', 'BUG-002', 'BUG-003', 'BUG-004', 'BUG-006', 'SEC-001', 'SEC-002', 'SEC-003', 'SEC-004', 'SEC-005', 'ARC-002', 'ARC-003', 'ARC-004', 'ARC-005', 'ARC-006', 'MNT-001', 'MNT-002', 'MNT-003', 'MN
+
+
+=== Session context/prompt ===
+BUG-105: run_extraction_plan mangler i TEMPLATE_TASK_TOOLS["ekstraher"] — LLM instrueres i at bruge tool der ikke er aktivt
+
+Sektion-instruktionen siger "BRUG run_extraction_plan" men værktøjet er ikke i TEMPLATE_TASK_TOOLS["ekstraher"]. LLM får "tool not found" på første kald og spilder iterationer.
+
+Location: agent_skills.py:162
+Impact: LLM spilder 1-2 iterationer på tool-not-found
+
+Foreslået fix: Tilføj run_extraction_plan til TEMPLATE_TASK_TOOLS["ekstraher"] (line 162) og TEMPLATE_TOOLS["refactor"] (line 73)

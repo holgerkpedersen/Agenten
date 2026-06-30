@@ -2060,9 +2060,10 @@
       "impact": "LLM spilder 1 iteration på fejl og forvirring over modstridende instruktioner",
       "proposed_fix": "Fjern list_symbols fra budget-beskeden når det er fjernet fra tools, eller undlad at fjerne det",
       "acceptance_criteria": "",
-      "status": "open",
+      "status": "resolved",
       "created_at": "2026-06-30T11:39:45",
-      "updated_at": "2026-06-30T11:39:45"
+      "updated_at": "2026-06-30T13:07:04",
+      "resolution_note": "Fejlen findes ikke længere. Koden håndterer allerede problemet på 3 niveauer: (1) set_task_tools fjerner list_symbols fra active tools for refactor Ekstraher, (2) _build_initial_messages bygger en trust-block der eksplicit fortæller LLM'en IKKE at kalde list_symbols, og (3) tool_hints filtreres baseret på active_tool_set så list_symbols-hintet ikke vises når værktøjet er fjernet. Der findes ingen 'budget-besked' der refererer til list_symbols i den aktuelle kode."
     },
     {
       "id": "BUG-101",
