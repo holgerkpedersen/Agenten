@@ -2,7 +2,7 @@
   "meta": {
     "generated": "2026-05-26",
     "source": "Code audit",
-    "total": 177,
+    "total": 178,
     "updated": "2026-06-14",
     "format": "C-A-S-E (Context, Action, Symptoms, Environment)",
     "total_risks": 6
@@ -2130,9 +2130,10 @@
       "impact": "LLM spilder 1-2 iterationer på tool-not-found",
       "proposed_fix": "Tilføj run_extraction_plan til TEMPLATE_TASK_TOOLS[\"ekstraher\"] (line 162) og TEMPLATE_TOOLS[\"refactor\"] (line 73)",
       "acceptance_criteria": "",
-      "status": "open",
+      "status": "resolved",
       "created_at": "2026-06-30T11:40:11",
-      "updated_at": "2026-06-30T11:40:11"
+      "updated_at": "2026-06-30T11:40:11",
+      "resolution_note": "Added run_extraction_plan to TEMPLATE_TASK_TOOLS[\"ekstraher\"] and TEMPLATE_TOOLS[\"refactor\"] in agent_skills.py"
     },
     {
       "id": "BUG-106",
@@ -2161,6 +2162,18 @@
       "status": "open",
       "created_at": "2026-06-30T11:40:12",
       "updated_at": "2026-06-30T11:40:12"
+    },
+    {
+      "id": "REFAC-024",
+      "title": "stream_core.py er 1568 linjer — bryder Single Responsibility Principle",
+      "type": "refactor",
+      "severity": "medium",
+      "description": "stream_core.py er 1568 linjer (grænse: 1000). En klasse på over 1000 linjer har typisk for mange ansvarsområder og bør opdeles efter SOLID-principperne.",
+      "location": "stream_core.py",
+      "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
+      "proposed_fix": "Opdel stream_core.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
+      "status": "open",
+      "related": []
     }
   ],
   "active_risks": [

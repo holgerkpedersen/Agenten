@@ -70,7 +70,7 @@ TEMPLATE_TOOLS = {
     "python-arkitektur": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "create_issue", "create_refactor_issue"],
     "billedanalyse": ["add_image", "write_file", "list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "create_issue", "create_refactor_issue"],
     "bugfix": ["read_issue", "update_issue_status", "run_tests", "create_refactor_issue", "create_issue", "list_chunks", "read_location", "list_symbols", "locate", "write_file", "edit_file", "list_files"],
-     "refactor": ["read_issue", "update_issue_status", "list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "extract_symbol", "remove_symbol", "add_import", "verify_refactor"],
+     "refactor": ["read_issue", "update_issue_status", "list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "extract_symbol", "remove_symbol", "add_import", "verify_refactor", "run_extraction_plan"],
     "testgenerering": ["list_chunks", "read_location", "list_files", "list_symbols", "locate", "write_file", "edit_file", "run_tests", "create_issue", "create_refactor_issue", "update_issue_status"],
     "issue_handler": [
         "read_issue", "update_issue_status", "run_tests",
@@ -159,7 +159,7 @@ TEMPLATE_TASK_TOOLS = {
     "refactor": {
         "analyse": ["read_issue", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "create_refactor_issue", "analyze_dependencies", "write_file"],
         "plan": ["plan_phase", "create_todo", "update_todo", "list_todos", "delete_todo", "read_issue", "update_issue_status", "write_file", "list_files", "list_chunks", "read_location", "read_chunk", "locate", "list_symbols", "analyze_dependencies", "suggest_module_groups"],
-        "ekstraher": ["list_symbols", "read_location", "locate", "write_file", "extract_symbol", "batch_extract_symbols", "verify_refactor", "add_method", "add_function", "list_chunks", "read_chunk"],
+        "ekstraher": ["run_extraction_plan", "list_symbols", "read_location", "locate", "write_file", "extract_symbol", "batch_extract_symbols", "verify_refactor", "add_method", "add_function", "list_chunks", "read_chunk"],
         "opdat\u00e9r": ["list_symbols", "read_location", "locate", "edit_file", "update_issue_status", "write_file", "remove_symbol", "add_import", "add_method", "add_function", "delete_file", "verify_refactor"],
         "test": ["plan_phase", "create_todo", "update_todo", "list_todos", "delete_todo", "run_tests", "edit_file", "update_issue_status", "verify_refactor"],
     },
