@@ -2,7 +2,7 @@
   "meta": {
     "generated": "2026-05-26",
     "source": "Code audit",
-    "total": 172,
+    "total": 169,
     "updated": "2026-06-14",
     "format": "C-A-S-E (Context, Action, Symptoms, Environment)",
     "total_risks": 6
@@ -1938,17 +1938,6 @@
       "resolution_note": "(parse_response og execute kalder begge _parse_json_robust(). Ingen duplikerede JSON-blokke tilbage. Alle 773 tests passerer.)"
     },
     {
-      "id": "BUG-098",
-      "title": "Hallucineret værktøjsnavn tuple duplikeret 3 steder i tools.py",
-      "type": "bug",
-      "severity": "medium",
-      "context": "Fil: tools.py:217, 243, 263. Tuplen `(\"navn\", \"name\", \"nombre\", \"名称\")` er hardcoded 3 gange i parse_response og execute metoderne. Hvis et nyt hallucineret navn tilføjes, skal det opdateres alle 3 steder.",
-      "action": "Definér modul-level konstant `_HALLUCINATED_TOOL_NAMES = frozenset({\"navn\", \"name\", \"nombre\", \"名称\"})` og reference den i alle 3 checks. Successkriterie: Én definition. Alle 3 checks bruger konstanten.",
-      "symptoms": "Nyt hallucineret navn skal tilføjes 3 steder. Risiko for inkonsistens. Hvis et nyt hallucineret navn tilføjes, skal det opdateres alle 3 steder..",
-      "environment": "Windows, Python 3.12, LM Studio",
-      "status": "open"
-    },
-    {
       "id": "BUG-099",
       "title": "selvforbedring nøgle duplikeret i TEMPLATE_PHASE_ITERATION_LIMITS — første blok er dead code",
       "type": "bug",
@@ -2007,17 +1996,6 @@
       "status": "open"
     },
     {
-      "id": "MNT-018",
-      "title": "\"GitHub API netvaerksfejl\" hardcoded 5 gange i github_wrapper.py",
-      "type": "maintainability",
-      "severity": "low",
-      "context": "Fil: github_wrapper.py:53, 74, 94, 115, 136. Den eksakte fejlbesked \"GitHub API netvaerksfejl\" er hardcoded i alle 5 GitHub API metoder (create_repo, create_issue, create_pr, list_repos, get_repo).",
-      "action": "Definér modul-level konstant `_NETWORK_ERROR = \"GitHub API netvaerksfejl\"` og reference den alle 5 steder. Successkriterie: Én definition. Alle 5 metoder bruger konstanten.",
-      "symptoms": "Hvis fejlbeskeden skal ændres (f.eks. oversættes til engelsk), skal 5 steder opdateres. Høj risiko for at én overses. Den eksakte fejlbesked er hardcoded i alle 5 metoder..",
-      "environment": "Windows, Python 3.12, Git",
-      "status": "open"
-    },
-    {
       "id": "MNT-019",
       "title": "_ensure_done_tool kaldt redundantly i alle branches af set_task_tools",
       "type": "maintainability",
@@ -2070,18 +2048,6 @@
       "proposed_fix": "Gennemført — se session 39a3b139 og commits 3c3809a, c082755.",
       "status": "resolved",
       "resolution_note": "Refactoring completed: api_server.py 1521→145 lines, 18 modules, 824 tests pass.",
-      "related": []
-    },
-    {
-      "id": "REFAC-024",
-      "title": "agent_stream.py er 2241 linjer — bryder Single Responsibility Principle",
-      "type": "refactor",
-      "severity": "medium",
-      "description": "agent_stream.py er 2241 linjer (grænse: 1000). En klasse på over 1000 linjer har typisk for mange ansvarsområder og bør opdeles efter SOLID-principperne.",
-      "location": "agent_stream.py",
-      "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
-      "proposed_fix": "Opdel agent_stream.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
-      "status": "open",
       "related": []
     }
   ],

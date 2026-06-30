@@ -260,6 +260,12 @@ def _reconcile_todos_with_disk(agent: Any) -> list[str]:
             # Already checked by tool call — no disk check needed
             pass
 
+        # Auto-check rf_t2 and verify_criteria when issue_resolved is set
+        # by the auto-advance path (e.g. Test phase passes without explicit
+        # update_issue_status call).
+        if tid in ("rf_t2", "verify_criteria") and getattr(agent, 'issue_resolved', False):
+            ids.append(tid)
+
     return ids
 
 

@@ -285,11 +285,24 @@ Flask serves uploads at `/uploads/<filename>` so gemma can fetch the image local
 1. `config.py`: `LLM_BASE_URL` now checks `OPENCODE_BASE_URL` env first — the OpenCode URL is baked into config at import time.
 2. `llm_wrapper.py` `_resolve_base_url`: removed `OPENCODE_BASE_URL` env check entirely. Priority is now: explicit `base_url` param → `LM_BASE_URL` env → auto-construct from `LM_HOST`/`LM_PORT`. This makes tests pass clean base_url values without interference.
 
-### 37. Test suite: `current_session_id` leaks between test files (`tests/test_sse_streaming.py:12-17`, `tests/test_api.py:11-16`)
+### 37. Test suite: `current_session_id` leaks between test files via module/instance attribute confusion (`tests/test_sse_streaming.py:12-17`, `tests/test_api.py:11-16`)
 
 **Symptom:** Full test suite hangs for 3+ minutes at `test_sse_streaming.py`. SSE tests take 6s+ each instead of <0.1s.  
-**Root cause:** `test_api.py` creates real sessions via `POST /api/sessions/create`, setting `api_server.current_session_id` to a real session ID. When `test_sse_streaming.py` runs next, SSE tests without session mocking pick up the leaked `current_session_id`, load real session data with a real LLM model, and try to execute the task tree with the REAL LLM (not mocked). The `_ensure_model_loaded("test-model")` call takes 2-4s to fail, and `solve_task_stream` runs 4+ real LLM iterations.  
-**Fix:** Reset `api_server.current_session_id = None` in the `client` fixture of both `test_api.py` and `test_sse_streaming.py`. Combined with `_ensure_model_loaded` TESTING guard, SSE tests now complete in <0.05s.
+**Root cause (2 layers):**
+
+**Layer 1 — Attribute confusion:** `session_manager.py:290` sets `current_session_id` as an **instance attribute** on the `SessionManager` singleton:
+```python
+session_manager.current_session_id = None  # instance attribute
+```
+When fixtures use `import session_manager; session_manager.current_session_id = None`, this creates a **module-level attribute** (separate from the instance attribute). `stream_execution.py` does `from session_manager import session_manager` (gets the INSTANCE), so `session_manager.current_session_id` reads the **instance** attribute — which was NEVER reset by the fixture. The fixture's module-level `current_session_id` shadows nothing because the instance attribute is never accessed via the module.
+
+**Layer 2 — No cleanup:** `test_api.py`'s decompose tests set `current_session_id` (instance) to a real session ID and `agent.task_tree` to a real tree, but the fixture only sets `current_session_id = None` on the wrong target (module attr). State leaks into subsequent SSE tests.
+
+**Fix (2 parts):**
+1. `import session_manager; session_manager.current_session_id = None` → `from session_manager import session_manager; session_manager.current_session_id = None` (imports the INSTANCE, correctly resets the **instance** attribute).
+2. Same fix in `test_api.py`'s fixture. Never use `import module; module.attr = value` when `attr` is an instance attribute, not a module-level variable.
+
+**Rule:** Always check whether an attribute lives on the module or on an instance inside the module with `hasattr()`. `session_manager.current_session_id` is an instance attribute on `session_manager.session_manager` — access it via `from session_manager import session_manager`.
 
 ### 38. `model_manager` and `_ensure_model_loaded` guard for non-LM-Studio backends (`api_server.py:824-829,646`, `model_manager.py:34-56,78-84,87-116`)
 
@@ -925,3 +938,32 @@ and directory exclusion.
 
 **Files:** `verify_imports.py` (new), `api_server.py:131-141`, `config.py:273`,
 `tests/test_verify_imports.py` (new)
+
+### 63. `run_tests` excluded from `called_tools` → Test phase overrides done→failed
+
+**Symptom:** Session `1de1a95b` — Test phase calls `run_tests()`, tests pass (832/832), phase
+auto-advances (status=done), but `_finalize_task_stream` re-checks `check_phase_done` with
+`tool_name=""` and `called_tools` (no `run_tests` there) → `tests_pass` returns False →
+`task_node.status` overridden from `"done"` to `"failed"` → task retried 5 times.
+
+**Root cause:** `stream_core.py:839-840` had a `pass` statement for `run_tests` to skip dedup
+tracking (intended to prevent false dedup-blocking for a side-effect tool called multiple times
+with same args). But `pass` silently dropped the tool from `called_tools` entirely — it was
+neither tracked in the dict NOR checked for dedup. `_finalize_task_stream`'s `check_phase_done`
+re-check with `tool_name=""` then couldn't find `run_tests`.
+
+**Fix (stream_core.py:838-844):** Changed `pass` to increment `called_tools` but skip only the
+dedup branch — `run_tests` is now tracked in the dict but never triggers dedup blocking:
+```python
+if tool_name in ("run_tests",):
+    tool_key = tool_name + str(args_val)
+    called_tools[tool_key] = called_tools.get(tool_key, 0) + 1
+```
+The `if tool_name not in ("run_tests", ...) and dup_count >= 1:` dedup check already skips
+`run_tests`, so the tracking is side-effect-free for the loop's dedup logic.
+
+**Tests:** 832 passed, 1 xfailed in 10.74s. Existing `test_falls_back_to_called_tools` at
+`test_phase_checks.py:464` already covers `check_tests_pass` with `call_tools` dict containing
+`run_tests` — it was the accumulation (not the check) that was buggy.
+
+**Files:** `stream_core.py:838-844`

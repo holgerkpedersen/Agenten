@@ -6,7 +6,7 @@ from i18n import K
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
 from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 import agent_skills
-from config import get_logger, log, BASE_DIR, STATIC_DIR, app, VERSION_FILES, BUILD_INFO, _is_development_mode, _file_mtime
+from config import get_logger, log, BASE_DIR, STATIC_DIR, app, VERSION_FILES, BUILD_INFO, _is_development_mode, _file_mtime, active_streams, active_streams_lock
 from agent_phase_checks import TEMPLATE_PHASE_CHECKS, check_phase_done
 
 # Placeholder - symboler flyttes fra api_server.py via batch_extract_symbols

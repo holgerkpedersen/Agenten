@@ -106,6 +106,19 @@ def _plan_phase(agent: Any, phase_name: str, phase_goal: str, steps: str | None 
     Always starts fresh — clears previous todos to avoid duplication on retry.
     """
     todos = _ensure_llm_todos(agent)
+
+    # Prevent duplicate plan_phase calls — if LLM already has a plan,
+    # warn and tell them to use update_todo instead.
+    # This prevents the LLM from stacking multiple plans on each retry.
+    if getattr(agent, '_llm_has_planned', False) and steps and steps.strip():
+        return {
+            "success": True,
+            "note": "\u26a0\ufe0f Du har allerede en plan for denne fase. Brug **update_todo(id, done=true)** "
+                    "til at markere fremskridt i stedet for at oprette en ny plan.",
+            "todos": list(agent._llm_todos),
+            "count": len(agent._llm_todos),
+        }
+
     # Clear any previous plan — start fresh every time (handles retries)
     if agent._llm_todos:
         if steps and steps.strip():
