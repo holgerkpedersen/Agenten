@@ -848,6 +848,24 @@ Same for `ast.AsyncWith`.
 
 **Files:** `refactoring_engine.py:565-569`
 
+### 66. `getattr(obj, attr, [])` returns None when attr exists but is None — one-shot streaming crash
+
+**Symptom:** One-shot template immediately crashes with `TypeError: argument of type 'NoneType' is not iterable` after "Påbegynder opgave" log. No LLM interaction occurs.
+
+**Root cause:** `getattr(agent.tool_registry, 'active_tools', [])` on `agent_message_builder.py:482` returns `None` instead of `[]` because `active_tools` EXISTS as an attribute on ToolRegistry (set to `None` in `__init__`). `getattr` only returns the default when the attribute DOES NOT EXIST at all. Then `"plan_phase" in None` crashes.
+
+**Why one-shot only:** `set_task_tools()` takes an early-return path for templates not in `TEMPLATE_TASK_TOOLS` (one-shot isn't listed), so `active_tools` stays `None`. Templates like refactor/bugfix have phase entries in `TEMPLATE_TASK_TOOLS`, so `set_task_tools` calls `set_active_tools(tools)` → `active_tools` becomes a list → no crash.
+
+**Fix:** Replace `getattr(obj, attr, [])` with `obj.attr if obj else None` + explicit `is None` check before `in`:
+```python
+active = agent.tool_registry.active_tools if agent.tool_registry else None
+if active is None or "plan_phase" in active:
+```
+
+**Key insight:** `getattr(obj, attr, default)` is NOT a safe way to get `[]` when attr could be `None`. The default is only used when the attr is completely missing, not when it's falsy. Use `getattr(obj, attr, None) or []` for safe iteration, or check `is None` explicitly before `in`.
+
+**Files:** `agent_message_builder.py:482`
+
 ### 60. `from session_manager import current_session_id` froze snapshots across modules — "Nedbryd en opgave først" after session load
 
 **Symptom:** User loads an existing session in the UI (tree is displayed), clicks "Stream" →
