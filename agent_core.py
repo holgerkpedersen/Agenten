@@ -503,18 +503,20 @@ class Agent:
         self._refresh_skills()
         templates = self._get_templates()
 
-        # Issue-type template routing: override skill matching for known prefixes
-        issue_match = re.match(r'^\s*(REFAC|ARC)-\d+', prompt)
-        if issue_match:
-            template = "refactor"
-        elif re.match(r'^\s*CORE-\d+', prompt):
-            template = "selvforbedring"
-        elif re.match(r'^\s*(BUG|SEC)-\d+', prompt):
-            template = "bugfix"
-        elif not template:
-            suggested = SkillLoader.suggest_template(prompt, self._skills)
-            if suggested and suggested in templates:
-                template = suggested
+        # Issue-type template routing: auto-detect from prompt prefix
+        # Only applies when no template was explicitly provided.
+        if not template:
+            issue_match = re.match(r'^\s*(REFAC|ARC)-\d+', prompt)
+            if issue_match:
+                template = "refactor"
+            elif re.match(r'^\s*CORE-\d+', prompt):
+                template = "selvforbedring"
+            elif re.match(r'^\s*(BUG|SEC)-\d+', prompt):
+                template = "bugfix"
+            else:
+                suggested = SkillLoader.suggest_template(prompt, self._skills)
+                if suggested and suggested in templates:
+                    template = suggested
 
         template_config = templates.get(template, templates["fri"]) if template else templates["fri"]
         self.active_template = template
