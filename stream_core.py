@@ -23,6 +23,44 @@ from agent_rubric import _validate_rubrics, _evaluate_rubric_check
 from agent_todo import _auto_populate_llm_todos, _auto_todo_update, _match_tool_to_todos, _reconcile_llm_todos, _reconcile_todos_with_disk
 from test_utils import _parse_test_summary, _run_full_test_suite
 
+
+def _extract_tool_call_content(messages: list[dict] | None) -> str:
+    """Extract text content from OpenAI-style tool_calls in assistant messages.
+
+    Native function calling places write_file/edit_file content (often 2000+ chars)
+    inside ``tool_calls[*].function.arguments`` as a JSON string, NOT in the
+    streaming ``content`` field. Phase checks like ``min_text_length`` need this
+    content to determine if the LLM produced enough output — without extraction
+    the check always sees 0-50 chars and fails, causing 5 retries.
+
+    Returns a newline-joined string of all argument values >50 chars.
+    """
+    if not messages:
+        return ""
+    parts: list[str] = []
+    for m in messages:
+        if not isinstance(m, dict) or m.get("role") != "assistant":
+            continue
+        for tc in (m.get("tool_calls") or []):
+            if not isinstance(tc, dict):
+                continue
+            fn = tc.get("function", tc)
+            if not isinstance(fn, dict):
+                continue
+            args_str = fn.get("arguments", "")
+            if not args_str or not isinstance(args_str, str):
+                continue
+            try:
+                args = json.loads(args_str)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if isinstance(args, dict):
+                for v in args.values():
+                    if isinstance(v, str) and len(v) > 50:
+                        parts.append(v)
+    return "\n".join(parts)
+
+
 def _execute_autoresearch_issue(agent: Any, issue_id: str) -> Generator[dict, None, bool]:
     """Execute a CORE issue inline via selvforbedring template.
 
@@ -365,9 +403,14 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
     # (e.g. update_issue_status in Analyse phase) — the tool-level check
     # is more specific and should not be overridden by a generic text-length check.
     if task_node.status == "done" and not getattr(agent, '_phase_auto_advanced', False):
+        # Native function calling places write_file content in tool_calls
+        # arguments, not in streaming text. Inject it here so min_text_length
+        # and other text-based phase checks can see the actual output.
+        _tool_content = _extract_tool_call_content(messages)
+        _combined_response = (full_response or "") + ("\n" + _tool_content if _tool_content else "")
         _done_passed, _done_reason = agent_phase_checks.check_phase_done(
             agent, task_node, called_tools=called_tools,
-            tool_name="", full_response=full_response,
+            tool_name="", full_response=_combined_response,
         )
         if not _done_passed and _done_reason:
             task_node.status = "failed"
@@ -1281,7 +1324,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         messages.append({"role": "user", "content": warning_msg})
                     agent._plan_warnings = []
                 # Auto-advance check (EFTER todo matching så todos opdateres før break)
-                msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=full_response)
+                # Inject tool call content so min_text_length sees write_file output
+                _tc_content_1 = _extract_tool_call_content(messages)
+                _fr_1 = (full_response or "") + ("\n" + _tc_content_1 if _tc_content_1 else "")
+                msg = _get_phase_auto_complete_msg(task_node, tool_name, result, agent, called_tools=called_tools, full_response=_fr_1)
                 if msg:
                     agent._log("INFO", msg, "")
                     full_response = msg
@@ -1422,7 +1468,10 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 yield {"type": "output_files", "files": sorted(agent._produced_files)}
             if tool_result.get("checkpoint_msg"):
                 yield {"type": "checkpoint", "message": tool_result["checkpoint_msg"], "tool": parsed["tool"]}
-            msg = _get_phase_auto_complete_msg(task_node, tool_result.get("tool"), tool_result.get("result"), agent, called_tools=called_tools, full_response=full_response)
+            # Inject tool call content so min_text_length sees write_file output
+            _tc_content_2 = _extract_tool_call_content(messages)
+            _fr_2 = (full_response or "") + ("\n" + _tc_content_2 if _tc_content_2 else "")
+            msg = _get_phase_auto_complete_msg(task_node, tool_result.get("tool"), tool_result.get("result"), agent, called_tools=called_tools, full_response=_fr_2)
             if msg:
                 agent._log("INFO", msg, "")
                 full_response = msg
