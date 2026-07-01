@@ -967,3 +967,33 @@ The `if tool_name not in ("run_tests", ...) and dup_count >= 1:` dedup check alr
 `run_tests` — it was the accumulation (not the check) that was buggy.
 
 **Files:** `stream_core.py:838-844`
+
+### 64. `renderTree` manglede `skipped` status-symbol i opgavetræet (`static/index.html:1526-1527,416`)
+
+**Symptom:** Cascade-skipped faser (pga. `issue_resolved = True`) viste `○` (pending) i opgavetræets status-cirkel, selvom backend korrekt satte `remaining.status = "skipped"` og sendte SSE `task_done` med `status: "skipped"`.
+
+**Root cause:** `renderTree()`'s ternære havde ingen case for `node.status === 'skipped'` — faldt igennem til default `'○'` + `'status-pending'` CSS.
+
+**Fix (2 ændringer i `static/index.html`):**
+1. `statusClass`: tilføj `(node.status === 'skipped' ? 'status-skipped' : 'status-pending')` — amber baggrund (`#f59e0b`)
+2. `statusText`: tilføj `(node.status === 'skipped' ? '⏭' : '○')` — skip-symbol
+3. CSS: `.status-skipped { background: #f59e0b; color: white; }`
+
+**Files:** `static/index.html:416,1526-1527`
+
+### 65. `"rejected"` vs `"resolved"` status-semantik for afviste bug-påstande (`agent_issues.py:266,285`, `instructions/bugfix.json`, `agent_skills.py:227`)
+
+**Symptom:** BUG-103's analyse konkluderede at påstanden kunne afvises (koden var allerede korrekt), men status blev sat til `"resolved"` — hvilket betyder "buggen er rettet". BUG-103 var aldrig en ægte fejl.
+
+**Root cause:** `update_issue_status()` havde kun `if status == "resolved": agent.issue_resolved = True`. `"rejected"` (brugt til afviste påstande) satte ikke flaget, så cascade-skip virkede ikke. Derudover instruerede Analyse-fasens prompt LLM'en til at bruge `'resolved'` for afviste påstande.
+
+**Semantik (skal overholdes):**
+- `"resolved"` = buggen var ægte og er blevet **rettet** (kodeændring udført) — bruges af Test/Opdatering faser
+- `"rejected"` = bug-påstanden var **ugyldig** (koden var altid korrekt, fejlen kan ikke reproduceres) — bruges af Analyse fasen
+
+**Fix (3 dele):**
+1. `agent_issues.py:266,285`: `if status in ("resolved", "rejected"): agent.issue_resolved = True` — cascade-skip virker nu for begge
+2. `instructions/bugfix.json`: Analyse TRIN 4 siger nu `'rejected'` i stedet for `'resolved'`
+3. `agent_skills.py:227`: Samme ændring for den indbyggede sektionsinstruktion
+
+**Files:** `agent_issues.py:266,285`, `instructions/bugfix.json:2`, `agent_skills.py:227`

@@ -35,12 +35,17 @@ def _get_max_tool_calls(task_name: str) -> int:
     Args:
         task_name:"""
     phase = _normalize_phase(task_name).lower()
-    if any(k in phase for k in ["analyse", "formål", "læs", "afklar"]):
+    if any(k in phase for k in ["analyse", "formål", "læs", "afklar", "analyze",
+                                  "analysis", "análisis", "分析", "目的"]):
         return config.MAX_TOOL_CALLS_ANALYSE
     if any(k in phase for k in ["implementering", "fix", "test", "ekstraher", "opdatér",
-                                  "kravanalyse", "arkitekturdesign", "kodeimplementering"]):
+                                  "kravanalyse", "arkitekturdesign", "kodeimplementering",
+                                  "implementation", "extract", "implementación",
+                                  "实现", "提取", "修复"]):
         return config.MAX_TOOL_CALLS_FIX
-    if any(k in phase for k in ["luk", "close", "opdatering", "verifikation"]):
+    if any(k in phase for k in ["luk", "close", "opdatering", "verifikation",
+                                  "completion", "update", "verification", "finish",
+                                  "cerrar", "完成", "更新", "验证"]):
         return config.MAX_TOOL_CALLS_CLOSE
     return config.MAX_TOOL_CALLS_ANALYSE
 

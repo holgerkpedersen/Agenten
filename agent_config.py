@@ -38,7 +38,7 @@ REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "delete_file", "extract_symb
 
 
 
-CLOSE_PHASE_ALIASES = {"opdatering", "opdatér", "luk", "close"}
+CLOSE_PHASE_ALIASES = {"opdatering", "opdatér", "update", "completion", "luk", "close", "cerrar", "actualizar", "finalizar", "关闭", "完成", "更新"}
 
 
 
@@ -55,7 +55,16 @@ AUTO_RESOLVE_PATTERNS = [
     r'(?:bug|issue|problem) no longer (?:exists|reproducible|applicable)',
     r'(?:no change|nothing to fix)',
     r'intet at (?:rette|fikse|gøre)',
+    r'ya (?:solucionado|corregido|arreglado)',
+    r'(?:el error|el bug|el problema) (?:no existe|ya no es reproducible)',
+    r'el código ya es (?:correcto|corregido)',
+    r'ya (?:implementado|completado)',
+    r'nada que (?:arreglar|corregir|hacer)',
+    r'(?:bug|问题) (?:不再存在|已修复|不再可重现)',
+    r'(?:无需修复|无变化|没有问题)',
+    r'已经(?:修复|解决|修正|实现)',
 ]
+AUTO_RESOLVE_PATTERNS = [re.compile(p, re.IGNORECASE) for p in AUTO_RESOLVE_PATTERNS]
 
 
 

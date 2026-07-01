@@ -65,22 +65,27 @@ def _deduce_action_type(task: str) -> list[str]:
         list"""
     task_lower = task.lower()
     types = []
-    if any(w in task_lower for w in ["read", "læs", "hent", "fetch", "get", "vis"]):
+    if any(w in task_lower for w in ["read", "læs", "hent", "fetch", "get", "vis",
+                                      "leer", "阅读", "obtener", "view"]):
         types.append("read")
     if any(w in task_lower for w in ["write", "skriv", "create", "opret", "edit",
-                                       "ret", "tilføj", "add", "update", "opdater"]):
+                                      "ret", "tilføj", "add", "update", "opdater",
+                                      "escribir", "crear", "editar", "añadir",
+                                      "编写", "创建", "编辑", "添加"]):
         types.append("write")
     if any(w in task_lower for w in ["git", "commit", "push", "branch", "merge",
-                                       "pull", "checkout"]):
+                                      "pull", "checkout"]):
         types.append("git")
     if any(w in task_lower for w in ["github", "pr", "issue", "pull request",
-                                       "repository", "repo"]):
+                                      "repository", "repo"]):
         types.append("github")
     if any(w in task_lower for w in ["search", "søg", "find", "led", "lookup",
-                                       "slå op"]):
+                                      "slå op", "buscar", "encontrar", "搜索", "查找"]):
         types.append("search")
     if any(w in task_lower for w in ["analyze", "analyser", "review", "gennemgå",
-                                       "kodegennemgang", "refactor", "omstrukturer"]):
+                                      "kodegennemgang", "refactor", "omstrukturer",
+                                      "analizar", "revisar", "分析", "审查",
+                                      "refactorizar"]):
         types.append("analyze")
     return types if types else ["general"]
 

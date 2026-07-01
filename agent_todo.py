@@ -85,8 +85,12 @@ def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: 
         if tool_name == "list_symbols" and ("list_symbols" in ttext.lower() or "list alle symboler" in ttext.lower()):
             ids.append(tid)
 
-        # read_location -> matches "læs" or "read_location"
-        if tool_name == "read_location" and ("read_location" in ttext.lower() or "læs" in ttext.lower() or "metoder" in ttext.lower()):
+        # read_location -> matches "læs", "read_location", "leer", "阅读" etc.
+        if tool_name == "read_location" and ("read_location" in ttext.lower() or "læs" in ttext.lower()
+            or "metoder" in ttext.lower() or "read" in ttext.lower()
+            or "leer" in ttext.lower() or "métodos" in ttext.lower()
+            or "阅读" in ttext.lower() or "方法" in ttext.lower()
+            or "ler" in ttext.lower() or "funções" in ttext.lower()):
             ids.append(tid)
 
         # run_tests -> matches "kør test" or "run_tests"

@@ -20,6 +20,82 @@ from typing import Any
 from i18n import K
 from lang import t
 
+# ── Issue text translations (titles & impacts) ──────────────────
+_ISSUE_TEXTS: dict[str, dict[str, str]] = {
+    "title_missing_tool": {
+        "da": "Manglende {uncalled} i {template}/{phase} — LLM kaldte ikke påkrævet værktøj",
+        "en": "Missing {uncalled} in {template}/{phase} — LLM did not call required tool",
+        "es": "Falta {uncalled} en {template}/{phase} — el LLM no llamó a la herramienta requerida",
+        "zh": "在 {template}/{phase} 中缺失 {uncalled} — LLM 未调用必需工具",
+    },
+    "title_tool_failed": {
+        "da": "Værktøj {tool} fejlede i {template}/{phase} — alle {attempts} forsøg slog fejl",
+        "en": "Tool {tool} failed in {template}/{phase} — all {attempts} attempts failed",
+        "es": "Herramienta {tool} falló en {template}/{phase} — todos los {attempts} intentos fallaron",
+        "zh": "工具 {tool} 在 {template}/{phase} 中失败 — 所有 {attempts} 次尝试均失败",
+    },
+    "title_read_loop": {
+        "da": "Læse-loop i {template}/{phase} — {reads} reads uden write",
+        "en": "Read loop in {template}/{phase} — {reads} reads without write",
+        "es": "Bucle de lectura en {template}/{phase} — {reads} lecturas sin escritura",
+        "zh": "在 {template}/{phase} 中循环读取 — {reads} 次读取无写入",
+    },
+    "title_short_output": {
+        "da": "Kort output i {template}/{phase} — {length} tegn, ingen tools",
+        "en": "Short output in {template}/{phase} — {length} chars, no tools",
+        "es": "Salida corta en {template}/{phase} — {length} caracteres, sin herramientas",
+        "zh": "在 {template}/{phase} 中输出过短 — {length} 个字符，无工具调用",
+    },
+    "title_incomplete": {
+        "da": "Ufuldstændig ekstrahering i {template}/{phase} — {c}/{p} moduler oprettet",
+        "en": "Incomplete extraction in {template}/{phase} — {c}/{p} modules created",
+        "es": "Extracción incompleta en {template}/{phase} — {c}/{p} módulos creados",
+        "zh": "在 {template}/{phase} 中提取不完整 — 已创建 {c}/{p} 个模块",
+    },
+    "title_unknown": {
+        "da": "Uforklaret fejl i {template}/{phase}",
+        "en": "Unexplained failure in {template}/{phase}",
+        "es": "Fallo inexplicado en {template}/{phase}",
+        "zh": "{template}/{phase} 中发生未知错误",
+    },
+    "impact_missing_tool": {
+        "da": "Fasen {phase} i {template} kan ikke gennemføres fordi LLM'en ikke kalder {uncalled}. Dette blokerer hele selvforbedrings-cyklussen.",
+        "en": "Phase {phase} in {template} cannot complete because the LLM doesn't call {uncalled}. This blocks the entire self-improvement cycle.",
+        "es": "La fase {phase} en {template} no puede completarse porque el LLM no llama a {uncalled}. Esto bloquea todo el ciclo de auto-mejora.",
+        "zh": "由于 LLM 未调用 {uncalled}，{template} 中的 {phase} 阶段无法完成。这阻碍了整个自我改进循环。",
+    },
+    "impact_tool_failed": {
+        "da": "Værktøjet {tool} fejler i {template}/{phase}. Alle forsøg på at bruge det slog fejl.",
+        "en": "Tool {tool} fails in {template}/{phase}. All attempts to use it failed.",
+        "es": "La herramienta {tool} falla en {template}/{phase}. Todos los intentos de usarla fallaron.",
+        "zh": "工具 {tool} 在 {template}/{phase} 中失败。所有使用尝试均失败。",
+    },
+    "impact_read_loop": {
+        "da": "LLM'en læser uden at skrive i {template}/{phase}, hvilket spilder iterationer og fører til timeout.",
+        "en": "LLM reads without writing in {template}/{phase}, wasting iterations and causing timeout.",
+        "es": "El LLM lee sin escribir en {template}/{phase}, desperdiciando iteraciones y causando tiempo de espera.",
+        "zh": "LLM 在 {template}/{phase} 中只读不写，浪费迭代并导致超时。",
+    },
+    "impact_incomplete": {
+        "da": "Kun {c}/{p} moduler blev oprettet i {template}/{phase}. Fasen kan ikke fuldføres før ALLE planlagte moduler findes.",
+        "en": "Only {c}/{p} modules were created in {template}/{phase}. The phase cannot complete until ALL planned modules exist.",
+        "es": "Solo se crearon {c}/{p} módulos en {template}/{phase}. La fase no puede completarse hasta que EXISTAN TODOS los módulos planificados.",
+        "zh": "在 {template}/{phase} 中仅创建了 {c}/{p} 个模块。在所有计划模块都存在之前，阶段无法完成。",
+    },
+    "impact_unknown": {
+        "da": "Fasen {phase} i {template} fejler af uforklarede årsager.",
+        "en": "Phase {phase} in {template} fails for unexplained reasons.",
+        "es": "La fase {phase} en {template} falla por razones inexplicadas.",
+        "zh": "{template} 中的 {phase} 阶段因未知原因失败。",
+    },
+}
+
+def _issue_text(key: str, lang: str = "da", **kwargs: str) -> str:
+    """Look up localized issue text, format with kwargs, fall back to DA."""
+    entry = _ISSUE_TEXTS.get(key, {})
+    txt = entry.get(lang) or entry.get("en") or entry.get("da") or key
+    return txt.format(**kwargs) if kwargs else txt
+
 # ── Rate limiting ──────────────────────────────────────────────
 _RATE_LIMIT_SEC = 300        # 5 minutes between sessions
 _last_analysis: dict[str, float] = {}  # session_id → timestamp
@@ -285,20 +361,47 @@ def _find_duplicate_issue(failure_type: str, template: str,
         type_label = failure_type.replace("_", " ")
         type_matched = type_label in combined
         if not type_matched:
-            da_labels = {
-                "missing_tool": ["manglende vaerktoej", "manglende v\u00e6rkt\u00f8j",
-                                 "ikke kaldt"],
-                "tool_failed": ["vaerktoej fejlede", "v\u00e6rkt\u00f8j fejlede",
-                                "fejlede"],
-                "read_loop": ["laese-loop", "l\u00e6se-loop", "laeser gentagne",
-                              "l\u00e6ser gentagne"],
-                "short_output": ["kort output", "for kort"],
-                "incomplete": ["ufuldst\u00e6ndig", "manglende moduler",
-                               "ikke alle moduler"],
-                "unknown": ["uforklaret"],
+            labels = {
+                "missing_tool": {
+                    "da": ["manglende værktøj", "manglende vaerktoej", "ikke kaldt"],
+                    "en": ["missing tool", "not called"],
+                    "es": ["herramienta faltante", "no llamado"],
+                    "zh": ["缺少工具", "未调用"],
+                },
+                "tool_failed": {
+                    "da": ["værktøj fejlede", "vaerktoej fejlede", "fejlede"],
+                    "en": ["tool failed", "failed"],
+                    "es": ["herramienta falló", "falló"],
+                    "zh": ["工具失败", "失败"],
+                },
+                "read_loop": {
+                    "da": ["læse-loop", "laese-loop", "læser gentagne", "laeser gentagne"],
+                    "en": ["read loop", "reading repeatedly"],
+                    "es": ["bucle de lectura", "leyendo repetidamente"],
+                    "zh": ["读取循环", "重复读取"],
+                },
+                "short_output": {
+                    "da": ["kort output", "for kort"],
+                    "en": ["short output", "too short"],
+                    "es": ["salida corta", "demasiado corto"],
+                    "zh": ["输出太短", "过短"],
+                },
+                "incomplete": {
+                    "da": ["ufuldstændig", "manglende moduler", "ikke alle moduler"],
+                    "en": ["incomplete", "missing modules", "not all modules"],
+                    "es": ["incompleto", "módulos faltantes", "no todos los módulos"],
+                    "zh": ["不完整", "缺少模块", "并非所有模块"],
+                },
+                "unknown": {
+                    "da": ["uforklaret"],
+                    "en": ["unexplained"],
+                    "es": ["inexplicado"],
+                    "zh": ["未知"],
+                },
             }
-            da_matches = da_labels.get(failure_type, [])
-            type_matched = any(dl in combined for dl in da_matches)
+            _agent_lang = 'da'  # dedup matching works with any language
+            lang_labels = labels.get(failure_type, {}).get(_agent_lang, labels.get(failure_type, {}).get("da", []))
+            type_matched = any(dl in combined for dl in lang_labels)
         if type_matched:
             score += 0.30
 
@@ -521,10 +624,11 @@ def _create_issue(agent: Any, failure_type: str, evidence: dict,
         The issue_id if created, or None on failure.
     """
     from agent_issues import create_issue
+    lang = getattr(agent, 'lang', 'da')
 
-    title = _build_issue_title(failure_type, evidence, template, phase)
+    title = _build_issue_title(failure_type, evidence, template, phase, lang)
     desc = _build_issue_description(failure_type, evidence, template, phase, analysis)
-    impact = _build_issue_impact(failure_type, evidence, template, phase)
+    impact = _build_issue_impact(failure_type, evidence, template, phase, lang)
     proposed_fix = _build_issue_fix(failure_type, evidence, template, phase)
 
     result = create_issue(
@@ -549,29 +653,27 @@ def _create_issue(agent: Any, failure_type: str, evidence: dict,
 
 
 def _build_issue_title(failure_type: str, evidence: dict,
-                        template: str, phase: str) -> str:
+                        template: str, phase: str, lang: str = "da") -> str:
     """Build a specific title based on failure context."""
     if failure_type == FAILURE_MISSING_TOOL:
-        uncalled = evidence.get("uncalled", [])
-        return (f"Manglende {', '.join(uncalled)} i {template}/{phase} "
-                f"— LLM kaldte ikke påkrævet værktøj")
+        uncalled = ', '.join(evidence.get("uncalled", []))
+        return _issue_text("title_missing_tool", lang, uncalled=uncalled, template=template, phase=phase)
     elif failure_type == FAILURE_TOOL_FAILED:
         tool = evidence.get("tool", "?")
-        return (f"Værktøj {tool} fejlede i {template}/{phase} "
-                f"— alle {evidence.get('attempts', 0)} forsøg slog fejl")
+        attempts = str(evidence.get('attempts', 0))
+        return _issue_text("title_tool_failed", lang, tool=tool, template=template, phase=phase, attempts=attempts)
     elif failure_type == FAILURE_READ_LOOP:
-        return (f"Læse-loop i {template}/{phase} "
-                f"— {evidence.get('consecutive_reads', 0)} reads uden write")
+        reads = str(evidence.get('consecutive_reads', 0))
+        return _issue_text("title_read_loop", lang, reads=reads, template=template, phase=phase)
     elif failure_type == FAILURE_SHORT_OUTPUT:
-        return (f"Kort output i {template}/{phase} "
-                f"— {evidence.get('response_length', 0)} tegn, ingen tools")
+        length = str(evidence.get('response_length', 0))
+        return _issue_text("title_short_output", lang, length=length, template=template, phase=phase)
     elif failure_type == FAILURE_INCOMPLETE:
-        p = evidence.get("modules_planned", "?")
-        c = evidence.get("modules_created", "?")
-        return (f"Ufuldstændig ekstrahering i {template}/{phase} "
-                f"— {c}/{p} moduler oprettet")
+        p = str(evidence.get("modules_planned", "?"))
+        c = str(evidence.get("modules_created", "?"))
+        return _issue_text("title_incomplete", lang, c=c, p=p, template=template, phase=phase)
     else:
-        return f"Uforklaret fejl i {template}/{phase}"
+        return _issue_text("title_unknown", lang, template=template, phase=phase)
 
 
 def _build_issue_description(failure_type: str, evidence: dict,
@@ -650,26 +752,22 @@ def _build_issue_description(failure_type: str, evidence: dict,
 
 
 def _build_issue_impact(failure_type: str, evidence: dict,
-                         template: str, phase: str) -> str:
+                         template: str, phase: str, lang: str = "da") -> str:
     """Build impact description."""
     if failure_type == FAILURE_MISSING_TOOL:
-        uncalled = evidence.get("uncalled", [])
-        return (f"Fasen {phase} i {template} kan ikke gennemføres fordi "
-                f"LLM'en ikke kalder {', '.join(uncalled)}. "
-                f"Dette blokerer hele selvforbedrings-cyklussen.")
+        uncalled = ', '.join(evidence.get("uncalled", []))
+        return _issue_text("impact_missing_tool", lang, phase=phase, template=template, uncalled=uncalled)
     elif failure_type == FAILURE_TOOL_FAILED:
-        return (f"Værktøjet {evidence.get('tool', '?')} fejler i "
-                f"{template}/{phase}. Alle forsøg på at bruge det slog fejl.")
+        tool = evidence.get("tool", "?")
+        return _issue_text("impact_tool_failed", lang, tool=tool, template=template, phase=phase)
     elif failure_type == FAILURE_READ_LOOP:
-        return (f"LLM'en læser uden at skrive i {template}/{phase}, "
-                f"hvilket spilder iterationer og fører til timeout.")
+        return _issue_text("impact_read_loop", lang, template=template, phase=phase)
     elif failure_type == FAILURE_INCOMPLETE:
-        c = evidence.get("modules_created", 0)
-        p = evidence.get("modules_planned", 0)
-        return (f"Kun {c}/{p} moduler blev oprettet i {template}/{phase}. "
-                f"Fasen kan ikke fuldføres før ALLE planlagte moduler findes.")
+        c = str(evidence.get("modules_created", 0))
+        p = str(evidence.get("modules_planned", 0))
+        return _issue_text("impact_incomplete", lang, c=c, p=p, template=template, phase=phase)
     else:
-        return f"Fasen {phase} i {template} fejler af uforklarede årsager."
+        return _issue_text("impact_unknown", lang, phase=phase, template=template)
 
 
 def _build_issue_fix(failure_type: str, evidence: dict,

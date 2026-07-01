@@ -49,8 +49,8 @@ def _build_chunk_hint(agent: Any) -> str:
 
 
 
-def _build_phase_reason(template: str, phase_name: str, original_prompt: str) -> str:
-    """Build an 'I'm working on X for Y. They need Z. With that:' reason block.
+def _build_phase_reason(template: str, phase_name: str, original_prompt: str, lang: str = "da") -> str:
+    """Build a context-aware "why am I here?" message for the LLM.
 
     Gives the LLM context about WHY this phase exists, not just WHAT to do.
     The pattern helps the LLM understand the purpose and act more intelligently.
@@ -60,89 +60,126 @@ def _build_phase_reason(template: str, phase_name: str, original_prompt: str) ->
     target_file = file_match.group(1) if file_match else "koden"
 
     reasons = {
-        ("refactor", "analyse"): (
-            f"Jeg arbejder p\u00e5 at opdele {target_file} i mindre moduler. "
-            f"Brugeren har brug for at forst\u00e5 symbolstrukturen og afh\u00e6ngighederne "
-            f"f\u00f8r modulopdeling."
-        ),
-        ("refactor", "plan"): (
-            f"Jeg har nu overblik over {target_file}. "
-            f"Brugeren har brug for en konkret plan for hvilke moduler der skal oprettes."
-        ),
-        ("refactor", "ekstraher"): (
-            f"Planen er klar. "
-            f"Brugeren har brug for at symboler flyttes fra {target_file} til nye modulfiler."
-        ),
-        ("refactor", "opdat\u00e9r"): (
-            f"Modulerne er oprettet. "
-            f"Brugeren har brug for at {target_file} opryddes "
-            f"\u2014 fjern flyttede symboler og tilf\u00f8j imports."
-        ),
-        ("refactor", "test"): (
-            f"Refaktoreringen er udf\u00f8rt. "
-            f"Brugeren har brug for at verificere at alle tests stadig best\u00e5r."
-        ),
-        ("bugfix", "analyse"): (
-            f"Jeg unders\u00f8ger en bugrapport. "
-            f"Brugeren har brug for at forst\u00e5 hvor fejlen opst\u00e5r."
-        ),
-        ("bugfix", "test"): (
-            f"Jeg har forst\u00e5et fejlen. "
-            f"Brugeren har brug for en test der reproducerer den."
-        ),
-        ("bugfix", "implementering"): (
-            f"Testen bekr\u00e6fter fejlen. "
-            f"Brugeren har brug for en minimal rettelse."
-        ),
-        ("bugfix", "verifikation"): (
-            f"Rettelsen er anvendt. "
-            f"Brugeren har brug for at bekr\u00e6fte at alle tests best\u00e5r."
-        ),
-        ("bugfix", "opdatering"): (
-            f"Alt virker. "
-            f"Brugeren har brug for at issuet markeres som l\u00f8st."
-        ),
-        ("selvforbedring", "analyser"): (
-            f"Jeg unders\u00f8ger hvorfor en fase fejlede. "
-            f"Brugeren har brug for at forst\u00e5 fejlkonteksten."
-        ),
-        ("selvforbedring", "diagnostic\u00e9r"): (
-            f"Jeg har overblikket. "
-            f"Brugeren har brug for at identificere rod\u00e5rsagen."
-        ),
-        ("selvforbedring", "ret"): (
-            f"Rod\u00e5rsagen er kendt. "
-            f"Brugeren har brug for at koden rettes."
-        ),
-        ("selvforbedring", "verific\u00e9r"): (
-            f"Rettelsen er anvendt. "
-            f"Brugeren har brug for at tests k\u00f8rer og issuet lukkes."
-        ),
-        ("selvforbedring", "commit"): (
-            f"Alt er verificeret. "
-            f"Brugeren har brug for at \u00e6ndringerne committes."
-        ),
-        ("issue_handler", "l\u00e6s"): (
-            f"Jeg har f\u00e5et et issue. "
-            f"Brugeren har brug for at forst\u00e5 hvad der skal laves."
-        ),
-        ("issue_handler", "afklar"): (
-            f"Jeg har l\u00e6st issuet. "
-            f"Brugeren har brug for at afklare pr\u00e6cis hvad der skal \u00e6ndres."
-        ),
-        ("issue_handler", "fix"): (
-            f"Jeg ved hvad der skal laves. "
-            f"Brugeren har brug for at koden rettes og testes."
-        ),
-        ("issue_handler", "luk"): (
-            f"Fikset er implementeret. "
-            f"Brugeren har brug for at issuet markeres som l\u00f8st."
-        ),
+        ("refactor", "analyse"): {
+            "da": f"Jeg arbejder på at opdele {target_file} i mindre moduler. Brugeren har brug for at forstå symbolstrukturen og afhængighederne før modulopdeling.",
+            "en": f"I'm working on splitting {target_file} into smaller modules. The user needs to understand the symbol structure and dependencies before modularization.",
+            "es": f"Estoy trabajando en dividir {target_file} en módulos más pequeños. El usuario necesita entender la estructura de símbolos y dependencias.",
+            "zh": f"我正在将 {target_file} 拆分为更小的模块。用户需要了解符号结构和依赖关系。",
+        },
+        ("refactor", "plan"): {
+            "da": f"Jeg har nu overblik over {target_file}. Brugeren har brug for en konkret plan for hvilke moduler der skal oprettes.",
+            "en": f"I now have an overview of {target_file}. The user needs a concrete plan for which modules to create.",
+            "es": f"Ahora tengo una visión general de {target_file}. El usuario necesita un plan concreto de qué módulos crear.",
+            "zh": f"我现在已经了解了 {target_file} 的整体情况。用户需要一个具体的模块创建计划。",
+        },
+        ("refactor", "ekstraher"): {
+            "da": f"Planen er klar. Brugeren har brug for at symboler flyttes fra {target_file} til nye modulfiler.",
+            "en": f"The plan is ready. The user needs symbols moved from {target_file} to new module files.",
+            "es": f"El plan está listo. El usuario necesita mover símbolos de {target_file} a nuevos archivos de módulo.",
+            "zh": f"计划已就绪。用户需要将符号从 {target_file} 移动到新的模块文件中。",
+        },
+        ("refactor", "opdatér"): {
+            "da": f"Modulerne er oprettet. Brugeren har brug for at {target_file} opryddes — fjern flyttede symboler og tilføj imports.",
+            "en": f"Modules are created. The user needs {target_file} cleaned up — remove moved symbols and add imports.",
+            "es": f"Los módulos están creados. El usuario necesita limpiar {target_file} — eliminar símbolos movidos y agregar imports.",
+            "zh": f"模块已创建。用户需要清理 {target_file} — 移除已移动的符号并添加导入。",
+        },
+        ("refactor", "test"): {
+            "da": f"Refaktoreringen er udført. Brugeren har brug for at verificere at alle tests stadig består.",
+            "en": f"The refactoring is done. The user needs to verify all tests still pass.",
+            "es": f"La refactorización está hecha. El usuario necesita verificar que todas las pruebas siguen pasando.",
+            "zh": f"重构已完成。用户需要验证所有测试仍然通过。",
+        },
+        ("bugfix", "analyse"): {
+            "da": f"Jeg undersøger en bugrapport. Brugeren har brug for at forstå hvor fejlen opstår.",
+            "en": f"I'm investigating a bug report. The user needs to understand where the error occurs.",
+            "es": f"Estoy investigando un informe de error. El usuario necesita entender dónde ocurre el fallo.",
+            "zh": f"我正在调查一个错误报告。用户需要了解错误发生的位置。",
+        },
+        ("bugfix", "test"): {
+            "da": f"Jeg har forstået fejlen. Brugeren har brug for en test der reproducerer den.",
+            "en": f"I understand the error. The user needs a test that reproduces it.",
+            "es": f"Entiendo el error. El usuario necesita una prueba que lo reproduzca.",
+            "zh": f"我已理解该错误。用户需要一个能重现它的测试。",
+        },
+        ("bugfix", "implementering"): {
+            "da": f"Testen bekræfter fejlen. Brugeren har brug for en minimal rettelse.",
+            "en": f"The test confirms the error. The user needs a minimal fix.",
+            "es": f"La prueba confirma el error. El usuario necesita una corrección mínima.",
+            "zh": f"测试确认了错误。用户需要一个最小的修复。",
+        },
+        ("bugfix", "verifikation"): {
+            "da": f"Rettelsen er anvendt. Brugeren har brug for at bekræfte at alle tests består.",
+            "en": f"The fix is applied. The user needs to confirm all tests pass.",
+            "es": f"La corrección está aplicada. El usuario necesita confirmar que todas las pruebas pasan.",
+            "zh": f"修复已应用。用户需要确认所有测试通过。",
+        },
+        ("bugfix", "opdatering"): {
+            "da": f"Alt virker. Brugeren har brug for at issuet markeres som løst.",
+            "en": f"Everything works. The user needs the issue marked as resolved.",
+            "es": f"Todo funciona. El usuario necesita marcar el issue como resuelto.",
+            "zh": f"一切正常。用户需要将问题标记为已解决。",
+        },
+        ("selvforbedring", "analyser"): {
+            "da": f"Jeg undersøger hvorfor en fase fejlede. Brugeren har brug for at forstå fejlkonteksten.",
+            "en": f"I'm investigating why a phase failed. The user needs to understand the error context.",
+            "es": f"Estoy investigando por qué falló una fase. El usuario necesita entender el contexto del error.",
+            "zh": f"我正在调查某个阶段失败的原因。用户需要了解错误上下文。",
+        },
+        ("selvforbedring", "diagnosticér"): {
+            "da": f"Jeg har overblikket. Brugeren har brug for at identificere rodårsagen.",
+            "en": f"I have the overview. The user needs to identify the root cause.",
+            "es": f"Tengo la visión general. El usuario necesita identificar la causa raíz.",
+            "zh": f"我已掌握全局。用户需要确定根本原因。",
+        },
+        ("selvforbedring", "ret"): {
+            "da": f"Rodårsagen er kendt. Brugeren har brug for at koden rettes.",
+            "en": f"The root cause is known. The user needs the code fixed.",
+            "es": f"La causa raíz es conocida. El usuario necesita que se corrija el código.",
+            "zh": f"根本原因已知。用户需要修复代码。",
+        },
+        ("selvforbedring", "verificér"): {
+            "da": f"Rettelsen er anvendt. Brugeren har brug for at tests kører og issuet lukkes.",
+            "en": f"The fix is applied. The user needs tests to run and the issue closed.",
+            "es": f"La corrección está aplicada. El usuario necesita que las pruebas se ejecuten y el issue se cierre.",
+            "zh": f"修复已应用。用户需要运行测试并关闭问题。",
+        },
+        ("selvforbedring", "commit"): {
+            "da": f"Alt er verificeret. Brugeren har brug for at ændringerne committes.",
+            "en": f"Everything is verified. The user needs the changes committed.",
+            "es": f"Todo está verificado. El usuario necesita que los cambios se confirmen.",
+            "zh": f"所有内容已验证。用户需要提交更改。",
+        },
+        ("issue_handler", "læs"): {
+            "da": f"Jeg har fået et issue. Brugeren har brug for at forstå hvad der skal laves.",
+            "en": f"I have received an issue. The user needs to understand what needs to be done.",
+            "es": f"He recibido un issue. El usuario necesita entender qué hay que hacer.",
+            "zh": f"我收到了一个问题。用户需要了解需要做什么。",
+        },
+        ("issue_handler", "afklar"): {
+            "da": f"Jeg har læst issuet. Brugeren har brug for at afklare præcis hvad der skal ændres.",
+            "en": f"I have read the issue. The user needs to clarify exactly what needs to change.",
+            "es": f"He leído el issue. El usuario necesita aclarar exactamente qué debe cambiar.",
+            "zh": f"我已阅读问题。用户需要明确具体需要更改的内容。",
+        },
+        ("issue_handler", "fix"): {
+            "da": f"Jeg ved hvad der skal laves. Brugeren har brug for at koden rettes og testes.",
+            "en": f"I know what needs to be done. The user needs the code fixed and tested.",
+            "es": f"Sé lo que hay que hacer. El usuario necesita que el código se corrija y pruebe.",
+            "zh": f"我知道需要做什么。用户需要修复并测试代码。",
+        },
+        ("issue_handler", "luk"): {
+            "da": f"Fikset er implementeret. Brugeren har brug for at issuet markeres som løst.",
+            "en": f"The fix is implemented. The user needs the issue marked as resolved.",
+            "es": f"La corrección está implementada. El usuario necesita marcar el issue como resuelto.",
+            "zh": f"修复已实施。用户需要将问题标记为已解决。",
+        },
     }
 
     key = (template or "").lower(), phase
     if key in reasons:
-        return f"## Baggrund\n{reasons[key]}\n"
+        texts = reasons[key]
+        return f"## Baggrund\n{texts.get(lang, texts.get('da', ''))}\n"
     return ""
 
 
@@ -369,7 +406,7 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
                   t(K.PHASE_ONLY, agent.lang).format(phase_name=task_node.name)
 
     # Build reason block — context about WHY this phase exists
-    reason_block = _build_phase_reason(getattr(agent, 'active_template', ''), task_node.name, original_prompt)
+    reason_block = _build_phase_reason(getattr(agent, 'active_template', ''), task_node.name, original_prompt, getattr(agent, 'lang', 'da'))
     if not reason_block:
         reason_block = ""
 

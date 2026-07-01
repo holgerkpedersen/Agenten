@@ -44,21 +44,33 @@ def _validate_done_output(agent: Any, result_text: str | dict, task_name: str, t
     if template == "refactor" and any(k in phase for k in ["analyse", "plan"]):
         return None
     rt = result_text.lower()
-    if any(k in phase for k in ["analyse", "læs", "afklar"]):
+    if any(k in phase for k in ["analyse", "læs", "afklar", "analysis", "análisis", "分析"]):
         has_issue_id = bool(re.search(r'(BUG|SEC|TST|ARC|PRF|MNT|REFAC)-\d+', result_text))
-        has_keyword = any(w in rt for w in ["bug", "confirmed", "already fixed", "location", "fejl", "bekræftet"])
+        has_keyword = any(w in rt for w in ["bug", "confirmed", "already fixed", "location",
+                                             "fejl", "bekræftet",
+                                             "error", "verified", "confirmed", "found",
+                                             "encontrado", "confirmado", "ubicación",
+                                             "错误", "确认", "已修复", "位置", "找到"])
         if not (has_issue_id and has_keyword):
             return t(K.VALIDATION_DONE_MISSING_KEYWORDS, agent.lang).format(
                 phase, "issue-id + bug/location status")
-    elif any(k in phase for k in ["implementering", "fix", "test", "ekstraher", "opdatér"]):
+    elif any(k in phase for k in ["implementering", "fix", "test", "ekstraher", "opdatér",
+                                   "implementation", "extract"]):
         has_keyword = any(w in rt for w in ["changed", "fixed", "edited", "implemented",
-                                             "rettede", "implementerede", "skrevet", "fil"])
+                                             "rettede", "implementerede", "skrevet", "fil",
+                                             "modificado", "corregido", "implementado",
+                                             "escrito", "archivo",
+                                             "修改", "修复", "实现", "编写", "文件"])
         if not has_keyword:
             return t(K.VALIDATION_DONE_MISSING_KEYWORDS, agent.lang).format(
                 phase, "what was changed/implemented")
-    elif any(k in phase for k in ["luk", "close", "opdatering", "verifikation"]):
+    elif any(k in phase for k in ["luk", "close", "opdatering", "verifikation",
+                                   "completion", "update", "verification",
+                                   "cerrar", "完成", "更新", "验证"]):
         has_keyword = any(w in rt for w in ["resolved", "resolution", "lukket", "afsluttet",
-                                             "tests pass", "består"])
+                                             "tests pass", "består",
+                                             "cerrado", "finalizado", "pruebas pasan",
+                                             "已解决", "已完成", "测试通过"])
         if not has_keyword:
             return t(K.VALIDATION_DONE_MISSING_KEYWORDS, agent.lang).format(
                 phase, "resolution_note + test status")

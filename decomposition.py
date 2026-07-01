@@ -35,7 +35,8 @@ def _ensure_model_loaded(model_key: str | None) -> None:
 
 TEMPLATE_GUIDANCE = {
     "resume": {
-        "keywords": ["resume", "referat", "opsummer", "analyser", "review", "beskriv", "sammenfat", "referér", "sammendrag"],
+        "keywords": ["resume", "referat", "opsummer", "summarize", "summary", "overview", "brief",
+                     "analyser", "review", "beskriv", "sammenfat", "referér", "sammendrag"],
         "examples": [
             'Lav et resume af [filnavn.py]',
             'Opsummer [filnavn] i et kort referat',
@@ -44,7 +45,9 @@ TEMPLATE_GUIDANCE = {
         "hint": "Vælg resume-skabelonen når du vil have en struktureret gennemgang af en bestemt fil."
     },
     "kodeanalyse": {
-        "keywords": ["analyser", "kode", "gennemgå", "review", "debug", "sikkerhed", "struktur", "arkitektur", "kodekvalitet", "fejl", "sårbarhed"],
+        "keywords": ["analyser", "kode", "gennemgå", "analyze", "code", "structure", "architecture",
+                     "review", "debug", "sikkerhed", "security", "quality", "vulnerability",
+                     "struktur", "arkitektur", "kodekvalitet", "fejl", "sårbarhed"],
         "examples": [
             'Analyser koden i [filnavn.py]',
             'Gennemgå [fil] for fejl og sikkerhedsproblemer',
@@ -53,7 +56,8 @@ TEMPLATE_GUIDANCE = {
         "hint": "Vælg kodeanalyse-skabelonen når du skal have analyseret en konkret fil eller kodebase."
     },
     "diffanalyse": {
-        "keywords": ["diff", "forskel", "ændring", "change", "commit", "pull", "merge", "version", "gren", "branch"],
+        "keywords": ["diff", "forskel", "ændring", "difference", "change", "commit",
+                     "change", "commit", "pull", "merge", "version", "gren", "branch"],
         "examples": [
             'Analyser forskellen mellem branch-a og branch-b',
             'Gennemgå de seneste commits og vurder risiko',
@@ -62,7 +66,8 @@ TEMPLATE_GUIDANCE = {
         "hint": "Vælg diffanalyse-skabelonen når du sammenligner to versioner eller branches."
     },
     "agenten": {
-        "keywords": ["git", "github", "commit", "push", "branch", "pull request", "pr", "workflow", "repository", "repo"],
+        "keywords": ["git", "github", "commit", "push", "branch", "pull request", "pr",
+                     "workflow", "repository", "repo"],
         "examples": [
             'Opret en branch, commit, push og lav en PR',
             'Git workflow: opret branch commit push PR',
@@ -71,7 +76,12 @@ TEMPLATE_GUIDANCE = {
         "hint": "Vælg PR Agenten-skabelonen når du skal udføre et git/github workflow."
     },
     "programmering": {
-        "keywords": ["programmer", "opret", "implementer", "byg", "skriv", "kod", "app", "feature", "funktion", "system", "modul", "klasse", "program", "tool", "værktøj", "library", "bibliotek", "ret", "fix", "bug", "fejl", "compile", "ændr", "opdater", "rediger", "tilføj", "slet", "rettelse", "debug"],
+        "keywords": ["programmer", "opret", "implementer", "byg", "skriv", "kod",
+                     "program", "implement", "build", "write", "code", "app",
+                     "feature", "funktion", "system", "modul", "klasse", "program",
+                     "tool", "værktøj", "library", "bibliotek",
+                     "ret", "fix", "bug", "fejl", "compile", "ændr", "opdater", "rediger",
+                     "tilføj", "slet", "rettelse", "debug"],
         "examples": [
             'Opret en Flask-app med en health endpoint',
             'Implementer en funktion der beregner moms i Python',
@@ -81,7 +91,9 @@ TEMPLATE_GUIDANCE = {
         "hint": "Vælg programmeringsskabelonen når du skal designe, implementere eller rette kode i et projekt."
     },
     "python-arkitektur": {
-        "keywords": ["arkitektur", "planlæg", "design", "struktur", "python", "flask", "komponent", "dokumentér", "systemoversigt", "modulopdeling"],
+        "keywords": ["arkitektur", "planlæg", "design", "architecture", "plan", "component",
+                     "struktur", "python", "flask", "komponent",
+                     "dokumentér", "systemoversigt", "modulopdeling"],
         "examples": [
             'Analyser [projekt] og planlæg arkitektur for en Python/Flask version',
             'Design arkitekturen for et nyt system med Flask og SQLAlchemy',
@@ -90,7 +102,9 @@ TEMPLATE_GUIDANCE = {
         "hint": "Vælg Python Arkitektur-skabelonen når du skal planlægge og dokumentere en systemarkitektur."
     },
     "billedanalyse": {
-        "keywords": ["billede", "billed", "image", "screenshot", "skærmbillede", "foto", "photo", "png", "jpg", "jpeg", "analyser billed", "hvad ser du", "beskriv billedet"],
+        "keywords": ["billede", "billed", "image", "picture", "screenshot",
+                     "screenshot", "skærmbillede", "foto", "photo", "png", "jpg", "jpeg",
+                     "analyser billed", "hvad ser du", "beskriv billedet"],
         "examples": [
             'Analyser dette skærmbillede af en fejlmeddelelse',
             'Hvad ser du på dette billede af en UI?',
@@ -99,7 +113,8 @@ TEMPLATE_GUIDANCE = {
         "hint": "Vælg Billedanalyse-skabelonen når du skal have analyseret et billede eller skærmbillede. Resultatet gemmes automatisk i en .md fil."
     },
     "bugfix": {
-        "keywords": ["bug", "fix", "fejl", "issue", "defekt", "test", "tdd", "red", "green", "refactor", "ret", "rettelse", "patch"],
+        "keywords": ["bug", "fix", "fejl", "issue", "defekt", "defect",
+                     "test", "tdd", "red", "green", "refactor", "ret", "rettelse", "patch"],
         "examples": [
             'Fix BUG-003: None crash i solve_task_stream',
             'Ret fejlen i [fil] og skriv test først',
