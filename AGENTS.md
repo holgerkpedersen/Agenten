@@ -1031,3 +1031,19 @@ The `if tool_name not in ("run_tests", ...) and dup_count >= 1:` dedup check alr
 **Tests:** `test_kodeanalyse_has_five` updated to check Danish-only key count (`'_' not in k`) instead of total section count.
 
 **Commit:** `342e6bf` (instructions), `6c31fd1` (autoresearch)
+
+### 69. `remaining >= 50` hardcoded check causes false post-extraction failures (`agent_tool_handler.py:327`, `stream_core.py:229`)
+
+**Symptom:** BUG-104 — Ekstraher phase auto-advance fails when a refactor plan deliberately leaves many symbols in the source file (e.g., plan moves 30 of 200 symbols, `remaining=170 >= 50` → false fail).
+
+**Root cause:** Hardcoded `remaining >= 50` threshold ignores the refactor plan's scope. Every extraction reduces `remaining` but the threshold is absolute, not relative to the plan.
+
+**Fix:** Both sites now use `agent._planned_symbols_per_target` (populated by `plan_phase`):
+```python
+planned_count = sum(len(syms) for syms in planned.values())
+if (planned_count > 0 and remaining > planned_count) or (planned_count == 0 and remaining >= 50):
+```
+- When a plan exists: compare `remaining` against planned extraction count
+- No plan: fall back to original 50 threshold
+
+**Files:** `agent_tool_handler.py:327`, `stream_core.py:229`
