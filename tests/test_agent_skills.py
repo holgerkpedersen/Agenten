@@ -65,10 +65,23 @@ class TestSectionInstructions:
             for key, val in sections.items():
                 assert len(val) > 10, f"{template}.{key} too short"
 
-    def test_kodeanalyse_has_five(self):
+    def test_kodeanalyse_has_five_danish_keys(self):
         from agent_skills import SECTION_INSTRUCTIONS
         sections = SECTION_INSTRUCTIONS["kodeanalyse"]
-        assert len(sections) == 5
+        danish_keys = [k for k in sections if '_' not in k]
+        assert len(danish_keys) == 5
+
+    def test_programmering_has_seven_danish_keys(self):
+        from agent_skills import SECTION_INSTRUCTIONS
+        sections = SECTION_INSTRUCTIONS["programmering"]
+        danish_keys = [k for k in sections if '_' not in k]
+        assert len(danish_keys) == 7
+
+    def test_billedanalyse_has_five_danish_keys(self):
+        from agent_skills import SECTION_INSTRUCTIONS
+        sections = SECTION_INSTRUCTIONS["billedanalyse"]
+        danish_keys = [k for k in sections if '_' not in k]
+        assert len(danish_keys) == 5
 
     def test_bugfix_has_five_phases(self):
         from agent_skills import SECTION_INSTRUCTIONS

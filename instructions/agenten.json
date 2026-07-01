@@ -1,6 +1,18 @@
 {
-  "Branch": "TRIN 1: Kald git_current_branch() for at se hvilken branch du er på.\\nTRIN 2: Brug git_create_branch('feature/xxx') for at oprette en ny branch.\\nTRIN 3: Bekræft med git_current_branch().\\nAfslut med <<<DONE>>>.",
-  "Commit": "TRIN 1: Brug git_status() og git_diff() for at se ændringer.\\nTRIN 2: Stage med git_add_all().\\nTRIN 3: Commit med git_commit('besked').\\nAfslut med <<<DONE>>>.",
-  "Push": "TRIN 1: Brug git_push() for at skubbe til remote.\\nTRIN 2: Bekræft med git_remote_status().\\nAfslut med <<<DONE>>>.",
-  "Pull request": "TRIN 1: Brug github_create_pr() med title og body.\\nTRIN 2: Bekræft at PR'en er oprettet.\\nAfslut med <<<DONE>>>."
+  "Branch": "TRIN 1: Kald git_current_branch() for at se hvilken branch du er på.\nTRIN 2: Brug git_create_branch('feature/xxx') for at oprette en ny branch.\nTRIN 3: Bekræft med git_current_branch().\nAfslut med <<<DONE>>>.",
+  "en_branch": "STEP 1: Call git_current_branch() to see which branch you are on.\nSTEP 2: Use git_create_branch('feature/xxx') to create a new branch.\nSTEP 3: Confirm with git_current_branch().\nEnd with <<<DONE>>>.",
+  "es_branch": "PASO 1: Llama git_current_branch() para ver en qué rama estás.\nPASO 2: Usa git_create_branch('feature/xxx') para crear una nueva rama.\nPASO 3: Confirma con git_current_branch().\nTermina con <<<DONE>>>.",
+  "zh_branch": "步骤 1：调用 git_current_branch() 查看当前所在分支。\n步骤 2：使用 git_create_branch('feature/xxx') 创建新分支。\n步骤 3：使用 git_current_branch() 确认。\n以 <<<DONE>>> 结束。",
+  "Commit": "TRIN 1: Brug git_status() og git_diff() for at se ændringer.\nTRIN 2: Stage med git_add_all().\nTRIN 3: Commit med git_commit('besked').\nAfslut med <<<DONE>>>.",
+  "en_commit": "STEP 1: Use git_status() and git_diff() to see changes.\nSTEP 2: Stage with git_add_all().\nSTEP 3: Commit with git_commit('message').\nEnd with <<<DONE>>>.",
+  "es_commit": "PASO 1: Usa git_status() y git_diff() para ver cambios.\nPASO 2: Prepara con git_add_all().\nPASO 3: Haz commit con git_commit('mensaje').\nTermina con <<<DONE>>>.",
+  "zh_commit": "步骤 1：使用 git_status() 和 git_diff() 查看更改。\n步骤 2：使用 git_add_all() 暂存。\n步骤 3：使用 git_commit('消息') 提交。\n以 <<<DONE>>> 结束。",
+  "Push": "TRIN 1: Brug git_push() for at skubbe til remote.\nTRIN 2: Bekræft med git_remote_status().\nAfslut med <<<DONE>>>.",
+  "en_push": "STEP 1: Use git_push() to push to remote.\nSTEP 2: Confirm with git_remote_status().\nEnd with <<<DONE>>>.",
+  "es_push": "PASO 1: Usa git_push() para subir al remoto.\nPASO 2: Confirma con git_remote_status().\nTermina con <<<DONE>>>.",
+  "zh_push": "步骤 1：使用 git_push() 推送到远程。\n步骤 2：使用 git_remote_status() 确认。\n以 <<<DONE>>> 结束。",
+  "Pull request": "TRIN 1: Brug github_create_pr() med title og body.\nTRIN 2: Bekræft at PR'en er oprettet.\nAfslut med <<<DONE>>>.",
+  "en_pull request": "STEP 1: Use github_create_pr() with title and body.\nSTEP 2: Confirm the PR was created.\nEnd with <<<DONE>>>.",
+  "es_pull request": "PASO 1: Usa github_create_pr() con título y cuerpo.\nPASO 2: Confirma que el PR fue creado.\nTermina con <<<DONE>>>.",
+  "zh_pull request": "步骤 1：使用 github_create_pr() 包含标题和正文。\n步骤 2：确认 PR 已创建。\n以 <<<DONE>>> 结束。"
 }

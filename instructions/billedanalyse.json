@@ -1,7 +1,22 @@
 {
   "Beskrivelse": "Analyser billedet og beskriv hvad der ses. Brug add_image hvis billedet ikke allerede er tilføjet. Beskriv motiv, personer, objekter, farver, layout og overordnet indtryk.",
+  "en_beskrivelse": "Analyze the image and describe what is seen. Use add_image if the image hasn't been added yet. Describe subject, people, objects, colors, layout and overall impression.",
+  "es_beskrivelse": "Analiza la imagen y describe lo que se ve. Usa add_image si la imagen aún no se ha añadido. Describe el motivo, personas, objetos, colores, diseño e impresión general.",
+  "zh_beskrivelse": "分析图像并描述所看到的内容。如果图像尚未添加，请使用 add_image。描述主题、人物、对象、颜色、布局和整体印象。",
   "Kontekst": "Kontekstualiser billedet. Hvor stammer det fra (app, hjemmeside, dokument)? Hvad er formålet? Hvilke brugere er det målrettet? Hvilken situation viser det?",
+  "en_kontekst": "Contextualize the image. Where does it come from (app, website, document)? What is the purpose? Which users is it targeting? What situation does it show?",
+  "es_kontekst": "Contextualiza la imagen. ¿De dónde proviene (app, sitio web, documento)? ¿Cuál es el propósito? ¿A qué usuarios está dirigido? ¿Qué situación muestra?",
+  "zh_kontekst": "将图像置于上下文中。它来自哪里（应用程序、网站、文档）？目的是什么？针对哪些用户？它展示了什么情况？",
   "Detaljer": "Gennemgå specifikke detaljer: tekstindhold, UI-elementer, kodeblokke, tal, datoer, navne, fejlmeddelelser. Fremhæv alt specifikt og målbart.",
+  "en_detaljer": "Review specific details: text content, UI elements, code blocks, numbers, dates, names, error messages. Highlight everything specific and measurable.",
+  "es_detaljer": "Revisa detalles específicos: contenido de texto, elementos de UI, bloques de código, números, fechas, nombres, mensajes de error. Destaca todo lo específico y medible.",
+  "zh_detaljer": "审查具体细节：文本内容、UI 元素、代码块、数字、日期、名称、错误消息。突出显示所有具体和可衡量的内容。",
   "Vurdering": "Vurder billedets kvalitet og indhold: Hvad fungerer godt? Hvad kunne forbedres? Er der fejl, inkonsistenser eller mangler? Giv konkrete forbedringsforslag.",
-  "Eksportér": "Skriv den fulde analyse til en .md fil. Brug write_file til at gemme i ./exports/billedanalyse_{timestamp}.md. Filen skal indeholde alle sektioner samlet. Brug formatet:\n\n# Billedanalyse\n\n## Beskrivelse\n...\n\n## Kontekst\n...\n\n## Detaljer\n...\n\n## Vurdering\n..."
+  "en_vurdering": "Assess the image quality and content: What works well? What could be improved? Are there errors, inconsistencies or gaps? Give concrete improvement suggestions.",
+  "es_vurdering": "Evalúa la calidad y el contenido de la imagen: ¿Qué funciona bien? ¿Qué se podría mejorar? ¿Hay errores, inconsistencias o lagunas? Da sugerencias concretas de mejora.",
+  "zh_vurdering": "评估图像质量和内容：哪些部分效果好？哪些可以改进？是否存在错误、不一致或遗漏？给出具体的改进建议。",
+  "Eksportér": "Skriv den fulde analyse til en .md fil. Brug write_file til at gemme i ./exports/billedanalyse_{timestamp}.md. Filen skal indeholde alle sektioner samlet. Brug formatet:\n\n# Billedanalyse\n\n## Beskrivelse\n...\n\n## Kontekst\n...\n\n## Detaljer\n...\n\n## Vurdering\n...",
+  "en_eksportér": "Write the full analysis to a .md file. Use write_file to save in ./exports/billedanalyse_{timestamp}.md. The file must contain all sections combined. Use the format:\n\n# Image Analysis\n\n## Description\n...\n\n## Context\n...\n\n## Details\n...\n\n## Assessment\n...",
+  "es_eksportér": "Escribe el análisis completo en un archivo .md. Usa write_file para guardar en ./exports/billedanalyse_{timestamp}.md. El archivo debe contener todas las secciones combinadas. Usa el formato:\n\n# Análisis de Imagen\n\n## Descripción\n...\n\n## Contexto\n...\n\n## Detalles\n...\n\n## Evaluación\n...",
+  "zh_eksportér": "将完整分析写入 .md 文件。使用 write_file 保存到 ./exports/billedanalyse_{timestamp}.md。文件必须包含所有合并的章节。使用格式：\n\n# 图像分析\n\n## 描述\n...\n\n## 上下文\n...\n\n## 细节\n...\n\n## 评估\n..."
 }

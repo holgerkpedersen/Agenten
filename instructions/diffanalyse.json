@@ -1,7 +1,22 @@
 {
   "Oversigt": "Skriv afsnittet 'Oversigt': beskriv hvad diff'en indeholder af ændringer.",
+  "en_oversigt": "Write the 'Overview' section: describe what changes the diff contains.",
+  "es_oversigt": "Escribe la sección 'Resumen': describe qué cambios contiene el diff.",
+  "zh_oversigt": "编写 '概述' 部分：描述 diff 中包含的更改内容。",
   "Risikovurdering": "Skriv afsnittet 'Risikovurdering': vurder risikoen (høj/middel/lav) for hver ændret fil.",
+  "en_risikovurdering": "Write the 'Risk Assessment' section: assess the risk (high/medium/low) for each changed file.",
+  "es_risikovurdering": "Escribe la sección 'Evaluación de Riesgos': evalúa el riesgo (alto/medio/bajo) para cada archivo modificado.",
+  "zh_risikovurdering": "编写 '风险评估' 部分：评估每个更改文件的风险（高/中/低）。",
   "Brydende ændringer": "Skriv afsnittet 'Brydende ændringer': identificér breaking changes og bagudkompatibilitet.",
+  "en_brydende ændringer": "Write the 'Breaking Changes' section: identify breaking changes and backward compatibility.",
+  "es_brydende ændringer": "Escribe la sección 'Cambios Rupturistas': identifica cambios incompatibles y compatibilidad hacia atrás.",
+  "zh_brydende ændringer": "编写 '重大更改' 部分：识别破坏性更改和向后兼容性。",
   "Kodekvalitet": "Skriv afsnittet 'Kodekvalitet': vurder ændringernes kvalitet og konsistens.",
-  "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå forbedringer til diff'en."
+  "en_kodekvalitet": "Write the 'Code Quality' section: assess the quality and consistency of the changes.",
+  "es_kodekvalitet": "Escribe la sección 'Calidad del Código': evalúa la calidad y consistencia de los cambios.",
+  "zh_kodekvalitet": "编写 '代码质量' 部分：评估更改的质量和一致性。",
+  "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå forbedringer til diff'en.",
+  "en_anbefalinger": "Write the 'Recommendations' section: suggest improvements to the diff.",
+  "es_anbefalinger": "Escribe la sección 'Recomendaciones': sugiere mejoras al diff.",
+  "zh_anbefalinger": "编写 '建议' 部分：提出对 diff 的改进建议。"
 }

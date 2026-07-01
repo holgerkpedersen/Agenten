@@ -1,6 +1,18 @@
 {
   "Analyse": "Læs filen med read_chunk(). Forstå alle klasser, funktioner, metoder og imports. Identificér hvilke der allerede har tests og hvilke der mangler. Opret et issue med create_issue() hvis du finder kode der mangler tests.",
+  "en_analyse": "Read the file with read_chunk(). Understand all classes, functions, methods and imports. Identify which already have tests and which are missing. Create an issue with create_issue() if you find code missing tests.",
+  "es_analyse": "Lee el archivo con read_chunk(). Comprende todas las clases, funciones, métodos e importaciones. Identifica cuáles ya tienen pruebas y cuáles faltan. Crea un issue con create_issue() si encuentras código que falta pruebas.",
+  "zh_analyse": "使用 read_chunk() 读取文件。理解所有的类、函数、方法和导入。识别哪些已有测试，哪些缺少测试。如果发现缺少测试的代码，使用 create_issue() 创建问题。",
   "Test (Red)": "Skriv pytest-tests for den manglende dækning i tests/temp/. Opret en NY testfil med write_file (testfilen må ikke findes i forvejen). Kør testen med run_tests(test_path='tests/temp/...') — den SKAL bestå (grøn fase). Hvis testen fejler, ret koden med edit_file og genkør.",
+  "en_test (red)": "Write pytest tests for the missing coverage in tests/temp/. Create a NEW test file with write_file (the test file must not already exist). Run the test with run_tests(test_path='tests/temp/...') — it MUST pass (green phase). If the test fails, fix the code with edit_file and rerun.",
+  "es_test (red)": "Escribe pruebas pytest para la cobertura faltante en tests/temp/. Crea un NUEVO archivo de prueba con write_file (el archivo de prueba no debe existir previamente). Ejecuta la prueba con run_tests(test_path='tests/temp/...') — DEBE pasar (fase verde). Si la prueba falla, corrige el código con edit_file y vuelve a ejecutar.",
+  "zh_test (red)": "为 tests/temp/ 中缺失的覆盖率编写 pytest 测试。使用 write_file 创建新的测试文件（测试文件不能已存在）。使用 run_tests(test_path='tests/temp/...') 运行测试 — 它必须通过（绿色阶段）。如果测试失败，使用 edit_file 修复代码并重新运行。",
   "Implementering": "Hvis produktionskoden skal ændres for at gøres testbar, brug edit_file til målrettede ændringer. Brug IKKE write_file — produktionsfilen findes allerede.",
-  "Verifikation (Green)": "Kør HELE testsuiten med run_tests() for at verificere ingen regressions. Opdater issue-status til 'resolved' med update_issue_status() hvis et TST-issue blev løst."
+  "en_implementering": "If production code needs to be changed to make it testable, use edit_file for targeted changes. Do NOT use write_file — the production file already exists.",
+  "es_implementering": "Si el código de producción necesita ser cambiado para hacerlo comprobable, usa edit_file para cambios específicos. NO uses write_file — el archivo de producción ya existe.",
+  "zh_implementering": "如果需要更改生产代码以使其可测试，使用 edit_file 进行有针对性的更改。不要使用 write_file — 生产文件已存在。",
+  "Verifikation (Green)": "Kør HELE testsuiten med run_tests() for at verificere ingen regressions. Opdater issue-status til 'resolved' med update_issue_status() hvis et TST-issue blev løst.",
+  "en_verifikation (green)": "Run the ENTIRE test suite with run_tests() to verify no regressions. Update issue status to 'resolved' with update_issue_status() if a TST issue was resolved.",
+  "es_verifikation (green)": "Ejecuta TODA la suite de pruebas con run_tests() para verificar que no hay regresiones. Actualiza el estado del issue a 'resolved' con update_issue_status() si se resolvió un issue TST.",
+  "zh_verifikation (green)": "使用 run_tests() 运行整个测试套件以验证无回归。如果 TST 问题已解决，使用 update_issue_status() 将问题状态更新为 'resolved'。"
 }

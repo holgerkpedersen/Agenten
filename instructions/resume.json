@@ -1,6 +1,18 @@
 {
   "Overblik": "Skriv afsnittet 'Overblik': beskriv filens formål, struktur og hovedindhold.",
+  "en_overblik": "Write the 'Overview' section: describe the file's purpose, structure and main content.",
+  "es_overblik": "Escribe la sección 'Resumen': describe el propósito, estructura y contenido principal del archivo.",
+  "zh_overblik": "编写 '概述' 部分：描述文件的目的、结构和主要内容。",
   "Nøglepunkter": "Skriv afsnittet 'Nøglepunkter': fremhæv de vigtigste tekniske detaljer, features og arkitektur.",
+  "en_nøglepunkter": "Write the 'Key Points' section: highlight the most important technical details, features and architecture.",
+  "es_nøglepunkter": "Escribe la sección 'Puntos Clave': destaca los detalles técnicos, características y arquitectura más importantes.",
+  "zh_nøglepunkter": "编写 '关键点' 部分：突出最重要的技术细节、功能和架构。",
   "Konklusion": "Skriv afsnittet 'Konklusion': vurder filens kvalitet, styrker og svagheder.",
-  "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå konkrete forbedringer og næste skridt."
+  "en_konklusion": "Write the 'Conclusion' section: assess the file's quality, strengths and weaknesses.",
+  "es_konklusion": "Escribe la sección 'Conclusión': evalúa la calidad, fortalezas y debilidades del archivo.",
+  "zh_konklusion": "编写 '结论' 部分：评估文件的质量、优点和缺点。",
+  "Anbefalinger": "Skriv afsnittet 'Anbefalinger': foreslå konkrete forbedringer og næste skridt.",
+  "en_anbefalinger": "Write the 'Recommendations' section: suggest concrete improvements and next steps.",
+  "es_anbefalinger": "Escribe la sección 'Recomendaciones': sugiere mejoras concretas y próximos pasos.",
+  "zh_anbefalinger": "编写 '建议' 部分：提出具体的改进建议和后续步骤。"
 }
