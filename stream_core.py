@@ -226,7 +226,9 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                 sym_result = agent_files.list_symbols(abs_src)
                 if sym_result.get("success"):
                     remaining = len(sym_result.get("symbols", []))
-                    if remaining >= 50:
+                    planned = getattr(agent, '_planned_symbols_per_target', None) or {}
+                    planned_count = sum(len(syms) for syms in planned.values())
+                    if (planned_count > 0 and remaining > planned_count) or (planned_count == 0 and remaining >= 50):
                         _path = "ekstraher_remaining"
                         task_node.status = "failed"
                         full_response = t(K.LOG_EXTRACT_INCOMPLETE, agent.lang).format(

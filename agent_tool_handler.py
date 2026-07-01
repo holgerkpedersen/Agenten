@@ -324,7 +324,11 @@ def _check_required_tools(agent: Any, called_tools: dict, task_name: str = "") -
                 sym_result = agent_files.list_symbols(abs_src)
                 if sym_result.get("success"):
                     remaining = len(sym_result.get("symbols", []))
-                    if remaining >= 50:
+                    planned = getattr(agent, '_planned_symbols_per_target', None) or {}
+                    planned_count = sum(len(syms) for syms in planned.values())
+                    if planned_count > 0 and remaining > planned_count:
+                        return t(K.LOG_EXTRACT_INCOMPLETE, agent.lang).format(remaining=remaining)
+                    elif planned_count == 0 and remaining >= 50:
                         return t(K.LOG_EXTRACT_INCOMPLETE, agent.lang).format(remaining=remaining)
             except Exception:
                 pass

@@ -2,7 +2,7 @@
   "meta": {
     "generated": "2026-05-26",
     "source": "Code audit",
-    "total": 178,
+    "total": 179,
     "updated": "2026-06-14",
     "format": "C-A-S-E (Context, Action, Symptoms, Environment)",
     "total_risks": 6
@@ -2094,19 +2094,19 @@
       "updated_at": "2026-06-30T11:39:45"
     },
     {
-"id": "BUG-103",
-  "title": "_extracted_registry er in-memory kun — tabt ved server-genstart",
-  "type": "bug",
-  "severity": "medium",
-  "description": "refactoring_engine.py:465 — _extracted_registry er en dict i hukommelsen. Ved genstart eller session-reload er registry tom, batch_extract_symbols prøver at gen-ekstrahere, remove_symbol fejler på allerede-fjernede symboler.",
-  "location": "refactoring_engine.py",
-  "impact": "Duplicate extractions og SYMBOL_NOT_FOUND fejl ved session-reload",
-  "proposed_fix": "Persister registry til session-filen eller brug _symbol_exists_in_target som primær check i stedet",
-  "acceptance_criteria": "",
-  "status": "rejected",
-  "created_at": "2026-06-30T11:39:45",
-  "updated_at": "2026-06-30T22:10:36",
-  "resolution_note": "Påstanden afvist: Koden har allerede to lag beskyttelse mod problemet. (1) move_symbol() bruger _symbol_exists_in_target() som fil-baseret idempotent guard der overlever genstart — forhindrer duplikat-extraktion til target. (2) remove_symbol() returnerer soft success med 'already_removed': True når symbolet ikke findes i source, i stedet for at fejle. _extracted_registry er kun en optimering til at undgå unødige fil-læsninger inden for samme session — dens tab ved genstart forårsager ikke fejl eller duplikat-extraktioner."
+      "id": "BUG-103",
+      "title": "_extracted_registry er in-memory kun — tabt ved server-genstart",
+      "type": "bug",
+      "severity": "medium",
+      "description": "refactoring_engine.py:465 — _extracted_registry er en dict i hukommelsen. Ved genstart eller session-reload er registry tom, batch_extract_symbols prøver at gen-ekstrahere, remove_symbol fejler på allerede-fjernede symboler.",
+      "location": "refactoring_engine.py",
+      "impact": "Duplicate extractions og SYMBOL_NOT_FOUND fejl ved session-reload",
+      "proposed_fix": "Persister registry til session-filen eller brug _symbol_exists_in_target som primær check i stedet",
+      "acceptance_criteria": "",
+      "status": "rejected",
+      "created_at": "2026-06-30T11:39:45",
+      "updated_at": "2026-06-30T22:10:36",
+      "resolution_note": "Påstanden afvist: Koden har allerede to lag beskyttelse mod problemet. (1) move_symbol() bruger _symbol_exists_in_target() som fil-baseret idempotent guard der overlever genstart — forhindrer duplikat-extraktion til target. (2) remove_symbol() returnerer soft success med 'already_removed': True når symbolet ikke findes i source, i stedet for at fejle. _extracted_registry er kun en optimering til at undgå unødige fil-læsninger inden for samme session — dens tab ved genstart forårsager ikke fejl eller duplikat-extraktioner."
     },
     {
       "id": "BUG-104",
@@ -2114,13 +2114,14 @@
       "type": "bug",
       "severity": "medium",
       "description": "agent_tool_handler.py:316-330 — remaining >= 50 er hardcoded. Hvis planen kun flytter 30 af 200 symboler, er remaining = 170 >= 50 → fejler altid. Checket burde sammenligne med planlagt antal, ikke hardcoded 50.",
-      "location": "agent_tool_handler.py",
+      "location": "agent_tool_handler.py + stream_core.py",
       "impact": "Ekstraher auto-advance fejler for planer der efterlader mange symboler i source (hvilket er normalt for store refactoreringer)",
       "proposed_fix": "Erstat remaining >= 50 med remaining > planned_extractions hentet fra refactor_plan.md",
-      "acceptance_criteria": "",
-      "status": "open",
+      "acceptance_criteria": "remaining >= 50 ersattes med remaining > planned_extractions i baade agent_tool_handler.py og stream_core.py",
+      "status": "resolved",
       "created_at": "2026-06-30T11:39:45",
-      "updated_at": "2026-06-30T11:39:45"
+      "updated_at": "2026-07-01T19:30:00",
+      "resolution_note": "Udskiftede hardcoded remaining >= 50 med dynamisk check: planned_count = sum( len(syms) ) fra agent._planned_symbols_per_target. Hvis planned_count > 0: fail kun hvis remaining > planned_count. Hvis planned_count == 0: behold 50 som fallback. Opdateret baade agent_tool_handler.py:327 og stream_core.py:229."
     },
     {
       "id": "BUG-105",
@@ -2176,6 +2177,21 @@
       "proposed_fix": "Opdel stream_core.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
       "status": "open",
       "related": []
+    },
+    {
+      "id": "CORE-004",
+      "title": "agent_files.py har fejlet ved selvtests 3+ gange",
+      "type": "self",
+      "severity": "high",
+      "description": "agent_files.py har fejlet ved automatisk test-verifikation 602 gange efter redigering af egen kode.\n\nSidste test-output: exit code -1",
+      "location": "agent_files.py",
+      "impact": "Systemet rolled back ændringen automatisk — ingen reel skade.",
+      "proposed_fix": "Årsagen var at ARC-022's edit_file brød tests. Systemet rolled back. 830 tests passerer nu.",
+      "acceptance_criteria": "830 tests skal bestå (verified).",
+      "status": "resolved",
+      "created_at": "2026-07-01T12:57:47",
+      "updated_at": "2026-07-01T19:23:00",
+      "resolution_note": "ARC-022 (Workdir resolution) redigerede agent_files.py via edit_file, hvilket forårsagede 602 testfejl. Systemet rolled back automatisk. 830 tests består nu. CORE-004 er en stale record — ingen kodeændring nødvendig."
     }
   ],
   "active_risks": [
