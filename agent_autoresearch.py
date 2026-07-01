@@ -90,6 +90,352 @@ _ISSUE_TEXTS: dict[str, dict[str, str]] = {
     },
 }
 
+# ── Description texts for _build_issue_description ────────────
+_DESC_TEXTS: dict[str, dict[str, str]] = {
+    "header": {
+        "da": "## Auto-research analyse: {failure_type}",
+        "en": "## Auto-research analysis: {failure_type}",
+        "es": "## Análisis de auto-investigación: {failure_type}",
+        "zh": "## 自动研究分析：{failure_type}",
+    },
+    "phase_line": {
+        "da": "**Skabelon:** {template}  |  **Fase:** {phase}",
+        "en": "**Template:** {template}  |  **Phase:** {phase}",
+        "es": "**Plantilla:** {template}  |  **Fase:** {phase}",
+        "zh": "**模板：** {template}  |  **阶段：** {phase}",
+    },
+    "what_happened": {
+        "da": "### Hvad skete der?",
+        "en": "### What happened?",
+        "es": "### ¿Qué sucedió?",
+        "zh": "### 发生了什么？",
+    },
+    "why_problem": {
+        "da": "### Hvorfor er dette et problem?",
+        "en": "### Why is this a problem?",
+        "es": "### ¿Por qué es esto un problema?",
+        "zh": "### 为什么这是个问题？",
+    },
+    "possible_causes": {
+        "da": "### Mulige årsager",
+        "en": "### Possible causes",
+        "es": "### Causas posibles",
+        "zh": "### 可能的原因",
+    },
+    "analysis": {
+        "da": "### Analyse",
+        "en": "### Analysis",
+        "es": "### Análisis",
+        "zh": "### 分析",
+    },
+    "expected_next": {
+        "da": "### Forventet næste skridt",
+        "en": "### Expected next steps",
+        "es": "### Próximos pasos esperados",
+        "zh": "### 预期的后续步骤",
+    },
+    "missing_tool_what": {
+        "da": "LLM'en kaldte IKKE de påkrævede værktøjer: {uncalled}.",
+        "en": "The LLM did NOT call the required tools: {uncalled}.",
+        "es": "El LLM NO llamó a las herramientas requeridas: {uncalled}.",
+        "zh": "LLM 未调用必需的工具：{uncalled}。",
+    },
+    "called_tools": {
+        "da": "Kaldte værktøjer: {called}.",
+        "en": "Called tools: {called}.",
+        "es": "Herramientas llamadas: {called}.",
+        "zh": "已调用的工具：{called}。",
+    },
+    "active_tools": {
+        "da": "Aktive værktøjer i fasen: {required}.",
+        "en": "Active tools in phase: {required}.",
+        "es": "Herramientas activas en la fase: {required}.",
+        "zh": "阶段中的活动工具：{required}。",
+    },
+    "missing_tool_why": {
+        "da": "Fasen kan ikke fuldføres uden at det påkrævede værktøj kaldes. Systemet afviser <<<DONE>>> når _check_required_tools fejler.",
+        "en": "The phase cannot complete without the required tool being called. The system rejects <<<DONE>>> when _check_required_tools fails.",
+        "es": "La fase no puede completarse sin llamar a la herramienta requerida. El sistema rechaza <<<DONE>>> cuando _check_required_tools falla.",
+        "zh": "如果不调用必需的工具，阶段就无法完成。当 _check_required_tools 失败时，系统会拒绝 <<<DONE>>>。",
+    },
+    "missing_tool_reasons": {
+        "da": "- LLM'en forstår ikke instruktionen (sektionsinstruktionen er uklar)\n- Modellen nægter at kalde skriveværktøjer (kendt begrænsning)\n- Fasen mangler write-tools i TEMPLATE_TASK_TOOLS\n- Der mangler en alternativ sti (create_issue i stedet for edit_file)",
+        "en": "- LLM doesn't understand the instruction (section instruction is unclear)\n- Model refuses to call write tools (known limitation)\n- Phase lacks write tools in TEMPLATE_TASK_TOOLS\n- Missing an alternative path (create_issue instead of edit_file)",
+        "es": "- El LLM no entiende la instrucción (la instrucción de sección no es clara)\n- El modelo se niega a llamar herramientas de escritura (limitación conocida)\n- La fase carece de herramientas de escritura en TEMPLATE_TASK_TOOLS\n- Falta una ruta alternativa (create_issue en lugar de edit_file)",
+        "zh": "- LLM 不理解指令（部分指令不清晰）\n- 模型拒绝调用写入工具（已知限制）\n- 阶段在 TEMPLATE_TASK_TOOLS 中缺少写入工具\n- 缺少替代路径（使用 create_issue 代替 edit_file）",
+    },
+    "tool_failed_what": {
+        "da": "Værktøjet {tool} blev kaldt {attempts} gange men fejlede hver gang.",
+        "en": "Tool {tool} was called {attempts} times but failed each time.",
+        "es": "La herramienta {tool} fue llamada {attempts} veces pero falló en cada intento.",
+        "zh": "工具 {tool} 被调用了 {attempts} 次，但每次都失败了。",
+    },
+    "last_error": {
+        "da": "Sidste fejl: {error}",
+        "en": "Last error: {error}",
+        "es": "Último error: {error}",
+        "zh": "最后错误：{error}",
+    },
+    "last_args": {
+        "da": "Sidste args: {args}",
+        "en": "Last args: {args}",
+        "es": "Últimos args: {args}",
+        "zh": "最后参数：{args}",
+    },
+    "tool_failed_analysis": {
+        "da": "Tool-fejl kan skyldes ugyldige argumenter, manglende rettigheder, eller en bug i værktøjets implementering.",
+        "en": "Tool failures can be caused by invalid arguments, missing permissions, or a bug in the tool's implementation.",
+        "es": "Las fallas de herramientas pueden ser causadas por argumentos inválidos, permisos faltantes, o un error en la implementación de la herramienta.",
+        "zh": "工具失败可能由无效参数、缺少权限或工具实现中的错误引起。",
+    },
+    "read_loop_what": {
+        "da": "LLM'en lavede {reads} læsekald i træk uden at skrive noget.",
+        "en": "The LLM made {reads} consecutive read calls without writing anything.",
+        "es": "El LLM realizó {reads} llamadas de lectura consecutivas sin escribir nada.",
+        "zh": "LLM 连续进行了 {reads} 次读取调用，没有写入任何内容。",
+    },
+    "read_loop_analysis": {
+        "da": "LLM'en mangler kontekst til at skrive. Overvej at øge iteration budget eller give en tom skabelon.",
+        "en": "The LLM lacks context to write. Consider increasing iteration budget or providing an empty template.",
+        "es": "Al LLM le falta contexto para escribir. Considera aumentar el presupuesto de iteración o proporcionar una plantilla vacía.",
+        "zh": "LLM 缺乏写入的上下文。考虑增加迭代预算或提供空模板。",
+    },
+    "incomplete_what": {
+        "da": "Fasen løb tør for iterationer før alt planlagt arbejde var færdigt ({c}/{p} moduler oprettet).",
+        "en": "The phase ran out of iterations before all planned work was completed ({c}/{p} modules created).",
+        "es": "La fase se quedó sin iteraciones antes de completar todo el trabajo planificado ({c}/{p} módulos creados).",
+        "zh": "阶段在完成所有计划工作之前耗尽了迭代次数（已创建 {c}/{p} 个模块）。",
+    },
+    "missing_modules": {
+        "da": "Manglende moduler: {missing}",
+        "en": "Missing modules: {missing}",
+        "es": "Módulos faltantes: {missing}",
+        "zh": "缺少的模块：{missing}",
+    },
+    "incomplete_analysis": {
+        "da": "LLM'en kaldte værktøjer korrekt, men iteration budgettet var for lavt til at fuldføre alle moduler. Budgettet skal beregnes dynamisk baseret på antal moduler i refactor_plan.md i stedet for at være fast.",
+        "en": "The LLM called tools correctly, but the iteration budget was too low to complete all modules. The budget should be calculated dynamically based on the number of modules in refactor_plan.md instead of being fixed.",
+        "es": "El LLM llamó herramientas correctamente, pero el presupuesto de iteración era demasiado bajo para completar todos los módulos. El presupuesto debe calcularse dinámicamente según el número de módulos en refactor_plan.md en lugar de ser fijo.",
+        "zh": "LLM 正确调用了工具，但迭代预算太低，无法完成所有模块。预算应根据 refactor_plan.md 中的模块数量动态计算，而不是固定的。",
+    },
+    "incomplete_next_steps": {
+        "da": "1. Læs _get_max_iterations() i agent_tasks.py\n2. Beregn dynamisk budget: max(20, 2 + antal_moduler * 2 + 5)\n3. Tilføj system-besked når todos auto-opdateres\n4. Opdater instructions/refactor.json — fjern 'Brug update_todo'",
+        "en": "1. Read _get_max_iterations() in agent_tasks.py\n2. Calculate dynamic budget: max(20, 2 + module_count * 2 + 5)\n3. Add system message when todos auto-update\n4. Update instructions/refactor.json — remove 'Brug update_todo'",
+        "es": "1. Lee _get_max_iterations() en agent_tasks.py\n2. Calcula presupuesto dinámico: max(20, 2 + count_modulos * 2 + 5)\n3. Añade mensaje del sistema cuando los todos se auto-actualicen\n4. Actualiza instructions/refactor.json — elimina 'Brug update_todo'",
+        "zh": "1. 阅读 agent_tasks.py 中的 _get_max_iterations()\n2. 计算动态预算：max(20, 2 + 模块数 * 2 + 5)\n3. 当待办事项自动更新时添加系统消息\n4. 更新 instructions/refactor.json — 删除 'Brug update_todo'",
+    },
+    "unknown_what": {
+        "da": "Kaldte værktøjer: {tools}",
+        "en": "Called tools: {tools}",
+        "es": "Herramientas llamadas: {tools}",
+        "zh": "已调用的工具：{tools}",
+    },
+    "unknown_length": {
+        "da": "Output længde: {length}",
+        "en": "Output length: {length}",
+        "es": "Longitud de salida: {length}",
+        "zh": "输出长度：{length}",
+    },
+}
+
+# ── Fix texts for _build_issue_fix ────────────────────────────
+_FIX_TEXTS: dict[str, dict[str, str]] = {
+    "missing_tool_intro": {
+        "da": "Fasen \"{phase}\" i \"{template}\" kræver at LLM'en kalder {uncalled}.",
+        "en": "Phase \"{phase}\" in \"{template}\" requires the LLM to call {uncalled}.",
+        "es": "La fase \"{phase}\" en \"{template}\" requiere que el LLM llame a {uncalled}.",
+        "zh": "阶段 \"{phase}\" 在 \"{template}\" 中要求 LLM 调用 {uncalled}。",
+    },
+    "context_label": {
+        "da": "Kontekst",
+        "en": "Context",
+        "es": "Contexto",
+        "zh": "上下文",
+    },
+    "edit_file_problem": {
+        "da": "Problem: {template}/{phase} har edit_file i active_tools, men LLM'en kaldte det ikke.",
+        "en": "Problem: {template}/{phase} has edit_file in active_tools, but the LLM did not call it.",
+        "es": "Problema: {template}/{phase} tiene edit_file en active_tools, pero el LLM no lo llamó.",
+        "zh": "问题：{template}/{phase} 在 active_tools 中有 edit_file，但 LLM 未调用它。",
+    },
+    "solution_choose": {
+        "da": "Løsning (vælg én):",
+        "en": "Solution (choose one):",
+        "es": "Solución (elige una):",
+        "zh": "解决方案（选择一项）：",
+    },
+    "solution_edit_file_1": {
+        "da": "Hvis edit_file skal være påkrævet: Opdater sektionsinstruktionen i instructions/{template}.json så \"{phase}\" starter med \"DIN FØRSTE handling SKAL være edit_file\".",
+        "en": "If edit_file should be required: Update the section instruction in instructions/{template}.json so \"{phase}\" starts with \"YOUR FIRST action MUST be edit_file\".",
+        "es": "Si edit_file debe ser requerido: Actualiza la instrucción de sección en instructions/{template}.json para que \"{phase}\" comience con \"TU PRIMERA acción DEBE ser edit_file\".",
+        "zh": "如果 edit_file 应为必需：更新 instructions/{template}.json 中的部分指令，使 \"{phase}\" 以 \"你的第一个操作必须是 edit_file\" 开头。",
+    },
+    "solution_edit_file_2": {
+        "da": "Hvis create_issue er et acceptabelt alternativ: Tilføj create_issue til TEMPLATE_TASK_TOOLS for {template}/{phase} i agent_skills.py.",
+        "en": "If create_issue is an acceptable alternative: Add create_issue to TEMPLATE_TASK_TOOLS for {template}/{phase} in agent_skills.py.",
+        "es": "Si create_issue es una alternativa aceptable: Añade create_issue a TEMPLATE_TASK_TOOLS para {template}/{phase} en agent_skills.py.",
+        "zh": "如果 create_issue 是可接受的替代方案：在 agent_skills.py 中为 {template}/{phase} 将 create_issue 添加到 TEMPLATE_TASK_TOOLS。",
+    },
+    "solution_edit_file_3": {
+        "da": "Hvis fasen er read-only: Fjern edit_file fra TEMPLATE_TASK_TOOLS for {template}/{phase}.",
+        "en": "If the phase is read-only: Remove edit_file from TEMPLATE_TASK_TOOLS for {template}/{phase}.",
+        "es": "Si la fase es de solo lectura: Elimina edit_file de TEMPLATE_TASK_TOOLS para {template}/{phase}.",
+        "zh": "如果阶段是只读的：从 {template}/{phase} 的 TEMPLATE_TASK_TOOLS 中移除 edit_file。",
+    },
+    "solution_write_file": {
+        "da": "Tilføj write_file til TEMPLATE_TASK_TOOLS for {template}/{phase} i agent_skills.py.",
+        "en": "Add write_file to TEMPLATE_TASK_TOOLS for {template}/{phase} in agent_skills.py.",
+        "es": "Añade write_file a TEMPLATE_TASK_TOOLS para {template}/{phase} en agent_skills.py.",
+        "zh": "在 agent_skills.py 中为 {template}/{phase} 将 write_file 添加到 TEMPLATE_TASK_TOOLS。",
+    },
+    "solution_update_issue_status": {
+        "da": "Tjek at {template}/{phase} er i CLOSE_PHASE_ALIASES i agent_tasks.py:993.",
+        "en": "Check that {template}/{phase} is in CLOSE_PHASE_ALIASES in agent_tasks.py:993.",
+        "es": "Verifica que {template}/{phase} esté en CLOSE_PHASE_ALIASES en agent_tasks.py:993.",
+        "zh": "检查 {template}/{phase} 是否在 agent_tasks.py:993 的 CLOSE_PHASE_ALIASES 中。",
+    },
+    "root_cause": {
+        "da": "Rodårsag: _check_required_tools() håndhæver at påkrævede værktøjer kaldes før <<<DONE>>>.",
+        "en": "Root cause: _check_required_tools() enforces that required tools are called before <<<DONE>>>.",
+        "es": "Causa raíz: _check_required_tools() exige que las herramientas requeridas sean llamadas antes de <<<DONE>>>.",
+        "zh": "根本原因：_check_required_tools() 强制执行必需工具在 <<<DONE>>> 之前被调用。",
+    },
+    "tool_failed_intro": {
+        "da": "Værktøjet {tool} fejlede i {template}/{phase} efter {attempts} forsøg.",
+        "en": "Tool {tool} failed in {template}/{phase} after {attempts} attempts.",
+        "es": "La herramienta {tool} falló en {template}/{phase} después de {attempts} intentos.",
+        "zh": "工具 {tool} 在 {template}/{phase} 中失败，尝试了 {attempts} 次。",
+    },
+    "tool_failed_solution": {
+        "da": "Løsning: Tjek {tool}'s implementering for denne edge case. Overvej at tilføje bedre fejlhåndtering.",
+        "en": "Solution: Check {tool}'s implementation for this edge case. Consider adding better error handling.",
+        "es": "Solución: Verifica la implementación de {tool} para este caso extremo. Considera añadir mejor manejo de errores.",
+        "zh": "解决方案：检查 {tool} 对此边缘情况的实现。考虑添加更好的错误处理。",
+    },
+    "read_loop_intro": {
+        "da": "LLM'en læste {reads} gange uden at skrive i {template}/{phase}.",
+        "en": "The LLM read {reads} times without writing in {template}/{phase}.",
+        "es": "El LLM leyó {reads} veces sin escribir en {template}/{phase}.",
+        "zh": "LLM 在 {template}/{phase} 中读取了 {reads} 次但没有写入。",
+    },
+    "read_loop_solution": {
+        "da": "Løsning: Øg iteration budget for {template}/{phase} i TEMPLATE_PHASE_ITERATION_LIMITS, eller tilføj \"DIN FØRSTE handling SKAL være edit_file\" i instructions/{template}.json.",
+        "en": "Solution: Increase iteration budget for {template}/{phase} in TEMPLATE_PHASE_ITERATION_LIMITS, or add \"YOUR FIRST action MUST be edit_file\" in instructions/{template}.json.",
+        "es": "Solución: Aumenta el presupuesto de iteración para {template}/{phase} en TEMPLATE_PHASE_ITERATION_LIMITS, o añade \"TU PRIMERA acción DEBE ser edit_file\" en instructions/{template}.json.",
+        "zh": "解决方案：增加 {template}/{phase} 在 TEMPLATE_PHASE_ITERATION_LIMITS 中的迭代预算，或在 instructions/{template}.json 中添加 \"你的第一个操作必须是 edit_file\"。",
+    },
+    "incomplete_intro": {
+        "da": "Fasen \"{phase}\" i \"{template}\" løb tør for iterationer før ALLE planlagte moduler var oprettet ({c}/{p}).",
+        "en": "Phase \"{phase}\" in \"{template}\" ran out of iterations before ALL planned modules were created ({c}/{p}).",
+        "es": "La fase \"{phase}\" en \"{template}\" se quedó sin iteraciones antes de que TODOS los módulos planificados fueran creados ({c}/{p}).",
+        "zh": "阶段 \"{phase}\" 在 \"{template}\" 中在创建所有计划模块之前耗尽了迭代次数（{c}/{p}）。",
+    },
+    "incomplete_missing_modules": {
+        "da": "Manglende moduler: {missing}",
+        "en": "Missing modules: {missing}",
+        "es": "Módulos faltantes: {missing}",
+        "zh": "缺少的模块：{missing}",
+    },
+    "incomplete_changes_header": {
+        "da": "Tre forbedringer er nødvendige:",
+        "en": "Three improvements are needed:",
+        "es": "Se necesitan tres mejoras:",
+        "zh": "需要三个改进：",
+    },
+    "incomplete_change_1_header": {
+        "da": "=== 1. Dynamisk iteration budget (agent_tasks.py) ===",
+        "en": "=== 1. Dynamic iteration budget (agent_tasks.py) ===",
+        "es": "=== 1. Presupuesto de iteración dinámico (agent_tasks.py) ===",
+        "zh": "=== 1. 动态迭代预算 (agent_tasks.py) ===",
+    },
+    "incomplete_change_1_desc": {
+        "da": "I funktionen _get_max_iterations() tilføj et tjek for refactor/Ekstraher der beregner budgettet dynamisk:",
+        "en": "In the _get_max_iterations() function, add a check for refactor/Ekstraher that calculates the budget dynamically:",
+        "es": "En la función _get_max_iterations(), añade una verificación para refactor/Ekstraher que calcule el presupuesto dinámicamente:",
+        "zh": "在 _get_max_iterations() 函数中，添加对 refactor/Ekstraher 的检查，动态计算预算：",
+    },
+    "incomplete_budget_estimate": {
+        "da": "Anslået budget for denne fase: {guess} iterationer (nuværende: {current} for refactor Ekstraher).",
+        "en": "Estimated budget for this phase: {guess} iterations (current: {current} for refactor Ekstraher).",
+        "es": "Presupuesto estimado para esta fase: {guess} iteraciones (actual: {current} para refactor Ekstraher).",
+        "zh": "此阶段的估计预算：{guess} 次迭代（当前：refactor Ekstraher 为 {current}）。",
+    },
+    "incomplete_change_2_header": {
+        "da": "=== 2. System-besked ved auto-todo opdatering (agent_tasks.py) ===",
+        "en": "=== 2. System message on auto-todo update (agent_tasks.py) ===",
+        "es": "=== 2. Mensaje del sistema al actualizar auto-todo (agent_tasks.py) ===",
+        "zh": "=== 2. 自动待办事项更新时的系统消息 (agent_tasks.py) ===",
+    },
+    "incomplete_change_2_desc": {
+        "da": "I solve_task_stream(), efter _reconcile_llm_todos(), tilføj:",
+        "en": "In solve_task_stream(), after _reconcile_llm_todos(), add:",
+        "es": "En solve_task_stream(), después de _reconcile_llm_todos(), añade:",
+        "zh": "在 solve_task_stream() 中，在 _reconcile_llm_todos() 之后添加：",
+    },
+    "incomplete_change_3_header": {
+        "da": "=== 3. Fjern 'Brug update_todo' fra instruktion (instructions/refactor.json) ===",
+        "en": "=== 3. Remove 'Brug update_todo' from instruction (instructions/refactor.json) ===",
+        "es": "=== 3. Elimina 'Brug update_todo' de la instrucción (instructions/refactor.json) ===",
+        "zh": "=== 3. 从指令中删除 'Brug update_todo' (instructions/refactor.json) ===",
+    },
+    "incomplete_change_3_replacement": {
+        "da": "Erstat '📋 Brug **update_todo** for at markere hvert modul færdigt.' med: '✅ TODO'er opdateres automatisk — spring update_todo over.'",
+        "en": "Replace '📋 Use **update_todo** to mark each module done.' with: '✅ TODOs update automatically — skip update_todo.'",
+        "es": "Reemplaza '📋 Usa **update_todo** para marcar cada módulo completo.' con: '✅ Los TODOs se actualizan automáticamente — salta update_todo.'",
+        "zh": "将 '📋 使用 **update_todo** 标记每个模块完成。' 替换为：'✅ 待办事项自动更新 — 跳过 update_todo。'",
+    },
+    "short_output_intro": {
+        "da": "Fasen \"{phase}\" i \"{template}\" har ingen eller for kort sektionsinstruktion.",
+        "en": "Phase \"{phase}\" in \"{template}\" has no or too short section instruction.",
+        "es": "La fase \"{phase}\" en \"{template}\" no tiene instrucción de sección o es demasiado corta.",
+        "zh": "阶段 \"{phase}\" 在 \"{template}\" 中没有或只有太短的部分指令。",
+    },
+    "short_output_solution_fri": {
+        "da": "Løsning: Tilføj en \"{phase}\"-sektion til SECTION_INSTRUCTIONS for \"{template}\"-templaten.\n\nÅbn instructions/selvforbedring.json (eller instructions/{template}.json) og tilføj:\n\n  \"{phase}\": \"Kald relevante værktøjer og producér mindst 200 tegn output. Brug edit_file til at redigere og run_tests til at verificere.\"\n\nBrug edit_file med old_text/new_text fra JSON-filen.",
+        "en": "Solution: Add a \"{phase}\" section to SECTION_INSTRUCTIONS for the \"{template}\" template.\n\nOpen instructions/selvforbedring.json (or instructions/{template}.json) and add:\n\n  \"{phase}\": \"Call relevant tools and produce at least 200 characters of output. Use edit_file to edit and run_tests to verify.\"\n\nUse edit_file with old_text/new_text from the JSON file.",
+        "es": "Solución: Añade una sección \"{phase}\" a SECTION_INSTRUCTIONS para la plantilla \"{template}\".\n\nAbre instructions/selvforbedring.json (o instructions/{template}.json) y añade:\n\n  \"{phase}\": \"Llama a las herramientas relevantes y produce al menos 200 caracteres de salida. Usa edit_file para editar y run_tests para verificar.\"\n\nUsa edit_file con old_text/new_text del archivo JSON.",
+        "zh": "解决方案：为 \"{template}\" 模板添加一个 \"{phase}\" 部分到 SECTION_INSTRUCTIONS。\n\n打开 instructions/selvforbedring.json（或 instructions/{template}.json）并添加：\n\n  \"{phase}\": \"调用相关工具并输出至少 200 个字符。使用 edit_file 编辑，使用 run_tests 验证。\"\n\n使用 JSON 文件中的 old_text/new_text 调用 edit_file。",
+    },
+    "short_output_solution_other": {
+        "da": "Løsning: Tjek instructions/{template}.json og tilføj en instruktion for \"{phase}\" der beder LLM'en om at kalde værktøjer og producere mindst 200 tegn.",
+        "en": "Solution: Check instructions/{template}.json and add an instruction for \"{phase}\" that tells the LLM to call tools and produce at least 200 characters.",
+        "es": "Solución: Verifica instructions/{template}.json y añade una instrucción para \"{phase}\" que indique al LLM llamar herramientas y producir al menos 200 caracteres.",
+        "zh": "解决方案：检查 instructions/{template}.json 并为 \"{phase}\" 添加指令，指示 LLM 调用工具并生成至少 200 个字符。",
+    },
+    "short_output_root_cause": {
+        "da": "Rodårsag: LLM'en afsluttede uden værktøjskald eller output. Manglende eller for vag sektionsinstruktion.",
+        "en": "Root cause: The LLM ended without tool calls or output. Missing or too vague section instruction.",
+        "es": "Causa raíz: El LLM terminó sin llamadas a herramientas o salida. Instrucción de sección faltante o demasiado vaga.",
+        "zh": "根本原因：LLM 在没有工具调用或输出的情况下结束。部分指令缺失或过于模糊。",
+    },
+    "unknown_intro": {
+        "da": "Uforklaret fejl i {template}/{phase}.",
+        "en": "Unexplained failure in {template}/{phase}.",
+        "es": "Fallo inexplicado en {template}/{phase}.",
+        "zh": "{template}/{phase} 中发生未知错误。",
+    },
+    "unknown_approach": {
+        "da": "Fremgangsmåde:\n1. Læs agent_log for at forstå hvad der skete.\n2. Tjek om fasen har en instruktion i instructions/ mappen.\n3. Hvis instruktionen mangler: tilføj den.\n4. Hvis instruktionen er for vag: gør den mere specifik.\n5. Kør run_tests() for at verificere.",
+        "en": "Approach:\n1. Read agent_log to understand what happened.\n2. Check if the phase has an instruction in the instructions/ folder.\n3. If the instruction is missing: add it.\n4. If the instruction is too vague: make it more specific.\n5. Run run_tests() to verify.",
+        "es": "Enfoque:\n1. Lee agent_log para entender qué sucedió.\n2. Verifica si la fase tiene una instrucción en la carpeta instructions/.\n3. Si falta la instrucción: agrégala.\n4. Si la instrucción es demasiado vaga: hazla más específica.\n5. Ejecuta run_tests() para verificar.",
+        "zh": "方法：\n1. 阅读 agent_log 了解发生了什么。\n2. 检查阶段在 instructions/ 文件夹中是否有指令。\n3. 如果缺少指令：添加它。\n4. 如果指令太模糊：使其更具体。\n5. 运行 run_tests() 验证。",
+    },
+}
+
+
+def _desc_text(key: str, lang: str = "da", **kwargs: str) -> str:
+    """Look up localized description text, format with kwargs, fall back to DA."""
+    entry = _DESC_TEXTS.get(key, {})
+    txt = entry.get(lang) or entry.get("en") or entry.get("da") or key
+    return txt.format(**kwargs) if kwargs else txt
+
+
+def _fix_text(key: str, lang: str = "da", **kwargs: str) -> str:
+    """Look up localized fix text, format with kwargs, fall back to DA."""
+    entry = _FIX_TEXTS.get(key, {})
+    txt = entry.get(lang) or entry.get("en") or entry.get("da") or key
+    return txt.format(**kwargs) if kwargs else txt
+
 def _issue_text(key: str, lang: str = "da", **kwargs: str) -> str:
     """Look up localized issue text, format with kwargs, fall back to DA."""
     entry = _ISSUE_TEXTS.get(key, {})
@@ -627,9 +973,9 @@ def _create_issue(agent: Any, failure_type: str, evidence: dict,
     lang = getattr(agent, 'lang', 'da')
 
     title = _build_issue_title(failure_type, evidence, template, phase, lang)
-    desc = _build_issue_description(failure_type, evidence, template, phase, analysis)
+    desc = _build_issue_description(failure_type, evidence, template, phase, analysis, lang)
     impact = _build_issue_impact(failure_type, evidence, template, phase, lang)
-    proposed_fix = _build_issue_fix(failure_type, evidence, template, phase)
+    proposed_fix = _build_issue_fix(failure_type, evidence, template, phase, lang)
 
     result = create_issue(
         agent,
@@ -643,11 +989,11 @@ def _create_issue(agent: Any, failure_type: str, evidence: dict,
     )
     if result.get("success"):
         issue_id = result.get("issue", {}).get("id", "?")
-        existing = "(eksisterende)" if result.get("existing") else "(ny)"
-        agent._log("AUTOR", f"Auto-research issue {issue_id} {existing}", title[:120])
+        existing_label = "(existing)" if result.get("existing") else "(new)"
+        agent._log("AUTOR", f"Auto-research issue {issue_id} {existing_label}", title[:120])
         return issue_id
     else:
-        agent._log("AUTOR", "Auto-research: create_issue fejlede",
+        agent._log("AUTOR", "Auto-research: create_issue failed",
                    str(result.get("error", "")))
         return None
 
@@ -678,73 +1024,69 @@ def _build_issue_title(failure_type: str, evidence: dict,
 
 def _build_issue_description(failure_type: str, evidence: dict,
                                template: str, phase: str,
-                               analysis: str) -> str:
+                               analysis: str, lang: str = "da") -> str:
     """Build a detailed description with specific context."""
-    lines = [f"## Auto-research analyse: {failure_type.replace('_', ' ')}"]
-    lines.append(f"**Skabelon:** {template}  |  **Fase:** {phase}")
+    ft_label = failure_type.replace('_', ' ')
+    lines = [_desc_text("header", lang, failure_type=ft_label)]
+    lines.append(_desc_text("phase_line", lang, template=template, phase=phase))
     lines.append("")
 
     if failure_type == FAILURE_MISSING_TOOL:
-        lines.append("### Hvad skete der?")
-        lines.append(f"LLM'en kaldte IKKE de påkrævede værktøjer: "
-                     f"{', '.join(evidence.get('uncalled', []))}.")
-        lines.append(f"Kaldte værktøjer: {', '.join(evidence.get('called', []))}.")
-        lines.append(f"Aktive værktøjer i fasen: {', '.join(evidence.get('required', []))}.")
+        uncalled = ', '.join(evidence.get('uncalled', []))
+        called = ', '.join(evidence.get('called', []))
+        required = ', '.join(evidence.get('required', []))
+        lines.append(_desc_text("what_happened", lang))
+        lines.append(_desc_text("missing_tool_what", lang, uncalled=uncalled))
+        lines.append(_desc_text("called_tools", lang, called=called))
+        lines.append(_desc_text("active_tools", lang, required=required))
         lines.append("")
-        lines.append("### Hvorfor er dette et problem?")
-        lines.append("Fasen kan ikke fuldføres uden at det påkrævede værktøj kaldes. "
-                     "Systemet afviser <<<DONE>>> når _check_required_tools fejler.")
+        lines.append(_desc_text("why_problem", lang))
+        lines.append(_desc_text("missing_tool_why", lang))
         lines.append("")
-        lines.append("### Mulige årsager")
-        lines.append("- LLM'en forstår ikke instruktionen (sektionsinstruktionen er uklar)")
-        lines.append("- Modellen nægter at kalde skriveværktøjer (kendt begrænsning)")
-        lines.append("- Fasen mangler write-tools i TEMPLATE_TASK_TOOLS")
-        lines.append("- Der mangler en alternativ sti (create_issue i stedet for edit_file)")
+        lines.append(_desc_text("possible_causes", lang))
+        lines.append(_desc_text("missing_tool_reasons", lang))
 
     elif failure_type == FAILURE_TOOL_FAILED:
         tool = evidence.get("tool", "?")
-        lines.append("### Hvad skete der?")
-        lines.append(f"Værktøjet {tool} blev kaldt {evidence.get('attempts', 0)} "
-                     f"gange men fejlede hver gang.")
-        lines.append(f"Sidste fejl: {evidence.get('last_error', 'ukendt')}")
-        lines.append(f"Sidste args: {evidence.get('last_args', 'ukendt')}")
+        attempts = str(evidence.get('attempts', 0))
+        last_error = evidence.get('last_error', '?')
+        last_args = evidence.get('last_args', '?')
+        lines.append(_desc_text("what_happened", lang))
+        lines.append(_desc_text("tool_failed_what", lang, tool=tool, attempts=attempts))
+        lines.append(_desc_text("last_error", lang, error=last_error))
+        lines.append(_desc_text("last_args", lang, args=last_args))
         lines.append("")
-        lines.append("### Analyse")
-        lines.append("Tool-fejl kan skyldes ugyldige argumenter, manglende "
-                     "rettigheder, eller en bug i værktøjets implementering.")
+        lines.append(_desc_text("analysis", lang))
+        lines.append(_desc_text("tool_failed_analysis", lang))
 
     elif failure_type == FAILURE_READ_LOOP:
-        lines.append("### Hvad skete der?")
-        lines.append(f"LLM'en lavede {evidence.get('consecutive_reads', 0)} "
-                     "læsekald i træk uden at skrive noget.")
+        reads = str(evidence.get('consecutive_reads', 0))
+        lines.append(_desc_text("what_happened", lang))
+        lines.append(_desc_text("read_loop_what", lang, reads=reads))
         lines.append("")
-        lines.append("### Analyse")
-        lines.append("LLM'en mangler kontekst til at skrive. "
-                     "Overvej at øge iteration budget eller give en tom skabelon.")
+        lines.append(_desc_text("analysis", lang))
+        lines.append(_desc_text("read_loop_analysis", lang))
+
     elif failure_type == FAILURE_INCOMPLETE:
-        p = evidence.get("modules_planned", "?")
-        c = evidence.get("modules_created", "?")
-        missing = evidence.get("missing_modules", [])
-        lines.append("### Hvad skete der?")
-        lines.append(f"Fasen løb tør for iterationer før alt planlagt arbejde "
-                     f"var færdigt ({c}/{p} moduler oprettet).")
-        lines.append(f"Manglende moduler: {', '.join(missing)}")
+        p = str(evidence.get("modules_planned", "?"))
+        c = str(evidence.get("modules_created", "?"))
+        missing = ', '.join(evidence.get("missing_modules", []))
+        lines.append(_desc_text("what_happened", lang))
+        lines.append(_desc_text("incomplete_what", lang, c=c, p=p))
+        lines.append(_desc_text("missing_modules", lang, missing=missing))
         lines.append("")
-        lines.append("### Analyse")
-        lines.append("LLM'en kaldte værktøjer korrekt, men iteration budgettet "
-                     "var for lavt til at fuldføre alle moduler. "
-                     "Budgettet skal beregnes dynamisk baseret på antal moduler "
-                     "i refactor_plan.md i stedet for at være fast.")
+        lines.append(_desc_text("analysis", lang))
+        lines.append(_desc_text("incomplete_analysis", lang))
         lines.append("")
-        lines.append("### Forventet næste skridt")
-        lines.append("1. Læs _get_max_iterations() i agent_tasks.py\n"
-                     "2. Beregn dynamisk budget: max(20, 2 + antal_moduler * 2 + 5)\n"
-                     "3. Tilføj system-besked når todos auto-opdateres\n"
-                     "4. Opdater instructions/refactor.json — fjern 'Brug update_todo'")
+        lines.append(_desc_text("expected_next", lang))
+        lines.append(_desc_text("incomplete_next_steps", lang))
+
     else:
-        lines.append("### Hvad skete der?")
-        lines.append(f"Kaldte værktøjer: {evidence.get('called_tools', [])}")
-        lines.append(f"Output længde: {evidence.get('response_length', 0)}")
+        tools_str = str(evidence.get('called_tools', []))
+        length = str(evidence.get('response_length', 0))
+        lines.append(_desc_text("what_happened", lang))
+        lines.append(_desc_text("unknown_what", lang, tools=tools_str))
+        lines.append(_desc_text("unknown_length", lang, length=length))
         lines.append("")
         lines.append(analysis[:500])
 
@@ -771,7 +1113,7 @@ def _build_issue_impact(failure_type: str, evidence: dict,
 
 
 def _build_issue_fix(failure_type: str, evidence: dict,
-                      template: str, phase: str) -> str:
+                      template: str, phase: str, lang: str = "da") -> str:
     """Build a specific, actionable fix proposal based on failure context.
 
     Generates an EXECUTABLE proposed_fix — not just a description.
@@ -784,12 +1126,12 @@ def _build_issue_fix(failure_type: str, evidence: dict,
         """Try to locate symbols and return file + line context."""
         try:
             from agent_files import locate_code
-            from agent_skills import TEMPLATE_PHASE_ITERATION_LIMITS
             for sym in symbols:
                 loc = locate_code("agent_skills.py", sym)
                 if loc.get("success"):
-                    return (f"agent_skills.py omkring linje {loc['line']}-{loc['end_line']}. "
-                            f"Brug locate(name=\"{sym}\") for at se den præcise kode.")
+                    ctx = _fix_text("context_label", lang)
+                    return (f"agent_skills.py around line {loc['line']}-{loc['end_line']}. "
+                            f"Use locate(name=\"{sym}\") to see the exact code.")
         except Exception:
             pass
         return ""
@@ -797,72 +1139,64 @@ def _build_issue_fix(failure_type: str, evidence: dict,
     if failure_type == FAILURE_MISSING_TOOL:
         uncalled = evidence.get("uncalled", [])
         lines = [
-            f"Fasen \"{phase}\" i \"{template}\" kræver at LLM'en kalder "
-            f"{', '.join(uncalled)}.",
+            _fix_text("missing_tool_intro", lang,
+                      phase=phase, template=template,
+                      uncalled=', '.join(uncalled)),
         ]
 
         ctx = _find_context(*uncalled, "SECTION_INSTRUCTIONS",
-                            f"TEMPLATE_TASK_TOOLS", "TEMPLATE_PHASE_ITERATION_LIMITS")
+                            "TEMPLATE_TASK_TOOLS", "TEMPLATE_PHASE_ITERATION_LIMITS")
         if ctx:
-            lines.append(f"\nKontekst: {ctx}")
+            lines.append(f"\n**{_fix_text('context_label', lang)}:** {ctx}")
 
         for tool in uncalled:
             if tool == "edit_file":
                 lines.extend([
                     "",
-                    f"Problem: {template}/{phase} har edit_file i active_tools, "
-                    "men LLM'en kaldte det ikke.",
+                    _fix_text("edit_file_problem", lang, template=template, phase=phase),
                     "",
-                    "Løsning (vælg én):",
-                    "1. Hvis edit_file skal være påkrævet: Opdater sektionsinstruktionen "
-                    f"i instructions/{template}.json så \"{phase}\" starter med "
-                    '"DIN FØRSTE handling SKAL være edit_file".',
-                    "2. Hvis create_issue er et acceptabelt alternativ: Tilføj "
-                    f"create_issue til TEMPLATE_TASK_TOOLS for {template}/{phase} "
-                    "i agent_skills.py.",
-                    "3. Hvis fasen er read-only: Fjern edit_file fra "
-                    f"TEMPLATE_TASK_TOOLS for {template}/{phase}.",
+                    _fix_text("solution_choose", lang),
+                    "1. " + _fix_text("solution_edit_file_1", lang, template=template, phase=phase),
+                    "2. " + _fix_text("solution_edit_file_2", lang, template=template, phase=phase),
+                    "3. " + _fix_text("solution_edit_file_3", lang, template=template, phase=phase),
                 ])
             elif tool == "write_file":
                 lines.append(
-                    f"\nTilføj write_file til TEMPLATE_TASK_TOOLS for "
-                    f"{template}/{phase} i agent_skills.py."
+                    "\n" + _fix_text("solution_write_file", lang, template=template, phase=phase)
                 )
             elif tool == "update_issue_status":
                 lines.append(
-                    f"\nTjek at {template}/{phase} er i CLOSE_PHASE_ALIASES "
-                    "i agent_tasks.py:993."
+                    "\n" + _fix_text("solution_update_issue_status", lang, template=template, phase=phase)
                 )
 
         lines.append(
-            "\nRodårsag: _check_required_tools() håndhæver at påkrævede "
-            "værktøjer kaldes før <<<DONE>>>."
+            "\n" + _fix_text("root_cause", lang)
         )
         return "\n".join(lines)
 
     elif failure_type == FAILURE_TOOL_FAILED:
         tool = evidence.get("tool", "?")
+        attempts = str(evidence.get('attempts', 0))
+        last_args = evidence.get('last_args', '?')
+        last_error = evidence.get('last_error', '?')
         ctx = _find_context(tool, "git_ops.edit_file", "tools.ToolRegistry.execute")
-        return (
-            f"Værktøjet {tool} fejlede i {template}/{phase} "
-            f"efter {evidence.get('attempts', 0)} forsøg.\n"
-            f"Sidste args: {evidence.get('last_args', 'ukendt')}\n"
-            f"Sidste fejl: {evidence.get('last_error', 'ukendt')}\n"
-            f"{('\\nKontekst: ' + ctx) if ctx else ''}\n\n"
-            f"Løsning: Tjek {tool}'s implementering for denne edge case. "
-            f"Overvej at tilføje bedre fejlhåndtering."
+        result = (
+            _fix_text("tool_failed_intro", lang, tool=tool, template=template, phase=phase, attempts=attempts)
+            + f"\nLast args: {last_args}\nLast error: {last_error}"
         )
+        if ctx:
+            result += f"\n\n**{_fix_text('context_label', lang)}:** {ctx}"
+        result += "\n\n" + _fix_text("tool_failed_solution", lang, tool=tool)
+        return result
 
     elif failure_type == FAILURE_READ_LOOP:
+        reads = str(evidence.get('consecutive_reads', 0))
         ctx = _find_context("TEMPLATE_PHASE_ITERATION_LIMITS", "MAX_TASK_ITERATIONS")
-        return (
-            f"LLM'en læste {evidence.get('consecutive_reads', 0)} gange "
-            f"uden at skrive i {template}/{phase}.\n"
-            f"{('\\nKontekst: ' + ctx) if ctx else ''}\n\n"
-            f"Løsning: Øg iteration budget for {template}/{phase} "
-            f"i TEMPLATE_PHASE_ITERATION_LIMITS, eller tilføj "
-            f"\"DIN FØRSTE handling SKAL være edit_file\" i instructions/{template}.json."
-        )
+        result = _fix_text("read_loop_intro", lang, reads=reads, template=template, phase=phase)
+        if ctx:
+            result += f"\n\n**{_fix_text('context_label', lang)}:** {ctx}"
+        result += "\n\n" + _fix_text("read_loop_solution", lang, template=template, phase=phase)
+        return result
 
     elif failure_type == FAILURE_INCOMPLETE:
         p = evidence.get("modules_planned", 0)
@@ -875,86 +1209,71 @@ def _build_issue_fix(failure_type: str, evidence: dict,
         except Exception:
             pass
         guess_budget = max(_current_budget, 2 + p * 2 + 5)
-        return (
-            f"Fasen \"{phase}\" i \"{template}\" løb tør for iterationer "
-            f"før ALLE planlagte moduler var oprettet ({c}/{p}).\n"
-            f"Manglende moduler: {', '.join(missing)}\n\n"
-            f"Tre forbedringer er nødvendige:\n\n"
-            f"=== 1. Dynamisk iteration budget (agent_tasks.py) ===\n"
-            f"I funktionen _get_max_iterations() tilføj et tjek for "
-            f"refactor/Ekstraher der beregner budgettet dynamisk:\n\n"
-            f"  if template == \"refactor\" and task_lower == \"ekstraher\":\n"
-            f"      import os\n"
-            f"      from file_checks import _parse_refactor_plan_modules\n"
-            f"      wd = os.environ.get('AGENT_WORKDIR', '') or os.getcwd()\n"
-            f"      pp = os.path.join(wd, 'refactor_plan.md')\n"
-            f"      if os.path.exists(pp):\n"
-            f"          mods = _parse_refactor_plan_modules(pp)\n"
-            f"          if mods:\n"
-            f"              return max({_current_budget}, 2 + len(mods) * 2 + 5)\n\n"
-            f"Anslået budget for denne fase: {guess_budget} iterationer "
-            f"(nuværende: {_current_budget} for refactor Ekstraher).\n\n"
-            f"=== 2. System-besked ved auto-todo opdatering (agent_tasks.py) ===\n"
-            f"I solve_task_stream(), efter _reconcile_llm_todos(), tilføj:\n\n"
-            f"  if _auto_done_ids:\n"
-            f"      messages.append({{'role': 'user', 'content':\n"
-            f"          f'[SYSTEM: ✅ TODO auto-opdateret: {{\", \".join(_auto_done_ids)}}]'}})\n\n"
-            f"=== 3. Fjern 'Brug update_todo' fra instruktion "
-            f"(instructions/refactor.json) ===\n"
-            f"Erstat '📋 Brug **update_todo** for at markere hvert modul færdigt.'\n"
-            f"med: '✅ TODO\\'er opdateres automatisk — spring update_todo over.'"
+
+        result = (
+            _fix_text("incomplete_intro", lang, phase=phase, template=template,
+                      c=str(c), p=str(p))
+            + "\n" + _fix_text("incomplete_missing_modules", lang,
+                               missing=', '.join(missing))
+            + "\n\n" + _fix_text("incomplete_changes_header", lang)
+            + "\n\n" + _fix_text("incomplete_change_1_header", lang)
+            + "\n" + _fix_text("incomplete_change_1_desc", lang)
+            + "\n\n"
+            + "  if template == \"refactor\" and task_lower == \"ekstraher\":\n"
+            + "      import os\n"
+            + "      from file_checks import _parse_refactor_plan_modules\n"
+            + "      wd = os.environ.get('AGENT_WORKDIR', '') or os.getcwd()\n"
+            + "      pp = os.path.join(wd, 'refactor_plan.md')\n"
+            + "      if os.path.exists(pp):\n"
+            + "          mods = _parse_refactor_plan_modules(pp)\n"
+            + "          if mods:\n"
+            + "              return max({_current_budget}, 2 + len(mods) * 2 + 5)\n\n"
+            + _fix_text("incomplete_budget_estimate", lang,
+                        guess=str(guess_budget), current=str(_current_budget))
+            + "\n\n" + _fix_text("incomplete_change_2_header", lang)
+            + "\n" + _fix_text("incomplete_change_2_desc", lang)
+            + "\n\n"
+            + "  if _auto_done_ids:\n"
+            + "      messages.append({'role': 'user', 'content':\n"
+            + "          f'[SYSTEM: \u2705 TODO auto-updated: {\", \".join(_auto_done_ids)}]'})\n\n"
+            + _fix_text("incomplete_change_3_header", lang)
+            + "\n" + _fix_text("incomplete_change_3_replacement", lang)
         )
+        return result
 
     elif failure_type == FAILURE_SHORT_OUTPUT:
         ctx = _find_context("SECTION_INSTRUCTIONS", "get_templates")
         lines = [
-            f"Fasen \"{phase}\" i \"{template}\" har ingen eller for kort "
-            "sektionsinstruktion.",
+            _fix_text("short_output_intro", lang, phase=phase, template=template),
         ]
         if ctx:
-            lines.append(f"\nKontekst: {ctx}\n")
+            lines.append(f"\n**{_fix_text('context_label', lang)}:** {ctx}\n")
 
         if template == "fri":
             lines.append(
-                f"Løsning: Tilføj en \"{phase}\"-sektion til SECTION_INSTRUCTIONS "
-                f"for \"{template}\"-templaten.\n\n"
-                f"Åbn instructions/selvforbedring.json (eller "
-                f"instructions/{template}.json) og tilføj:\n\n"
-                f'  "{phase}": "Kald relevante værktøjer og producér '
-                f'mindst 200 tegn output. Brug edit_file til at redigere '
-                f'og run_tests til at verificere."\n\n'
-                f"Brug edit_file med old_text/new_text fra JSON-filen."
+                _fix_text("short_output_solution_fri", lang, phase=phase, template=template)
             )
         else:
             lines.append(
-                f"Løsning: Tjek instructions/{template}.json og tilføj en "
-                f"instruktion for \"{phase}\" der beder LLM'en om at "
-                f"kalde værktøjer og producere mindst 200 tegn."
+                _fix_text("short_output_solution_other", lang, phase=phase, template=template)
             )
 
         lines.append(
-            "\nRodårsag: LLM'en afsluttede uden værktøjskald eller output. "
-            "Manglende eller for vag sektionsinstruktion."
+            "\n" + _fix_text("short_output_root_cause", lang)
         )
         return "\n".join(lines)
 
     else:
-        # Unknown failure — try to provide specific context
-        ctx_lines = [f"Uforklaret fejl i {template}/{phase}."]
+        ctx_lines = [_fix_text("unknown_intro", lang, template=template, phase=phase)]
         ctx = _find_context("SECTION_INSTRUCTIONS",
-                            f"TEMPLATE_TASK_TOOLS",
+                            "TEMPLATE_TASK_TOOLS",
                             "TEMPLATE_PHASE_ITERATION_LIMITS",
                             "get_templates")
         if ctx:
-            ctx_lines.append(f"\nKontekst: {ctx}\n")
+            ctx_lines.append(f"\n**{_fix_text('context_label', lang)}:** {ctx}\n")
 
         ctx_lines.append(
-            "Fremgangsmåde:\n"
-            "1. Læs agent_log for at forstå hvad der skete.\n"
-            "2. Tjek om fasen har en instruktion i instructions/ mappen.\n"
-            "3. Hvis instruktionen mangler: tilføj den.\n"
-            "4. Hvis instruktionen er for vag: gør den mere specifik.\n"
-            "5. Kør run_tests() for at verificere."
+            _fix_text("unknown_approach", lang)
         )
         return "\n".join(ctx_lines)
 
