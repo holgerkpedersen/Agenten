@@ -59,8 +59,17 @@ def check_min_text_length(spec: dict[str, Any], full_response: str = "", agent: 
                     text += "\n" + content
                 elif isinstance(content, list):
                     for part in content:
-                        if isinstance(part, dict) and part.get("type") == "text":
+                        if not isinstance(part, dict):
+                            continue
+                        ptype = part.get("type", "")
+                        if ptype == "text":
                             text += "\n" + part.get("text", "")
+                        elif ptype in ("tool_use", "function_call"):
+                            inp = part.get("input") or part.get("arguments") or {}
+                            if isinstance(inp, dict):
+                                for v in inp.values():
+                                    if isinstance(v, str) and len(v) > 50:
+                                        text += "\n" + v
     if len(text) >= min_chars:
         return True, f"min_text_length: {len(text)} tegn (>= {min_chars})"
     return False, f"min_text_length: kun {len(text)} tegn (kræver {min_chars})"

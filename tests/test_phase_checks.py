@@ -340,6 +340,29 @@ class TestMinTextLength(unittest.TestCase):
         ok, _ = check_min_text_length({"min_chars": 100}, agent=agent)
         self.assertTrue(ok)
 
+    def test_includes_tool_use_content(self):
+        """Native tool calling: write_file content counts as LLM output text."""
+        agent = FakeAgent(messages=[
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "skriver analyse"},
+                {"type": "tool_use", "input": {"path": "refactor_analyse.md",
+                                                "content": "z" * 600}},
+            ]},
+        ])
+        ok, msg = check_min_text_length({"min_chars": 500}, agent=agent)
+        self.assertTrue(ok, msg)
+
+    def test_short_tool_use_not_counted(self):
+        """Tool call args <50 chars are not counted (avoid noise from small params)."""
+        agent = FakeAgent(messages=[
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "kort"},
+                {"type": "tool_use", "input": {"filepath": "x.py"}},
+            ]},
+        ])
+        ok, _ = check_min_text_length({"min_chars": 500}, agent=agent)
+        self.assertFalse(ok)
+
     def test_invalid_min_chars(self):
         ok, _ = check_min_text_length({"min_chars": "abc"})
         self.assertFalse(ok)

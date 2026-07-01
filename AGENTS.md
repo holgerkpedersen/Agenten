@@ -1047,3 +1047,17 @@ if (planned_count > 0 and remaining > planned_count) or (planned_count == 0 and 
 - No plan: fall back to original 50 threshold
 
 **Files:** `agent_tool_handler.py:327`, `stream_core.py:229`
+
+### 70. `min_text_length` phase check fails for native tool calling — `write_file` content not counted (`text_tool_checks.py:60-63`, `phase_engine.py:23`)
+
+**Symptom:** Session b3cb403d — Analyse phase failed 5× despite LLM calling `list_symbols` → `read_location`(3-4x) → `write_file(refactor_analyse.md)` → `done()` every time. `TEMPLATE_PHASE_CHECKS` for refactor/Analyse has `all_of: [min_text_length:500, tool_called:read_location≥3, file_exists:refactor_analyse.md]`. The `file_exists` and `tool_called` checks pass, but `min_text_length` fails with "kun 0 tegn (kræver 500)".
+
+**Root cause:** When using native function calling, the LLM's actual output (2700+ chars of analysis) is in the `write_file` tool call `content` argument — a `type: "tool_use"` message part. `check_min_text_length` only counted `type: "text"` parts from assistant messages, not `type: "tool_use"` input content. The LLM's thinking text is ~100-400 chars, but its tool call content is 2700+ chars.
+
+**Fix:** `check_min_text_length` in `text_tool_checks.py` now also scans `type: "tool_use"` (and `type: "function_call"`) parts — extracts string values >50 chars from the `input`/`arguments` dict. This means `write_file(content="## Oversigt\n...2700 chars...")` now counts as ~2700 chars of output, easily passing the 500 threshold.
+
+**Also fixed:** Stale `refactor_plan.md` (referencing `stream_core.py` from a previous session) caused Analyse phase to show "Planen nævner 1 moduler: stream_core.py" as a success criterion. Removed the `if plan_modules:` block from Analyse phase todos in `phase_utils.py` — at Analyse time, no plan exists yet for the current session. Deleted stale `refactor_plan.md` and `refactor_analyse.md`.
+
+**Tests:** 3 new tests in `tests/test_phase_checks.py`: `test_includes_tool_use_content` (write_file content counts), `test_short_tool_use_not_counted` (args <50 chars excluded), `test_includes_list_content` (existing, unchanged).
+
+**Files:** `text_tool_checks.py:60-71`, `phase_utils.py:322` (removed stale plan check from Analyse)

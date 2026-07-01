@@ -319,13 +319,6 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
                 {"id": "rf_a5", "text": "Kortlæg ansvarsområder for modulopdeling", "done": False},
                 {"id": "rf_a6", "text": "Gem analyse i refactor_analyse.md med write_file()", "done": False},
             ])
-            if plan_modules:
-                todos.append({
-                    "id": "rf_a_modules",
-                    "text": "Planen nævner {} moduler: {}".format(len(plan_modules), ', '.join(plan_modules)),
-                    "done": False
-                })
-
         elif phase == "plan":
             todos.extend([
                 {"id": "rf_p0", "text": "Læs refactor_analyse.md for at få analyse-resultater", "done": False},
