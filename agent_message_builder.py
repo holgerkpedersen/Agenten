@@ -479,7 +479,8 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     lang_instr = t(K.ANSWER_IN, agent.lang)
     user_guidance = f"{lang_instr}. "
     # Prominent instruction to build a plan (BEFORE tool guidance)
-    if "plan_phase" in getattr(agent.tool_registry, 'active_tools', []) or getattr(agent.tool_registry, 'active_tools', None) is None:
+    active = agent.tool_registry.active_tools if agent.tool_registry else None
+    if active is None or "plan_phase" in active:
         user_guidance += t(K.TODO_PLAN_START, agent.lang) + " "
     if chunk_hint:
         user_guidance += chunk_hint.strip() + " "
