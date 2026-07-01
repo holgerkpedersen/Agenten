@@ -1015,3 +1015,19 @@ The `if tool_name not in ("run_tests", ...) and dup_count >= 1:` dedup check alr
 3. `agent_skills.py:227`: Samme ændring for den indbyggede sektionsinstruktion
 
 **Files:** `agent_issues.py:266,285`, `instructions/bugfix.json:2`, `agent_skills.py:227`
+
+### 67. `instructions/*.json` translations pattern — `en_`, `es_`, `zh_` prefixed keys
+
+**Pattern:** Every Danish key in `instructions/*.json` gets corresponding `en_<lowercase_key>`, `es_<lowercase_key>`, `zh_<lowercase_key>` entries. The `_load_section_instructions()` in `agent_skills.py` resolves the correct key via `agent.lang + "_" + phase_name.lower()` lookup, falling back to the original Danish key.
+
+**Files translated (2026-07-01):** `agenten.json`, `billedanalyse.json`, `diffanalyse.json`, `kodeanalyse.json`, `programmering.json`, `python-arkitektur.json`, `resume.json`, `selvforbedring.json`, `testgenerering.json`, `issue_handler.json` (missing `en_læs`/`es_læs`/`zh_læs` added).
+
+### 68. `agent_autoresearch.py` — `_DESC_TEXTS` and `_FIX_TEXTS` dicts for 4-language description/fix prose
+
+**Pattern:** Two new dicts mirror `_ISSUE_TEXTS`: `_DESC_TEXTS` (26 keys, `_build_issue_description()`) and `_FIX_TEXTS` (30 keys, `_build_issue_fix()`). Both use the same `_text()` helper pattern with `lang` parameter. `_build_issue_description()` and `_build_issue_fix()` now accept `lang` param — called from `_create_issue()` which gets `agent.lang`.
+
+**Replacements:** ~250 lines of hardcoded Danish prose (section headings, analysis text, solution suggestions, root cause descriptions) replaced with `_desc_text()`/`_fix_text()` lookups. Code fragments and file paths remain language-independent.
+
+**Tests:** `test_kodeanalyse_has_five` updated to check Danish-only key count (`'_' not in k`) instead of total section count.
+
+**Commit:** `342e6bf` (instructions), `6c31fd1` (autoresearch)
