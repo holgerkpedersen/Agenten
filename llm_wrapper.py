@@ -75,6 +75,8 @@ class LMStudioWrapper:
         
         Args:
             model:"""
+        if not model or model in ("test-model", "test", "mock-model", "fake-model"):
+            return
         with self._model_lock:
             self.model = model
 
