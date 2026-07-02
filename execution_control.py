@@ -47,6 +47,15 @@ def user_reply() -> Any:
         return jsonify({"success": False, "error": "Empty message"}), 400
     agent.pending_reply = msg
     agent._log("USER", "Bruger svar", msg[:100])
+    # Propagate to active stream agent so user messages reach the LLM during streaming
+    try:
+        from config import active_streams, active_streams_lock
+        with active_streams_lock:
+            for _sagent in active_streams.values():
+                _sagent.pending_reply = msg
+                break
+    except Exception:
+        pass
     return jsonify({"success": True})
 
 

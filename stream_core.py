@@ -1260,27 +1260,27 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     elif exit_code:
                         agent._log("ERROR", f"❌ Tests failed (exit code: {exit_code})",
                                    json.dumps({"exit_code": exit_code}))
-                if exit_code and exit_code != 0:
-                    consecutive_test_failures += 1
-                    _is_refactor_test_phase = (
-                        getattr(agent, 'active_template', '') == 'refactor'
-                        and _normalize_phase(getattr(task_node, 'name', '')).lower() == 'test'
-                    )
-                    if _is_refactor_test_phase:
-                        _raw_output = (inner or {}).get("stdout", "") or ""
-                        _diag = _classify_test_failure(_raw_output)
-                        _diag_msg = (
-                            f"\n\n[SYSTEM: Fejltype: {_diag['category']}\n"
-                            f"Detalje: {_diag['detail']}\n"
-                            f"Forslag: {_diag['suggestion']}]"
+                    if exit_code and exit_code != 0:
+                        consecutive_test_failures += 1
+                        _is_refactor_test_phase = (
+                            getattr(agent, 'active_template', '') == 'refactor'
+                            and _normalize_phase(getattr(task_node, 'name', '')).lower() == 'test'
                         )
-                        result_str += _diag_msg
-                        if consecutive_test_failures >= 3:
-                            _context_block = _build_refactor_phase_context(agent)
-                            if _context_block:
-                                result_str += f"\n\n[SYSTEM: Status på moduler:\n{_context_block[:800]}]"
-                else:
-                    consecutive_test_failures = 0
+                        if _is_refactor_test_phase:
+                            _raw_output = (inner or {}).get("stdout", "") or ""
+                            _diag = _classify_test_failure(_raw_output)
+                            _diag_msg = (
+                                f"\n\n[SYSTEM: Fejltype: {_diag['category']}\n"
+                                f"Detalje: {_diag['detail']}\n"
+                                f"Forslag: {_diag['suggestion']}]"
+                            )
+                            result_str += _diag_msg
+                            if consecutive_test_failures >= 3:
+                                _context_block = _build_refactor_phase_context(agent)
+                                if _context_block:
+                                    result_str += f"\n\n[SYSTEM: Status på moduler:\n{_context_block[:800]}]"
+                    else:
+                        consecutive_test_failures = 0
                 if tool_name == "locate":
                     if isinstance(result, dict) and result.get("success"):
                         agent._located_files.add(os.path.abspath(result.get("file", "")))

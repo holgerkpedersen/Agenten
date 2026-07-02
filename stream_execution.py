@@ -287,6 +287,10 @@ def execute_stream() -> Any:
     stream_agent.decompose_llm = agent.decompose_llm
     stream_agent.searcher = agent.searcher
     stream_agent._session_id = current_session_id or "unknown"
+    # Propagate pending_reply from global agent so user messages reach the stream agent
+    if getattr(agent, 'pending_reply', None):
+        stream_agent.pending_reply = agent.pending_reply
+        agent.pending_reply = None
     if current_session_id:
         os.environ['AGENT_SESSION_ID'] = current_session_id
     else:
