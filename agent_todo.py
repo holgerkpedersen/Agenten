@@ -329,7 +329,8 @@ def _auto_populate_llm_todos(agent: Any, task_node: Any) -> list[dict]:
         try:
             from file_checks import _parse_refactor_plan_modules, _extract_modules_from_plan
             _all_mods = _parse_refactor_plan_modules(plan_path)
-        except Exception:
+        except Exception as _e:
+            agent._log("WARNING", f"Kunne ikke parse refactor_plan_modules fra {plan_path}: {_e}")
             _all_mods = []
         if _all_mods:
             # Filter out the source file (the file being refactored)
