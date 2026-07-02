@@ -8,6 +8,76 @@ import json
 from i18n import K
 from lang import t
 
+
+def _classify_test_failure(test_output: str, source_file: str = "api_server.py") -> dict:
+    """Parse pytest output and classify the failure into a known refactor error type.
+
+    Returns a dict with:
+      - ``category``: one of ``import_error``, ``module_not_found``,
+        ``circular_import``, ``attribute_error``, ``name_error``,
+        ``syntax_error``, ``test_logic``, ``unknown``
+      - ``detail``: the actual error message (first relevant line)
+      - ``suggestion``: what the LLM should do to fix it (Danish)
+    """
+    detail = ""
+    for line in test_output.splitlines():
+        line_s = line.strip()
+        if not detail and ("Error:" in line_s or "E       " in line_s or "ERROR:" in line_s):
+            detail = line_s.replace("E       ", "").strip()[:200]
+        if "short test summary" in line_s.lower():
+            break
+
+    if not detail:
+        return {"category": "unknown", "detail": "",
+                "suggestion": "Læs test-output for at identificere fejlen."}
+
+    dl = detail.lower()
+
+    if "circular import" in dl or "circularimport" in dl:
+        return {"category": "circular_import", "detail": detail,
+                "suggestion": "To moduler importerer hinanden. Opret et tredje modul med delte symboler "
+                              "(f.eks. shared_state.py eller types.py) og importer dérfra i stedet."}
+
+    if "modulenotfound" in dl or "no module named" in dl:
+        return {"category": "module_not_found", "detail": detail,
+                "suggestion": "Modulfilen findes ikke på disk. Brug list_files() for at se hvilke "
+                              "filer der findes, eller write_file() for at oprette det manglende modul."}
+
+    if "cannot import name" in dl or "unable to import" in dl:
+        return {"category": "import_error", "detail": detail,
+                "suggestion": "Et symbol er ikke tilgængeligt i modulet. Brug list_symbols() for at "
+                              "se hvad modulet indeholder, og batch_extract_symbols() for at flytte "
+                              "det manglende symbol fra kildefilen til modulet."}
+
+    if "attributeerror" in dl or "has no attribute" in dl:
+        return {"category": "attribute_error", "detail": detail,
+                "suggestion": "Et symbol findes ikke i det forventede modul. Brug list_symbols() på "
+                              "modulfilen og locate() i kildefilen. Flyt det manglende symbol med "
+                              "batch_extract_symbols() hvis det mangler i modulet."}
+
+    if "nameerror" in dl or "is not defined" in dl:
+        return {"category": "name_error", "detail": detail,
+                "suggestion": "Flyttet kode refererer et symbol der stadig findes i kildefilen. "
+                              "Brug verify_refactor(source='{source_file}', source_for_deps='<modul>') "
+                              "for at opdage manglende afhængigheder. Tilføj import med add_import() "
+                              "eller flyt det manglende symbol med batch_extract_symbols()."}
+
+    if "syntaxerror" in dl or "invalid syntax" in dl:
+        return {"category": "syntax_error", "detail": detail,
+                "suggestion": "AST-brud i en modulfil. Brug verify_refactor(source='<modul>') for "
+                              "at finde den præcise syntax-fejl, og ret med edit_file()."}
+
+    if "assertionerror" in dl or "assert " in dl:
+        return {"category": "test_logic", "detail": detail,
+                "suggestion": "En test fejler på assert. Læs testen og produktionskoden med "
+                              "read_location() for at forstå forventet vs. faktisk opførsel. "
+                              "Ret produktionskoden med edit_file()."}
+
+    return {"category": "unknown", "detail": detail,
+            "suggestion": "Læs test-output for at identificere fejlen. Brug read_location() til at "
+                          "læse den kode der refereres i fejlmeddelelsen."}
+
+
 def _resolve_refactor_plan_path(agent, plan_file="refactor_plan.md"):
     """Resolve refactor plan path against AGENT_WORKDIR.
     

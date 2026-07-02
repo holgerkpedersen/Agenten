@@ -235,7 +235,24 @@ _HARDCODED_INSTRUCTIONS_DATA = {
         "Plan": "Læs `refactor_analyse.md` med read_chunk() for at få analysen — du behøver IKKE læse symboler/funktioner igen. Beslut modulopdeling og skriv planen med write_file(path='refactor_plan.md', content='...').\n\n⛔ FORMATKRAV — planen SKAL bruge dette EKSAKTE format:\n\n## Oversigt\nKort overblik over modulopdelingen.\n\n## Module: config.py\n**Ansvar:** En-sætnings beskrivelse\n**Symboler (N):** sym1, sym2, sym3, ... (komma-separeret, ÉN linje)\n\n## Module: næste_fil.py\n...\n\nREGLER: ALTID '## Module: file.py' (IKKE 'Modul', IKKE '### N.'). ALTID én '**Ansvar:**' linje. ALTID én '**Symboler (N):**' linje med ALLE symboler komma-separeret (IKKE bullets).\n\n📋 TRINRÆKKEFØLGE:\n1. Kald plan_phase(fasenavn='Plan', mål='...', steps='...')\n2. Kald read_chunk(path='refactor_analyse.md') for at få analysen\n3. Kald write_file(path='refactor_plan.md', content='...') med planen\n4. Kald <<<DONE>>>\n\n⚠️ DU MÅ KUN returnere tekst NÅR du kalder et værktøj. Hvis du returnerer tekst UDEN værktøj, spilder du iterationer.",
         "Ekstraher": "🔥 BRUG run_extraction_plan(source='{source_file}') — IKKE manuelle batch_extract_symbols kald. run_extraction_plan læser refactor_plan.md, parser ALLE moduler og symboler, kører batch_extract_symbols for hvert modul DETERMINISTISK (ingen LLM-indblanding), tilføjer auto-imports for framework-symboler som app, BASE_DIR, request m.fl., og verificerer at hvert modul kan importeres. Alt sker i ét enkelt kald.\n\n⛔ Kald IKKE list_symbols, list_chunks, read_chunk, read_location før run_extraction_plan — de spilder iterationer.\n⛔ Brug IKKE manuelle batch_extract_symbols med mindre run_extraction_plan fejler på et specifikt modul.\n⛔ Kald IKKE verify_refactor bagefter — run_extraction_plan verificerer selv.\n\n📋 TRINRÆKKEFØLGE:\n1. Kald run_extraction_plan(source='{source_file}') — det eneste kald du behøver\n2. Hvis det lykkes: Kald <<<DONE>>> (systemet auto-afslutter)\n3. Hvis et modul fejler: Brug batch_extract_symbols manuelt for DET modul\n\nSystemet auto-afslutter denne fase når ALLE moduler er oprettet.",
         "Opdatér": "Opdater {source_file} med remove_symbol() og add_import() — DETERMINISTISKE værktøjer der ikke kræver LLM. Brug remove_symbol(source='{source_file}', symbol_name='FunktionsNavn') for at fjerne et symbol der allerede er flyttet til et modul. Brug add_import(source='{source_file}', module='routes', symbol='FunktionsNavn') for at tilføje en import til et modul. Brug verify_refactor(source='{source_file}') til at tjekke syntaks.\n📋 Din opgaveplan (via **plan_phase**) bør angive remove_symbol → add_import → verify_refactor for hvert modul. Du har KUN 20 iterations. Brug edit_file KUN hvis remove_symbol/add_import ikke kan klare opgaven. <<<DONE>>> først når {source_file} er syntaktisk gyldig og alle relevante imports er tilføjet.",
-        "Test": "Kør testsuiten med run_tests(). Hvis tests fejler, ret import-stier med edit_file() og genkør. Bliv ved indtil ALLE tests består. Opdater issue-status til 'resolved' med update_issue_status() når tests består. 📋 Brug **update_todo** for at markere fremdrift.",
+        "Test": "Kør testsuiten med run_tests(). Analyser fejloutputtet og kategorisér:\n\n"
+                 "  🔴 ImportError/ModuleNotFoundError → Modul mangler på disk eller import-sti er forkert.\n"
+                 "     Brug: edit_file() til at rette import-stien, eller write_file() for at oprette modul.\n\n"
+                 "  🔴 CircularImportError → To moduler importerer hinanden.\n"
+                 "     Brug: Opret et tredje modul med delte symboler (shared_state.py) og importer dérfra.\n\n"
+                 "  🔴 AttributeError → Symbol mangler i modul.\n"
+                 "     Brug: list_symbols() på modulfilen, locate() i kildefilen, batch_extract_symbols() for at flytte.\n\n"
+                 "  🔴 NameError → Flyttet kode refererer symboler der stadig kun findes i kildefilen.\n"
+                 "     Brug: verify_refactor(source='{source_file}', source_for_deps='<modul>') — detekterer manglende afhængigheder.\n\n"
+                 "  🔴 SyntaxError → AST-brud i module-fil.\n"
+                 "     Brug: verify_refactor() for at finde præcis fejl, derefter edit_file().\n\n"
+                 "  🟢 Tests PASSER → bekræft at refaktoreringen rent faktisk er udført:\n"
+                 "     Brug: verify_refactor() på ALLE moduler + kildefil.\n"
+                 "     Kør: _refactor_actually_moved_code() (systemet kalder den automatisk).\n"
+                 "     Kald: update_issue_status('resolved') først NÅR alt er verificeret.\n\n"
+                 "📋 Hvis tests fejler 3+ gange: Brug read_location() til at læse den fejlende kode,\n"
+                 "   forstå strukturen, og ret præcist — gæt ikke på import-stier.\n\n"
+                 "📋 Brug **update_todo** for at markere fremdrift.",
     },
     "testgenerering": {
         "Analyse": "Læs filen med read_chunk(). Forstå alle klasser, funktioner, metoder og imports. Identificér hvilke der allerede har tests og hvilke der mangler. Opret et issue med create_issue() hvis du finder kode der mangler tests.",

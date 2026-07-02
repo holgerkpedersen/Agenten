@@ -1982,7 +1982,9 @@
       "action": "Opret en enkelt `resolve_workdir_path(path: str) -> str` i et delt modul (agent_files.py). Brug den alle 5 steder. Successkriterie: Én funktion. Alle 5 kaldere bruger den. Ens opførsel på tværs.",
       "symptoms": "Forskellig opførsel afhængig af hvilken funktion der kaldes. En bugfix i én implementering overses i de andre. Hver håndterer edge cases forskelligt..",
       "environment": "Windows, Python 3.12",
-      "status": "open"
+      "status": "resolved",
+      "updated_at": "2026-07-02T14:26:29",
+      "resolution_note": "Auto-resolved: Test phase confirmed bug is already fixed. ✅ Tests bestået — refaktoreringen er bekræftet uden regressioner. Afslutter Test-fasen.\n\n✅ Tests bestået — husk at kalde update_issue_status() for at markere issuet som løst."
     },
     {
       "id": "MNT-017",

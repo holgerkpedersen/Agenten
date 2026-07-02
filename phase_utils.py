@@ -141,12 +141,16 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
 
     if tool_name == "run_tests" and not agent._tests_failed:
         if "test" in phase:
-            # For refactor: tests passing IS proof of work — modules on disk + imports = done.
-            # Refactor has no "Rød test" phase; uses its own message.
             if getattr(agent, 'active_template', '') == 'refactor':
-                agent.issue_resolved = True
-                agent._needs_resolve_persist = True
-                return t(K.LOG_REFACTOR_TESTS_PASSED, agent.lang)
+                if _refactor_actually_moved_code(agent):
+                    agent.issue_resolved = True
+                    agent._needs_resolve_persist = True
+                    return t(K.LOG_REFACTOR_TESTS_PASSED, agent.lang)
+                return (
+                    t(K.LOG_REFACTOR_TESTS_PASSED, agent.lang)
+                    + "\n\n"
+                    + t(K.TEST_BUT_NO_REFACTOR, agent.lang)
+                )
             if _refactor_actually_moved_code(agent):
                 agent.issue_resolved = True
                 agent._needs_resolve_persist = True

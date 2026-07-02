@@ -6,7 +6,7 @@ import agent_git
 from typing import Any, Generator
 from agent_config import log, EXECUTION_TIMEOUT, _WRITE_TOOLS, PHASE_ALIASES, REQUIRED_ACTION_TOOLS, CLOSE_PHASE_ALIASES, ISSUE_ID_PATTERN, AUTO_RESOLVE_PATTERNS, FRAMEWORK_PY, _TODO_TOOL_MAP
 from agent_message_builder import _build_chunk_hint, _build_phase_reason, _build_initial_messages, _msg_content_len, _truncate_messages, _build_truncation_summary, _cont_hint, _add_user_msg
-from agent_refactor_helpers import _resolve_refactor_plan_path, _check_import_placement, _refactor_actually_moved_code, _build_refactor_phase_context, _save_full_context_for_refactor, _count_symbols_in_file, _get_symbol_names_in_file, _validate_ekstraher_symbols, _build_module_progress_msg, _detect_module_deps, _resolve_source_file, _check_refactor_progress, _all_planned_modules_exist
+from agent_refactor_helpers import _resolve_refactor_plan_path, _check_import_placement, _refactor_actually_moved_code, _build_refactor_phase_context, _save_full_context_for_refactor, _count_symbols_in_file, _get_symbol_names_in_file, _validate_ekstraher_symbols, _build_module_progress_msg, _detect_module_deps, _resolve_source_file, _check_refactor_progress, _all_planned_modules_exist, _classify_test_failure
 from agent_utils import _is_greenfield, _use_native_tools, _normalize_phase, _inject_todo_tools
 from agent_stream import _parse_test_summary, _track_produced_file, _get_phase_auto_complete_msg, _extract_last_assistant_text, _get_modified_core_files, _verify_self_modification, _run_full_test_suite, _execute_autoresearch_issue, _finalize_task_stream, _generate_phase_todos, solve_task_stream
 from agent_task_phase import _get_phase_task_tools, _get_max_tool_calls, _get_max_iterations, set_task_tools, solve_task, _set_phase_model
@@ -175,6 +175,19 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
         elif exit_code:
             agent._log("ERROR", f"❌ Tests failed (exit code: {exit_code})",
                        json.dumps({"exit_code": exit_code}))
+        if exit_code and exit_code != 0:
+            _is_refactor_test = (
+                getattr(agent, 'active_template', '') == 'refactor'
+                and _normalize_phase(getattr(task_node, 'name', '')).lower() == 'test'
+            )
+            if _is_refactor_test:
+                _raw = (inner or {}).get("stdout", "") or ""
+                _diag = _classify_test_failure(_raw)
+                result_str += (
+                    f"\n\n[SYSTEM: Fejltype: {_diag['category']}\n"
+                    f"Detalje: {_diag['detail']}\n"
+                    f"Forslag: {_diag['suggestion']}]"
+                )
 
     if parsed["tool"] == "locate":
         if isinstance(result, dict) and result.get("success"):

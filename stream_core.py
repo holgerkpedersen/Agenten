@@ -6,7 +6,7 @@ from agent_config import log, EXECUTION_TIMEOUT, _WRITE_TOOLS, PHASE_ALIASES, RE
 from lang import t
 from i18n import K
 import agent_files
-from agent_refactor_helpers import _resolve_refactor_plan_path, _check_import_placement, _refactor_actually_moved_code, _build_refactor_phase_context, _save_full_context_for_refactor, _count_symbols_in_file, _get_symbol_names_in_file, _validate_ekstraher_symbols, _build_module_progress_msg, _detect_module_deps, _resolve_source_file, _check_refactor_progress, _all_planned_modules_exist
+from agent_refactor_helpers import _resolve_refactor_plan_path, _check_import_placement, _refactor_actually_moved_code, _build_refactor_phase_context, _save_full_context_for_refactor, _count_symbols_in_file, _get_symbol_names_in_file, _validate_ekstraher_symbols, _build_module_progress_msg, _detect_module_deps, _resolve_source_file, _check_refactor_progress, _all_planned_modules_exist, _classify_test_failure
 import re
 import agent_autoresearch
 from agent_task_phase import _get_max_iterations, _get_max_tool_calls, _normalize_phase, _set_phase_model, set_task_tools
@@ -663,6 +663,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
     consecutive_failures = 0
     consecutive_same_tool = 0
     consecutive_text_only = 0
+    consecutive_test_failures = 0
     last_tool_name = ""
     last_name_arg = ""
     READ_ONLY_TOOLS = {"read_location", "read_chunk", "list_chunks", "list_files", "list_symbols", "locate", "read_issue"}
@@ -1259,6 +1260,27 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                     elif exit_code:
                         agent._log("ERROR", f"❌ Tests failed (exit code: {exit_code})",
                                    json.dumps({"exit_code": exit_code}))
+                if exit_code and exit_code != 0:
+                    consecutive_test_failures += 1
+                    _is_refactor_test_phase = (
+                        getattr(agent, 'active_template', '') == 'refactor'
+                        and _normalize_phase(getattr(task_node, 'name', '')).lower() == 'test'
+                    )
+                    if _is_refactor_test_phase:
+                        _raw_output = (inner or {}).get("stdout", "") or ""
+                        _diag = _classify_test_failure(_raw_output)
+                        _diag_msg = (
+                            f"\n\n[SYSTEM: Fejltype: {_diag['category']}\n"
+                            f"Detalje: {_diag['detail']}\n"
+                            f"Forslag: {_diag['suggestion']}]"
+                        )
+                        result_str += _diag_msg
+                        if consecutive_test_failures >= 3:
+                            _context_block = _build_refactor_phase_context(agent)
+                            if _context_block:
+                                result_str += f"\n\n[SYSTEM: Status på moduler:\n{_context_block[:800]}]"
+                else:
+                    consecutive_test_failures = 0
                 if tool_name == "locate":
                     if isinstance(result, dict) and result.get("success"):
                         agent._located_files.add(os.path.abspath(result.get("file", "")))
