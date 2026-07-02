@@ -13,7 +13,7 @@ Fix bugs using Test-Driven Development. This skill guides the agent through a st
 
  1. **Analyse**: Read the issue with `read_issue()`. Understand the bug, its root cause, and the affected code. For Python files, use `locate()`/`read_location()` to read specific functions — NOT `read_chunk()` (which is only for non-Python files).
 
- 2. **Test (Red)**: Write a pytest that reproduces the bug in `tests/temp/test_BUG-XXX.py`. The test MUST FAIL on the first run (`run_tests()`). If the test passes, it doesn't actually catch the bug — rewrite it.
+ 2. **Test (Red)**: Write a pytest that asserts the CORRECT behavior in `tests/temp/test_BUG-XXX.py`. Call the function with the same inputs the bug describes, but ASSERT the expected correct output. The test MUST FAIL on the first run (`run_tests()`). If the test passes instead of failing, it means the test asserts the BUGGY behavior — rewrite it. If it still passes after rewriting and the code genuinely already works correctly, call `update_issue_status("resolved")`.
 
  3. **Implementering**: Apply the minimal code change needed. For existing files use `edit_file()` (with `old_text`/`new_text` or `symbol`). To add a new method to a class use `add_method()`. To add a module-level function use `add_function()`. Never use `write_file()` on files that already exist.
 

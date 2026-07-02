@@ -43,10 +43,6 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
                 return None
         _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_DUP_RESULT, agent.lang)}")
         return None
-    if parsed["tool"] in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
-        _add_user_msg(messages, f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_ISSUE_RESOLVED, agent.lang)}")
-        return None
-
     # Block docs/ writes during Ekstraher — they waste iterations on status reports
     if parsed["tool"] == "write_file" and isinstance(parsed.get("args"), dict):
         _wf_path = (parsed.get("args") or {}).get("path", "")

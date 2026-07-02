@@ -151,15 +151,10 @@ def _get_phase_auto_complete_msg(task_node: Any, tool_name: str, tool_result: di
                     + "\n\n"
                     + t(K.TEST_BUT_NO_REFACTOR, agent.lang)
                 )
-            if _refactor_actually_moved_code(agent):
-                agent.issue_resolved = True
-                agent._needs_resolve_persist = True
-                return t(K.LOG_RED_TEST_PASSED, agent.lang)
-            return (
-                t(K.LOG_RED_TEST_PASSED, agent.lang)
-                + "\n\n"
-                + t(K.TEST_BUT_NO_REFACTOR, agent.lang)
-            )
+            # Do NOT auto-resolve for Test (Red) — the LLM must decide whether
+            # the bug is already fixed (call update_issue_status) or whether
+            # the test asserts buggy behavior (rewrite the test).
+            return t(K.LOG_RED_TEST_PASSED_GUIDANCE, agent.lang)
         if any(k in phase for k in ["implementering", "fix", "verifikation",
                                      "opdatering", "luk", "close", "green"]):
             return t(K.LOG_PHASE_COMPLETE, agent.lang)

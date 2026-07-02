@@ -419,7 +419,7 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
         elif _done_passed:
             # Auto-checkmark phase todos when deterministic check passes
             _phase_name = _normalize_phase(task_node.name).lower()
-            if "test" in _phase_name and not getattr(agent, 'issue_resolved', False):
+            if "test" in _phase_name and not getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') == 'refactor':
                 agent.issue_resolved = True
 
     # Auto-fix cross-module imports for refactor Ekstraher — runs regardless
@@ -1042,15 +1042,6 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                         yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                         yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                         continue
-                if tool_name in ("write_file", "edit_file") and getattr(agent, 'issue_resolved', False) and getattr(agent, 'active_template', '') != 'refactor':
-                    result_str = f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: BLOCKERET — issuet er allerede markeret som resolved. Redig\u00e9r IKKE filer. Brug <<<DONE>>> for at afslutte, eller gen\u00e5bn issuet f\u00f8rst."
-                    result = {"success": False, "error": "Issue already resolved"}
-                    agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
-                    agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                    messages.append({"role": "user", "content": result_str})
-                    yield {"type": "tool_call", "tool": tool_name, "args": args_val}
-                    yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
-                    continue
                 # Fix 1: Validate old_text was in a prior tool result
                 if tool_name == "edit_file" and args_val.get("old_text") and not args_val.get("symbol"):
                     old_text = args_val["old_text"]

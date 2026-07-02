@@ -280,6 +280,7 @@
     "required_tools_missing": "Missing required tools: {tools}. Task cannot be completed without using these.",
     "tests_passed_no_resolve": "✅ Tests passed — remember to call update_issue_status() to mark the issue as resolved.",
     "red_test_passed": "✅ Red test passed — bug is already fixed. Completing Test (Red) phase.",
+    "red_test_passed_guidance": "The test passed in the red phase — it should have failed. Possible reasons:\n(1) The bug is already fixed in the code → call update_issue_status('resolved') to mark the issue as resolved.\n(2) The test asserts the current buggy behavior → rewrite the test to assert the EXPECTED correct behavior.\n\nDo NOT use <<<DONE>>> before taking action — the system will not auto-complete this phase.",
     "refactor_tests_passed": "✅ Tests passed — refactoring verified with no regressions. Completing Test phase.",
     "extract_incomplete": "⚠️ Extraction incomplete: {remaining} symbols STILL in api_server.py. Phase cannot complete until ≥ 50 symbols are moved.",
     "test_but_no_refactor": "⚠️ Tests pass, but the refactor was NOT done: no modules from refactor_plan.md contain real code. Call edit_file to move functions from api_server.py to the modules, then re-run run_tests.",

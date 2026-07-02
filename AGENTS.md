@@ -1061,3 +1061,26 @@ if (planned_count > 0 and remaining > planned_count) or (planned_count == 0 and 
 **Tests:** 3 new tests in `tests/test_phase_checks.py`: `test_includes_tool_use_content` (write_file content counts), `test_short_tool_use_not_counted` (args <50 chars excluded), `test_includes_list_content` (existing, unchanged).
 
 **Files:** `text_tool_checks.py:60-71`, `phase_utils.py:322` (removed stale plan check from Analyse)
+
+### 71. BUG-102 infinite loop: Test (Red) false positive → cascade-skip → write_file blocked
+
+**Symptom:** Session `feba9e32` — BUG-102 could not be fixed. Test (Red) passed immediately, Implementering was cascade-skipped, and the Agent was stuck in an infinite loop unable to write/edit any file.
+
+**Root cause chain (4 independent bugs):**
+
+- **(A)** Bugfix Test (Red) prompt said "Skriv en pytest der fanger bug'en" — LLMs interpreted "fanger" as "assert the current buggy behavior", so the test passed immediately without needing a fix.
+- **(B)** Two code paths auto-set `issue_resolved = True` when tests pass in any "test" phase: `phase_utils.py:154-157` (via `_get_phase_auto_complete_msg`) and `stream_core.py:421-424` (via `_finalize_task_stream`). No guard for Test (Red) phase — cascade-skip prevented Implementering from ever running.
+- **(C+D)** When `issue_resolved = True`, both `agent_tool_handler.py:46-48` and `stream_core.py:1045-1053` blocked `write_file`/`edit_file` with "issuet er allerede markeret som resolved". Even if the LLM somehow reached a write-capable phase, it couldn't modify files.
+
+**Fix (4 parts):**
+
+- **Fix A** (`instructions/bugfix.json:6-9`, `agent_skills.py:228`, `skills/bugfix.md:16`): Rewrote Test (Red) prompt to explicitly say "assertér det forventede korrekte output (det funktionen BURDE returnere)" and "hvis testen består, betyder det at testen assertér BUGGY opførsel — omskriv testen". Tells the LLM to assert *correct* behavior, not current behavior.
+- **Fix B** (`phase_utils.py:154-157`, `stream_core.py:421-424`): Replaced auto-resolve block with a guidance message (`LOG_RED_TEST_PASSED_GUIDANCE` in all 4 languages) that tells the LLM to either call `update_issue_status('resolved')` or rewrite the test. Narrowed `stream_core.py` auto-resolve to `active_template == 'refactor'` only.
+- **Fix C** (`agent_tool_handler.py:46-48`): Removed the `issue_resolved` block — cascade-skip already prevents unnecessary phases; within an active phase the LLM needs full tool access.
+- **Fix D** (`stream_core.py:1045-1053`): Same removal for the native-FC path.
+
+**Key insight:** `issue_resolved` should NOT block tool access. The cascade-skip mechanism (skipping sibling phases when `issue_resolved = True`) is sufficient to prevent work on resolved issues. Blocking tools within an active phase just creates deadlocks.
+
+**Tests:** 819 passed, 1 xfailed (baseline unchanged). SSE streaming tests timeout is pre-existing (entry 37).
+
+**Files:** `instructions/bugfix.json`, `agent_skills.py:228`, `skills/bugfix.md:16`, `phase_utils.py:154-161`, `stream_core.py:421-424,1045-1053`, `agent_tool_handler.py:46-48`, `i18n.py:252`, `lang/*.json`

@@ -278,6 +278,7 @@
     "required_tools_missing": "Faltan herramientas obligatorias: {tools}. La tarea no se puede completar sin usarlas.",
     "tests_passed_no_resolve": "✅ Pruebas aprobadas — recuerda llamar a update_issue_status() para marcar el issue como resuelto.",
     "red_test_passed": "✅ Prueba roja pasada — el bug ya está corregido. Finalizando fase Test (Red).",
+    "red_test_passed_guidance": "La prueba pasó en la fase roja — debería haber fallado. Posibles razones:\n(1) El bug ya está corregido en el código → llama a update_issue_status('resolved') para marcar el issue como resuelto.\n(2) La prueba afirma el comportamiento actual con bug → reescribe la prueba para que afirme el comportamiento CORRECTO esperado.\n\nNO uses <<<DONE>>> antes de actuar — el sistema no completará esta fase automáticamente.",
     "refactor_tests_passed": "✅ Pruebas pasadas — refactoring verificado sin regresiones. Finalizando fase Test.",
     "extract_incomplete": "⚠️ Extracción incompleta: {remaining} símbolos TODAVÍA en api_server.py. La fase no puede completarse hasta que se hayan movido ≥ 50 símbolos.",
     "test_but_no_refactor": "⚠️ Las pruebas pasan, pero la refactorización NO se ha hecho: ningún módulo de refactor_plan.md contiene código real. Llama a edit_file para mover funciones de api_server.py a los módulos, y vuelve a ejecutar run_tests.",
