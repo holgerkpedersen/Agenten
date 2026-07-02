@@ -496,10 +496,17 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
         if not has_any_write and not agent.images and not agent.file_chunks:
             user_guidance += "\n\nOBS: Ingen filer er indl\u00e6st. Du KAN svare direkte uden at kalde v\u00e6rkt\u00f8jer f\u00f8rst. Sp\u00f8rg IKKE efter filnavne \u2014 brug din egen viden til at besvare opgaven."
     WRITE_TOOLS = {'write_file', 'edit_file', 'delete_file', 'add_method', 'add_function', 'extract_symbol', 'remove_symbol', 'add_import'}
-    has_write = any(t in WRITE_TOOLS for t in (agent.tool_registry.active_tools or []))
-    if has_write:
+    # WRITE_REQUIRED ("DU SKAL skrive/redigere KODE") advarende besked er designet
+    # til faser der ændrer eksisterende kode (edit_file, extract_symbol, add_method.)
+    # Faser som refactor Analyse/Kodeanalyse producerer markdown-dokumenter via
+    # write_file — advarelsen "skrive/redigere KODE" er misvisende for disse faser.
+    # Vis kun advarelsen når kode-ændrings-værktøjer er aktive, ikke kun write_file.
+    CODE_EDIT_TOOLS = {'edit_file', 'delete_file', 'add_method', 'add_function', 'extract_symbol', 'remove_symbol', 'add_import'}
+    active_tools_list = agent.tool_registry.active_tools or []
+    has_code_edit = any(t in CODE_EDIT_TOOLS for t in active_tools_list)
+    if has_code_edit:
         user_guidance += t(K.WRITE_REQUIRED, agent.lang)
-        active_write = [t for t in WRITE_TOOLS if t in (agent.tool_registry.active_tools or [])]
+        active_write = [t for t in WRITE_TOOLS if t in active_tools_list]
         user_guidance += f" Tilg\u00e6ngelige skrivev\u00e6rkt\u00f8jer: {', '.join(active_write)}."
     wta_tip = agent._seq.generate_tool_tip(agent.active_template or "fri", task_node.name) if hasattr(agent, '_seq') else ""
     if wta_tip:
