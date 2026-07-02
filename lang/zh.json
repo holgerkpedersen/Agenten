@@ -278,6 +278,7 @@
         "required_tools_missing": "缺少必需工具：{tools}。不使用这些工具无法完成任务。",
         "tests_passed_no_resolve": "✅ 测试通过 —— 请记得调用 update_issue_status() 将问题标记为已解决。",
         "red_test_passed": "✅ 红测试通过 —— 错误已修复。正在结束测试（红）阶段。",
+        "refactor_tests_passed": "✅ 测试通过 —— 重构已验证无回归。正在结束测试阶段。",
         "extract_incomplete": "⚠️ 提取不完整：{remaining} 个符号仍在 api_server.py 中。在移动 ≥ 50 个符号之前，阶段无法完成。",
         "test_but_no_refactor": "⚠️ 测试通过，但重构未完成：refactor_plan.md 中的模块没有真实代码。请调用 edit_file 将函数从 api_server.py 移到模块中，然后重新运行 run_tests。",
         "refactor_incomplete": "重构未完成。仍缺少 {missing_count} 个模块，或 api_server.py 未缩减到 1000 行以下。",

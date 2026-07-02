@@ -249,6 +249,7 @@ class K(StrEnum):
     LOG_REQUIRED_TOOLS_MISSING = "log.required_tools_missing"
     LOG_TESTS_PASSED_NO_RESOLVE = "log.tests_passed_no_resolve"
     LOG_RED_TEST_PASSED = "log.red_test_passed"
+    LOG_REFACTOR_TESTS_PASSED = "log.refactor_tests_passed"
     TEST_BUT_NO_REFACTOR = "log.test_but_no_refactor"
     REFACTOR_INCOMPLETE = "log.refactor_incomplete"
     LOG_PHASE_COMPLETE  = "log.phase_complete"
