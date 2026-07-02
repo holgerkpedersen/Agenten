@@ -61,6 +61,7 @@ TEMPLATE_PHASE_CHECKS: dict[str, dict[str, dict[str, Any]]] = {
                     "plan_path": "refactor_plan.md",
                     "ext": ".py",
                     "exclude_patterns": [r"^__[A-Za-z0-9_]+__$"],
+                    "plan_coverage": True,
                 },
                 {
                     "type": "plan_symbols_per_module",

@@ -224,12 +224,26 @@ def check_symbols_covered_by_modules(spec: dict[str, Any], base_dir: str | None 
             f"symbols_covered: ingen top-level symboler i {source_rel} "
             f"— intet at spore (tom eller trivial fil)"
         )
+    plan_coverage = bool(spec.get("plan_coverage", False))
+    if plan_coverage:
+        planning = _parse_plan_symbol_mapping(plan_content)
+        planned_symbols: set[str] = set()
+        for syms in planning.values():
+            planned_symbols.update(syms)
+        if not planned_symbols:
+            return True, (
+                f"symbols_covered: plan_coverage aktiveret men ingen symboler "
+                f"fundet i planen — springer over"
+            )
+
     names_to_track: list[tuple[str, str]] = []
     for s in source_symbols:
         name = s.get("name", "")
         if not name:
             continue
         if any(p.match(name) for p in exclude_res):
+            continue
+        if plan_coverage and name not in planned_symbols:
             continue
         names_to_track.append((name, s.get("type", "?")))
     if not names_to_track:
