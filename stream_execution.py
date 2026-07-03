@@ -17,11 +17,23 @@ from config import get_logger, log, BASE_DIR, STATIC_DIR, app, VERSION_FILES, BU
 from image_handler import _normalize_images
 import threading
 
-# Placeholder - symboler flyttes fra api_server.py via batch_extract_symbols
+# Stream sequence counter — incremented for each execute_stream call
+_stream_seq = 0
+_stream_seq_lock = threading.Lock()
+
+# Tracks which session_ids currently have active execution generators
+_active_session_executions: dict = {}
+_active_session_executions_lock = threading.Lock()
 
 
+def _sse(data: dict, stream_seq: int) -> str:
+    """Format an SSE event, injecting stream_seq for stale-event detection."""
+    if stream_seq:
+        data["stream_seq"] = stream_seq
+    return f"data: {json.dumps(data)}\n\n"
 
-def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: list[int], task_context_prompt: str, show_thinking: bool, ui_lang: str, current_session_id: str | None) -> Generator[str, None, None]:
+
+def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: list[int], task_context_prompt: str, show_thinking: bool, ui_lang: str, current_session_id: str | None, stream_seq: int = 0) -> Generator[str, None, None]:
     """execute with stream.
 
     Args:
@@ -43,21 +55,21 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
     # Skip nodes already marked done/skipped (manual checkpoint)
     if node.status in ("done", "skipped"):
         skip_msg = node.result or f"Markeret som {node.status} (manuelt)"
-        yield f"data: {json.dumps({'type': 'task_start', 'task': node.name, 'success_criteria': getattr(node, 'success_criteria', []), 'skipped': True})}\n\n"
-        yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': skip_msg})}\n\n"
+        yield _sse({'type': 'task_start', 'task': node.name, 'success_criteria': getattr(node, 'success_criteria', []), 'skipped': True}, stream_seq)
+        yield _sse({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': skip_msg}, stream_seq)
         completed[0] += _count_tasks(node)
         progress = int((completed[0] / total_tasks) * 100)
         with execution_status_lock:
             execution_status["progress"] = progress
-        yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+        yield _sse({'type': 'progress', 'progress': progress}, stream_seq)
         agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {node.name}", "detail": f"Allerede markeret som {node.status}"})
-        yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+        yield _sse({'type': 'log', 'log': agent.agent_log[-1]}, stream_seq)
         return
 
     task_data = {'type': 'task_start', 'task': node.name}
     if hasattr(node, 'success_criteria') and node.success_criteria:
         task_data['success_criteria'] = node.success_criteria
-    yield f"data: {json.dumps(task_data)}\n\n"
+    yield _sse(task_data, stream_seq)
     with execution_status_lock:
         execution_status["current_task"] = node.name
 
@@ -70,17 +82,17 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
             for remaining in node.children[node.children.index(child):]:
                 remaining.status = "skipped"
                 remaining.result = skip_msg
-                yield f"data: {json.dumps({'type': 'task_start', 'task': remaining.name, 'success_criteria': getattr(remaining, 'success_criteria', [])})}\n\n"
-                yield f"data: {json.dumps({'type': 'task_done', 'task': remaining.name, 'status': remaining.status, 'result': skip_msg})}\n\n"
+                yield _sse({'type': 'task_start', 'task': remaining.name, 'success_criteria': getattr(remaining, 'success_criteria', [])}, stream_seq)
+                yield _sse({'type': 'task_done', 'task': remaining.name, 'status': remaining.status, 'result': skip_msg}, stream_seq)
                 agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {remaining.name}", "detail": skip_msg})
-                yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+                yield _sse({'type': 'log', 'log': agent.agent_log[-1]}, stream_seq)
                 completed[0] += _count_tasks(remaining)
             progress = int((completed[0] / total_tasks) * 100)
             with execution_status_lock:
                 execution_status["progress"] = progress
-            yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+            yield _sse({'type': 'progress', 'progress': progress}, stream_seq)
             break
-        yield from _execute_with_stream(child, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id)
+        yield from _execute_with_stream(child, agent, total_tasks, completed, task_context_prompt, show_thinking, ui_lang, current_session_id, stream_seq)
         if child.result:
             child_results.append(f"- {child.name}: {child.result}")
         # Stop execution on failed phase — don't continue to siblings
@@ -89,15 +101,15 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
                 remaining.status = "skipped"
                 skip_msg = f"Skipped — forrige fase '{child.name}' fejlede"
                 remaining.result = skip_msg
-                yield f"data: {json.dumps({'type': 'task_start', 'task': remaining.name, 'success_criteria': getattr(remaining, 'success_criteria', [])})}\n\n"
-                yield f"data: {json.dumps({'type': 'task_done', 'task': remaining.name, 'status': remaining.status, 'result': skip_msg})}\n\n"
+                yield _sse({'type': 'task_start', 'task': remaining.name, 'success_criteria': getattr(remaining, 'success_criteria', [])}, stream_seq)
+                yield _sse({'type': 'task_done', 'task': remaining.name, 'status': remaining.status, 'result': skip_msg}, stream_seq)
                 agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": f"Opgave sprunget over: {remaining.name}", "detail": skip_msg})
-                yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+                yield _sse({'type': 'log', 'log': agent.agent_log[-1]}, stream_seq)
                 completed[0] += _count_tasks(remaining)
             progress = int((completed[0] / total_tasks) * 100)
             with execution_status_lock:
                 execution_status["progress"] = progress
-            yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
+            yield _sse({'type': 'progress', 'progress': progress}, stream_seq)
             break
 
     if node.children and all(c.status in ("done", "skipped", "failed") for c in node.children):
@@ -108,8 +120,8 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
         progress = int((completed[0] / total_tasks) * 100)
         with execution_status_lock:
             execution_status["progress"] = progress
-        yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-        yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': node.result[:500]})}\n\n"
+        yield _sse({'type': 'progress', 'progress': progress}, stream_seq)
+        yield _sse({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': node.result[:500]}, stream_seq)
         return
 
     node.status = "running"
@@ -133,7 +145,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
             improved_prompt = lessons + "\n\n" + task_context_prompt
             agent._log("INFO", f"Genforsøg {retry_attempt}/{_MAX_RETRIES} for {node.name}",
                        f"Forrige fejl: {retry_contexts[-1].get('failure_reason','?')}")
-            yield f"data: {json.dumps({'type': 'retry', 'task': node.name, 'attempt': retry_attempt, 'max': _MAX_RETRIES})}\n\n"
+            yield _sse({'type': 'retry', 'task': node.name, 'attempt': retry_attempt, 'max': _MAX_RETRIES}, stream_seq)
 
         full_response = ""
         for event in agent.solve_task_stream(node, improved_prompt if retry_attempt > 0 else task_context_prompt):
@@ -141,37 +153,38 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
                 return
             if event["type"] == "chunk":
                 full_response += event["chunk"]
-                yield f"data: {json.dumps({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']})}\n\n"
+                yield _sse({'type': 'llm_chunk', 'task': node.name, 'chunk': event['chunk']}, stream_seq)
             elif event["type"] == "tool_call":
-                yield f"data: {json.dumps({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']})}\n\n"
+                yield _sse({'type': 'tool_call', 'task': node.name, 'tool': event['tool'], 'args': event['args']}, stream_seq)
             elif event["type"] == "tool_result":
-                yield f"data: {json.dumps({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']})}\n\n"
+                yield _sse({'type': 'tool_result', 'task': node.name, 'tool': event['tool'], 'result': event['result']}, stream_seq)
             elif event["type"] == "output_files":
-                yield f"data: {json.dumps({'type': 'output_files', 'task': node.name, 'files': event['files']})}\n\n"
+                yield _sse({'type': 'output_files', 'task': node.name, 'files': event['files']}, stream_seq)
             elif event["type"] == "log":
-                yield f"data: {json.dumps({'type': 'log', 'log': event['log']})}\n\n"
+                yield _sse({'type': 'log', 'log': event['log']}, stream_seq)
             elif event["type"] == "todo_clear":
-                yield f"data: {json.dumps({'type': 'todo_clear'})}\n\n"
+                yield _sse({'type': 'todo_clear'}, stream_seq)
             elif event["type"] == "todo_add":
-                yield f"data: {json.dumps({'type': 'todo_add', 'todo': event['todo']})}\n\n"
+                yield _sse({'type': 'todo_add', 'todo': event['todo']}, stream_seq)
             elif event["type"] == "todo_update":
-                yield f"data: {json.dumps({'type': 'todo_update', 'id': event['id'], 'done': event['done']})}\n\n"
+                yield _sse({'type': 'todo_update', 'id': event['id'], 'done': event['done']}, stream_seq)
             elif event["type"] == "llm_todo_clear":
-                yield f"data: {json.dumps({'type': 'llm_todo_clear'})}\n\n"
+                yield _sse({'type': 'llm_todo_clear'}, stream_seq)
             elif event["type"] == "llm_todo_add":
-                yield f"data: {json.dumps({'type': 'llm_todo_add', 'id': event['id'], 'text': event['text']})}\n\n"
+                yield _sse({'type': 'llm_todo_add', 'id': event['id'], 'text': event['text']}, stream_seq)
             elif event["type"] == "llm_todo_update":
                 payload = {"type": "llm_todo_update", "id": event["id"], "done": event["done"]}
                 if event.get("text"):
                     payload["text"] = event["text"]
-                yield f"data: {json.dumps(payload)}\n\n"
+                yield _sse(payload, stream_seq)
             elif event["type"] == "llm_todo_delete":
-                yield f"data: {json.dumps({'type': 'llm_todo_delete', 'id': event['id']})}\n\n"
+                yield _sse({'type': 'llm_todo_delete', 'id': event['id']}, stream_seq)
             elif event["type"] == "budget":
-                yield f"data: {json.dumps({'type': 'budget', 'iteration': event['iteration'], 'max': event['max'], 'remaining': event['remaining']})}\n\n"
+                yield _sse({'type': 'budget', 'iteration': event['iteration'], 'max': event['max'], 'remaining': event['remaining']}, stream_seq)
             elif event["type"] == "done":
                 full_response = event["result"]
             elif event["type"] == "autoresearch":
+                event["stream_seq"] = stream_seq
                 yield f"data: {json.dumps(event)}\n\n"
 
         if not full_response:
@@ -200,7 +213,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
                     agent._log("INFO",
                                f"Stopper retry tidligt — 0 symbols flyttet i sidste 2 forsøg",
                                f"({retry_attempt+1}/{_MAX_RETRIES} forsøg brugt)")
-                    yield f"data: {json.dumps({'type': 'log', 'log': {'timestamp': time.time(), 'level': 'INFO', 'message': f'Stopper retry: 0 symbols flyttet i sidste 2 forsøg', 'detail': ''}})}\n\n"
+                    yield _sse({'type': 'log', 'log': {'timestamp': time.time(), 'level': 'INFO', 'message': f'Stopper retry: 0 symbols flyttet i sidste 2 forsøg', 'detail': ''}}, stream_seq)
                     node.status = "failed"
                     break
             continue
@@ -213,8 +226,8 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
     with execution_status_lock:
         execution_status["progress"] = progress
         execution_status["log"].append({"task": node.name, "status": node.status, "result": full_response[:200]})
-    yield f"data: {json.dumps({'type': 'progress', 'progress': progress})}\n\n"
-    yield f"data: {json.dumps({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': full_response})}\n\n"
+    yield _sse({'type': 'progress', 'progress': progress}, stream_seq)
+    yield _sse({'type': 'task_done', 'task': node.name, 'status': node.status, 'result': full_response}, stream_seq)
     agent.agent_log.append({"timestamp": time.time(), "level": "INFO", "message": t(K.UI_TASK_DONE_PREFIX, ui_lang) + ": " + node.name, "detail": full_response})
     tests_failed = getattr(agent, '_tests_failed', None)
     agent.execution_log.append({
@@ -224,7 +237,7 @@ def _execute_with_stream(node: Any, agent: Any, total_tasks: int, completed: lis
         "result_length": len(full_response),
         "tests_failed": tests_failed,
     })
-    yield f"data: {json.dumps({'type': 'log', 'log': agent.agent_log[-1]})}\n\n"
+    yield _sse({'type': 'log', 'log': agent.agent_log[-1]}, stream_seq)
     if current_session_id:
         session_manager.add_prompt_result(current_session_id, node.name, full_response, None)
 
@@ -281,6 +294,21 @@ def execute_stream() -> Any:
     current_session_id = session_manager.current_session_id
     ui_lang = "da"
 
+    # Generate a unique stream sequence number for stale-event detection (STAB-003)
+    with _stream_seq_lock:
+        global _stream_seq
+        _stream_seq += 1
+        stream_seq = _stream_seq
+
+    # Stop any previous active execution for the same session (STAB-003)
+    if current_session_id:
+        with _active_session_executions_lock:
+            prev_agent = _active_session_executions.get(current_session_id)
+            if prev_agent:
+                prev_agent.stop_requested = True
+                log.info("Stopped previous stream execution for session %s (seq=%d)", current_session_id, stream_seq)
+            _active_session_executions[current_session_id] = None  # placeholder until agent ready
+
     # Create a session-scoped agent to avoid race conditions with concurrent SSE requests (ARC-007)
     stream_agent = Agent()
     stream_agent.llm = agent.llm
@@ -296,7 +324,12 @@ def execute_stream() -> Any:
     else:
         os.environ.pop('AGENT_SESSION_ID', None)
 
-    log.info("Execute stream - session: %s", current_session_id)
+    # Register the new agent in active executions
+    if current_session_id:
+        with _active_session_executions_lock:
+            _active_session_executions[current_session_id] = stream_agent
+
+    log.info("Execute stream - session: %s (seq=%d)", current_session_id, stream_seq)
     if current_session_id:
         session_data = session_manager.load_session(current_session_id)
         if session_data:
@@ -343,6 +376,13 @@ def execute_stream() -> Any:
             log.info("Agent show_thinking set to: %s", stream_agent.show_thinking)
             stream_agent.stop_requested = False
 
+    # Remove from active executions when stream ends
+    def _cleanup_execution() -> None:
+        if current_session_id:
+            with _active_session_executions_lock:
+                if _active_session_executions.get(current_session_id) is stream_agent:
+                    del _active_session_executions[current_session_id]
+
     # Register this agent in active streams for session-scoped access (BUG-001)
     session_id = current_session_id  # capture locally to avoid race condition (BUG-011)
     if session_id:
@@ -368,12 +408,12 @@ def execute_stream() -> Any:
                     agent.task_tree_from_dict(session_data["tree"])
                     log.info("Tree restored from session in generate()")
             if agent.task_tree is None:
-                yield f"data: {json.dumps({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, _ui)})}\n\n"
+                yield _sse({'type': 'error', 'message': t(K.ERR_DECOMPOSE_FIRST, _ui)}, stream_seq)
                 return
 
         original_prompt = getattr(agent, 'full_prompt_with_context', '') or agent.original_prompt
         show_thinking = getattr(agent, 'show_thinking', True)
-        yield f"data: {json.dumps({'type': 'context', 'original_prompt': original_prompt, 'show_thinking': show_thinking})}\n\n"
+        yield _sse({'type': 'context', 'original_prompt': original_prompt, 'show_thinking': show_thinking}, stream_seq)
 
         agent.agent_log = []
         agent.execution_log = []
@@ -383,15 +423,15 @@ def execute_stream() -> Any:
         agent._log("INFO", "Nedbryd LLM", agent.decompose_llm.model if hasattr(agent, 'decompose_llm') else '?')
         agent._log("INFO", "Udfør LLM", agent.llm.model)
 
-        for log in agent.agent_log[-10:]:
-            yield f"data: {json.dumps({'type': 'log', 'log': log})}\n\n"
+        for log_entry in agent.agent_log[-10:]:
+            yield _sse({'type': 'log', 'log': log_entry}, stream_seq)
 
         MAX_CTX = 150000
         task_context_prompt = original_prompt[:MAX_CTX] + ("\n\n[... trunkeret — brug read_chunk() for at læse flere chunks ...]" if len(original_prompt) > MAX_CTX else "")
 
         total_tasks = _count_tasks(agent.task_tree.root)
         completed = [0]
-        yield f"data: {json.dumps({'type': 'start', 'total_tasks': total_tasks})}\n\n"
+        yield _sse({'type': 'start', 'total_tasks': total_tasks}, stream_seq)
 
         saved = False
         with execution_status_lock:
@@ -399,22 +439,23 @@ def execute_stream() -> Any:
             execution_status["log"] = []
         try:
             if _check_client(agent):
-                yield f"data: {json.dumps({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui)})}\n\n"
+                yield _sse({'type': 'stopped', 'message': t(K.UI_STREAM_STOPPED, _ui), 'stream_seq': stream_seq}, stream_seq)
                 return
-            yield from _execute_with_stream(agent.task_tree.root, agent, total_tasks, completed, task_context_prompt, show_thinking, _ui, session_id)
+            yield from _execute_with_stream(agent.task_tree.root, agent, total_tasks, completed, task_context_prompt, show_thinking, _ui, session_id, stream_seq)
             _save_session_data(session_id, agent, _ui)
             saved = True
             with execution_status_lock:
                 execution_status["running"] = False
                 execution_status["progress"] = 100
-            yield f"data: {json.dumps({'type': 'complete', 'message': t(K.UI_ALL_DONE, _ui)})}\n\n"
+            yield _sse({'type': 'complete', 'message': t(K.UI_ALL_DONE, _ui)}, stream_seq)
         except Exception as e:
             if not saved:
                 _save_session_data(session_id, agent, _ui)
             with execution_status_lock:
                 execution_status["running"] = False
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+            yield _sse({'type': 'error', 'message': str(e)}, stream_seq)
         finally:
+            _cleanup_execution()
             if not saved:
                 _save_session_data(session_id, agent, _ui)
                 with execution_status_lock:
@@ -436,6 +477,11 @@ def execute_resume() -> Any:
         def _no_session():
             yield f"data: {json.dumps({'type': 'error', 'message': 'Ingen aktiv session'})}\n\n"
         return Response(stream_with_context(_no_session()), mimetype='text/event-stream')
+
+    with _stream_seq_lock:
+        global _stream_seq
+        _stream_seq += 1
+        stream_seq = _stream_seq
 
     session_id = current_session_id
     with active_streams_lock:
@@ -467,7 +513,7 @@ def execute_resume() -> Any:
 
     def generate_resume(agent: Any) -> Generator[str, None, None]:
         _ui = ui_lang
-        yield f"data: {json.dumps({'type': 'log', 'log': {'level': 'INFO', 'message': '\u25b6\ufe0f Udf\u00f8relse genoptaget', 'detail': ''}})}\n\n"
+        yield _sse({'type': 'log', 'log': {'level': 'INFO', 'message': '\u25b6\ufe0f Udf\u00f8relse genoptaget', 'detail': ''}}, stream_seq)
         resume_msg = {"role": "user", "content": "Udf\u00f8relsen blev pauset. Forts\u00e6t hvor du slap. Kald det n\u00e6ste v\u00e6rkt\u00f8j eller afslut med <<<DONE>>>."}
         agent._paused_messages = None
         agent._pause_requested = False
@@ -477,11 +523,11 @@ def execute_resume() -> Any:
                 paused_original,
                 saved_messages=saved + [resume_msg],
             )
-            yield f"data: {json.dumps({'type': 'complete', 'message': 'Genoptagelse fuldf\u00f8rt'})}\n\n"
+            yield _sse({'type': 'complete', 'message': 'Genoptagelse fuldf\u00f8rt'}, stream_seq)
         except GeneratorExit:
             pass
         except Exception as exc:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+            yield _sse({'type': 'error', 'message': str(exc)}, stream_seq)
 
     return Response(stream_with_context(generate_resume(stream_agent)), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no', 'Connection': 'keep-alive'})
 

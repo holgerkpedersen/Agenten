@@ -1301,6 +1301,7 @@ let eventSource = null;
 let _isExecuting = false;
 let _currentPhase = '';
 let _currentOutputs = {};
+let _currentStreamSeq = 0;  // STAB-003: track latest stream sequence to ignore stale SSE events
 let _llmBox = null;
 let _progressContainer = null;
 let panels = {};
@@ -3079,6 +3080,7 @@ async function resumeExecution() {
     
     eventSource = new EventSource('/api/execute-resume');
     _isExecuting = true;
+    _currentStreamSeq = 0;  // STAB-003: reset for resume stream
     document.getElementById("headerBody")?.classList.add("btn-executing");
     
     eventSource.onmessage = function(event) {
@@ -3243,6 +3245,7 @@ async function executeWithStream() {
     
     eventSource = new EventSource('/api/execute-stream');
     _isExecuting = true;
+    _currentStreamSeq = 0;  // STAB-003: track latest stream_seq, ignore stale events
     document.getElementById("headerBody")?.classList.add("btn-executing");
     document.getElementById('stopBtn').disabled = false;
     document.getElementById('pauseBtn').disabled = false;
@@ -3251,6 +3254,19 @@ async function executeWithStream() {
     
     function _handleMainEvent(event) {
         const data = JSON.parse(event.data);
+        
+        // STAB-003: Drop stale events from previous stream generations
+        if (data.stream_seq && _currentStreamSeq) {
+            if (data.stream_seq < _currentStreamSeq) {
+                console.debug('[SSE] Ignoring stale event (seq', data.stream_seq, '< current', _currentStreamSeq + ')', data.type);
+                return;
+            }
+            if (data.stream_seq > _currentStreamSeq) {
+                _currentStreamSeq = data.stream_seq;
+            }
+        } else if (data.stream_seq && !_currentStreamSeq) {
+            _currentStreamSeq = data.stream_seq;
+        }
         
         switch(data.type) {
             case 'context':
@@ -4260,6 +4276,13 @@ async function useIssueAsTask(encoded) {
     document.getElementById('selectedFilesDisplay').innerHTML = '';
     document.getElementById('fileContentPreview').innerHTML = '';
     document.getElementById('fileContentPreview').style.display = 'none';
+
+    // Ren session — issue skal ikke starte i en eksisterende session med stale data
+    currentSessionId = null;
+    currentTree = null;
+    lastDecomposeTemplate = null;
+    const treeContainer = document.getElementById('treeContainer');
+    if (treeContainer) treeContainer.innerHTML = `<div style="color:#64748b;">${_('click_tree_hint')}</div>`;
 
     const fileMatches = issue.location ? [...issue.location.matchAll(/([\w./-]+\.\w+)/g)] : [];
     let firstLoaded = false;
