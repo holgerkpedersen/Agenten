@@ -7,6 +7,8 @@ from api_server import app, UPLOAD_DIR, BASE_DIR
 @pytest.fixture
 def client():
     app.config['TESTING'] = True
+    from session_manager import session_manager
+    session_manager.current_session_id = None
     with app.test_client() as client:
         yield client
 

@@ -4,6 +4,28 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+
+@pytest.fixture(autouse=True)
+def _reset_shared_globals():
+    """STAB-005: Reset shared global state before every test to prevent leaks
+    across test files. The agent singleton, session state, and execution globals
+    persist at module level and must be cleared between unrelated tests."""
+    from session_manager import session_manager, agent
+    from stream_execution import _active_session_executions, _active_session_executions_lock
+
+    session_manager.current_session_id = None
+    agent.task_tree = None
+    agent.agent_log = []
+    agent.execution_log = []
+    agent.file_chunks = {}
+    agent.issue_resolved = False
+    agent.active_template = None
+    agent.current_phase = None
+
+    with _active_session_executions_lock:
+        _active_session_executions.clear()
+
+
 @pytest.fixture
 def test_session_dir(tmp_path):
     d = tmp_path / "sessions"
