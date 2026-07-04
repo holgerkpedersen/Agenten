@@ -57,6 +57,8 @@ def _get_max_iterations(agent: Any, task_name: str) -> int:
     Looks up per-template override in TEMPLATE_PHASE_ITERATION_LIMITS, then
     falls back to MAX_TASK_ITERATIONS (or MAX_PR_TASK_ITERATIONS for PR
     workflows) from config.
+
+    Templates without phases (e.g. one-shot) can use "_default" as the key.
     """
     template = getattr(agent, "active_template", "") or ""
     if template and task_name:
@@ -66,6 +68,9 @@ def _get_max_iterations(agent: Any, task_name: str) -> int:
         for key, limit in template_limits.items():
             if key.lower() == task_lower:
                 return limit
+        # Fallback to _default for templates without phases (e.g. one-shot)
+        if "_default" in template_limits:
+            return template_limits["_default"]
     if agent_git.is_pr_workflow(task_name):
         return config.MAX_PR_TASK_ITERATIONS
     return config.MAX_TASK_ITERATIONS

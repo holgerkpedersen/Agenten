@@ -480,7 +480,8 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
     user_guidance = f"{lang_instr}. "
     # Prominent instruction to build a plan (BEFORE tool guidance)
     active = agent.tool_registry.active_tools if agent.tool_registry else None
-    if active is None or "plan_phase" in active:
+    is_one_shot = getattr(agent, 'active_template', None) == "one-shot"
+    if not is_one_shot and (active is None or "plan_phase" in active):
         user_guidance += t(K.TODO_PLAN_START, agent.lang) + " "
     if chunk_hint:
         user_guidance += chunk_hint.strip() + " "

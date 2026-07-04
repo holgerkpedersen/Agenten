@@ -50,7 +50,13 @@ TEMPLATE_TOOLS = {
     "kodeanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "write_file", "create_issue", "create_refactor_issue"],
     "diffanalyse": ["list_chunks", "read_location", "read_chunk", "list_files", "list_symbols", "locate", "git_diff", "git_log", "create_issue", "create_refactor_issue"],
     "fri": None,
-    "one-shot": None,
+    "one-shot": [
+        "list_files", "list_chunks", "read_location", "read_chunk",
+        "locate", "list_symbols",
+        "write_file", "edit_file", "add_method", "add_function",
+        "create_issue", "create_refactor_issue", "read_issue",
+        "update_issue_status", "analyze_dependencies",
+    ],
     "agenten": [
         "list_chunks",
         "read_location",

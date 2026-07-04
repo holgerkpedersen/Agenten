@@ -138,6 +138,9 @@ TEMPLATE_PHASE_ITERATION_LIMITS: dict[str, dict[str, int]] = {
         "Verific\u00e9r": 8,
         "Commit": 4,
     },
+    "one-shot": {
+        "_default": 10,
+    },
     "testgenerering": {
         "Analyse": 6,
         "Test (Red)": 8,

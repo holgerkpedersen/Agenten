@@ -15,9 +15,14 @@ class TestTemplateTools:
         from agent_skills import TEMPLATE_TOOLS
         assert TEMPLATE_TOOLS["fri"] is None
 
-    def test_one_shot_is_none(self):
+    def test_one_shot_has_curated_tools(self):
         from agent_skills import TEMPLATE_TOOLS
-        assert TEMPLATE_TOOLS["one-shot"] is None
+        tools = TEMPLATE_TOOLS["one-shot"]
+        assert isinstance(tools, list)
+        assert len(tools) > 0
+        assert "create_refactor_issue" in tools
+        assert "write_file" in tools
+        assert "read_issue" in tools
 
     def test_resume_tools(self):
         from agent_skills import TEMPLATE_TOOLS
