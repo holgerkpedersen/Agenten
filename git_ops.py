@@ -795,9 +795,18 @@ def list_files(path: str = ".", pattern: str | None = None, max_depth: int = 2) 
                 relpath = os.path.relpath(fp, path)
                 try:
                     size = os.path.getsize(fp)
+                    nlines = 0
+                    _, ext = os.path.splitext(f)
+                    if ext.lower() in ('.py', '.md', '.txt', '.json', '.html', '.css', '.js', '.yml', '.yaml', '.toml', '.ini', '.cfg', '.cfg', '.xml', '.csv'):
+                        try:
+                            with open(fp, 'rb') as _lf:
+                                nlines = sum(1 for _ in _lf)
+                        except OSError:
+                            pass
                 except OSError:
                     size = 0
-                result.append({"file": relpath, "size": size})
+                    nlines = 0
+                result.append({"file": relpath, "size": size, "lines": nlines})
         return {"success": True, "files": result, "count": len(result), "path": os.path.abspath(path)}
     except Exception as e:
         return {"success": False, "error": str(e)}
