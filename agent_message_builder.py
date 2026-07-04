@@ -22,7 +22,11 @@ def _build_chunk_hint(agent: Any) -> str:
         for key in available_keys:
             total = len(agent.file_chunks[key])
             display = key.replace("file_", "", 1)
-            parts.append(f"\n  {display} ({total} chunk{'s' if total > 1 else ''})")
+            # Count lines from first chunk (already in memory)
+            nlines = 0
+            for c in agent.file_chunks[key]:
+                nlines += c.count("\n")
+            parts.append(f"\n  {display} ({nlines} linjer, {total} chunk{'s' if total > 1 else ''})")
         base_dir = os.environ.get("AGENT_WORKDIR", "") or os.path.abspath('.')
         hint = f"\n\n## TILG\u00c6NGELIGE FILER (projektmappe: {base_dir})"
         hint += "".join(parts)
