@@ -2140,10 +2140,10 @@
       "location": "stream_core.py",
       "impact": "Høj vedligeholdelsesomkostning, lav overskuelighed, øget risiko for regression.",
       "proposed_fix": "Opdel stream_core.py i flere moduler efter SOLID. Analysér ansvarsområder, opret moduler, flyt metoder, opdatér imports.",
-      "status": "resolved",
+      "status": "open",
       "related": [],
-      "updated_at": "2026-07-03T20:42:57",
-      "resolution_note": "Auto-resolved: Analyse konkluderede at fejlen allerede er løst. Gennemførte 10 værktøjskald. Opgave fuldført automatisk."
+      "updated_at": "2026-07-04T12:00:00",
+      "resolution_note": "Auto-resolved var en fejl — filen er stadig 1639 linjer. Skal refaktoreres."
     },
     {
       "id": "CORE-004",
