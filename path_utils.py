@@ -81,6 +81,7 @@ def auto_detect_workdir(file_chunks: dict | None = None, prompt: str = "") -> st
 
     workdir = min(detected, key=len)
     os.environ['AGENT_WORKDIR'] = workdir
+    from ast_index import _ensure_workdir_indexed
     _ensure_workdir_indexed()
     return workdir
 
