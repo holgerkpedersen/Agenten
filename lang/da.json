@@ -214,6 +214,7 @@
     "update_todo": "Markér en todo som fuldført eller opdatér dens tekst.",
     "delete_todo": "Fjern en todo fra din plan.",
     "list_todos": "Vis din nuværende planstatus. source='auto' = Agentens krav, source='llm' = dine todos, source='all' = begge (default).",
+    "remove_unused_imports": "Fjern ubrugte top-level imports i en Python-fil vha. AST-analyse. Kræver: filepath (stien til filen). Overspringer __future__-imports, wildcard-imports (from X import *), og navne i __all__. Returnerer liste over fjernede imports.",
     "delete_file": "Slet en fil fra disken. Kræver: filepath (stien til filen). Virker kun inden for projektmappen. Bekræft at filen ikke længere er nødvendig før kald."
   },
   "tool_system_prompt": "Du har adgang til værktøjer. Kald dem sådan:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nNår færdig, svar sådan:\n{DONE_MARKER}{{\"result\":\"DIN DETALJEREDE KONKLUSION — IKKE bare done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Opgave\n{task}",

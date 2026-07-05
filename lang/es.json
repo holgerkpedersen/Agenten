@@ -212,6 +212,7 @@
     "update_todo": "Marca una tarea como completada o actualiza su texto.",
     "delete_todo": "Elimina una tarea de tu plan.",
     "list_todos": "Muestra el progreso actual de tu plan. source='auto' = requisitos del Agent, source='llm' = tus tareas, source='all' = ambos (predeterminado).",
+    "remove_unused_imports": "Eliminar imports no utilizados de nivel superior en un archivo Python mediante an\u00e1lisis AST. Requiere: filepath. Omite imports de __future__, wildcard (from X import *), y nombres en __all__. Devuelve lista de imports eliminados.",
     "delete_file": "Eliminar un archivo del disco. Requiere: filepath. Solo funciona dentro del directorio del proyecto. Verifique que el archivo ya no es necesario."
   },
   "tool_system_prompt": "Tienes acceso a herramientas. Llámalas así:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nCuando termines, responde así:\n{DONE_MARKER}{{\"result\":\"TU CONCLUSIÓN DETALLADA — NO solo done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Tarea\n{task}",

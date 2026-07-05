@@ -212,6 +212,7 @@
         "update_todo": "将待办事项标记为已完成或更新其文本。",
         "delete_todo": "从你的计划中删除一个待办事项。",
         "list_todos": "查看你当前计划的进度。source='auto' = Agent要求，source='llm' = 你的待办事项，source='all' = 两者（默认）。",
+        "remove_unused_imports": "使用AST分析删除Python文件中未使用的顶级导入。需要：filepath（文件路径）。跳过__future__导入、通配符导入（from X import *）和__all__中的名称。返回已删除导入的列表。",
         "delete_file": "从磁盘删除文件。需要：filepath（文件路径）。仅在项目目录内有效。调用前请确认文件不再需要。"
     },
     "tool_system_prompt": "你可以使用工具。像这样调用它们：\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\n完成后，像这样回复：\n{DONE_MARKER}{{\"result\":\"你的详细结论 — 不仅仅是done\"}}{END_MARKER}\n\n{tools_desc}\n\n## 任务\n{task}",

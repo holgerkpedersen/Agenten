@@ -199,6 +199,13 @@ def register_file_tools(agent: Any) -> None:
         )
     ))
 
+    agent.tool_registry.register(Tool(
+        "remove_unused_imports",
+        t(K.TOOL_REMOVE_UNUSED_IMPORTS, agent.lang),
+        ["filepath"],
+        lambda filepath: git_ops.remove_unused_imports(filepath=filepath)
+    ))
+
     def _verify_refactor_wrapper(source: str, source_for_deps: str | None = None) -> dict:
         return refactoring_engine.verify_refactor(source=source, source_for_deps=source_for_deps)
 

@@ -214,6 +214,7 @@
     "update_todo": "Mark a todo as done or update its text.",
     "delete_todo": "Remove a todo from your plan.",
     "list_todos": "View your current plan progress. source='auto' = Agent requirements, source='llm' = your todos, source='all' = both (default).",
+    "remove_unused_imports": "Remove unused top-level imports in a Python file using AST analysis. Requires: filepath. Skips __future__ imports, wildcard imports (from X import *), and names in __all__. Returns list of removed imports.",
     "delete_file": "Delete a file from disk. Requires: filepath. Only works within the project directory. Verify the file is no longer needed before calling."
   },
   "tool_system_prompt": "You have access to tools. Call them like this:\n\n{TOOL_MARKER}{{\"tool\":\"tool_name\",\"args\":{{\"param\":\"value\"}}}}{END_MARKER}\n\nWhen done, respond like this:\n{DONE_MARKER}{{\"result\":\"YOUR DETAILED CONCLUSION — NOT just done\"}}{END_MARKER}\n\n{tools_desc}\n\n## Task\n{task}",

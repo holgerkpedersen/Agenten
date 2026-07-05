@@ -106,6 +106,7 @@ class K(StrEnum):
     TOOL_ADD_FUNCTION                   = "tools.add_function"
     TOOL_EXTRACT_SYMBOL                 = "tools.extract_symbol"
     TOOL_REMOVE_SYMBOL                  = "tools.remove_symbol"
+    TOOL_REMOVE_UNUSED_IMPORTS          = "tools.remove_unused_imports"
     TOOL_ADD_IMPORT                     = "tools.add_import"
     TOOL_VERIFY_REFACTOR                = "tools.verify_refactor"
     TOOL_ANALYZE_DEPENDENCIES           = "tools.analyze_dependencies"

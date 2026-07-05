@@ -969,6 +969,125 @@ def add_function(filepath: str, function_code: str, after_symbol: str = "") -> d
     }
 
 
+def remove_unused_imports(filepath: str) -> dict[str, Any]:
+    """Remove unused top-level imports from a Python file using AST analysis.
+
+    Walks the AST to find all top-level Import/ImportFrom nodes, cross-references
+    provided names against actual Name references in the rest of the file, and removes
+    imports whose names never appear in the code.
+
+    Skips: ``__future__`` imports, wildcard imports (``from X import *``),
+    names listed in ``__all__``.
+    """
+    path = _resolve_path(filepath)
+    if not is_safe_location(path):
+        return {"success": False, "error": "Adgang nægtet: stien er uden for projektmappen"}
+    if not os.path.exists(path):
+        return {"success": False, "error": f"Filen findes ikke: {path}"}
+    if not path.lower().endswith('.py'):
+        return {"success": False, "error": "Kun Python-filer (.py) understøttes"}
+
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except Exception as e:
+        return {"success": False, "error": f"Kunne ikke læse filen: {e}"}
+
+    try:
+        tree = ast.parse(content)
+    except SyntaxError as e:
+        return {"success": False, "error": f"Syntaxfejl i filen: {e}"}
+
+    lines = content.split('\n')
+
+    # --- collect imports info ---
+    imports_info: list[tuple[ast.stmt, set[str], bool, bool]] = []
+    used_names: set[str] = set()
+    all_names: set[str] = set()
+
+    for node in ast.iter_child_nodes(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            is_future = isinstance(node, ast.ImportFrom) and node.module == '__future__'
+            is_wildcard = isinstance(node, ast.ImportFrom) and any(a.name == '*' for a in node.names)
+            provided: set[str] = set()
+            for alias in node.names:
+                name = alias.asname or alias.name.split('.')[0]
+                provided.add(name)
+            imports_info.append((node, provided, is_future, is_wildcard))
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
+            t0 = node.targets[0]
+            if isinstance(t0, ast.Name) and t0.id == '__all__' and isinstance(node.value, (ast.List, ast.Tuple)):
+                for elt in node.value.elts:
+                    if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                        all_names.add(elt.value)
+        else:
+            for child in ast.walk(node):
+                if isinstance(child, ast.Name):
+                    used_names.add(child.id)
+
+    # --- find dead imports ---
+    removed = []
+    removals: list[tuple[int, int]] = []
+
+    for node, provided, is_future, is_wildcard in imports_info:
+        if is_future or is_wildcard:
+            continue
+        useful = provided & (used_names | all_names)
+        if not useful:
+            start = node.lineno - 1
+            end = node.end_lineno  # inclusive in AST, exclusive in slice
+            removed_text = '\n'.join(lines[start:end])
+            removals.append((start, end))
+            removed.append(removed_text)
+
+    if not removed:
+        return {
+            "success": True,
+            "removed": [],
+            "count": 0,
+            "file": os.path.abspath(path),
+            "message": "Ingen ubrugte imports fundet.",
+        }
+
+    # --- remove in reverse order to preserve indices ---
+    for start, end in reversed(removals):
+        del lines[start:end]
+
+    new_content = '\n'.join(lines)
+
+    # --- compress 3+ consecutive blank lines to 2 ---
+    new_content = re.sub(r'\n{4,}', '\n\n\n', new_content)
+
+    if not new_content.strip():
+        new_content = '\n'
+
+    try:
+        ast.parse(new_content)
+    except SyntaxError as e:
+        return {
+            "success": False,
+            "error": f"Syntaksfejl efter fjernelse af imports på linje {e.lineno}: {e.msg}",
+            "removed": removed,
+        }
+
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Kunne ikke skrive filen: {e}",
+            "removed": removed,
+        }
+
+    return {
+        "success": True,
+        "removed": removed,
+        "count": len(removed),
+        "file": os.path.abspath(path),
+    }
+
+
 def _find_file_references(filepath: str) -> list[str]:
     """Search project files for references to the given file.
 
