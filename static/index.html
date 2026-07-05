@@ -2512,9 +2512,8 @@ function copySessionId() {
     const id = currentSessionId;
     if (!id) return;
     navigator.clipboard.writeText(id).then(() => {
-        addLogEntry('INFO', 'Session ID kopieret', id);
+        showCopyFeedback(true);
     }).catch(() => {
-        // Fallback: select text
         const el = document.getElementById('sessionIdDisplay');
         if (el) {
             const range = document.createRange();
@@ -2522,8 +2521,21 @@ function copySessionId() {
             const sel = window.getSelection();
             sel?.removeAllRanges();
             sel?.addRange(range);
+            showCopyFeedback(true);
         }
     });
+}
+
+function showCopyFeedback(success) {
+    const el = document.getElementById('sessionIdDisplay');
+    if (!el) return;
+    const orig = el.textContent;
+    el.textContent = success ? '✓ Kopieret!' : '✗ Fejl';
+    el.style.color = success ? 'var(--success)' : 'var(--danger)';
+    setTimeout(() => {
+        el.textContent = orig;
+        el.style.color = 'var(--text-dim)';
+    }, 2000);
 }
 
 function updateSessionIdDisplay() {

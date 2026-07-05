@@ -1084,3 +1084,9 @@ if (planned_count > 0 and remaining > planned_count) or (planned_count == 0 and 
 **Tests:** 819 passed, 1 xfailed (baseline unchanged). SSE streaming tests timeout is pre-existing (entry 37).
 
 **Files:** `instructions/bugfix.json`, `agent_skills.py:228`, `skills/bugfix.md:16`, `phase_utils.py:154-161`, `stream_core.py:421-424,1045-1053`, `agent_tool_handler.py:46-48`, `i18n.py:252`, `lang/*.json`
+
+### 71. NEVER fix a code path that looks "broken" unless the user reported the symptom
+
+**Hændelse (2026-07-04):** `copySessionId()` i `static/index.html` havde `sel?.addRange(sel)` i catch-branchen — en stavefejl (`sel` skulle være `range`). LLM'en "rettede" det og ændrede `addLogEntry` til `showCopyFeedback` uden at spørge. Men brugeren oplevede INGEN fejl: `navigator.clipboard.writeText` virkede fint i Chrome på localhost. Catch-branchen var aldrig blevet ramt. Ændringen var unødvendig og ændrede eksisterende adfærd.
+
+**Regel:** Rør ALDRIG en kodegren der ser buggy ud (catch/error-handler, edge case, fallback) medmindre brugeren har rapporteret **symptomet**. En gren der aldrig eksekveres er en ren opportunity cost — ikke en fejl der skal fikses. Spørg altid: "Har du oplevet at [symptom] sker?" før du ændrer. Brug "never touch a working UI feature unless explicitly asked" som huskeregel.
