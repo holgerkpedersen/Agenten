@@ -1020,6 +1020,10 @@ def remove_unused_imports(filepath: str) -> dict[str, Any]:
                 for elt in node.value.elts:
                     if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
                         all_names.add(elt.value)
+            else:
+                for child in ast.walk(node):
+                    if isinstance(child, ast.Name):
+                        used_names.add(child.id)
         else:
             for child in ast.walk(node):
                 if isinstance(child, ast.Name):

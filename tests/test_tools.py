@@ -566,3 +566,209 @@ class TestListFiles:
         from git_ops import list_files
         result = list_files("/nonexistent/path")
         assert result["success"] is False
+
+
+class TestRemoveUnusedImports:
+    def test_remove_single_unused(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import os\nimport sys\n\nx = os.path.join('a', 'b')\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 1
+        assert "import sys" in result["removed"][0]
+        content = f.read_text(encoding='utf-8')
+        assert "import os" in content
+        assert "import sys" not in content
+        assert "x = os.path.join" in content
+
+    def test_remove_multiple_unused(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import os\nimport sys\nimport json\n\nx = os.getcwd()\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 2
+        content = f.read_text(encoding='utf-8')
+        assert "import os" in content
+        assert "import sys" not in content
+        assert "import json" not in content
+
+    def test_keep_all_used(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import os\nimport sys\n\nx = os.getcwd()\ny = sys.version\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0
+        assert result["message"] == "Ingen ubrugte imports fundet."
+        assert f.read_text(encoding='utf-8') == "import os\nimport sys\n\nx = os.getcwd()\ny = sys.version\n"
+
+    def test_future_import_kept(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("from __future__ import annotations\nimport sys\n\nx = 1\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 1  # sys removed, __future__ kept
+        content = f.read_text(encoding='utf-8')
+        assert "from __future__ import annotations" in content
+        assert "import sys" not in content
+
+    def test_wildcard_import_kept(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("from os import *\nimport sys\n\nx = 1\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 1  # sys removed, wildcard kept
+        content = f.read_text(encoding='utf-8')
+        assert "from os import *" in content
+        assert "import sys" not in content
+
+    def test_all_names_preserves_import(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import sys\n\n__all__ = ['sys']\nx = 1\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0  # sys in __all__ → kept
+
+    def test_indirect_reference_kept(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import os\n\nx = os.path.join('a', 'b')\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0  # os.name appears in ast.Attribute → kept
+
+    def test_used_in_function_body(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import json\n\ndef foo():\n    return json.dumps({'a': 1})\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0
+
+    def test_no_imports(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("x = 1\ny = 2\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0
+
+    def test_non_py_file_rejected(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.txt"
+        f.write_text("import os\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is False
+        assert ".py" in result["error"].lower()
+
+    def test_nonexistent_file(self, tmp_path):
+        from git_ops import remove_unused_imports
+        result = remove_unused_imports(str(tmp_path / "nonexistent.py"))
+        assert result["success"] is False
+        assert "findes ikke" in result["error"]
+
+    def test_syntax_error_file(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import os\n\nx = {{{ broken\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is False
+        assert "Syntaxfejl" in result["error"]
+
+    def test_multi_line_import_fully_unused(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("from os import (\n    path,\n    walk,\n)\nimport sys\n\nx = 1\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 2
+        content = f.read_text(encoding='utf-8')
+        assert "from os import" not in content
+        assert "import sys" not in content
+
+    def test_multi_line_import_partially_used(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("from os import (\n    path,\n    walk,\n)\n\nx = path.join('a', 'b')\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0  # `path` is used → whole import kept
+
+    def test_import_as_name(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import numpy as np\n\nx = np.array([1, 2])\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0
+
+    def test_import_as_name_unused(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import numpy as np\n\nx = 1\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 1
+        content = f.read_text(encoding='utf-8')
+        assert "import numpy" not in content
+
+    def test_from_import_several_one_used(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("from os import path, walk, listdir\n\nx = path.join('a', 'b')\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0  # `path` is used → whole line kept
+
+    def test_from_import_unused(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("from os import path\nimport sys\n\nx = 1\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 2
+        content = f.read_text(encoding='utf-8')
+        assert "from os" not in content
+        assert "import sys" not in content
+
+    def test_empty_file(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 0
+
+    def test_only_imports_all_unused(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import os\nimport sys\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 2
+        content = f.read_text(encoding='utf-8').strip()
+        assert content == ""
+
+    def test_remove_with_blank_line_compression(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import os\n\n\n\n\nx = 1\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 1
+        content = f.read_text(encoding='utf-8')
+        assert "import os" not in content
+        assert "x = 1" in content
+
+    def test_remove_multiple_blank_line_compression(self, tmp_path):
+        from git_ops import remove_unused_imports
+        f = tmp_path / "test.py"
+        f.write_text("import os\n\n\n\nimport sys\n\n\n\nx = 1\n", encoding='utf-8')
+        result = remove_unused_imports(str(f))
+        assert result["success"] is True
+        assert result["count"] == 2
