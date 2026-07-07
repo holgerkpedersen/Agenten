@@ -436,18 +436,22 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
     # Prerequisite check: Ekstraher requires refactor_plan.md from Plan
     if agent.active_template == "refactor" and _normalize_phase(task_node.name) == "ekstraher":
         _wd_check = os.environ.get('AGENT_WORKDIR', '')
-        if _wd_check:
+        _alt = getattr(agent, '_refactor_plan_path', '')
+        # Session-scoped path (where Plan-fasen actually writes) takes priority
+        if _alt:
+            _plan_path = _alt if os.path.isabs(_alt) else os.path.join(_wd_check or '.', _alt)
+        elif _wd_check:
             _plan_path = os.path.join(_wd_check, "refactor_plan.md")
         else:
             _plan_path = "refactor_plan.md"
-        _alt = getattr(agent, '_refactor_plan_path', '')
         _check_ok = os.path.exists(_plan_path)
         if not _check_ok:
-            # Fallback: check _refactor_plan_path (may point to session-scoped dir)
-            if _alt and os.path.isabs(_alt):
-                _check_ok = os.path.exists(_alt)
-            elif _alt and _wd_check:
-                _check_ok = os.path.exists(os.path.join(_wd_check, _alt))
+            # Fallback: check root refactor_plan.md (pre-session-scoping sessions)
+            _fallback = os.path.join(_wd_check, "refactor_plan.md") if _wd_check else "refactor_plan.md"
+            if _fallback != _plan_path:
+                _check_ok = os.path.exists(_fallback)
+                if _check_ok:
+                    _plan_path = _fallback
         if not _check_ok:
             _msg = (f"Plan-fasen har ikke produceret `refactor_plan.md`. "
                     f"Ekstraher kan ikke køre uden planen. Genstart refactor-processen.")
@@ -458,7 +462,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
         # Auto-load refactor_plan.md into file_chunks so Ekstraher can read it
         _chunk_key = "file_refactor_plan.md"
         if _chunk_key not in agent.file_chunks:
-            _plan_abs = _alt if (_alt and os.path.isabs(_alt)) else (_plan_path if os.path.isabs(_plan_path) else os.path.join(_wd_check or '.', _plan_path))
+            _plan_abs = _plan_path if os.path.isabs(_plan_path) else os.path.join(_wd_check or '.', _plan_path)
             try:
                 with open(_plan_abs, 'r', encoding='utf-8') as _f:
                     _content = _f.read()

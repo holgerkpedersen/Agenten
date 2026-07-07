@@ -377,15 +377,15 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
     if not spec:
         return False, ""
 
-    # Replace refactor_plan.md with session-scoped path from agent
+    # Replace refactor_plan.md with session-scoped path from agent.
+    # Use json round-trip for deep replacement — the spec can have
+    # "refactor_plan.md" nested inside sub-check dicts (plan_path keys),
+    # which a shallow top-level iteration misses.
     _splan = getattr(agent, '_refactor_plan_path', '')
     if _splan and "refactor_plan.md" in str(spec):
-        spec = dict(spec)
-        for k, v in list(spec.items()):
-            if isinstance(v, str) and "refactor_plan.md" in v:
-                spec[k] = v.replace("refactor_plan.md", _splan)
-            elif isinstance(v, list):
-                spec[k] = [item.replace("refactor_plan.md", _splan) if isinstance(item, str) else item for item in v]
+        spec_str = json.dumps(spec)
+        spec_str = spec_str.replace("refactor_plan.md", _splan)
+        spec = json.loads(spec_str)
 
     # Dynamic path resolution: replace hardcoded api_server.py with the
     # actual target file from refactor_plan.md header or original prompt.
@@ -393,7 +393,11 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
     _target = None
     if "api_server.py" in str(spec) or "{source_file}" in str(spec):
         _plan_path = None
-        if base_dir:
+        # Session-scoped plan path takes priority (Plan-fasen writes here)
+        _splan = getattr(agent, '_refactor_plan_path', '')
+        if _splan and os.path.exists(_splan):
+            _plan_path = _splan
+        if not _plan_path and base_dir:
             _plan_candidate = os.path.join(base_dir, "refactor_plan.md")
             if os.path.exists(_plan_candidate):
                 _plan_path = _plan_candidate

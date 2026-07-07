@@ -21,9 +21,16 @@ def _validate_done_output(agent: Any, result_text: str | dict, task_name: str, t
         result_text = result_text.get("result", str(result_text))
     # For refactor Ekstraher/Opdatér phases, don't require long done() text —
     # the files on disk ARE the validation. Only require 20 chars minimum.
+    # Refactor Analyse/Plan produce .md files, not done() prose — skip length
+    # check entirely (was blocking done with "Resultatet er for kort").
     _phase_v = _normalize_phase(task_name).lower()
     _template_v = getattr(agent, 'active_template', '') or ''
-    _min_len = 20 if (_template_v == "refactor" and _phase_v in ("ekstraher", "opdatér")) else 50
+    if _template_v == "refactor" and _phase_v in ("analyse", "plan"):
+        _min_len = 0
+    elif _template_v == "refactor" and _phase_v in ("ekstraher", "opdatér"):
+        _min_len = 20
+    else:
+        _min_len = 50
     if not isinstance(result_text, str) or len(result_text.strip()) < _min_len:
         return t(K.VALIDATION_DONE_TOO_SHORT, agent.lang).format(len(result_text) if result_text else 0)
     
