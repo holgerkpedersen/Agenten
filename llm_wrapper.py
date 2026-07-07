@@ -187,7 +187,7 @@ class LMStudioWrapper:
                         if url not in existing_urls:
                             new_images.append(part)
                     if isinstance(messages[target_idx]["content"], str):
-                        content = new_images + [{"type": "text", "text": messages[first_user]["content"]}]
+                        content = new_images + [{"type": "text", "text": messages[target_idx]["content"]}]
                     else:
                         content = new_images + content
                     messages[target_idx] = {**messages[target_idx], "content": content}
@@ -373,13 +373,28 @@ class LMStudioWrapper:
             else:
                 err_body = response.text[:500]
                 log.error("LLM API error (Status %s): %s", response.status_code, err_body)
-                return f"ERROR:HTTP {response.status_code}: {err_body}"
+                # Provide more helpful error messages with recovery guidance
+                if response.status_code == 429:
+                    return f"ERROR: Rate limit exceeded. Vent venligst og prøv igen senere. Hvis problemet fortsætter, så reducer kompleksiteten af din forespørgsel."
+                elif response.status_code == 500:
+                    return f"ERROR: Internal server error i LLM. Prøv igen med en enklere forespørgsel eller kontroller at LM Studio kører korrekt."
+                elif response.status_code == 503:
+                    return f"ERROR: Tjenesten er utilgængelig. Kontroller at LM Studio er startet og tilgængelig på {self.base_url}"
+                else:
+                    return f"ERROR:HTTP {response.status_code}: {err_body}. Prøv at forenkle din forespørgsel eller skift til en anden model."
         except requests.exceptions.Timeout:
             log.error("Timeout after %ss", self.timeout)
-            return f"ERROR:Timeout after {self.timeout}s"
+            return f"ERROR: Timeout efter {self.timeout}s. Forsøg at forenkle din forespørgsel, reducere mængden af kontekst, eller øge timeout-værdien. Overvej at bruge en mindre kompleks model til denne type opgave."
         except Exception as e:
             log.error("Error: %s", e)
-            return f"ERROR:{str(e)}"
+            # Provide more helpful error messages with recovery guidance
+            error_str = str(e).lower()
+            if "connection" in error_str:
+                return f"ERROR: Forbindelsesfejl: {str(e)}. Kontroller at LM Studio kører og er tilgængelig på {self.base_url}. Sørg for at serveren er startet korrekt."
+            elif "memory" in error_str:
+                return f"ERROR: Minsk hukommelse: {str(e)}. Luk andre programmer for at frigøre hukommelse, eller reducér mængden af data der sendes til modellen."
+            else:
+                return f"ERROR: {str(e)}. Prøv at forenkle din forespørgsel eller genstart tjenesten hvis problemet fortsætter."
 
     def _truncate_messages(self, messages: list[dict]) -> list[dict]:
         """truncate messages.
@@ -572,21 +587,28 @@ class LMStudioWrapper:
                     json.dump({"error": f"Timeout after {stream_timeout}s"}, tf, ensure_ascii=False, indent=2)
             except Exception:
                 pass
-            yield f"\n[ERROR: Timeout after {stream_timeout}s — ingen data i 30s]"
+            yield f"\n[ERROR: Timeout efter {stream_timeout}s — ingen data i 30s. Forsøg at forenkle din forespørgsel eller brug en mindre kompleks model.]"
         except requests.exceptions.ConnectionError:
             try:
                 with open(resp_path, 'w', encoding='utf-8') as cf:
                     json.dump({"error": f"Cannot connect to LM Studio at {self.base_url}"}, cf, ensure_ascii=False, indent=2)
             except Exception:
                 pass
-            yield f"\n[ERROR: Cannot connect to LM Studio at {self.base_url}]"
+            yield f"\n[ERROR: Kan ikke oprette forbindelse til LM Studio på {self.base_url}. Kontroller at LM Studio er startet og at adressen er korrekt.]"
         except Exception as e:
             try:
                 with open(resp_path, 'w', encoding='utf-8') as exf:
                     json.dump({"error": str(e)}, exf, ensure_ascii=False, indent=2)
             except Exception:
                 pass
-            yield f"\n[ERROR: {str(e)}]"
+            # Provide more helpful error messages with recovery guidance
+            error_str = str(e).lower()
+            if "connection" in error_str:
+                yield f"\n[ERROR: Forbindelsesfejl: {str(e)}. Kontroller at LM Studio kører og er tilgængelig på {self.base_url}.]"
+            elif "timeout" in error_str:
+                yield f"\n[ERROR: Timeout: {str(e)}. Forsøg at forenkle din forespørgsel eller brug en mindre kompleks model.]"
+            else:
+                yield f"\n[ERROR: {str(e)}. Prøv at forenkle din forespørgsel eller genstart tjenesten hvis problemet fortsætter.]"
         else:
             if self._stream_timeout != config.LLM_STREAM_TIMEOUT:
                 self._stream_timeout = config.LLM_STREAM_TIMEOUT

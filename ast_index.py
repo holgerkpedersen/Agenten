@@ -51,7 +51,27 @@ def build_ast_index(code: str, filename: str) -> str | None:
         tree = ast.parse(code)
     except SyntaxError:
         return None
+    
+    # Collect imports for better context
+    imports = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imports.append(f"import {alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ''
+            for alias in node.names:
+                imports.append(f"from {module} import {alias.name}")
+    
     index_lines = [f"### {filename}"]
+    if imports:
+        index_lines.append("  Imports:")
+        for imp in imports[:10]:  # Limit to first 10 imports
+            index_lines.append(f"    {imp}")
+        if len(imports) > 10:
+            index_lines.append(f"    ... og {len(imports) - 10} flere")
+        index_lines.append("")  # Empty line for readability
+    
     def _sig(n):
         """sig.
 
@@ -74,28 +94,53 @@ def build_ast_index(code: str, filename: str) -> str | None:
         def __init__(self) -> None:
             """Initialize the instance."""
             self.in_class = False
+            self.class_stack = []  # Track class hierarchy
         def visit_ClassDef(self, node: ast.ClassDef) -> None:
             """visit class def.
 
             Args:
                 node:"""
+            # Get base classes for inheritance info
+            bases = []
+            for base in node.bases:
+                if isinstance(base, ast.Name):
+                    bases.append(base.id)
+                elif isinstance(base, ast.Attribute):
+                    # For attribute access like module.Class
+                    bases.append(ast.unparse(base) if hasattr(ast, 'unparse') else str(base))
+                else:
+                    bases.append("...")
+            
+            base_str = f" ({', '.join(bases)})" if bases else ""
+            indent = "  " * len(self.class_stack)
+            index_lines.append(f"{indent}class {node.name}{base_str} [{node.lineno}]{_doc(node)}")
+            
+            self.class_stack.append(node.name)
             old = self.in_class
             self.in_class = True
             methods = []
             for item in node.body:
                 if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     methods.append(f"    {item.name}({_sig(item)}) [{item.lineno}]{_doc(item)}")
-            index_lines.append(f"  class {node.name} [{node.lineno}]{_doc(node)}")
+                elif isinstance(item, ast.AnnAssign) and hasattr(item, 'target'):
+                    # Handle class variables with type hints
+                    if hasattr(item.target, 'id'):
+                        methods.append(f"    {item.target.id}: ...")
             index_lines.extend(methods)
             self.generic_visit(node)
             self.in_class = old
+            self.class_stack.pop()
         def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
             """visit function def.
 
             Args:
                 node:"""
             if not self.in_class:
-                index_lines.append(f"  {node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
+                # Check if it's a special method (like __init__)
+                prefix = ""
+                if node.name.startswith("__") and node.name.endswith("__"):
+                    prefix = "🔧 "  # Special method indicator
+                index_lines.append(f"  {prefix}{node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
             self.generic_visit(node)
         def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
             """visit async function def.
@@ -103,11 +148,50 @@ def build_ast_index(code: str, filename: str) -> str | None:
             Args:
                 node:"""
             if not self.in_class:
-                index_lines.append(f"  {node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
+                index_lines.append(f"  async {node.name}({_sig(node)}) [{node.lineno}]{_doc(node)}")
             self.generic_visit(node)
 
     _Builder().visit(tree)
+    
+    # Add complexity information
+    try:
+        complexity = _calculate_complexity(tree)
+        if complexity > 0:
+            index_lines.append("")
+            index_lines.append(f"  Kompleksitet: {complexity} (lav: 1-5, middel: 6-10, høj: 11+)")
+    except:
+        pass  # Ignore complexity calculation errors
+    
     return "\n".join(index_lines) if len(index_lines) > 1 else None
+
+
+def _calculate_complexity(tree: ast.AST) -> int:
+    """Calculate cyclomatic complexity of the code.
+    
+    Args:
+        tree: AST tree
+        
+    Returns:
+        Complexity score
+    """
+    complexity = 1  # Start with 1 for the base path
+    
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.If, ast.While, ast.For)):
+            complexity += 1
+        elif isinstance(node, ast.ExceptHandler):
+            complexity += 1
+        elif isinstance(node, ast.And) or isinstance(node, ast.Or):
+            complexity += 1
+        elif isinstance(node, (ast.ListComp, ast.DictComp, ast.SetComp, ast.GeneratorExp)):
+            complexity += 1
+        elif isinstance(node, ast.Assert):
+            complexity += 1
+        elif isinstance(node, ast.Return):
+            # Don't count returns in complexity as they don't add paths
+            pass
+            
+    return complexity
 
 
 

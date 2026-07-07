@@ -438,10 +438,118 @@ def _build_initial_messages(agent: Any, task_node: Any, original_prompt: str, ch
             _active.active_tools = [t for t in _active.active_tools if t != "list_symbols"]
             agent._log("DEBUG", "Fjernede list_symbols fra active tools (trust-block aktiv)", "")
 
+    # Chain-of-thought reasoning block for complex tasks
+    _reasoning_block = ""
+    if agent.active_template in ["programmering", "refactor", "bugfix", "selvforbedring"] and \
+       task_node.name.lower() in ["kodeimplementering", "ekstraher", "implementering", "ret", "fix"]:
+        lang = getattr(agent, 'lang', 'da')
+        if lang == "da":
+            _reasoning_block = (
+                "\n\n💭 TÆNK HØJT (Chain of Thought):\n"
+                "Før du giver dit endelige svar, så tænk trin for trin igennem problemet.\n"
+                "1. Hvad er målet med denne fase?\n"
+                "2. Hvad er de potentielle tilgange?\n"
+                "3. Hvad er fordele og ulemper ved hver tilgang?\n"
+                "4. Hvilken tilgang vælger du og hvorfor?\n"
+                "5. Hvordan vil du implementere denne tilgang?\n"
+                "Efter din tænkeproces, så giv dit endelige svar.\n"
+                "Format dit svar som:\n"
+                "[Din tænkeproces her]\n\n[Din endelige løsning her]\n"
+            )
+        elif lang == "en":
+            _reasoning_block = (
+                "\n\n💭 THINK ALOUD (Chain of Thought):\n"
+                "Before giving your final answer, please think through the problem step by step.\n"
+                "1. What is the goal of this phase?\n"
+                "2. What are the potential approaches?\n"
+                "3. What are the advantages and disadvantages of each approach?\n"
+                "4. Which approach do you choose and why?\n"
+                "5. How will you implement this approach?\n"
+                "After your thought process, then provide your final answer.\n"
+                "Format your answer as:\n"
+                "[Your thought process here]\n\n[Your final solution here]\n"
+            )
+        elif lang == "es":
+            _reasoning_block = (
+                "\n\n💭 PENSAR EN ALTO (Cadena de Pensamiento):\n"
+                "Antes de dar su respuesta final, por favor piense paso a paso a través del problema.\n"
+                "1. ¿Cuál es el objetivo de esta fase?\n"
+                "2. ¿Cuáles son los enfoques potenciales?\n"
+                "3. ¿Cuáles son las ventajas y desventajas de cada enfoque?\n"
+                "4. ¿Qué enfoque eliges y por qué?\n"
+                "5. ¿Cómo implementarás este enfoque?\n"
+                "Después de tu proceso de pensamiento, entonces proporciona tu respuesta final.\n"
+                "Formatea tu respuesta como:\n"
+                "[Tu proceso de pensamiento aquí]\n\n[Tu solución final aquí]\n"
+            )
+        elif lang == "zh":
+            _reasoning_block = (
+                "\n\n💭 大声说出来（思维链）：\n"
+                "在给出最终答案之前，请逐步思考问题。\n"
+                "1. 这一阶段的目标是什么？\n"
+                "2. 有哪些潜在的方法？\n"
+                "3. 每种方法的优缺点是什么？\n"
+                "4. 你选择哪种方法以及为什么？\n"
+                "5. 你将如何实施这种方法？\n"
+                "思考过程完成后，再提供您的最终答案。\n"
+                "请将您的答案格式化为：\n"
+                "[您的思考过程这里]\n\n[您的最终解决方案这里]\n"
+            )
+
+    # Self-refinement block for code-related tasks
+    _refinement_block = ""
+    if agent.active_template in ["programmering", "refactor", "bugfix"] and \
+       task_node.name.lower() in ["kodeimplementering", "ekstraher", "implementering", "ret", "fix"]:
+        lang = getattr(agent, 'lang', 'da')
+        if lang == "da":
+            _refinement_block = (
+                "\n\n🔍 SELF-REFINEMENT:\n"
+                "Før du afslutter, så gennemgå dit arbejde:\n"
+                "1. Følger koden PEP 8 standarden?\n"
+                "2. Er alle funktioner og klasser korrekt navngivet?\n"
+                "3. Er der tilføjet docstrings til offentlige funktioner og klasser?\n"
+                "4. Er der god fejlhåndtering hvor det er nødvendigt?\n"
+                "5. Er koden let at læse og forstå?\n"
+                "Hvis du fandt områder der kan forbedres, så fortsæt med at arbejde på dem før du afslutter."
+            )
+        elif lang == "en":
+            _refinement_block = (
+                "\n\n🔍 SELF-REFINEMENT:\n"
+                "Before finalizing, please review your work:\n"
+                "1. Does the code follow PEP 8 standards?\n"
+                "2. Are all functions and classes properly named?\n"
+                "3. Have you added docstrings to public functions and classes?\n"
+                "4. Is there proper error handling where needed?\n"
+                "5. Is the code easy to read and understand?\n"
+                "If you found areas for improvement, please continue working on them before finalizing."
+            )
+        elif lang == "es":
+            _refinement_block = (
+                "\n\n🔍 AUTORREFINAMIENTO:\n"
+                "Antes de finalizar, por favor revise su trabajo:\n"
+                "1. ¿El código sigue el estándar PEP 8?\n"
+                "2. ¿Están todas las funciones y clases correctamente nombradas?\n"
+                "3. ¿Has añadido docstrings a las funciones y clases públicas?\n"
+                "4. ¿Hay un manejo de errores adecuado donde sea necesario?\n"
+                "5. ¿Es el código fácil de leer y entender?\n"
+                "Si encontraste áreas para mejorar, por favor continúa trabajando en ellas antes de finalizar."
+            )
+        elif lang == "zh":
+            _refinement_block = (
+                "\n\n🔍 自我改进：\n"
+                "在最终确定之前，请回顾您的工作：\n"
+                "1. 代码是否符合PEP 8标准？\n"
+                "2. 所有函数和类是否命名正确？\n"
+                "3. 您是否为公共函数和类添加了文档字符串？\n"
+                "4. 是否在需要的地方有适当的错误处理？\n"
+                "5. 代码是否易于阅读和理解？\n"
+                "如果您发现可以改进的领域，请在最终确定之前继续处理它们。"
+            )
+
     if section_instr:
-        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{_trust_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{section_instr}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{_trust_block}{phase_block}{_reasoning_block}{_refinement_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
     else:
-        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{_trust_block}{phase_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
+        task_prompt = f"{reason_block}{task_node.name}{criteria_block}{sibling_block}{plan_block}{_group_block}{_symbols_block}{_trust_block}{phase_block}{_reasoning_block}{_refinement_block}\n\nKontekst / Context: {clean_prompt}{chunk_hint}"
 
     # Append phase todos as a numbered checklist — LLM must follow the order
     todos = getattr(agent, '_phase_todos', None)
