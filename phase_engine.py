@@ -415,6 +415,19 @@ def check_phase_done(agent: Any, task_node: Any, called_tools: dict | None = Non
                     _target = _pm.group(1)
             except (OSError, UnicodeDecodeError):
                 pass
+        # Verify plan-derived target actually exists on disk.
+        # Stale plans from prior sessions may reference files that
+        # no longer exist — discard the target so we fall through
+        # to the original-prompt fallback below.
+        if _target:
+            _target_candidates = [_target]
+            if base_dir:
+                _target_candidates.insert(0, os.path.join(base_dir, _target))
+            _wd = os.environ.get('AGENT_WORKDIR', '')
+            if _wd and not base_dir:
+                _target_candidates.insert(0, os.path.join(_wd, _target))
+            if not any(os.path.exists(p) for p in _target_candidates):
+                _target = None
         if not _target:
             _prompt = getattr(agent, "original_prompt", "")
             _pm = re.search(r"([a-zA-Z_][\w.]+\.py)", _prompt)

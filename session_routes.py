@@ -5,6 +5,7 @@ from typing import Any, Generator
 from lang import t, get_ui_translations
 from i18n import K
 from refactoring_engine import clear_extracted_registry
+import os
 import time
 from datetime import datetime
 from image_handler import _normalize_images
@@ -27,6 +28,16 @@ def create_session() -> Any:
     with agent.images_lock:
         agent.images = []  # clear images from previous session
     clear_extracted_registry()  # nulstil extraction-register til ny session
+    # Ryd stale refactor-planer fra tidligere sessioner — undgår at
+    # en plan fra session X auto-completer faser i session Y.
+    _wd = os.environ.get('AGENT_WORKDIR') or os.getcwd()
+    for _f in ["refactor_plan.md", "refactor_analyse.md"]:
+        _p = os.path.join(_wd, _f)
+        if os.path.exists(_p):
+            try:
+                os.remove(_p)
+            except OSError:
+                pass
     return jsonify({"success": True, "session_id": session_id, "session": session_data})
 
 

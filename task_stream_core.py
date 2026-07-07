@@ -185,9 +185,23 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
         if "run_tests" in called_names and "update_issue_status" not in called_names:
             available = set(agent.tool_registry.active_tools or [])
             if "update_issue_status" in available and not agent._tests_failed:
-                hint = t(K.LOG_TESTS_PASSED_NO_RESOLVE, agent.lang)
-                full_response = full_response.rstrip() + "\n\n" + hint
-                agent._log("INFO", hint, "")
+                # For refactor: tests der består betyder IKKE at
+                # refaktoreringen er gennemført — hvis ingen moduler har
+                # reel kode, er "Tests bestået" bare den eksisterende
+                # testsuite der kører på den uændrede kodebase.
+                if agent.active_template == "refactor":
+                    from agent_refactor_helpers import _refactor_actually_moved_code
+                    if not _refactor_actually_moved_code(agent):
+                        task_node.status = "failed"
+                        full_response = t(K.REFACTOR_INCOMPLETE, agent.lang)
+                    else:
+                        hint = t(K.LOG_TESTS_PASSED_NO_RESOLVE, agent.lang)
+                        full_response = full_response.rstrip() + "\n\n" + hint
+                        agent._log("INFO", hint, "")
+                else:
+                    hint = t(K.LOG_TESTS_PASSED_NO_RESOLVE, agent.lang)
+                    full_response = full_response.rstrip() + "\n\n" + hint
+                    agent._log("INFO", hint, "")
 
         phase = _normalize_phase(task_node.name).lower()
         if phase in ("analyse", "l\u00e6s", "afklar") and not getattr(agent, 'issue_resolved', False):
@@ -938,25 +952,24 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                         yield {"type": "tool_call", "tool": tool_name, "args": args_val}
                         yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
                         continue
-                # For refactor Test: blokér run_tests hvis edit_file ikke er kaldt først
-                # (forhindrer run_tests-loop når tests fejler pga. brudte imports)
+                # For refactor Test: inject guidance hvis run_tests kaldes
+                # igen uden at edit_file er kaldt — men lad testen køre
+                # rigtigt. Fake "Tests fejlede" beskeder forvirrer LLM'en.
                 _is_refactor_test = (
                     getattr(agent, 'active_template', '') == 'refactor'
                     and getattr(task_node, 'name', '').lower() in ('test',)
                 )
                 if _is_refactor_test and tool_name == "run_tests":
-                    tests_ran = any("run_tests" in str(t) for t in called_tools)
                     _edit_called = any("edit_file" in str(t) for t in called_tools)
-                    if tests_ran and not _edit_called:
-                        result_str = "[SYSTEM: Tests kørte og fejlede Brug edit_file til at rette import-stierne, før du kører tests igen. Desuden ligger originalfilen i git, så du kan finde eventuelt manglende symboler der]"
-                        #OLD: result_str = "[SYSTEM: Ret import-fejlene med edit_file FØRST, før du kører tests]"
-                        result = {"success": False, "error": "edit_file required first"}
-                        agent._log("TOOL", t(K.LOG_TOOL_CALLING, agent.lang).format(tool=tool_name), str(args_val))
-                        agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=tool_name), result_str)
-                        messages.append({"role": "user", "content": result_str})
-                        yield {"type": "tool_call", "tool": tool_name, "args": args_val}
-                        yield {"type": "tool_result", "tool": tool_name, "args": args_val, "result": result}
-                        continue
+                    if not _edit_called:
+                        _tests_ran = any("run_tests" in str(t) for t in called_tools)
+                        if _tests_ran:
+                            messages.append({"role": "user", "content": (
+                                "[ADVARSEL: Du har kørt run_tests flere gange uden at kalde edit_file. "
+                                "Hvis tests fejler, skal du rette import-stierne med edit_file FØRST "
+                                "før du kører tests igen.]"
+                            )})
+                            # Lad testen køre normalt — fortsæt til execution nedenfor
                 # Plan-deviation check: block batch_extract_symbols if symbols go to wrong module
                 # Block docs/ writes during Ekstraher — they waste iterations on status reports
                 if tool_name == "write_file" and isinstance(args_val, dict):
