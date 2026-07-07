@@ -11,8 +11,28 @@
   "en_arkitektur": "First read docs/arkitektur.md if it exists (read_chunk). MERGE existing content and your new analysis results into ONE updated document. Send MULTIPLE read_location calls at once to review the structure quickly. Then save with write_file(path='docs/arkitektur.md', content='<merged>', overwrite=true). Analyze the file's structure, classes and functions. Assess design patterns used, coupling between modules, cohesion, and whether SOLID principles are followed.",
   "es_arkitektur": "Primero lee docs/arkitektur.md si existe (read_chunk). COMBINA el contenido existente y tus nuevos resultados de análisis en UN documento actualizado. Envía VARIAS llamadas read_location a la vez para revisar la estructura rápidamente. Luego guarda con write_file(path='docs/arkitektur.md', content='<combinado>', overwrite=true). Analiza la estructura del archivo, clases y funciones. Evalúa patrones de diseño utilizados, acoplamiento entre módulos, cohesión, y si se siguen los principios SOLID.",
   "zh_arkitektur": "如果存在，首先读取 docs/arkitektur.md（使用 read_chunk）。将现有内容和你新的分析结果合并到一个更新的文档中。同时发送多个 read_location 调用以快速审查结构。然后使用 write_file(path='docs/arkitektur.md', content='<合并>', overwrite=true) 保存。分析文件的结构、类和函数。评估使用的设计模式、模块间的耦合度、内聚性以及是否遵循 SOLID 原则。",
-  "Kodekvalitet": "Læs først docs/kodekvalitet.md hvis den findes (read_chunk). SAML eksisterende indhold og dine nye analyseresultater i ÉT opdateret dokument. Send FLERE read_location-kald på én gang for at gennemgå funktionerne hurtigt. Gem derefter med write_file(path='docs/kodekvalitet.md', content='<samlet>', overwrite=true). Vurder læsbarhed, vedligeholdbarhed, test coverage, navngivning (PEP 8), type hints, fejlhåndtering, complexity, DRY-princippet og separation of concerns.",
-  "en_kodekvalitet": "First read docs/kodekvalitet.md if it exists (read_chunk). MERGE existing content and your new analysis results into ONE updated document. Send MULTIPLE read_location calls at once to review functions quickly. Then save with write_file(path='docs/kodekvalitet.md', content='<merged>', overwrite=true). Assess readability, maintainability, test coverage, naming (PEP 8), type hints, error handling, complexity, DRY principle and separation of concerns.",
+  "Kodekvalitet": "Læs først docs/kodekvalitet.md hvis den findes (read_chunk). SAML eksisterende indhold og dine nye analyseresultater i ÉT opdateret dokument. Send FLERE read_location-kald på én gang for at gennemgå funktionerne hurtigt. Gem derefter med write_file(path='docs/kodekvalitet.md', content='<samlet>', overwrite=true). Vurder læsbarhed, vedligeholdbarhed, test coverage, navngivning (PEP 8), type hints, fejlhåndtering, complexity, DRY-princippet og separation of concerns.
+
+💡 SPECIFIKKE KODEKVALITETSKONTROLLER:
+- PEP 8: Maks linjelængde 88 tegn, korrekt indentation, mellemrum omkring operatorer
+- Navngivning: beskrivende navne, konsistens (snake_case for funktioner/variabler, PascalCase for klasser)
+- Type hints: på funktioner og metoder hvor det er meningsfuldt
+- Docstrings: på alle offentlige funktioner og klasser (Google eller NumPy stil)
+- Fejlhåndtering: specifikke undtagelser frem for bare Except, meningsfulde fejlmeddelelser
+- Complexity: undgå dybt nested kode (maks 3-4 niveauer), små funktioner (maks 20-30 linjer)
+- DRY: gentagelse af kode bør ekstraheres til fælles funktioner
+- Sikkerhed: ingen hardcoded credentials, korrekt inputvalidering",
+  "en_kodekvalitet": "First read docs/kodekvalitet.md if it exists (read_chunk). MERGE existing content and your new analysis results into ONE updated document. Send MULTIPLE read_location calls at once to review functions quickly. Then save with write_file(path='docs/kodekvalitet.md', content='<merged>', overwrite=true). Assess readability, maintainability, test coverage, naming (PEP 8), type hints, error handling, complexity, DRY principle and separation of concerns.
+
+💡 SPECIFIC CODE QUALITY CHECKS:
+- PEP 8: Max line length 88 chars, correct indentation, spaces around operators
+- Naming: descriptive names, consistency (snake_case for functions/variables, PascalCase for classes)
+- Type hints: on functions and methods where meaningful
+- Docstrings: on all public functions and classes (Google or NumPy style)
+- Error handling: specific exceptions over bare Except, meaningful error messages
+- Complexity: avoid deeply nested code (max 3-4 levels), small functions (max 20-30 lines)
+- DRY: code repetition should be extracted to common functions
+- Security: no hardcoded credentials, proper input validation",
   "es_kodekvalitet": "Primero lee docs/kodekvalitet.md si existe (read_chunk). COMBINA el contenido existente y tus nuevos resultados de análisis en UN documento actualizado. Envía VARIAS llamadas read_location a la vez para revisar funciones rápidamente. Luego guarda con write_file(path='docs/kodekvalitet.md', content='<combinado>', overwrite=true). Evalúa legibilidad, mantenibilidad, cobertura de pruebas, nombres (PEP 8), type hints, manejo de errores, complejidad, principio DRY y separación de preocupaciones.",
   "zh_kodekvalitet": "如果存在，首先读取 docs/kodekvalitet.md（使用 read_chunk）。将现有内容和你新的分析结果合并到一个更新的文档中。同时发送多个 read_location 调用以快速审查函数。然后使用 write_file(path='docs/kodekvalitet.md', content='<合并>', overwrite=true) 保存。评估可读性、可维护性、测试覆盖率、命名规范（PEP 8）、类型提示、错误处理、复杂性、DRY 原则和关注点分离。",
   "Sikkerhed": "Læs først docs/sikkerhed.md hvis den findes (read_chunk). SAML eksisterende indhold og dine nye analyseresultater i ÉT opdateret dokument. Send FLERE read_location-kald på én gang for at gennemgå funktionerne hurtigt. Gem derefter med write_file(path='docs/sikkerhed.md', content='<samlet>', overwrite=true). Analysér inputvalidering (XSS, SQL injection), autentifikation og session management, access control/autorisation, kryptering og databeskyttelse, fejlhåndtering, sårbarheder i dependencies, security headers. Følg OWASP top 10.",
