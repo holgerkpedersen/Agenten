@@ -20,7 +20,19 @@ def _add_file_entry(file_context: str, agent: Any, filename: str, content: str) 
     agent.file_chunks[chunk_key] = chunks
     agent_issues.detect_oversize_file(agent, filename, content)
     if agent._pending_refactor:
-        agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
+        # Skip auto-creation af REFAC issues når sessionen selv er en
+        # refactor for den pågældende fil — issue er redundant; sessionen
+        # ER fixet. Sæt flag så decompose() kan justere oversize-noten.
+        prompt = (getattr(agent, 'original_prompt', '') or '').lower()
+        template = (getattr(agent, 'active_template', '') or '').lower()
+        is_self_refactor = (
+            template == 'refactor'
+            and filename.lower().replace('\\', '/').split('/')[-1] in prompt
+        )
+        if is_self_refactor:
+            agent._self_refactor_file = True
+        else:
+            agent_issues.create_refactor_issue(agent, filename, agent._pending_refactor["lines"])
         agent._pending_refactor = None
     is_python = filename.endswith('.py')
     if is_python:

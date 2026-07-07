@@ -93,6 +93,7 @@ class Agent:
         self.pending_reply: str | None = None
         self.stop_requested: bool = False
         self._pending_refactor: dict[str, Any] | None = None
+        self._self_refactor_file: bool = False  # sat af _add_file_entry når sessionen er en refactor for filen
         self.lang: str = "da"
         self.active_template: str | None = None
         self.current_phase: str | None = None
