@@ -103,11 +103,11 @@
       "Actualización"
     ],
     "refactor": [
-      "Análisis",
-      "Plan",
-      "Extraer",
-      "Actualizar",
-      "Probar"
+      "Análisis (refactor_analyse.md guardado con todos los símbolos agrupados en módulos)",
+      "Plan (refactor_plan.md con división de módulos para todos los símbolos)",
+      "Extraer (todos los archivos .py de módulo del plan creados)",
+      "Actualizar (archivo fuente reducido e imports añadidos)",
+      "Probar (todas las pruebas pasan)"
     ],
     "testgenerering": [
       "Análisis",

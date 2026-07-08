@@ -103,11 +103,11 @@
       "Opdatering"
     ],
     "refactor": [
-      "Analyse",
-      "Plan",
-      "Ekstraher",
-      "Opdatér",
-      "Test"
+      "Analyse (refactor_analyse.md gemt med alle symboler grupperet i moduler)",
+      "Plan (refactor_plan.md med modulopdeling for alle symboler)",
+      "Ekstraher (alle .py modulfiler fra planen oprettet)",
+      "Opdatér (kildefil reduceret og imports tilføjet)",
+      "Test (alle tests består)"
     ],
     "testgenerering": [
       "Analyse",

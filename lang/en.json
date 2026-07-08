@@ -103,11 +103,11 @@
       "Update"
     ],
     "refactor": [
-      "Analysis",
-      "Plan",
-      "Extract",
-      "Update",
-      "Test"
+      "Analysis (refactor_analyse.md saved with all symbols grouped into modules)",
+      "Plan (refactor_plan.md with module division for all symbols)",
+      "Extract (all .py module files from plan created)",
+      "Update (source file reduced and imports added)",
+      "Test (all tests pass)"
     ],
     "testgenerering": [
       "Analysis",

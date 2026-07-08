@@ -314,7 +314,7 @@ def _generate_phase_todos(template: str, phase_name: str, prompt: str = "", agen
             todos.extend([
                 {"id": "rf_a1", "text": "List alle symboler med list_symbols()", "done": False},
                 {"id": "rf_a2", "text": "Læs de vigtigste metoder med read_location()", "done": False},
-                {"id": "rf_a3", "text": "Analyser afhængigheder med analyze_dependencies()", "done": False},
+                {"id": "rf_a3", "text": "Analyser afhængigheder baseret på read_location resultater", "done": False},
                 {"id": "rf_a4", "text": "Identificer SOLID-overtrædelser", "done": False},
                 {"id": "rf_a5", "text": "Kortlæg ansvarsområder for modulopdeling", "done": False},
                 {"id": "rf_a6", "text": "Gem analyse i refactor_analyse.md med write_file()", "done": False},

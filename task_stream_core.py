@@ -646,24 +646,28 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                         else:
                             budget_msg += "\n\n💡 Har du en plan? Brug **list_todos** for at se din status. Mangler du en plan, kald **plan_phase(fasenavn, mål)**."
 
-                # For Analyse: remind to write refactor_analyse.md if not done yet
+                # For Analyse: remind to write refactor_analyse.md if not done yet.
+                # Wait until iteration 4 so the LLM can use list_symbols + up to 3
+                # read_location calls (as promised by the section instruction TRIN 2-5)
+                # before the write-file nudge fires.
                 if getattr(agent, 'active_template', '') == 'refactor' and _normalize_phase(task_node.name).lower() == "analyse":
                     _apath = "refactor_analyse.md"
                     _awd = os.environ.get('AGENT_WORKDIR', '')
                     if _awd:
                         _apath = os.path.join(_awd, _apath)
-                    if not os.path.exists(_apath) and i >= 1:
-                        _wmsg = "⛔ Du SKAL kalde write_file(path='refactor_analyse.md', content='...') nu. Det er din eneste opgave i denne fase. Kald IKKE plan_phase, list_symbols eller read_location igen."
+                    if not os.path.exists(_apath) and i >= 4:
+                        _wmsg = "⛔ Du SKAL kalde write_file(path='refactor_analyse.md', content='...') nu. Det er din eneste opgave i denne fase. Kald IKKE plan_phase eller list_symbols igen."
                         messages.append({"role": "system", "content": _wmsg})
                         budget_msg += "\n\n" + _wmsg
-                # For Plan: remind to write refactor_plan.md if not done yet
+                # For Plan: remind to write refactor_plan.md if not done yet.
+                # Wait until iteration 4 so the LLM can read refactor_analyse.md first.
                 if getattr(agent, 'active_template', '') == 'refactor' and _normalize_phase(task_node.name).lower() == "plan":
                     _ppath = "refactor_plan.md"
                     _pwd = os.environ.get('AGENT_WORKDIR', '')
                     if _pwd:
                         _ppath = os.path.join(_pwd, _ppath)
-                    if not os.path.exists(_ppath) and i >= 1:
-                        _wmsg = "⛔ Du SKAL kalde write_file(path='refactor_plan.md', content='...') nu. Det er din eneste opgave i denne fase. Kald IKKE plan_phase, list_symbols eller read_location igen."
+                    if not os.path.exists(_ppath) and i >= 4:
+                        _wmsg = "⛔ Du SKAL kalde write_file(path='refactor_plan.md', content='...') nu. Det er din eneste opgave i denne fase. Kald IKKE plan_phase eller list_symbols igen."
                         messages.append({"role": "system", "content": _wmsg})
                         budget_msg += "\n\n" + _wmsg
                 messages.append({"role": "user", "content": budget_msg})
