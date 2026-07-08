@@ -524,7 +524,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
     consecutive_test_failures = 0
     last_tool_name = ""
     last_name_arg = ""
-    READ_ONLY_TOOLS = {"read_location", "read_chunk", "list_chunks", "list_files", "list_symbols", "locate", "read_issue"}
+    READ_ONLY_TOOLS = {"read_location", "read_chunk", "list_files", "list_symbols", "locate", "read_issue"}
     WRITE_TOOLS = {"write_file", "edit_file", "delete_file", "extract_symbol", "batch_extract_symbols", "remove_symbol", "add_import", "add_method", "add_function"}
     agent._write_failed = False
     agent._tests_failed = False

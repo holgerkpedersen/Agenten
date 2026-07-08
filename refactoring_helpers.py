@@ -54,11 +54,13 @@ def _extract_retry_context(node: Any, agent: Any, full_response: str, symbols_be
     Returns:
         Dictionary med kontekst for retry.
     """
+    moved = max(0, symbols_before - symbols_after) if symbols_before >= 0 and symbols_after >= 0 else 0
     return {
         'node': node,
         'full_response': full_response,
         'symbols_before': symbols_before,
         'symbols_after': symbols_after,
+        'symbols_moved': moved,
         'tool_log_tail': getattr(agent, 'tool_log', [])[-5:] if hasattr(agent, 'tool_log') else []
     }
 

@@ -34,7 +34,7 @@ PHASE_ALIASES = {
 
 
 
-REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "delete_file", "extract_symbol", "remove_symbol", "add_import", "add_method", "add_function", "update_issue_status"}
+REQUIRED_ACTION_TOOLS = {"edit_file", "write_file", "delete_file", "extract_symbol", "remove_symbol", "add_import", "add_method", "add_function", "update_issue_status", "batch_extract_symbols", "run_extraction_plan", "verify_refactor"}
 
 
 
