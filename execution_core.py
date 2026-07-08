@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory, Response, stream_with_context
-from server_config import app
+from server_config import app, active_streams, active_streams_lock
 from session_manager import SessionManager, _guard_json_body, agent, session_manager, execution_status, execution_status_lock, export_folder_lock
 from stream_execution import _save_session_data as _ssd
 from decomposition import TEMPLATE_GUIDANCE
