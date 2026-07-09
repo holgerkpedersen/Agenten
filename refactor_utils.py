@@ -5,7 +5,6 @@ import ast
 import json
 import textwrap
 from lang import t
-from ast_analyzer import AstAnalyzer
 
 log = get_logger(__name__)
 
@@ -340,6 +339,7 @@ def _find_unresolved_local_deps(source_content: str, target_content: str) -> lis
     target_imported: set[str] = set()
     for node in ast.walk(target_tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
+            from ast_analyzer import AstAnalyzer
             target_imported |= AstAnalyzer.names_from_import_node(node)
 
     all_known = target_defined | target_imported | _BUILTINS | _BUILTINS_TYPING
