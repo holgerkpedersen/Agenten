@@ -77,15 +77,16 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
     if parsed["tool"] == "batch_extract_symbols" and isinstance(parsed.get("args"), dict):
         _planned = getattr(agent, '_planned_symbols_per_target', None)
         if _planned:
-            _target = os.path.basename(parsed["args"].get("target", ""))
+            _target = os.path.basename(parsed["args"].get("target", "")).strip('`')
             _symbols_raw = parsed["args"].get("symbols", "")
             _called_syms = set(s.strip() for s in _symbols_raw.split(",") if s.strip())
             # Find which module each symbol is PLANNED for
             _wrong = []
             for _sym in _called_syms:
                 for _mod, _plan_syms in _planned.items():
-                    if _sym in _plan_syms and os.path.basename(_mod) != _target:
-                        _wrong.append((_sym, os.path.basename(_mod)))
+                    _mod_clean = os.path.basename(_mod).strip('`')
+                    if _sym in _plan_syms and _mod_clean != _target:
+                        _wrong.append((_sym, _mod_clean))
                         break
             if _wrong:
                 _wrong_str = ", ".join(f"{s} → {m}" for s, m in _wrong[:5])

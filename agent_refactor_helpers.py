@@ -364,6 +364,7 @@ def _validate_ekstraher_symbols(agent: Any) -> str | None:
     for mod_file, expected_syms in planned.items():
         if not expected_syms:
             continue
+        mod_file = mod_file.strip('`')
         total_planned += len(expected_syms)
 
         mod_path = mod_file
@@ -450,6 +451,7 @@ def _build_module_progress_msg(agent: Any) -> str:
     for mod, planned_syms in planned.items():
         if not planned_syms:
             continue
+        mod = mod.strip('`')
         mod_basename = os.path.basename(mod)
         exists = os.path.exists(mod)
         if exists:

@@ -453,6 +453,26 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                 if _check_ok:
                     _plan_path = _fallback
         if not _check_ok:
+            # Session-restore fallback: recreate from file_chunks
+            _chunk_key = "file_refactor_plan.md"
+            if _chunk_key in agent.file_chunks:
+                _chunk_data = agent.file_chunks[_chunk_key]
+                _reconstructed = ""
+                if isinstance(_chunk_data, list):
+                    for _c in _chunk_data:
+                        _content = _c.get("content", _c) if isinstance(_c, dict) else _c
+                        _reconstructed += (_content if isinstance(_content, str) else str(_content))
+                elif isinstance(_chunk_data, str):
+                    _reconstructed = _chunk_data
+                if _reconstructed.strip():
+                    try:
+                        with open(_plan_path, 'w', encoding='utf-8') as _f:
+                            _f.write(_reconstructed)
+                        _check_ok = True
+                        agent._log("INFO", "Ekstraher prerequisite ok", f"Recreated refactor_plan.md ({len(_reconstructed)} chars) from file_chunks session data")
+                    except Exception as _exc2:
+                        agent._log("WARNING", f"Could not recreate refactor_plan.md: {_exc2}", "")
+        if not _check_ok:
             _msg = (f"Plan-fasen har ikke produceret `refactor_plan.md`. "
                     f"Ekstraher kan ikke køre uden planen. Genstart refactor-processen.")
             agent._log("ERROR", "Ekstraher prerequisite missing", _msg)
@@ -796,7 +816,7 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                             # Count how many planned modules exist on disk
                             planned = getattr(agent, '_planned_symbols_per_target', None)
                             if planned:
-                                exists_count = sum(1 for mod in planned if os.path.exists(mod))
+                                exists_count = sum(1 for mod in planned if os.path.exists(mod.strip('`')))
                                 total_count = len(planned)
                                 if exists_count < total_count:
                                     # Some modules don't exist yet — remove batch extract tools,
@@ -815,8 +835,9 @@ def solve_task_stream(agent: Any, task_node: Any, original_prompt: str, saved_me
                                 missing_modules = []
                                 if planned:
                                     for mod in planned:
-                                        if not os.path.exists(mod):
-                                            missing_modules.append(os.path.basename(mod))
+                                        mod_clean = mod.strip('`')
+                                        if not os.path.exists(mod_clean):
+                                            missing_modules.append(os.path.basename(mod_clean))
                                 if missing_modules:
                                     mod_list = ', '.join(missing_modules[:3])
                                     extra = f" mere" if len(missing_modules) > 3 else ""
@@ -1000,14 +1021,15 @@ f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: {t(K.SYS_EDIT_OLDTEXT_NOREAD, agent.lang)
                 if tool_name == "batch_extract_symbols" and isinstance(args_val, dict):
                     _planned = getattr(agent, '_planned_symbols_per_target', None)
                     if _planned:
-                        _target = os.path.basename(args_val.get("target", ""))
+                        _target = os.path.basename(args_val.get("target", "")).strip('`')
                         _symbols_raw = args_val.get("symbols", "")
                         _called_syms = set(s.strip() for s in _symbols_raw.split(",") if s.strip())
                         _wrong = []
                         for _sym in _called_syms:
                             for _mod, _plan_syms in _planned.items():
-                                if _sym in _plan_syms and os.path.basename(_mod) != _target:
-                                    _wrong.append((_sym, os.path.basename(_mod)))
+                                _mod_clean = os.path.basename(_mod).strip('`')
+                                if _sym in _plan_syms and _mod_clean != _target:
+                                    _wrong.append((_sym, _mod_clean))
                                     break
                         if _wrong:
                             _wrong_str = ", ".join(f"{s} → {m}" for s, m in _wrong[:5])

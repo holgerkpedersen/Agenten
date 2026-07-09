@@ -47,8 +47,10 @@ def _match_tool_to_todos(tool_name: str, args_val: dict, agent: Any, todo_list: 
             if target and (target in ttext or os.path.basename(target) in ttext):
                 # Check planned symbols vs called symbols
                 _planned = getattr(agent, '_planned_symbols_per_target', {})
-                if _planned and target in _planned and tool_name == "batch_extract_symbols":
-                    _planned_syms = set(_planned[target])
+                # Strip backticks from planned keys (plan may use `file.py` format)
+                _planned_clean = {k.strip('`'): v for k, v in _planned.items()}
+                if _planned_clean and target in _planned_clean and tool_name == "batch_extract_symbols":
+                    _planned_syms = set(_planned_clean[target])
                     _called = args_val.get("symbols", "")
                     if isinstance(_called, str):
                         _called_syms = set(s.strip() for s in _called.replace("'", "").replace('"', '').split(',') if s.strip())

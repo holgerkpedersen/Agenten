@@ -30,17 +30,19 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
         if heading_m and '.py' not in line:
             current_mod = None
 
-        # Format 1: ## Module: file_utils.py
+        # Format 1: ## Module: file_utils.py  (also handles ## Module: `file_utils.py`)
         m = re.match(r'^##\s+Module:\s*(\S+\.\w+)', line)
         if m:
-            current_mod = m.group(1)
+            current_mod = m.group(1).strip('`')
             mapping.setdefault(current_mod, [])
             # Check for inline symbols on the same line
             sym_inline = re.search(r'\*{0,2}[Ss]ymbol(er|s)?\s*\(\d+\):\*{0,2}\s*(.+)', line)
             if sym_inline:
                 for part in sym_inline.group(2).split(','):
-                    part = part.strip()
-                    sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                    part = part.strip().strip('`')
+                    if not part:
+                        continue
+                    sym_m = re.match(r'([a-zA-Z_]\w*)', part)
                     if sym_m:
                         name = sym_m.group(1)
                         if name and not name.startswith('__') and name not in mapping[current_mod]:
@@ -48,16 +50,19 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
             continue
 
         # Format 1b: ## Modul N: filename.py (Danish heading with optional number)
-        m = re.match(r'^#{2,6}\s+[Mm]odul[er]*\s*\d*:?\s*([\w./-]+\.\w+)', line)
+        # Also handles ## Modul: `file_utils.py` (with backticks)
+        m = re.match(r'^#{2,6}\s+[Mm]odul[er]*\s*\d*:?\s*(\S+\.\w+)', line)
         if m:
-            current_mod = m.group(1)
+            current_mod = m.group(1).strip('`')
             mapping.setdefault(current_mod, [])
             # Check for inline symbols on the same line
             sym_inline = re.search(r'\*{0,2}[Ss]ymbol(er|s)?\s*\(\d+\):\*{0,2}\s*(.+)', line)
             if sym_inline:
                 for part in sym_inline.group(2).split(','):
-                    part = part.strip()
-                    sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                    part = part.strip().strip('`')
+                    if not part:
+                        continue
+                    sym_m = re.match(r'([a-zA-Z_]\w*)', part)
                     if sym_m:
                         name = sym_m.group(1)
                         if name and not name.startswith('__') and name not in mapping[current_mod]:
@@ -70,25 +75,29 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
         if m and current_mod:
             syms_text = m.group(2)
             for part in syms_text.split(','):
-                part = part.strip()
-                sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                part = part.strip().strip('`')
+                if not part:
+                    continue
+                sym_m = re.match(r'([a-zA-Z_]\w*)', part)
                 if sym_m:
                     name = sym_m.group(1)
                     if name and not name.startswith('__') and name not in mapping[current_mod]:
                         mapping[current_mod].append(name)
             continue
 
-        # Format 2: ### N. filename.py
-        m = re.match(r'^#{2,6}\s+[\d\.\)]*\s*([\w./-]+\.\w+)', line)
+        # Format 2: ### N. filename.py  (also handles ### N. `filename.py`)
+        m = re.match(r'^#{2,6}\s+[\d\.\)]*\s*(\S+\.\w+)', line)
         if m:
-            current_mod = m.group(1)
+            current_mod = m.group(1).strip('`')
             mapping.setdefault(current_mod, [])
             # Check for inline symbols on the same line
             sym_inline = re.search(r'\*{0,2}[Ss]ymbol(er|s)?\s*\(\d+\):\*{0,2}\s*(.+)', line)
             if sym_inline:
                 for part in sym_inline.group(2).split(','):
-                    part = part.strip()
-                    sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                    part = part.strip().strip('`')
+                    if not part:
+                        continue
+                    sym_m = re.match(r'([a-zA-Z_]\w*)', part)
                     if sym_m:
                         name = sym_m.group(1)
                         if name and not name.startswith('__') and name not in mapping[current_mod]:
@@ -98,7 +107,7 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
         # Format 3: markdown table
         m = re.match(r'^\|\s*\*{1,2}([\w./-]+\.\w+)\*{1,2}\s*\|(.+)', line)
         if m:
-            mod = m.group(1)
+            mod = m.group(1).strip('`')
             mapping.setdefault(mod, [])
             syms = re.findall(r'`([a-zA-Z_]\w*)`', m.group(2))
             for s in syms:
@@ -120,8 +129,10 @@ def _parse_plan_symbol_mapping(plan_content: str) -> dict[str, list[str]]:
             if label_m:
                 text_clean = text_clean[label_m.end():]
             for part in text_clean.split(','):
-                part = part.strip()
-                sym_m = re.match(r'`?([a-zA-Z_]\w*)', part)
+                part = part.strip().strip('`')
+                if not part:
+                    continue
+                sym_m = re.match(r'([a-zA-Z_]\w*)', part)
                 if sym_m:
                     name = sym_m.group(1)
                     if name and not name.startswith('__') and name not in mapping[current_mod]:

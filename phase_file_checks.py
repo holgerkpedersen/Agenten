@@ -128,18 +128,18 @@ def _extract_modules_from_plan(
     ext_pattern = re.escape(ext)
 
     heading_pat = re.compile(
-        rf"^\s*#{1,6}\s+[\d\.\)]*\s*([\w./-]+{ext_pattern})\b",
+        rf"^\s*#{1,6}\s+[\d\.\)]*\s*(\S+{ext_pattern})\b",
         re.MULTILINE,
     )
-    # Also match "## Module: file.py" (colon-separated heading)
+    # Also match "## Module: file.py" or "## Module: `file.py`" (colon-separated heading)
     module_heading_pat = re.compile(
-        rf"^\s*#{1,6}\s+[Mm]odul[er]*\s*\d*:?\s*([\w./-]+{ext_pattern})\b",
+        rf"^\s*#{1,6}\s+[Mm]odul[er]*\s*\d*:?\s*(\S+{ext_pattern})\b",
         re.MULTILINE,
     )
-    inline_pat = re.compile(rf"\b([\w./-]+{ext_pattern})\b")
+    inline_pat = re.compile(rf"(?<![a-zA-Z])`?([\w./-]+{ext_pattern})`?(?![a-zA-Z])")
     for pat in (heading_pat, module_heading_pat, inline_pat):
         for m in pat.finditer(plan_content):
-            name = m.group(1).strip()
+            name = m.group(1).strip().strip('`')
             if not name:
                 continue
             if not allow_nested and ("/" in name or "\\" in name):

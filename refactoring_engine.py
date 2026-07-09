@@ -2090,20 +2090,27 @@ class RefactoringEngine:
                 "summary": f"❌ Kan ikke læse plan: {e}",
             }
 
-        # Parse modules from plan — format:
-        # ## Module: config.py
-        # ... **Symboler (N):** sym1, sym2, sym3
+        # Parse modules from plan — supports multiple formats:
+        #   ## Module: config.py
+        #   ## Module: `config.py`        (backtick-wrapped names)
+        #   ## Modul 1: config.py          (Danish with optional number)
+        #   ### 1. config.py               (numbered heading)
+        # Symbols can be listed as:
+        #   **Symboler (3):** sym1, sym2, sym3
+        #   **Symbols to move**: followed by bullet items:
+        #     - `sym1`
+        #     - sym2
         module_pattern = re.compile(
-            r"^#{1,6}\s+[Mm]odule?:?\s*([\w./-]+\.py)\b",
+            r"^#{1,6}\s+(?:\d+[\.\)]\s*|(?:[Mm]odul[er]*\s*\d*:?\s*)?)([\w./`-]+\.py)\b",
             re.MULTILINE,
         )
         symbols_pattern = re.compile(
-            r"\*\*Symboler\s*\(\d+\):\*\*\s*(.+)",
+            r"\*\*Symbol(?:er|s)?\s*(?:to move)?\s*(?:\(\d+\))?:\*\*\s*(.+)",
         )
 
         modules: list[dict[str, Any]] = []
         for mod_match in module_pattern.finditer(plan_content):
-            mod_name = mod_match.group(1).strip()
+            mod_name = mod_match.group(1).strip().strip('`')
             # Find the Symboler line within the module section
             start = mod_match.end()
             # Find end of this module section (next ## heading or end of file)
@@ -2114,9 +2121,12 @@ class RefactoringEngine:
             symbols: list[str] = []
             if sym_match:
                 raw = sym_match.group(1).strip()
-                symbols = [s.strip() for s in raw.split(",") if s.strip()]
+                symbols = [s.strip().strip('`').strip() for s in raw.split(",") if s.strip().strip('`').strip()]
             if not symbols:
-                symbols = []
+                # Fallback: extract symbols from bullet/indented lines
+                bullet_pat = re.compile(r'^\s*[-*]\s+`?([a-zA-Z_]\w*)`?\s*$', re.MULTILINE)
+                bullet_matches = bullet_pat.findall(section)
+                symbols = [s for s in bullet_matches if s]
             modules.append({"name": mod_name, "symbols": symbols})
 
         if not modules:
