@@ -92,42 +92,53 @@ def _finalize_task_stream(agent: Any, task_node: Any, full_response: str, text_f
                     f"gemme din plan før du afslutter."
                 )
 
-    # For refactor Ekstraher: verify that symbols were actually removed from source,
-    # not just that extract_symbol/batch_extract_symbols was called once.
+    # For refactor Ekstraher: verify extraction was complete
     template = getattr(agent, "active_template", "")
     if task_node.status in ("done",) and template == "refactor":
         phase = _normalize_phase(task_node.name).lower()
         if "ekstraher" in phase:
-            try:
-                src_file = getattr(agent, '_source_file', '') or 'api_server.py'
-                abs_src = os.path.abspath(src_file) if not os.path.isabs(src_file) else src_file
-                sym_result = agent_files.list_symbols(abs_src)
-                if sym_result.get("success"):
-                    remaining = len(sym_result.get("symbols", []))
-                    planned = getattr(agent, '_planned_symbols_per_target', None) or {}
-                    planned_count = sum(len(syms) for syms in planned.values())
-                    if (planned_count > 0 and remaining > planned_count) or (planned_count == 0 and remaining >= 50):
-                        _path = "ekstraher_remaining"
-                        task_node.status = "failed"
-                        full_response = t(K.LOG_EXTRACT_INCOMPLETE, agent.lang).format(
-                            remaining=remaining
-                        )
-            except Exception:
-                pass
+            _called_names = {k.split("{")[0] for k in called_tools}
+            if "run_extraction_plan" not in _called_names:
+                # run_extraction_plan was NOT called — old remaining-symbols check
+                try:
+                    src_file = getattr(agent, '_source_file', '') or 'api_server.py'
+                    abs_src = os.path.abspath(src_file) if not os.path.isabs(src_file) else src_file
+                    sym_result = agent_files.list_symbols(abs_src)
+                    if sym_result.get("success"):
+                        remaining = len(sym_result.get("symbols", []))
+                        planned = getattr(agent, '_planned_symbols_per_target', None) or {}
+                        planned_count = sum(len(syms) for syms in planned.values())
+                        if (planned_count > 0 and remaining > planned_count) or (planned_count == 0 and remaining >= 50):
+                            _path = "ekstraher_remaining"
+                            task_node.status = "failed"
+                            full_response = t(K.LOG_EXTRACT_INCOMPLETE, agent.lang).format(
+                                remaining=remaining
+                            )
+                except Exception:
+                    pass
 
-        # Per-module symbol validation: check that ALL planned symbols exist
-        # in their target modules, not just that the source was emptied.
-        # NOTE: Only run for ekstraher phases — during Analyse/Plan modules
-        # don't exist yet, so validation would falsely fail.
-        if task_node.status in ("done",):
-            phase = _normalize_phase(task_node.name).lower()
-            if "ekstraher" in phase:
+            # Per-module symbol validation: check that ALL planned symbols exist
+            # in their target modules
+            if task_node.status in ("done",):
                 try:
                     validation_msg = _validate_ekstraher_symbols(agent)
                     if validation_msg:
                         _path = "ekstraher_validation"
                         task_node.status = "failed"
                         full_response = validation_msg
+                    else:
+                        # All planned symbols in correct targets — auto-run tests.
+                        # If tests pass, mark issue resolved to cascade-skip Opdatér/Test.
+                        agent._extraction_complete = True
+                        try:
+                            test_ok = _run_full_test_suite(agent)
+                            if test_ok:
+                                agent.issue_resolved = True
+                                log(f"[_finalize] Ekstraher: tests PASSED after extraction — cascade-skipping Opdatér/Test")
+                            else:
+                                log(f"[_finalize] Ekstraher: tests FAILED after extraction — will NOT cascade-skip")
+                        except Exception as e:
+                            log(f"[_finalize] Ekstraher: auto-test error: {e}")
                 except Exception:
                     pass
 

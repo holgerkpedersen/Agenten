@@ -2088,7 +2088,17 @@ class RefactoringEngine:
                 "failed": 0,
                 "progress": [],
                 "summary": f"❌ Kan ikke læse plan: {e}",
+                "source_valid": False,
+                "tests_passed": False,
             }
+
+        # Take snapshot of source file for full rollback
+        source_snapshot = None
+        if os.path.exists(source):
+            try:
+                source_snapshot = FileSnapshot.create(source)
+            except Exception:
+                pass
 
         # Parse modules from plan — supports multiple formats:
         #   ## Module: config.py
@@ -2226,8 +2236,25 @@ class RefactoringEngine:
                 summary_parts.append(f"  ⏭️  {m['module']}: {m.get('message', '?')}")
 
         all_ok = failed_count == 0
+
+        # Syntax-validate source file after all extractions
+        source_valid = False
+        syntax_error = ""
+        if all_ok and source_snapshot:
+            try:
+                with open(source, encoding="utf-8") as _f:
+                    ast.parse(_f.read())
+                source_valid = True
+            except (SyntaxError, OSError) as _e:
+                syntax_error = str(_e)
+                source_snapshot.restore()
+                all_ok = False
+                failed_count += 1
+
         if all_ok:
             summary_parts.append(f"\n✅ ALLE {total} moduler behandlet — ekstrahering fuldført!")
+        elif succeeded_count > 0 and syntax_error:
+            summary_parts.append(f"\n⚠️ {failed_count} modul(er) fejlede — syntaksfejl i kildefilen efter ekstraktion: {syntax_error[:200]}")
         elif succeeded_count > 0:
             summary_parts.append(f"\n⚠️ {failed_count} modul(er) fejlede — se detaljer ovenfor")
         else:
@@ -2241,6 +2268,9 @@ class RefactoringEngine:
             "skipped": skipped_count,
             "progress": progress,
             "summary": "\n".join(summary_parts),
+            "source_valid": source_valid,
+            "syntax_error": syntax_error if not source_valid else "",
+            "tests_passed": False,
         }
 
     @staticmethod

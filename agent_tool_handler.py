@@ -73,32 +73,21 @@ def _handle_tool_call(agent: Any, parsed: dict, messages: list[dict], called_too
             _cached = agent._list_symbols_cache[_ls_file]
             agent._log("TOOL", t(K.LOG_TOOL_RESULT, agent.lang).format(tool=parsed['tool']), f"(cached) cached result")
             return {"tool": parsed["tool"], "args": parsed.get("args", {}), "result": _cached, **({"checkpoint_msg": ""} if False else {})}
-    # Plan-deviation check: block batch_extract_symbols if symbols go to wrong module
-    if parsed["tool"] == "batch_extract_symbols" and isinstance(parsed.get("args"), dict):
-        _planned = getattr(agent, '_planned_symbols_per_target', None)
-        if _planned:
-            _target = os.path.basename(parsed["args"].get("target", "")).strip('`')
-            _symbols_raw = parsed["args"].get("symbols", "")
-            _called_syms = set(s.strip() for s in _symbols_raw.split(",") if s.strip())
-            # Find which module each symbol is PLANNED for
-            _wrong = []
-            for _sym in _called_syms:
-                for _mod, _plan_syms in _planned.items():
-                    _mod_clean = os.path.basename(_mod).strip('`')
-                    if _sym in _plan_syms and _mod_clean != _target:
-                        _wrong.append((_sym, _mod_clean))
-                        break
-            if _wrong:
-                _wrong_str = ", ".join(f"{s} → {m}" for s, m in _wrong[:5])
-                _deviation_msg = (
-                    f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: "
-                    f"Plan-deviation: {_wrong_str}\n"
-                    f"Du sender symboler til {_target} men planen siger de hører til et andet modul. "
-                    f"Ret batch kaldet til at bruge det korrekte target."
-                )
-                _add_user_msg(messages, _deviation_msg)
-                return {"tool": parsed["tool"], "args": parsed["args"],
-                        "result": {"success": False, "error": "Plan deviation blocked"}}
+    # In Ekstraher phase: block batch_extract_symbols and extract_symbol —
+    # LLM must use run_extraction_plan instead (handles ALL modules in one call)
+    if parsed["tool"] in ("batch_extract_symbols", "extract_symbol") and isinstance(parsed.get("args"), dict):
+        _phase = _normalize_phase(task_node.name).lower() if hasattr(task_node, 'name') else ''
+        if getattr(agent, 'active_template', '') == 'refactor' and "ekstraher" in _phase:
+            _block_msg = (
+                f"{t(K.SYS_ERROR_PREFIX, agent.lang)}: "
+                f"I Ekstraher-fasen skal du KUN bruge run_extraction_plan(source, plan_path). "
+                f"Det håndterer ALLE moduler p&aring; én gang, fjerner symboler fra source, "
+                f"tilf&oslash;jer imports, OG verificerer syntaks. "
+                f"Kald run_extraction_plan(source='{parsed['args'].get('source', '')}', plan_path='refactor_plan.md')"
+            )
+            _add_user_msg(messages, _block_msg)
+            return {"tool": parsed["tool"], "args": parsed["args"],
+                    "result": {"success": False, "error": "Brug run_extraction_plan i stedet"}}
     result = agent.tool_registry.execute(parsed["tool"], parsed["args"])
     if parsed["tool"] == "list_symbols" and isinstance(result, dict) and result.get("success"):
         _f = (parsed.get("args") or {}).get("filepath", "")
