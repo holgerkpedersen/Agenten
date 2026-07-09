@@ -1,0 +1,42 @@
+{
+  "$schema": "plan-parser-v1",
+  "name": "default",
+  "description": "Baseline config — works with 90%+ of current LLMs",
+  "model_patterns": [],
+  "module": {
+    "heading": {
+      "pattern": "^#{1,6}\\s+(?:\\d+[\\.\\)]\\s*|(?:[Mm]odul[er]*\\s*\\d*:?\\s*)?)([\\w./`-]+\\.py)\\b",
+      "flags": "m",
+      "label": "## Module: file.py / ## file.py / ### 1. file.py"
+    },
+    "exclude_headings": ["Forbliver", "forbliver", "bliver i"],
+    "exclude_symbol_labels": ["forbliver", "bliver", "remains", "stays"]
+  },
+  "symbols": {
+    "inline": {
+      "pattern": "\\*\\*Symbol(?:er|s)?\\s*(?:to move|der flyttes|der skal flyttes)?\\s*(?:\\(\\d+\\))?:\\*\\*\\s*(.+)",
+      "label": "**Symboler (N):** sym1, sym2  / **Symboler der flyttes (N):** ..."
+    },
+    "bullet": {
+      "enabled": true,
+      "pattern": "^\\s*[-*]\\s+`?([a-zA-Z_]\\w*)`?\\s*$",
+      "flags": "m",
+      "label": "- sym1"
+    },
+    "table": {
+      "enabled": false,
+      "pattern": "^\\|\\s*\\*{1,2}([\\w./-]+\\.\\w+)\\*{1,2}\\s*\\|(.+)",
+      "flags": "m",
+      "label": "| **file.py** | sym1, sym2 |"
+    },
+    "on_heading_line": {
+      "enabled": true,
+      "pattern": "\\*{0,2}[Ss]ymbol(?:er|s)?\\s*(?:\\(\\d+\\))?:\\*{0,2}\\s*(.+)",
+      "label": "Inline symbols on heading line: ## file.py **Symboler (3):** sym1, sym2"
+    }
+  },
+  "module_only": {
+    "methods": ["heading", "inline"],
+    "inline_pattern": "(?<![a-zA-Z])`?([\\w./-]+\\.py)`?(?![a-zA-Z])"
+  }
+}

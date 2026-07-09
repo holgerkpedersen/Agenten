@@ -1,0 +1,39 @@
+{
+  "$schema": "plan-parser-v1",
+  "name": "minimax-m2.5",
+  "description": "Minimax M2.5 — uses same format as default",
+  "model_patterns": ["minimax", "MiniMax"],
+  "module": {
+    "heading": {
+      "pattern": "^#{1,6}\\s+(?:\\d+[\\.\\)]\\s*|(?:[Mm]odul[er]*\\s*\\d*:?\\s*)?)([\\w./`-]+\\.py)\\b",
+      "flags": "m",
+      "label": "## Module: file.py / ## file.py / ### 1. file.py"
+    },
+    "exclude_headings": ["Forbliver", "forbliver", "bliver i"],
+    "exclude_symbol_labels": ["forbliver", "bliver", "remains", "stays"]
+  },
+  "symbols": {
+    "inline": {
+      "pattern": "\\*\\*Symbol(?:er|s)?\\s*(?:to move|der flyttes|der skal flyttes)?\\s*(?:\\(\\d+\\))?:\\*\\*\\s*(.+)",
+      "label": "**Symboler (N):** sym1, sym2"
+    },
+    "bullet": {
+      "enabled": true,
+      "pattern": "^\\s*[-*]\\s+`?([a-zA-Z_]\\w*)`?\\s*$",
+      "flags": "m"
+    },
+    "table": {
+      "enabled": false,
+      "pattern": "^\\|\\s*\\*{1,2}([\\w./-]+\\.\\w+)\\*{1,2}\\s*\\|(.+)",
+      "flags": "m"
+    },
+    "on_heading_line": {
+      "enabled": true,
+      "pattern": "\\*{0,2}[Ss]ymbol(?:er|s)?\\s*(?:\\(\\d+\\))?:\\*{0,2}\\s*(.+)"
+    }
+  },
+  "module_only": {
+    "methods": ["heading", "inline"],
+    "inline_pattern": "(?<![a-zA-Z])`?([\\w./-]+\\.py)`?(?![a-zA-Z])"
+  }
+}

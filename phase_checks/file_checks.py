@@ -9,6 +9,8 @@ import os
 import re
 from typing import Any
 
+from plan_parser import parse_modules_from_plan
+
 
 def check_file_exists(
     paths: list[str], spec: dict[str, Any] | None = None, base_dir: str | None = None
@@ -102,44 +104,16 @@ def _extract_modules_from_plan(
 ) -> list[str]:
     """Extract module filenames from a refactor plan markdown.
 
-    The plan format from the LLM typically looks like:
-        ### 1. routes.py **Ansvar:** Endpoint definitioner
-        ### 2. session_manager.py **Ansvar:** Session CRUD
-
-    We also pick up bare filenames like ``routes.py`` anywhere in the text
-    (in case the LLM didn't use a heading).
-
-    Args:
-        plan_content: The markdown content of the plan file.
-        ext: File extension to look for (default ".py").
-        allow_nested: If True, keep paths with ``/`` or ``\\``
-            (e.g. ``gui/browser_window.py``). Used by greenfield projects where
-            modules are organized in subdirectories.
+    Delegates to ``plan_parser.parse_modules_from_plan()`` which loads LLM-specific
+    regex configs from ``llm_plans/*.json``.
     """
     if not plan_content:
         return []
 
-    seen: set[str] = set()
-    ext_pattern = re.escape(ext)
-    heading_pat = re.compile(
-        rf"^\s*#{1,6}\s+[\d\.\)]*\s*(\S+{ext_pattern})\b", re.MULTILINE
-    )
-    # Also match "## Module: file.py" or "## Module: `file.py`" (colon-separated heading)
-    module_heading_pat = re.compile(
-        rf"^\s*#{1,6}\s+[Mm]odul[er]*\s*\d*:?\s*(\S+{ext_pattern})\b", re.MULTILINE
-    )
-    inline_pat = re.compile(rf"(?<![a-zA-Z])`?([\w./-]+{ext_pattern})`?(?![a-zA-Z])")
-
-    for pat in (heading_pat, module_heading_pat, inline_pat):
-        for m in pat.finditer(plan_content):
-            name = m.group(1).strip().strip('`')
-            if not name:
-                continue
-            if not allow_nested and ("/" in name or "\\" in name):
-                continue
-            seen.add(name)
-
-    return sorted(seen)
+    modules = parse_modules_from_plan(plan_content, allow_nested=allow_nested)
+    if ext != ".py":
+        modules = [m for m in modules if m.endswith(ext)]
+    return modules
 
 
 def check_files_from_plan(

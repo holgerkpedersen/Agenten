@@ -1090,3 +1090,27 @@ if (planned_count > 0 and remaining > planned_count) or (planned_count == 0 and 
 **Hændelse (2026-07-04):** `copySessionId()` i `static/index.html` havde `sel?.addRange(sel)` i catch-branchen — en stavefejl (`sel` skulle være `range`). LLM'en "rettede" det og ændrede `addLogEntry` til `showCopyFeedback` uden at spørge. Men brugeren oplevede INGEN fejl: `navigator.clipboard.writeText` virkede fint i Chrome på localhost. Catch-branchen var aldrig blevet ramt. Ændringen var unødvendig og ændrede eksisterende adfærd.
 
 **Regel:** Rør ALDRIG en kodegren der ser buggy ud (catch/error-handler, edge case, fallback) medmindre brugeren har rapporteret **symptomet**. En gren der aldrig eksekveres er en ren opportunity cost — ikke en fejl der skal fikses. Spørg altid: "Har du oplevet at [symptom] sker?" før du ændrer. Brug "never touch a working UI feature unless explicitly asked" som huskeregel.
+
+### 72. Ekstraher one-shot: `run_extraction_plan` only, syntax rollback, auto-test cascade
+
+**Ændring (2026-07-09):** Eliminér Opdatér/Test faser ved at gøre Ekstraher deterministisk.
+
+**Problem:** Ekstraher brugte 15+ iterationer på at kalde `batch_extract_symbols` ét modul ad gangen — løb tør for iterations, skabte duplikater via `_extracted_registry` hash-collision, og LLM'ens `edit_file` for Opdatér fejlede pga. escaping/indentation.
+
+**Løsning (5 files, commit `195f5dc`):**
+
+1. **`refactoring_engine.py:run_extraction_plan`**: Før extraction tager `FileSnapshot` af source (kopi af hele filindholdet). Efter ALLE modules er skrevet, kører `ast.parse(source)` på den modificerede source. Hvis syntaksfejl → restore source fra snapshot, slet alle oprettede module-filer. Returnerer `source_valid` + `syntax_error` i resultat-dict. Transformerer dermed `run_extraction_plan` fra "best effort" til "alt-eller-intet".
+
+2. **`agent_tool_handler.py:76-99`**: I Ekstraher-fasen (`active_template == 'refactor'` og fase indeholder `ekstraher`), blokér `batch_extract_symbols` og `extract_symbol` med en fejlmeddelelse der instruerer LLM'en til at bruge `run_extraction_plan(source=..., plan_path=...)` i stedet. LLM'en har kun EEN tool mulighed.
+
+3. **`agent_skills.py:168`**: Fjern `extract_symbol` og `batch_extract_symbols` fra refactor Ekstraher tool-listen — LLM'en kan slet ikke se dem.
+
+4. **`instructions/refactor.json`**: Omskriv både `Ekstraher` og `en_ekstraher` sektionsinstruktioner til at beskrive `run_extraction_plan` som ENESTE tilladte tool. Tilføj `🚫 batch_extract_symbols OG extract_symbol er BLOKEREDE`. Forklar at ét kald = alle moduler + syntaks-check, og at Opdatér/Test springes over efter succes.
+
+5. **`task_stream_core.py:_finalize_task_stream`**: Erstat den gamle `remaining >= 50` check med: hvis `run_extraction_plan` var i `called_tools`, spring remaining-symbols check over (`run_extraction_plan` håndterer alt). Efter `_validate_ekstraher_symbols` passerer (alle planlagte symboler findes i deres target-moduler), auto-kald `_run_full_test_suite(agent)`. Hvis tests passer → `agent.issue_resolved = True` → cascade-skip Opdatér og Test faser.
+
+**Resultat:** Ekstraher-fasen kræver nu ét LLM-kald til `run_extraction_plan`. Systemet verificerer syntaks, ruller tilbage ved fejl, validerer symbol-placering, og auto-kører tests. Ved succes springes Opdatér og Test over (0 iterationer spildt).
+
+**Tests:** 877 passed, 1 xfailed (stabil).
+
+**Files:** `refactoring_engine.py:2037-2279`, `agent_tool_handler.py:76-99`, `agent_skills.py:168`, `instructions/refactor.json`, `task_stream_core.py:95-150`
