@@ -5,26 +5,26 @@ Read this before making changes.
 
 ## Project Structure
 
-| File | Purpose |
-|------|---------|
-| `api_server.py` | Flask REST API + all endpoints |
-| `agent_core.py` | Agent facade (504 lines) — `__init__`, tool registration, `decompose_prompt`, `execute_tree`, thin delegation methods |
-| `agent_issues.py` | Issue tools (`read_issue`, `update_issue_status`, `create_refactor_issue`) + oversize file detection |
-| `agent_files.py` | File/chunk operations (`_read_file_content`, `_get_folder_context`, `chunk_text`, `list_chunks`, `read_chunk`) |
-| `agent_tree.py` | Tree operations (`parse_tree_from_llm`, `create_fallback_tree`, `count_tasks`, `record_outcome`, `evolve_if_needed`) |
-| `agent_skills.py` | Skills matching, template/config constants (`TEMPLATE_TOOLS`, `TEMPLATE_TASK_TOOLS`, `SECTION_INSTRUCTIONS`, `get_templates`) |
-| `agent_git.py` | Git/PR workflow helpers (`is_pr_workflow`, `extract_branch_name`, `verify_pr_step`) + PR constants |
-| `agent_tasks.py` | Task execution engine (`solve_task_stream`, `solve_task`, `handle_tool_call`, `_auto_populate_llm_todos`, `_reconcile_llm_todos`) |
-| `agent_tools_todo.py` | LLM-driven todo management tools (`plan_phase`, `create_todo`, `update_todo`, `delete_todo`, `list_todos`) |
-| `llm_wrapper.py` | LM Studio API client, image encoding, vision support |
-| `tools.py` | ToolRegistry, tool dispatch (`execute()`), `parse_response()` |
-| `lang.py` | Danish/English/Spanish/Chinese translations |
-| `i18n.py` | Translation key enum (K.KEY) |
-| `phase_engine.py` | Phase auto-advance logic (`check_phase_done`, `TEMPLATE_PHASE_CHECKS`) |
-| `static/index.html` | Complete frontend SPA |
-| `skills/*.md` | Agent skill definitions |
-| `instructions/*.json` | Per-template section instructions (JSON, override `agent_skills.py`) |
-| `sessions/*.json` | Persisted session data |
+| File                  | Purpose                                                                                                                           |
+|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| `api_server.py`       | Flask REST API + all endpoints                                                                                                    |
+| `agent_core.py`       | Agent facade (504 lines) — `__init__`, tool registration, `decompose_prompt`, `execute_tree`, thin delegation methods             |
+| `agent_issues.py`     | Issue tools (`read_issue`, `update_issue_status`, `create_refactor_issue`) + oversize file detection                              |
+| `agent_files.py`      | File/chunk operations (`_read_file_content`, `_get_folder_context`, `chunk_text`, `list_chunks`, `read_chunk`)                    |
+| `agent_tree.py`       | Tree operations (`parse_tree_from_llm`, `create_fallback_tree`, `count_tasks`, `record_outcome`, `evolve_if_needed`)              |
+| `agent_skills.py`     | Skills matching, template/config constants (`TEMPLATE_TOOLS`, `TEMPLATE_TASK_TOOLS`, `SECTION_INSTRUCTIONS`, `get_templates`)     |
+| `agent_git.py`        | Git/PR workflow helpers (`is_pr_workflow`, `extract_branch_name`, `verify_pr_step`) + PR constants                                |
+| `agent_tasks.py`      | Task execution engine (`solve_task_stream`, `solve_task`, `handle_tool_call`, `_auto_populate_llm_todos`, `_reconcile_llm_todos`) |
+| `agent_tools_todo.py` | LLM-driven todo management tools (`plan_phase`, `create_todo`, `update_todo`, `delete_todo`, `list_todos`)                        |
+| `llm_wrapper.py`      | LM Studio API client, image encoding, vision support                                                                              |
+| `tools.py`            | ToolRegistry, tool dispatch (`execute()`), `parse_response()`                                                                     |
+| `lang.py`             | Danish/English/Spanish/Chinese translations                                                                                       |
+| `i18n.py`             | Translation key enum (K.KEY)                                                                                                      |
+| `phase_engine.py`     | Phase auto-advance logic (`check_phase_done`, `TEMPLATE_PHASE_CHECKS`)                                                            |
+| `static/index.html`   | Complete frontend SPA                                                                                                             |
+| `skills/*.md`         | Agent skill definitions                                                                                                           |
+| `instructions/*.json` | Per-template section instructions (JSON, override `agent_skills.py`)                                                              |
+| `sessions/*.json`     | Persisted session data                                                                                                            |
 
 ## Version Check
 

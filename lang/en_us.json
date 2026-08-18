@@ -583,6 +583,12 @@
     "hide_detail": "hide detail",
     "reuse": "Reuse",
     "connecting": "Connecting to stream...",
+    "monochrome_toggle": "Monochrome",
+    "resume": "Resume",
+    "undo": "Undo",
+    "resume_hint": "Click Resume to continue",
+    "paused_log": "Execution paused",
+    "resuming_log": "Resume clicked — attempting to resume...",
     "footer_developed": "Developed by Holger K. Pedersen",
     "footer_made_with": "UI/UX Reshaped with <span style=\"color:#ef4444;\">❤</span> by Tarek Tarabichi"
   },
