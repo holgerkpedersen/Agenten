@@ -82,6 +82,17 @@ LLM_MODEL = os.environ.get("LM_MODEL", "qwen3.5-9b-mtp")
 LLM_STREAM_TIMEOUT = 900
 LLM_CONNECT_TIMEOUT = 120
 
+# LOCAL LLM ENGINES (2TI) — our own local models, ADDITIONAL to the friend's LM Studio.
+LLAMA_BASE_URL = os.environ.get("LLAMA_BASE_URL", "http://127.0.0.1:8900/v1")
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+OLLACOMPILER_BASE_URL = os.environ.get("OLLACOMPILER_BASE_URL", "http://localhost:8066")
+LOCAL_LLM_ENGINES = {
+    "llama": {"base_url": LLAMA_BASE_URL, "kind": "openai"},
+    "ollama": {"base_url": OLLAMA_BASE_URL, "kind": "ollama"},
+    "ollacompiler": {"base_url": OLLACOMPILER_BASE_URL, "kind": "ollacompiler", "stateful": True},
+}
+
+
 # Image upload
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10 MB max per image file
 

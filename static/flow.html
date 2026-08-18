@@ -144,25 +144,28 @@
             margin-left: 8px;
         }
     </style>
-</head>
+<script src="static/assets/js/iconify-icon.min.js" defer></script><link rel="stylesheet" href="static/assets/css/remixicon.css">
+    <link rel="stylesheet" href="static/assets/css/wowdash.css">
+    <link rel="stylesheet" href="static/theme.css">
+    <script src="assets/js/iconify.min.js" defer></script></head>
 <body>
 <div class="app">
-    <h1>🔍 Flow Builder</h1>
+    <strong><p class="fw-semibold mb-0"> Flow Builder</p></strong>
     <div class="sub">Web Research Flow — Dynamics 365 compatible</div>
 
     <div class="toolbar">
         <span class="label">Topic</span>
         <input type="text" id="topicInput" placeholder="e.g. quantum computing breakthroughs 2025" value="quantum computing">
-        <button class="btn-search" onclick="searchAndBuild()">🔎 Search & Build Flow</button>
+        <button class="btn-search" onclick="searchAndBuild()"> Search & Build Flow</button>
         <span id="status" style="color:#94a3b8;font-size:13px;"></span>
     </div>
 
     <div class="layout">
         <div class="card">
-            <h3>📊 Flow Diagram</h3>
+            <strong><p class="fw-semibold mb-0"> Flow Diagram</p></strong>
             <div class="mermaid-wrapper">
                 <pre class="mermaid" id="mermaidContainer">graph TB
-  Trigger["🔷 Manual Trigger"]
+  Trigger[" Manual Trigger"]
   style Trigger fill:#3b82f6,color:#fff
   Trigger -->|Succeeded| End["Enter a topic to build a flow"]
   style End fill:#64748b,color:#fff</pre>
@@ -170,7 +173,7 @@
         </div>
 
         <div class="card">
-            <h3>📄 Search Results <span id="resultCount" class="badge">0</span></h3>
+            <strong><p class="fw-semibold mb-0"><span class="iconify" data-icon="solar:document-text"></span> Search Results <span id="resultCount" class="badge">0</span></p></strong>
             <div class="results-list" id="resultsContainer">
                 <div style="color:#64748b;text-align:center;padding:40px;">Search results will appear here</div>
             </div>
@@ -178,15 +181,15 @@
 
         <div class="card" style="grid-column: 1 / -1;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <h3 style="margin:0;">⚙️ Flow JSON</h3>
-                <button class="btn-apply" onclick="applyFlowJson()">🔄 Apply & Re-render</button>
+                <strong><p class="fw-semibold mb-0" style="margin:0;"> Flow JSON</p></strong>
+                <button class="btn-apply" onclick="applyFlowJson()"> Apply & Re-render</button>
             </div>
             <textarea id="flowJsonEditor"></textarea>
         </div>
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="static/assets/js/mermaid.min.js"></script>
 <script>
 mermaid.initialize({
     startOnLoad: true,
@@ -206,9 +209,9 @@ function $(id) { return document.getElementById(id); }
 
 async function searchAndBuild() {
     const topic = $('topicInput').value.trim();
-    if (!topic) { $('status').textContent = '⚠️ Enter a topic'; return; }
+    if (!topic) { $('status').textContent = '<span class="iconify" data-icon="solar:alert-triangle"></span> Enter a topic'; return; }
 
-    $('status').textContent = '⏳ Searching...';
+    $('status').textContent = '<span class="iconify" data-icon="solar:clock-circle"></span> Searching...';
     $('resultsContainer').innerHTML = '<div style="color:#64748b;text-align:center;padding:40px;">Searching...</div>';
     $('resultCount').textContent = '0';
 
@@ -221,7 +224,7 @@ async function searchAndBuild() {
         const data = await resp.json();
 
         if (!data.success) {
-            $('status').textContent = '❌ Error: ' + (data.error || 'Unknown');
+            $('status').textContent = '<span class="iconify" data-icon="solar:close-circle"></span> Error: ' + (data.error || 'Unknown');
             return;
         }
 
@@ -235,9 +238,9 @@ async function searchAndBuild() {
         // Render mermaid diagram
         renderMermaid(data.mermaid);
 
-        $('status').textContent = `✅ ${data.results.length} results for "${data.topic}"`;
+        $('status').textContent = `<span class="iconify" data-icon="solar:check-circle"></span> ${data.results.length} results for "${data.topic}"`;
     } catch (e) {
-        $('status').textContent = '❌ ' + e.message;
+        $('status').textContent = '<span class="iconify" data-icon="solar:close-circle"></span> ' + e.message;
     }
 }
 
@@ -267,7 +270,7 @@ function renderMermaid(diagram) {
     wrapper.replaceChild(pre, old);
     mermaid.run({ nodes: [pre] }).catch(e => {
         console.error('Mermaid error:', e);
-        pre.outerHTML = '<div style="color:#ef4444;padding:20px;">⚠️ Could not render diagram. Check JSON syntax.</div>';
+        pre.outerHTML = '<div style="color:#ef4444;padding:20px;"><span class="iconify" data-icon="solar:alert-triangle"></span> Could not render diagram. Check JSON syntax.</div>';
     });
 }
 
@@ -285,12 +288,12 @@ function applyFlowJson() {
             })
         }).then(resp => resp.json()).then(data => {
             if (data.mermaid) renderMermaid(data.mermaid);
-            $('status').textContent = '✅ Flow JSON applied & re-rendered';
+            $('status').textContent = '<span class="iconify" data-icon="solar:check-circle"></span> Flow JSON applied & re-rendered';
         }).catch(e => {
-            $('status').textContent = '❌ Could not regenerate from edited JSON';
+            $('status').textContent = '<span class="iconify" data-icon="solar:close-circle"></span> Could not regenerate from edited JSON';
         });
     } catch (e) {
-        $('status').textContent = '❌ Invalid JSON: ' + e.message;
+        $('status').textContent = '<span class="iconify" data-icon="solar:close-circle"></span> Invalid JSON: ' + e.message;
     }
 }
 

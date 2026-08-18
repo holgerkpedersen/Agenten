@@ -7,7 +7,7 @@ log = get_logger(__name__)
 
 _LANG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lang")
 LANG = {}
-for _lang_code in ["da", "en", "es", "zh"]:
+for _lang_code in ["da", "en", "en_us", "es", "zh"]:
     _path = os.path.join(_LANG_DIR, f"{_lang_code}.json")
     if os.path.exists(_path):
         try:
@@ -16,10 +16,10 @@ for _lang_code in ["da", "en", "es", "zh"]:
         except (_json.JSONDecodeError, OSError) as e:
             log.warning("Failed to load translation %s: %s", _lang_code, e)
 
-def t(key: str, lang: str = "da") -> str:
-    """Get translated string via dot notation: t('log.task_start', 'en')
+def t(key: str, lang: str = "en_us") -> str:
+    """Get translated string via dot notation: t('log.task_start', 'en_us')
     Supports both nested keys (e.g. 'ui.title') and flat dot-keys in ui (e.g. 'session.default_name')."""
-    base = LANG.get(lang, LANG["da"])
+    base = LANG.get(lang, LANG.get("en_us", LANG["da"]))
     # Check direct match at root level first
     if key in base:
         return base[key]
@@ -41,7 +41,7 @@ def t(key: str, lang: str = "da") -> str:
 
 def get_ui_translations(lang: str) -> dict:
     """Return all UI translations for the frontend as a flat dict."""
-    data = LANG.get(lang, LANG["da"])
+    data = LANG.get(lang, LANG.get("en_us", LANG["da"]))
     ui = dict(data.get("ui", {}))
     T = data.get("templates", {})
     for k, v in T.items():

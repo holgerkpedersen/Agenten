@@ -77,7 +77,7 @@ class ToolRegistry:
     def __init__(self) -> None:
         """Initialize the instance."""
         self.tools = {}
-        self.lang = "da"
+        self.lang = "en_us"
         self.active_tools = None
 
     def set_active_tools(self, names: list[str]) -> None:
