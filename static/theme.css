@@ -191,23 +191,46 @@
      -moz-user-select: text;
  }
 
- body {
-     font-family: 'Segoe UI', system-ui;
-     background: var(--bg);
-     margin: 0;
-     padding: 20px;
-     color: var(--text);
-     overflow: hidden;
-     height: 100vh;
-     transition: background 0.3s, color 0.3s;
- }
+body {
+    font-family: 'Segoe UI', system-ui;
+    background: var(--bg);
+    margin: 0;
+    padding: 16px 20px;
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    box-sizing: border-box;
+    transition: background 0.3s, color 0.3s;
+}
 
- .app-container {
-     display: flex;
-     flex-direction: column;
-     height: 100vh;
-     gap: 15px;
- }
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 12px;
+    min-height: 0;
+}
+
+.footer {
+    background: var(--panel-bg);
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: background 0.3s, border-color 0.3s;
+}
+
+.footer a {
+    color: var(--text-muted);
+    transition: color 0.2s;
+    text-decoration: none;
+}
+
+.footer a:hover {
+    color: var(--accent);
+}
 
  .header {
      background: var(--panel-bg);

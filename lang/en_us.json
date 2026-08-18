@@ -589,9 +589,8 @@
     "resume_hint": "Click Resume to continue",
     "paused_log": "Execution paused",
     "resuming_log": "Resume clicked — attempting to resume...",
-    "undoing": "Undoing...",
-    "footer_developed": "Developed by Holger K. Pedersen, All rights reserved",
-    "footer_made_with": "Made with ❤ by Tarek Tarabichi"
+    "footer_developed": "Developed by Holger K. Pedersen",
+    "footer_made_with": "UI/UX Reshaped with <span style=\"color:#ef4444;\">❤</span> by Tarek Tarabichi"
   },
   "criteria.decompose": "Specify success criteria in parentheses after each task name, e.g.: Task (criterion1, criterion2)",
   "criteria.header": "Success Criteria",

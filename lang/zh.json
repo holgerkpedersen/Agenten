@@ -575,8 +575,9 @@
     "rerun_label": "重新运行",
     "show_detail": "显示详情",
     "hide_detail": "隐藏详情",
-    "reuse": "重用",
-    "connecting": "正在连接流..."
+    "connecting": "正在连接流...",
+    "footer_developed": "由 Holger K. Pedersen 开发",
+    "footer_made_with": "由 Tarek Tarabichi 用 <span style=\"color:#ef4444;\">❤</span> 重新设计 UI/UX"
   },
   "criteria.decompose": "在每个任务名称后的括号内指定成功标准，例如：任务 (标准1, 标准2)",
   "criteria.header": "成功标准",

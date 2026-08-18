@@ -578,7 +578,9 @@
     "show_detail": "mostrar detalle",
     "hide_detail": "ocultar detalle",
     "reuse": "Reutilizar",
-    "connecting": "Conectando al flujo..."
+    "connecting": "Conectando al flujo...",
+    "footer_developed": "Desarrollado por Holger K. Pedersen",
+    "footer_made_with": "UI/UX rediseñado con <span style=\"color:#ef4444;\">❤</span> por Tarek Tarabichi"
   },
   "criteria.decompose": "Especifica los criterios de éxito entre paréntesis después de cada nombre de tarea, ej.: Tarea (criterio1, criterio2)",
   "criteria.header": "Criterios de Éxito",

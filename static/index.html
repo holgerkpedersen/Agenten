@@ -205,19 +205,19 @@
         </div>
 
         <div class="canvas-container col-12" id="canvasContainer"></div>
-    <footer class="footer col-12 mt-3">
+    <footer class="footer col-12">
         <div class="row g-2 align-items-center">
             <div class="col-6">
-                <span id="footerDeveloped" class="text-sm text-secondary-light"></span>
-                <a href="https://github.com/holgerkpedersen" target="_blank" rel="noopener"
-                    title="Holger K. Pedersen" class="ms-1">
+                <span id="footerDeveloped" class="text-sm text-secondary-light">Developed by Holger K. Pedersen</span>
+                <a href="https://github.com/holgerkpedersen/Agenten" target="_blank" rel="noopener"
+                    title="Holger K. Pedersen - Agenten" class="ms-1">
                     <span class="iconify" data-icon="mdi:github" style="vertical-align:middle;font-size:18px"></span>
                 </a>
             </div>
             <div class="col-6 text-end">
-                <span id="footerMadeWith" class="text-sm text-secondary-light"></span>
-                <a href="https://github.com/LebToki" target="_blank" rel="noopener"
-                    title="Tarek Tarabichi" class="ms-1">
+                <span id="footerMadeWith" class="text-sm text-secondary-light">UI/UX Reshaped with <span style="color:#ef4444;">❤</span> by Tarek Tarabichi</span>
+                <a href="https://github.com/LebToki/Agenten" target="_blank" rel="noopener"
+                    title="Tarek Tarabichi - Agenten" class="ms-1">
                     <span class="iconify" data-icon="mdi:github" style="vertical-align:middle;font-size:18px"></span>
                 </a>
             </div>
@@ -510,8 +510,8 @@
             issues_delete: '',
             issues_delete_title: 'Slet issue',
             issues_delete_confirm: 'Slet issue {id}?',
-            footer_developed: 'Developed by Holger K. Pedersen, All rights reserved',
-            footer_made_with: 'Made with ❤ by Tarek Tarabichi',
+            footer_developed: 'Developed by Holger K. Pedersen',
+            footer_made_with: 'UI/UX Reshaped with <span style="color:#ef4444;">❤</span> by Tarek Tarabichi',
 
             issues_use_as_task: 'Brug som opgave',
 
@@ -674,7 +674,7 @@
             if (e('filesLabel')) e('filesLabel').textContent = _('files');
             if (e('promptLabel')) e('promptLabel').textContent = _('prompt');
             if (e('footerDeveloped')) e('footerDeveloped').textContent = _('footer_developed');
-            if (e('footerMadeWith')) e('footerMadeWith').textContent = _('footer_made_with');
+            if (e('footerMadeWith')) e('footerMadeWith').innerHTML = _('footer_made_with');
             if (e('filePathInput')) e('filePathInput').placeholder = _('file_path_placeholder');
             if (e('promptInput')) e('promptInput').placeholder = _('prompt_placeholder');
             if (e('browseBtn')) e('browseBtn').textContent = ' ' + _('browse');

@@ -589,9 +589,8 @@
     "resume_hint": "Tryk Genoptag for at fortsætte",
     "paused_log": "Udførelse pauset",
     "resuming_log": "Bruger trykkede Genoptag — forsøger at genoptage...",
-    "undoing": "Fortryder...",
-    "footer_developed": "Udviklet af Holger K. Pedersen, Alle rettigheder forbeholdt",
-    "footer_made_with": "Lavet med ❤ af Tarek Tarabichi"
+    "footer_developed": "Udviklet af Holger K. Pedersen",
+    "footer_made_with": "UI/UX gentænkt med <span style=\"color:#ef4444;\">❤</span> af Tarek Tarabichi"
   },
   "criteria.decompose": "Angiv succeskriterier i parentes efter hvert opgavenavn, f.eks.: Opgave (kriterie1, kriterie2)",
   "criteria.header": "Success-kriterier",
